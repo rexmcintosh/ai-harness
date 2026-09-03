@@ -332,3 +332,52 @@ def test_venice_usage_table_header_labels_the_estimate_and_shows_diem(monkeypatc
     assert "delta" not in out
     # The estimate must be labelled as notional so it is never read as billed spend.
     assert "estimate" in out.lower()
+
+
+def test_venice_usage_sums_multiple_keys_mapping_to_one_project(monkeypatch, capsys, tmp_path):
+    # Two Venice keys can carry the same project name (e.g. a rotated key kept
+    # alongside its replacement, or the bare and `proj-` spellings). The reconcile
+    # must SUM their usd and diem into one row rather than keep the last key seen.
+    monkeypatch.setenv("VENICE_USAGE_DB", str(tmp_path / "t.db"))
+    from venice_usage.ledger import append
+    append(project="council", task_type="ask", model="m", usd=1.25)
+
+    class FakeClient:
+        def __init__(self, *a, **k): pass
+        def per_key_usage(self):
+            return [{"key_id": "1", "key_name": "proj-council", "usd": 0.10, "diem": 12.5},
+                    {"key_id": "2", "key_name": "council", "usd": 0.25, "diem": 7.5}]
+
+    monkeypatch.setattr(cli, "UsageClient", FakeClient)
+    monkeypatch.setattr(cli, "load_venice_admin_key", lambda: "admin")
+
+    cli._cmd_venice_usage(None, datetime(2026, 7, 20), as_json=True)
+    rows = {r["project"]: r for r in json.loads(capsys.readouterr().out)["rows"]}
+    assert list(rows) == ["council"]                 # one row, not one per key
+    assert rows["council"]["venice_usd"] == pytest.approx(0.35)
+    assert rows["council"]["venice_diem"] == pytest.approx(20.0)
+    assert rows["council"]["note"] == ""
+
+
+def test_venice_usage_reports_none_not_zero_for_project_without_a_key(monkeypatch, capsys, tmp_path):
+    # A project with ledger rows but no Venice key has UNKNOWN Venice usage, not
+    # zero usage. `venice_diem`/`venice_usd` must be None so the `no key` note
+    # stays meaningful and the table prints `-` rather than a misleading 0.0000.
+    monkeypatch.setenv("VENICE_USAGE_DB", str(tmp_path / "t.db"))
+    from venice_usage.ledger import append
+    append(project="romance", task_type="draft", model="m", usd=1.00)
+
+    class FakeClient:
+        def __init__(self, *a, **k): pass
+        def per_key_usage(self):
+            return [{"key_id": "1", "key_name": "proj-council", "usd": 0.0, "diem": 3.0}]
+
+    monkeypatch.setattr(cli, "UsageClient", FakeClient)
+    monkeypatch.setattr(cli, "load_venice_admin_key", lambda: "admin")
+
+    cli._cmd_venice_usage(None, datetime(2026, 7, 20), as_json=True)
+    rows = {r["project"]: r for r in json.loads(capsys.readouterr().out)["rows"]}
+    assert rows["romance"]["venice_diem"] is None
+    assert rows["romance"]["venice_usd"] is None
+    assert rows["romance"]["note"] == "no key"
+    assert rows["council"]["venice_diem"] == 3.0     # the covered project is unaffected
