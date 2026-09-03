@@ -19,7 +19,7 @@ class VeniceClient:
     def __init__(self, api_key, *, base_url=VENICE_API, timeout=180,
                  retries=2, backoff=1.5, post=None, temperature=0.2):
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_COUNCIL_KEY, VENICE_API_KEY)")
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout

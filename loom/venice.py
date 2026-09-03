@@ -22,7 +22,7 @@ class VeniceClient:
                  retries: int = 2, backoff: float = 1.5, temperature: float = 0.2,
                  post: Optional[Callable] = None) -> None:
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_LOOM_KEY, VENICE_API_KEY)")
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout

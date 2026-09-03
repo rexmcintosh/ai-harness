@@ -63,3 +63,20 @@ def test_blank_loom_key_falls_through(monkeypatch):
     monkeypatch.setenv("VENICE_LOOM_KEY", "")
     monkeypatch.setenv("VENICE_API_KEY", "default-key")
     assert backends.get_backend("venice")._client.api_key == "default-key"
+
+
+@pytest.mark.parametrize("blank", [False, True], ids=["absent", "blank"])
+def test_venice_backend_raises_when_no_key_source_is_set(monkeypatch, blank):
+    # No explicit arg, and neither env var is usable: VeniceClient must refuse at
+    # construction (VeniceError), not later at the first call, and its message
+    # must name the preferred loom var first so the operator sets the right one.
+    from loom.venice import VeniceError
+    for name in ("VENICE_LOOM_KEY", "VENICE_API_KEY"):
+        if blank:
+            monkeypatch.setenv(name, "")
+        else:
+            monkeypatch.delenv(name, raising=False)
+    with pytest.raises(VeniceError) as exc:
+        backends.get_backend("venice")
+    msg = str(exc.value)
+    assert msg.index("VENICE_LOOM_KEY") < msg.index("VENICE_API_KEY")
