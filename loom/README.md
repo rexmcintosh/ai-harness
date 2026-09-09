@@ -11,6 +11,7 @@ its home (wiki article, `~/wiki/decisions/`, per-project `memory/`, `~/.claude/s
     .venv/bin/python -m loom.cli promote           # apply staged .claude + merge loom-shadow -> master
     .venv/bin/python -m loom.cli requeue <sid>     # return a quarantined/stuck session to pending
     .venv/bin/python -m loom.cli rollback --ts <stamp>     # undo a promote from its backup
+    .venv/bin/python -m loom.cli reconcile-phantom [--apply]  # one-time: fold + delete the phantom ~/wiki/wiki/ tree (docs/loom-phantom-wiki-reconcile-2026-09-09.md)
     ./loom/run-absorb.sh                            # cron entry: absorb --live + Telegram summary
 
 ## How it stays safe
