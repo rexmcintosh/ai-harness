@@ -1,8 +1,18 @@
 # Portfolio cockpit
 
-A private website over existing operating records. It reads the shared YAML backlog, the Attain product queue, Romance Ops, two local freshness checks, and the existing model-use ledger. It shows all necessary work; the one-hour aspiration never hides items. The first owner action holds one exact shared-backlog item with a reason.
+A private website over existing operating records. Today shows changes since Rex's last saved review, work needing owner attention, dated recorded results, and connected-source failures. It reads the shared backlog and archive, the Attain product queue, Romance Ops, two local freshness checks, and the existing model-use ledger. All active work remains accessible through combined category, initiative, and text filters.
 
-This is a first connected view, not a complete portfolio monitor. Five initiative summaries and four decision cases are dated audit material. A refresh updates source observations, not their business-outcome evidence. Unconnected projects, unavailable sources, cash receipts, allocations, and unproven outcomes stay explicit. The only implemented action is Hold. Notion owner choices still use their existing source links.
+This remains a connected view, not a complete portfolio monitor. Five initiative summaries and four reference cases are dated audit context, separated from current records. A merge is shown as a merge; a separate deployment hold stays explicit. Undated results remain available but do not count as recent completions. Closed or dropped records do not become successful outcomes. Cash receipts, allocations, and customer benefits are still unconnected. No inference runs on refresh.
+
+## How the morning brief works
+
+The first visit shows current work and dated results from the preceding seven days; it does not call every existing task new. **Mark brief reviewed** explicitly saves Rex's place across devices. Refreshing, filtering, logging in, and reading evidence do not acknowledge the brief. Saving a review does not approve, release, hold, or close work. Pending work remains visible after review.
+
+A small local JSON checkpoint records the source facts shown, not a second task database. A signed snapshot fingerprint and previous-checkpoint identity prevent an old tab or changed source from acknowledging unseen facts. Writes use a separate lock and atomic replacement. Repeating the same accepted request returns the saved result. A failure before replacement preserves the previous checkpoint. If only the final directory sync fails, the server verifies the replacement and logs the remaining durability uncertainty instead of claiming that the review was not saved. An unavailable source preserves its prior comparison facts, so recovery is not mistaken for newly created work. A disappearing item is not reported complete without a terminal record. Sources first connected after a saved review establish their own first comparison; their history is not called new. A newly discovered result without a completion date is labelled newly observed. Edits to known results are changes, not new completions. Saves larger than the supported 2 MB checkpoint are rejected before replacement.
+
+Shared `open` work is **Queued**, not running. `held` remains **Held**, including linked owner-state conflicts. `in_review` requests inspection, without claiming ready-to-merge evidence. The Attain controller's `Working` status is evidence of an in-progress run. Attain drafts and requested Romance rework are waiting; Romance `To do` and `Missed` are owner tasks. Unknown states remain visible. These labels do not grant execution authority or replace the source's controls.
+
+Read-only local evidence pages look up exact backlog IDs and show the existing result, hold reason, task, and recorded review. Source links still lead to the existing Notion owner controls. Hold remains the only operational mutation implemented by the cockpit and stays separately gated by `COCKPIT_ENABLE_ACTIONS`.
 
 ## Run a private preview
 
@@ -57,6 +67,7 @@ Run it as the existing owner account that owns the shared backlog locks. Configu
 | `COCKPIT_DOCS_ROOT` | Reviewed repository's `docs` directory. Required for a non-editable wheel install; decision documents are not copied into the wheel. |
 | `COCKPIT_REMOTE_READS=1` | Enable read-only Attain and Romance Notion feeds, using each existing scoped token. |
 | `COCKPIT_ENABLE_ACTIONS=1` | Enable the tested exact-item Hold action after the live queue action check is approved. |
+| `COCKPIT_BRIEF_STATE_PATH` | Optional display-checkpoint file; defaults to `<projects>/.cockpit/review.json`. Keep this on the VPS local filesystem, durable and private. A preview uses its own file. |
 
 Use one process so its login rate limit is shared. Behind a private proxy, requests may share an address and hence a limit. Sessions last two hours; rotating the signing key invalidates all of them. Log out removes the browser cookie; this small service has no session-revocation database. Keep access private and TLS enabled. Secure, HttpOnly, SameSite cookies, CSRF checks, accepted hosts and exact Origin checks protect authenticated actions. `Referrer-Policy: same-origin` preserves the Origin on login forms while withholding it from other sites. See [Flask security](https://flask.palletsprojects.com/en/stable/web-security/) and [MDN referrer policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy).
 
@@ -71,7 +82,31 @@ Provider acceptance, current heartbeat, human attention, task completion and bus
 ## Verification
 
 ```sh
-python -m pytest tests/test_cockpit.py tests/test_workqueue_direction.py -q
+python -m pytest tests/test_cockpit.py tests/test_cockpit_brief.py tests/test_workqueue_direction.py -q
+# On the VPS with Node 22 and /usr/bin/google-chrome:
+node tests/cockpit-ui-browser.mjs
 ```
 
-The dev extra includes Flask. Browser tests on 12 September used Chromium at 1440×1100 and 390×844. Login, live read-only feeds, filtering, source cases, no horizontal overflow and no JavaScript errors were checked. Authenticated Hold was also exercised through a browser against a disposable queue. No live queue action occurred during preparation.
+The dev extra includes Flask; a skipped cockpit module is not a passing cockpit check. Tests cover missing sources, unknown statuses, missing/future completion dates, stale tabs, duplicate identities, explicit and idempotent review, failed checkpoint writes, and unchanged work records. Run the browser checks against both complete and missing-source fixtures, and inspect the private preview at desktop and mobile widths. Preview review state and cookies must be separate from production.
+
+## Existing VPS adapter
+
+This cockpit uses Gunicorn under `portfolio-cockpit.service`, with Tailscale Serve proxying private HTTPS to `127.0.0.1:8790`. It is not hosted on Workers, Netlify, or Pages. `.site-flow/config.json` records this verified custom adapter. Prepare a separate authenticated preview on loopback and a separate private Serve port; do not point the production proxy at a working tree. The September 13 preview uses loopback 8791 and HTTPS 8443, a separate signing key/cookie/checkpoint, and the existing owner password hash. It disables all work mutations.
+
+For an approved release, install the committed tree into a new versioned environment under `~/.local/share/portfolio-cockpit/releases`, update the existing `current` symlink, restart the existing service, and verify authenticated snapshot, work evidence, static assets, and login. Preserve the previous release for rollback. Do not enable Hold as a side effect. After release, stop the preview unit and remove only its Serve port; never reset the whole Serve configuration.
+
+## Owner explanations and two kinds of work
+
+Every card leads with its business title, its place in the initiative, and the concrete reason it matters. Expanded cards show recorded progress and the recommended next step. Original developer titles, notes, identifiers, and full saved reviews remain available under disclosures. The exact-item page reads the full saved Council review where available, so conditions cut off in old queue notes remain accessible.
+
+`Run the business` covers existing recurring activity: the TikTok commenting pilot, scheduled social posting, and the weekly numbers review. `Improve the business` covers changes, repairs, and launch work from the product/backlog queues and explicit launch/gate providers. A repair can protect cash and still belong in improvement work; the label does not determine its priority. Sources with no supported classification say `Not classified`. Classification uses the source/provider identity, never words such as "ready" in a note.
+
+The cockpit reads Romance Ops' actual Due date and direct Source link. Today's and overdue operations appear ahead of improvement reviews; future routines remain in Upcoming operations and All work. Due dates use the source's timezone, with Europe/Lisbon as the owner default. Saving a brief does not complete a routine. The existing Romance scanner and Ops poller create the next dated task; this cockpit adds no recurring executor, paid scan, or notification channel.
+
+The September 13 TikTok task was already present as `Engage: 2 To do · 0 bench`. The source title hid its meaning, and the cockpit had discarded its due date and draft-table link. The new daily explanation works for each dated Engage record, showing the prepared-comment link and the owner's posting step. It does not assume all original targets remain unposted or equate a closed day with proven marketing results. If the source returns no due operations, the view does not claim every expected routine ran: full recurring-source coverage is still incomplete.
+
+`<projects>/.cockpit/work-context.json` holds private prepared owner explanations for the inspected work and results. It is presentation data, not a second work queue. Keep it outside Git and package artifacts with mode 0600; the source repository is public. `COCKPIT_CONTEXT_PATH` can point to another private location. Each entry names the source record and its content revision, including the complete local task and saved full review when present. The reader suppresses an old recommendation whenever that source changes. Missing or malformed explanations never hide work. No model runs on refresh. The editable source remains the backlog or its existing scoped owner queue.
+
+For a new or changed explanation, read the full task, result, review conditions, and initiative context. Prepare `title`, `context`, `why`, `progress`, and `next_step`; use the record's evidence date as `as_of`. Preserve uncertainty about current deployment, measured benefit, and unresolved review points. Bind `source_revision` to that record's current `context_revision` only after comparing the proposed explanation with those exact facts. A matching revision establishes fidelity to the saved record, not independent proof that its historical claims remain true. Future undrafted work is explicitly labelled; source producers do not yet all supply this owner explanation contract.
+
+Additional checks: `python -m pytest tests/test_cockpit_context.py -q`. These cover stale explanation suppression, full-review evidence, rejected acknowledgement of an unseen explanation change, checkpoint upgrade continuity, per-day recurring work, due-date grouping, and direct draft links.

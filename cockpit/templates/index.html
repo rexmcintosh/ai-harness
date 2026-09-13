@@ -1,1 +1,61 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf }}"><title>Portfolio | Today</title><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head><body><a class="skip" href="#main">Skip to decisions</a><aside class="sidebar"><a class="wordmark" href="/">Portfolio<span class="portfolio-mark" aria-hidden="true">P</span></a><nav aria-label="Portfolio"><a href="#main" class="active">Today</a><a href="#initiatives">Initiatives</a><a href="#work">Work and decisions</a><a href="#operations">Unattended work</a><a href="#resources">Resources and review</a></nav><div class="owner"><span class="owner-avatar">R</span><div>Rex<small>Direction and decisions</small></div></div><form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="quiet" type="submit">Log out</button></form></aside><main id="main"><header class="topbar"><p id="date">Today</p><div><span id="mode"></span><button id="refresh" class="quiet">Refresh</button></div></header><section class="opening"><div><h1>What moves us forward?</h1><p>Your decisions, grounded in the work and the evidence.</p></div><p class="freshness" id="freshness">Reading the portfolio…</p></section><p id="error" class="error" role="alert" hidden></p><div id="loading" role="status">Reading existing sources. Missing evidence will stay visible.</div><div id="content" hidden><section class="decision-section" aria-labelledby="decision-title"><div class="section-title"><h2 id="decision-title">Decisions that matter</h2><span>Cash flow first. Useful progress next.</span></div><div id="decisions"></div></section><section id="initiatives"><div class="section-title"><h2>Are we making progress?</h2><span>Outcomes and operating evidence stay separate.</span></div><div id="initiative-list"></div></section><section id="work"><div class="section-title"><h2>Work and decisions</h2><span id="work-count"></span></div><div class="work-tools"><label for="filter">Find work</label><input id="filter" type="search" placeholder="Initiative, task, or reason"><p>All necessary work stays here. One hour is an aspiration.</p></div><div id="work-list"></div><p id="empty" hidden>No work matches this search.</p></section><section id="operations"><div class="section-title"><h2>Unattended work</h2><span>Fresh evidence is different from a healthy process.</span></div><div id="sources"></div><div id="coverage" class="coverage"></div></section><section id="resources"><div class="section-title"><h2>Resources and monthly review</h2><span>Did the spend produce something that mattered?</span></div><div id="resource-view"></div></section></div><footer>Observe. Orient. Decide. Act. Check the result.</footer></main><dialog id="hold-dialog"><form id="hold-form"><h2>Hold this work</h2><p id="hold-title"></p><label for="hold-reason">What is it waiting for?</label><textarea id="hold-reason" rows="4" maxlength="4000" required></textarea><p>This saves your reason on the existing work item. Other work continues.</p><div class="dialog-actions"><button id="cancel-hold" type="button" class="quiet">Cancel</button><button type="submit">Hold work</button></div><p id="hold-error" class="error" role="alert"></p></form></dialog></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>Portfolio | Today</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to today</a>
+  <aside class="sidebar">
+    <a class="wordmark" href="/">Portfolio<span class="portfolio-mark" aria-hidden="true">P</span></a>
+    <nav aria-label="Portfolio">
+      <a href="#main" class="active">Today</a><a href="#work">All work</a><a href="#initiatives">Initiatives</a><a href="#operations">Sources</a><a href="#resources">Resources</a>
+    </nav>
+    <div class="owner"><span class="owner-avatar">R</span><div>Rex<small>Direction and decisions</small></div></div>
+    <form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="quiet" type="submit">Log out</button></form>
+  </aside>
+  <main id="main">
+    <header class="topbar"><p id="date">Today</p><div><span id="mode"></span><button id="refresh" class="quiet" type="button">Refresh</button></div></header>
+    <section class="opening" aria-labelledby="page-title"><div><h1 id="page-title">Today</h1><p>What changed, what needs you, and what finished.</p></div><p class="freshness" id="freshness">Reading the portfolio…</p></section>
+    <p id="error" class="error" role="alert" hidden></p>
+    <div id="loading" role="status">Reading connected sources. Missing evidence will stay visible.</div>
+    <div id="content" hidden>
+      <section class="brief" aria-labelledby="brief-title">
+        <div class="brief-heading"><div><h2 id="brief-title">Morning brief</h2><p id="brief-detail" class="muted"></p></div><div class="brief-review"><span id="brief-baseline" class="muted"></span><div><button id="review-brief" type="button" hidden>Mark brief reviewed</button><small id="review-explanation" hidden>Saves your place. Does not approve work.</small></div></div></div>
+        <div id="brief-counts" class="brief-counts" aria-label="Current work counts"></div>
+        <p id="brief-review-error" class="error compact-error" role="alert" hidden></p>
+        <section class="operations-block" aria-labelledby="operations-today-title"><div class="operations-heading"><div><h3 id="operations-today-title">Today’s operations</h3><p>Routine work due now from connected sources.</p></div><span id="operations-count" class="muted"></span></div><div id="operations"></div></section>
+        <details class="brief-disclosure upcoming-operations-disclosure"><summary><span>Upcoming routine work</span><span id="upcoming-operations-count" class="muted"></span></summary><div id="upcoming-operations"></div></details>
+        <div class="brief-grid">
+          <section class="brief-block changes-block" aria-labelledby="changes-title"><h3 id="changes-title">Changes since review</h3><div id="changes"></div></section>
+          <section class="brief-block" aria-labelledby="results-title"><h3 id="results-title">Recent results</h3><div id="recent-results"></div></section>
+          <section class="brief-block" aria-labelledby="issues-title"><h3 id="issues-title">Source issues</h3><div id="source-issues"></div></section>
+        </div>
+        <details class="brief-disclosure attention-disclosure"><summary><span id="attention-title">Awaiting review</span><span id="attention-count" class="muted"></span></summary><div id="attention"></div></details>
+        <details class="brief-disclosure results-disclosure"><summary><span>All recorded results</span><span id="all-results-count" class="muted"></span></summary><div><p id="results-archive-note" class="muted"></p><div id="all-results"></div></div></details>
+      </section>
+      <section id="work" aria-labelledby="work-title">
+        <div class="section-title"><div><h2 id="work-title">All work</h2><p>Every active item from connected sources.</p></div><span id="work-total"></span></div>
+        <div class="work-tools" role="group" aria-label="Work filters">
+          <label for="category-filter">Status<select id="category-filter"></select></label>
+          <label for="work-type-filter">Work type<select id="work-type-filter"></select></label>
+          <label for="initiative-filter">Initiative<select id="initiative-filter"></select></label>
+          <label class="search-label" for="filter">Find work<input id="filter" type="search" placeholder="Business context or technical record"></label>
+          <button id="clear-filters" class="quiet" type="button">Clear filters</button>
+        </div>
+        <p id="work-count" class="result-count" aria-live="polite"></p><div id="work-list"></div><p id="empty" class="empty-state" hidden>No work matches these filters. Clear the filters to see all work.</p>
+      </section>
+      <section id="initiatives" aria-labelledby="initiatives-title"><div class="section-title"><div><h2 id="initiatives-title">Initiative baselines</h2><p>Dated context beside current live work counts.</p></div></div><div id="initiative-list"></div></section>
+      <section id="reference-cases" aria-labelledby="reference-title"><details class="reference-cases"><summary><span id="reference-title">Dated reference cases</span><span id="reference-count" class="muted"></span></summary><div id="decisions"></div></details></section>
+      <section id="operations" aria-labelledby="operations-title"><div class="section-title"><div><h2 id="operations-title">Connected sources</h2><p>Source health and evidence coverage.</p></div></div><div id="sources"></div><div id="coverage" class="coverage"></div></section>
+      <section id="resources" aria-labelledby="resources-title"><div class="section-title"><div><h2 id="resources-title">Resources and monthly review</h2><p>Recorded use stays separate from cash and outcomes.</p></div></div><div id="resource-view"></div></section>
+    </div>
+    <footer>Observe. Orient. Decide. Act. Check the result.</footer>
+  </main>
+  <dialog id="hold-dialog"><form id="hold-form"><h2>Hold this work</h2><p id="hold-title"></p><label for="hold-reason">What is it waiting for?</label><textarea id="hold-reason" rows="4" maxlength="4000" required></textarea><p>This saves your reason on the existing work item. Other work continues.</p><div class="dialog-actions"><button id="cancel-hold" type="button" class="quiet">Cancel</button><button type="submit">Hold work</button></div><p id="hold-error" class="error" role="alert"></p></form></dialog>
+</body>
+</html>

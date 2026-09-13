@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Portfolio | Work evidence</title><link rel="stylesheet" href="/static/app.css"></head><body class="document-page"><main><a href="/">Back to the portfolio</a>
+{% if records|length > 1 %}<p class="error">More than one record has this identity. Resolve the conflicting records before acting.</p>{% endif %}
+{% for source, row in records %}{% set brief = row.owner_brief %}<article class="evidence-record">
+<p class="evidence-context">{{ brief.context }}</p><h1>{{ brief.title }}</h1>
+{% if brief.state != 'current' %}<p class="explanation-warning {{ brief.state }}">{% if brief.state == 'stale' %}Explanation needs updating{% else %}Explanation not prepared{% endif %}</p>{% endif %}
+<p class="evidence-why">{{ brief.why }}</p>
+<section class="evidence-explanation" aria-label="Owner explanation"><h2>Recorded progress</h2><p>{{ brief.progress }}</p>
+{% if brief.state == 'current' %}<h2>Recommended next step</h2><p>{{ brief.next_step or 'No next step is recommended.' }}</p>{% endif %}
+{% if brief.as_of %}<small>Source record as of {{ brief.as_of }}</small>{% endif %}</section>
+<p>{{ source }} · {{ row.repo }} · {{ row.status }}</p>
+{% if row.merged %}<p>Merge recorded: {{ row.merged }}{% if row.merge_commit %} ({{ row.merge_commit }}){% endif %}. This does not establish deployment or business benefit.</p>{% endif %}
+{% if row.deployment_followup %}<p>Separate deployment task: <a href="{{ url_for('work_evidence', item_id=row.deployment_followup) }}">{{ row.deployment_followup }}</a></p>{% endif %}
+<details class="evidence-disclosure"><summary>Full original record</summary><pre class="decision-document">{{ row.original_record|default(row)|tojson(indent=2) }}</pre></details>
+{% if row.full_review %}<details class="evidence-disclosure"><summary>Full recorded review</summary><pre class="decision-document">{{ row.full_review }}</pre><p>This saved review does not confirm that the current work is ready to release.</p></details>{% endif %}
+</article>{% endfor %}
+</main></body></html>

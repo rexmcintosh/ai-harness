@@ -6,10 +6,12 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
+from urllib.parse import quote
 
 import yaml
 
 from .actions import revision
+from . import briefing, context
 
 
 def stamp():
@@ -43,21 +45,77 @@ def local_work(config):
         rows = data['items']
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise ValueError('Invalid queue')
-        counts = Counter(row.get('id') for row in rows)
+        counts = Counter(str(row.get('id', '')) for row in rows)
         work = []
         for row in rows:
-            if row.get('status') not in ('open', 'held', 'in_review'):
+            if row.get('status') in ('done', 'dropped'):
                 continue
             iid = str(row.get('id', ''))
             work.append({'id': iid, 'title': str(row.get('title') or 'Untitled work'),
-                         'repo': str(row.get('repo') or 'Unassigned'), 'status': row['status'],
+                         'repo': str(row.get('repo') or 'Unassigned'), 'status': str(row.get('status') or 'unknown'),
                          'why': str(row.get('note') or 'No decision reason recorded.'),
                          'created': str(row.get('created') or ''), 'source': 'Shared backlog',
-                         'source_url': safe_url(row.get('source')), 'revision': revision(row),
-                         'can_hold': bool(iid) and counts[iid] == 1 and row['status'] in ('open', 'in_review')})
+                         'source_url': safe_url(row.get('source')) or '/work/' + quote(iid, safe=''),
+                         'evidence_at': str(row.get('worked') or row.get('created') or '') or None,
+                         'revision': revision(row),
+                         'context_revision': context.source_revision(row, context.full_review(config, iid)),
+                         'can_hold': isinstance(row.get('id'), str) and bool(iid) and counts[iid] == 1 and row.get('status') in ('open', 'in_review')})
         return work, source_record('Shared backlog', path, 'available', 'All active items, including held work.')
     except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
         return [], source_record('Shared backlog', path, 'unavailable', 'The queue could not be read. An empty view does not mean no work.')
+
+
+def archived_results(config):
+    path = config['ARCHIVE_PATH']
+    try:
+        rows = read_document(path)['items']
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError('Invalid archive')
+        results = []
+        for row in rows:
+            if row.get('status') not in ('done', 'dropped'):
+                continue
+            iid = str(row.get('id', ''))
+            merged = bool(row.get('merge_commit') and row.get('merged'))
+            completed = row.get('merged') or row.get('dropped')
+            result = dict(id=iid, title=str(row.get('title') or 'Untitled result'), repo=str(row.get('repo') or 'Unassigned'),
+                          status=row['status'], why=str(row.get('note') or row.get('result') or row.get('resolution') or 'No result detail recorded.'),
+                          source='Backlog archive', source_url=safe_url(row.get('source')) or '/work/' + quote(iid, safe=''),
+                          completed_at=str(completed) if completed else None,
+                          context_revision=context.source_revision(row, context.full_review(config, iid)),
+                          merge_commit=str(row.get('merge_commit') or ''),
+                          deployment_followup=str(row.get('deployment_followup') or ''),
+                          evidence_at=str(completed) if completed else None,
+                          outcome_label='Merged' if merged else ('Dropped' if row['status'] == 'dropped' else 'Recorded done'))
+            if row.get('deployment_followup'):
+                result['next_action'] = 'Deployment is a separate held task: ' + str(row['deployment_followup']) + '.'
+            elif merged:
+                result['next_action'] = 'The merge is recorded. Check the result notes for remaining release or outcome checks.'
+            results.append(result)
+        return results, source_record('Backlog archive', path, 'available', 'Recorded completions and dropped work; a merge does not prove a live release.')
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
+        return [], source_record('Backlog archive', path, 'unavailable', 'Completed work could not be read. Recent results may be missing.')
+
+
+def work_evidence(config, item_id):
+    """Read one exact record. Never turn a request path into a filesystem path."""
+    matches = []
+    explanations = context.load(config)
+    try:
+        initiatives = read_document(config['CATALOG_PATH']).get('initiatives', [])
+    except (OSError, ValueError, yaml.YAMLError):
+        initiatives = []
+    for name, path in (('Shared backlog', config['BACKLOG_PATH']), ('Backlog archive', config['ARCHIVE_PATH'])):
+        try:
+            rows = read_document(path)['items']
+            if not isinstance(rows, list):
+                raise ValueError('Invalid records')
+            for row in rows:
+                if isinstance(row, dict) and str(row.get('id', '')) == item_id:
+                    matches.append((name, context.evidence(config, row, name, explanations, initiatives)))
+        except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
+            continue
+    return matches
 
 
 def health_sources(config, catalog):
@@ -109,14 +167,28 @@ def snapshot(config):
         catalog = {}
         catalog_source = source_record('Portfolio direction and decisions', config['CATALOG_PATH'], 'unavailable', 'Direction could not be read.')
     work, backlog_source = local_work(config)
-    sources = [catalog_source, backlog_source, *health_sources(config, catalog)]
+    results, archive_source = archived_results(config)
+    sources = [catalog_source, backlog_source, archive_source, *health_sources(config, catalog)]
     if config.get('REMOTE_READS'):
         from .remote import remote_work
         remote, remote_sources = remote_work(config)
         # An Ops row may point to the same backlog item. Keep its owner source link.
         existing = {row['id']: row for row in work}
+        existing_results = {row['id']: row for row in results}
         for row in remote:
             linked = row.pop('backlog_id', None)
+            if row.pop('is_terminal', False):
+                # A linked owner acknowledgement is not a second completion.
+                if linked in existing_results:
+                    existing_results[linked]['source_url'] = row['source_url']
+                elif linked not in existing:
+                    results.append(row)
+                else:
+                    existing[linked]['owner_surface_status'] = row['status']
+                continue
+            if linked in existing_results:
+                # An unfinished owner task must remain visible even after a merge.
+                row['why'] = 'The backlog records completion; this owner task is still open. ' + row.get('why', '')
             if linked in existing:
                 existing[linked]['source_url'] = row['source_url']
                 existing[linked]['owner_surface_status'] = row['status']
@@ -124,11 +196,22 @@ def snapshot(config):
                 work.append(row)
         sources.extend(remote_sources)
     else:
-        sources.append({'name': 'Notion owner queues', 'status': 'unavailable', 'updated_at': None,
-                        'observed_at': stamp(), 'detail': 'Remote reads are not enabled in this view.'})
+        sources.extend({'name': name, 'status': 'unavailable', 'updated_at': None,
+                        'observed_at': stamp(), 'detail': 'Remote reads are not enabled in this view.'}
+                       for name in ('Attain product queue', 'Romance Ops'))
     known_repos = {repo for initiative in catalog.get('initiatives', []) for repo in initiative.get('repos', [])}
     coverage = sorted({row['repo'] for row in work if row['repo'] not in known_repos})
-    return {'generated_at': stamp(), 'initiatives': catalog.get('initiatives', []),
+    initiatives = catalog.get('initiatives', [])
+    explanations = context.load(config, sources)
+    for row in work:
+        briefing.enrich(row, initiatives)
+        context.attach(row, explanations)
+    for row in results:
+        briefing.enrich(row, initiatives, terminal=True)
+        context.attach(row, explanations)
+    data = {'generated_at': stamp(), 'initiatives': initiatives, 'results': results,
             'decisions': catalog.get('decisions', []), 'work': work, 'sources': sources,
             'resources': resources(config), 'unmapped_repositories': coverage,
             'coverage_notes': catalog.get('coverage_notes', []), 'mode': 'Decision controls enabled' if config.get('ENABLE_ACTIONS') else 'Read-only view'}
+    briefing.build(data, config)
+    return data

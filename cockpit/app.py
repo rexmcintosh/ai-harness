@@ -13,7 +13,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash
 from werkzeug.exceptions import SecurityError
 
-from . import actions, sources
+from . import actions, sources, briefing
 
 
 def create_app(config=None):
@@ -33,15 +33,23 @@ def create_app(config=None):
         PUBLIC_ORIGIN=os.environ.get('COCKPIT_PUBLIC_ORIGIN', ''),
     )
     app.config.update(config or {})
+    app.config.setdefault('ARCHIVE_PATH', str(Path(app.config['BACKLOG_PATH']).with_name('archive.yaml')))
+    app.config.setdefault('BRIEF_STATE_PATH', os.environ.get('COCKPIT_BRIEF_STATE_PATH', str(Path(app.config['PROJECTS_ROOT']) / '.cockpit' / 'review.json')))
+    app.config.setdefault('CONTEXT_PATH', os.environ.get('COCKPIT_CONTEXT_PATH', str(Path(app.config['PROJECTS_ROOT']) / '.cockpit' / 'work-context.json')))
     if len(app.config['SECRET_KEY']) < 32 or not app.config['PASSWORD_HASH']:
         raise ValueError('Set a strong cockpit signing key and owner password hash before starting')
     signer = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='portfolio-owner-action')
+    review_signer = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='portfolio-brief-review')
     attempts = {}
 
     @app.before_request
     def protect():
         if isinstance(request.routing_exception, SecurityError):
             raise request.routing_exception
+        if request.endpoint not in ('login', 'static') and not session.get('owner'):
+            if request.path.startswith('/api/'):
+                return jsonify(error='Log in to see your portfolio.'), 401
+            return redirect('/login')
         if request.method == 'POST':
             expected_origin = app.config['PUBLIC_ORIGIN'] or request.host_url.rstrip('/')
             if request.headers.get('Origin') and request.headers['Origin'] != expected_origin:
@@ -49,10 +57,6 @@ def create_app(config=None):
             supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf', '')
             if not supplied or not session.get('csrf') or not secrets.compare_digest(supplied, session['csrf']):
                 abort(403)
-        if request.endpoint not in ('login', 'static') and not session.get('owner'):
-            if request.path.startswith('/api/'):
-                return jsonify(error='Log in to see your portfolio.'), 401
-            return redirect('/login')
 
     @app.after_request
     def headers(response):
@@ -92,11 +96,46 @@ def create_app(config=None):
     @app.get('/api/snapshot')
     def snapshot():
         data = sources.snapshot(app.config)
+        checkpoint = data.pop('_checkpoint')
+        if checkpoint['available']:
+            data['brief']['review_token'] = review_signer.dumps({k: checkpoint[k] for k in ('snapshot', 'baseline')})
         for item in data['work']:
             if item.pop('can_hold', False) and app.config['ENABLE_ACTIONS']:
                 item['hold_token'] = signer.dumps({'id': item['id'], 'revision': item['revision'], 'action': 'hold'})
             item.pop('revision', None)
         return jsonify(data)
+
+    @app.post('/api/brief/review')
+    def review_brief():
+        body = request.get_json(silent=True)
+        token = body.get('token') if isinstance(body, dict) else None
+        if not isinstance(token, str) or not token:
+            return jsonify(error='Refresh the brief before marking it reviewed.'), 400
+        try:
+            claim = review_signer.loads(token, max_age=3600)
+            token_id = hashlib.sha256(token.encode()).hexdigest()
+            with briefing.checkpoint_lock(app.config):
+                prior, prior_status = briefing.load_state(app.config)
+                if prior_status == 'available' and prior.get('token_id') == token_id:
+                    return jsonify(reviewed_at=prior['reviewed_at'])
+                data = sources.snapshot(app.config)
+                checkpoint = data['_checkpoint']
+                if (not checkpoint['available'] or claim != {k: checkpoint[k] for k in ('snapshot', 'baseline')}):
+                    return jsonify(error='The brief changed. Refresh and read the new information before marking it reviewed.'), 409
+                return jsonify(reviewed_at=briefing.save(app.config, checkpoint, token_id))
+        except BadSignature:
+            return jsonify(error='The brief expired or changed. Refresh before marking it reviewed.'), 409
+        except BlockingIOError:
+            return jsonify(error='Another review is being saved. Refresh and try again.'), 409
+        except (OSError, ValueError):
+            return jsonify(error='The review save could not be confirmed. Your work is unchanged; refresh before trying again.'), 503
+
+    @app.get('/work/<item_id>')
+    def work_evidence(item_id):
+        records = sources.work_evidence(app.config, item_id)
+        if not records:
+            abort(404)
+        return render_template('work.html', records=records), 200 if len(records) == 1 else 409
 
     @app.post('/api/work/<item_id>/hold')
     def hold(item_id):

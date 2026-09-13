@@ -68,22 +68,32 @@ def remote_work(config):
             batch = []
             for row in rows:
                 status = _value(row, 'Status')
-                if status in ('Done', 'Closed', 'Dropped', 'Dismissed', 'Archived'): continue
+                terminal = status in ('Done', 'Closed', 'Dropped', 'Dismissed', 'Archived')
                 if name == 'Attain product queue':
                     title, why, repo, iid = _value(row, 'Task'), _value(row, 'Result') or _value(row, 'Done when'), 'sat-prep', 'notion:' + row['id']
+                    if terminal:
+                        why = _value(row, 'Result') or 'Marked closed in the product queue; no result detail recorded.'
                     linked = None
                 else:
                     title, why, repo = _value(row, 'Name'), _value(row, 'Why'), 'romance-empire'
                     key = _value(row, 'Key')
                     linked = key.split(':', 1)[1] if key.startswith('runner:') else None
                     iid = 'ops:' + (key or row['id'])
+                    if terminal:
+                        why = 'Closure is recorded in the owner queue. Check the source for the owner’s completion evidence.'
                 batch.append({'id': iid, 'title': title or 'Untitled work', 'why': why or 'Open the source for its current decision.',
                               'repo': repo, 'status': status or 'unknown', 'source': name,
                               'source_url': safe_url(row.get('url')), 'created': row.get('created_time', ''),
-                              'updated_at': row.get('last_edited_time'), 'backlog_id': linked, 'can_hold': False})
+                              'updated_at': row.get('last_edited_time'), 'backlog_id': linked, 'can_hold': False,
+                              'due': _value(row, 'Due'), 'due_timezone': cfg.get('timezone', 'Europe/Lisbon'),
+                              'source_type': _value(row, 'Source'),
+                              'series_name': _value(row, 'Series'),
+                              'action_url': safe_url(_value(row, 'Source link')),
+                              'is_terminal': terminal,
+                              'completed_at': _value(row, 'Finished') if terminal and name == 'Attain product queue' else None})
             work.extend(batch)
             sources.append({'name': name, 'status': 'available', 'updated_at': max((r.get('last_edited_time', '') for r in rows), default=None),
-                            'observed_at': stamp(), 'detail': f'{len(batch)} nonterminal rows read from the existing owner queue.'})
+                            'observed_at': stamp(), 'detail': f'{sum(not r["is_terminal"] for r in batch)} active and {sum(r["is_terminal"] for r in batch)} closed records read from the existing owner queue.'})
         except (OSError, ValueError, KeyError, TypeError, requests.RequestException, yaml.YAMLError):
             sources.append({'name': name, 'status': 'unavailable', 'updated_at': None,
                             'observed_at': stamp(), 'detail': 'The scoped owner queue could not be read. No replacement account was used.'})

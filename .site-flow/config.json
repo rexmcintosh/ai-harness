@@ -1,0 +1,9 @@
+{
+  "adapter": "vps-systemd",
+  "project_name": "portfolio-cockpit",
+  "service": "portfolio-cockpit.service",
+  "release_root": "/home/dev/.local/share/portfolio-cockpit/releases",
+  "loopback_port": 8790,
+  "private_proxy": "tailscale-serve",
+  "instructions": "cockpit/README.md#existing-vps-adapter"
+}
