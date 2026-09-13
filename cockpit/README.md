@@ -12,7 +12,17 @@ A small local JSON checkpoint records the source facts shown, not a second task 
 
 Shared `open` work is **Queued**, not running. `held` remains **Held**, including linked owner-state conflicts. `in_review` requests inspection, without claiming ready-to-merge evidence. The Attain controller's `Working` status is evidence of an in-progress run. Attain drafts and requested Romance rework are waiting; Romance `To do` and `Missed` are owner tasks. Unknown states remain visible. These labels do not grant execution authority or replace the source's controls.
 
-Read-only local evidence pages look up exact backlog IDs and show the existing result, hold reason, task, and recorded review. Source links still lead to the existing Notion owner controls. Hold remains the only operational mutation implemented by the cockpit and stays separately gated by `COCKPIT_ENABLE_ACTIONS`.
+Read-only local evidence pages look up exact backlog IDs and show the existing result, hold reason, task, and recorded review. Source links still lead to the existing Notion owner controls. Hold remains separately gated by `COCKPIT_ENABLE_ACTIONS`. Copy work prompt opens the handoff into the owner’s normal chat, described below.
+
+## Complete an owner task
+
+**Mark complete** writes `Status=Done` to the existing Romance Ops task in Notion, then reads it back to confirm. It appears directly on eligible Today cards and inside their All work details when `COCKPIT_COMPLETION_ENABLED=1` and remote reads are enabled. Source records already marked Done automatically move out of active work on refresh. Returning to the page after more than a minute refreshes source facts once; there is no polling job or model call.
+
+Completion is allowed for open owner Task, Watch, and Deadline records from the engage, social (including weekly ritual keys), and notion providers. Runner decisions, launch/gate work, pending source commands, and any task matching a configured Done hook retain their source-specific workflow. This prevents an ordinary completion button from approving work or triggering a launch step. Completing today's dated task leaves the next occurrence intact. The source owns the task status; this adds no local completion database and makes no claim about measured business results or individual comments being published.
+
+Each button carries a signed, expiring task identity, relevant source facts, and hook configuration. The server uses the existing Ops lock, rechecks the exact scoped parent and current facts, writes only Status, and verifies the result. Notion does not provide an atomic compare-and-set here; unrelated external edits after the check can still race. A lost write response gets one verification read, never an automatic second write. Unconfirmed completion keeps the card visible with an error. Repeating a confirmed completion is read-only. Unsupported tasks remain visible with their source controls.
+
+Validate with `python -m pytest tests/test_cockpit_completion.py -q` and `node tests/cockpit-ui-browser.mjs`. These exercise source writes, stale identity/rules, unrelated-task preservation, the existing queue lock, request authentication, failed saves, duplicate clicks, automatic return refresh, and separate daily occurrences.
 
 ## Run a private preview
 
@@ -91,7 +101,7 @@ The dev extra includes Flask; a skipped cockpit module is not a passing cockpit 
 
 ## Existing VPS adapter
 
-This cockpit uses Gunicorn under `portfolio-cockpit.service`, with Tailscale Serve proxying private HTTPS to `127.0.0.1:8790`. It is not hosted on Workers, Netlify, or Pages. `.site-flow/config.json` records this verified custom adapter. Prepare a separate authenticated preview on loopback and a separate private Serve port; do not point the production proxy at a working tree. The September 13 preview uses loopback 8791 and HTTPS 8443, a separate signing key/cookie/checkpoint, and the existing owner password hash. It disables all work mutations.
+This cockpit uses Gunicorn under `portfolio-cockpit.service`, with Tailscale Serve proxying private HTTPS to `127.0.0.1:8790`. It is not hosted on Workers, Netlify, or Pages. `.site-flow/config.json` records this verified custom adapter. Prepare a separate authenticated preview on loopback and a separate private Serve port; do not point the production proxy at a working tree. The September 13 preview uses loopback 8791 and HTTPS 8443, a separate signing key/cookie/checkpoint, and the existing owner password hash. Hold stays disabled. The cockpit has no embedded chat or worker-launch endpoint. If source completion is enabled in a preview, an explicit owner click updates the real Notion task; fixture browser checks must never click a real task just to test it.
 
 For an approved release, install the committed tree into a new versioned environment under `~/.local/share/portfolio-cockpit/releases`, update the existing `current` symlink, restart the existing service, and verify authenticated snapshot, work evidence, static assets, and login. Preserve the previous release for rollback. Do not enable Hold as a side effect. After release, stop the preview unit and remove only its Serve port; never reset the whole Serve configuration.
 
@@ -110,3 +120,16 @@ The September 13 TikTok task was already present as `Engage: 2 To do · 0 bench`
 For a new or changed explanation, read the full task, result, review conditions, and initiative context. Prepare `title`, `context`, `why`, `progress`, and `next_step`; use the record's evidence date as `as_of`. Preserve uncertainty about current deployment, measured benefit, and unresolved review points. Bind `source_revision` to that record's current `context_revision` only after comparing the proposed explanation with those exact facts. A matching revision establishes fidelity to the saved record, not independent proof that its historical claims remain true. Future undrafted work is explicitly labelled; source producers do not yet all supply this owner explanation contract.
 
 Additional checks: `python -m pytest tests/test_cockpit_context.py -q`. These cover stale explanation suppression, full-review evidence, rejected acknowledgement of an unseen explanation change, checkpoint upgrade continuity, per-day recurring work, due-date grouping, and direct draft links.
+
+
+## Copy a prompt into a normal chat
+
+**Copy work prompt** replaces the in-cockpit discussion flow. It reads the latest exact item and copies a plain-text handoff for the owner's normal chat session. The prompt includes business context, source status, original task, existing branch, saved review, source links and VPS paths. It starts with orientation and a recommended next step; copying does not approve implementation or release. Use the normal chat's existing tools, account, working agreement and Delegate/Venice policy. Record later results in the existing source so the cockpit sees them on refresh.
+
+This is a read-only authenticated endpoint. It creates no conversation database, launches no model or worker, and changes no source status. The branch's unshipped embedded chat and cockpit dispatcher have been removed; their old endpoints return 404. Existing unattended runners and normal chat sessions remain the execution surfaces. The runner still uses the previously prepared Sonnet/medium default and dedicated Venice review credential.
+
+The handoff carries selected evidence fields, never a whole snapshot or action token. Each evidence section over 12,000 characters is explicitly omitted with instructions to read the complete source; it is never called a complete review after truncation. Missing or stale explanations remain marked as such. Linked Ideal State pages are references, not a claim to have fetched their current contents. Missing or duplicate identities return an error instead of copying another task.
+
+Clipboard writes begin in the click handler, with the read result supplied as a Promise. A denied or unavailable clipboard opens a selectable-text dialog with an explicit Copy prompt retry. A source error produces no stale fallback prompt. See [MDN Clipboard API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API) for browser permission differences. Only a successful clipboard result shows Copied.
+
+Validate with `python -m pytest tests/test_cockpit_handoff.py -q` and `node tests/cockpit-ui-browser.mjs`. Cover exact context, full review conditions, changed sources, duplicate/missing records, removed execution routes, real clipboard copy, denied permissions, failed reads, manual fallback and mobile fit.

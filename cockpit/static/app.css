@@ -283,3 +283,10 @@ dialog p { font-size:14px; }
   .brief-row-footer { flex-direction:column; align-items:flex-start; gap:8px; }
 }
 @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+
+.completion-control { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:8px 0 14px; }
+.completion-control p { margin:0; }
+.completion-notice { padding:12px 16px; background:#edf8f1; color:#175733; border:1px solid #bddac7; border-radius:8px; }
+
+.prompt-control { margin-top: 14px; }
+.prompt-control p { margin: 8px 0 0; font-size: 13px; }

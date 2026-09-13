@@ -61,6 +61,7 @@ import yaml
 
 from sessiongc.cli import GitError, default_branch_ref, git, git_ok, parse_worktrees
 from backlogrun import readiness
+from backlogrun.venice_keys import VeniceKeyError, load_key as load_venice_key
 
 HOME = os.path.expanduser("~")
 PROJECTS = os.path.join(HOME, "projects")
@@ -117,7 +118,8 @@ class Config:
     tg_send: str = field(default_factory=lambda: _env(
         "BACKLOG_RUN_TG_SEND", os.path.join(PROJECTS, "build-ai-automation-workflow", "bin", "tg-send")))
     env_file: str = field(default_factory=lambda: _env("BACKLOG_RUN_ENV_FILE", os.path.join(HOME, ".env")))
-    model: str = ""
+    model: str = "sonnet"
+    effort: str = "medium"
     budget_usd: float = 20.0
     item_timeout: int = 3600
     deadline: int = 3 * 3600
@@ -636,10 +638,12 @@ def run_session(cfg: Config, prompt: str, *, cwd: str, env: dict, timeout: int) 
     stderr, data (parsed --output-format json or None)."""
     argv = [claude_bin(cfg), "-p", "-", "--output-format", "json", "--dangerously-skip-permissions",
             "--settings", cfg.settings_path, "--strict-mcp-config", "--mcp-config", cfg.mcp_path]
-    if cfg.model:
-        argv += ["--model", cfg.model]
     if cfg.budget_usd and cfg.budget_usd > 0:
         argv += ["--max-budget-usd", str(cfg.budget_usd)]
+    if cfg.model:
+        argv += ["--model", cfg.model]
+    if cfg.effort:
+        argv += ["--effort", cfg.effort]
     proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True, start_new_session=True)
     timed_out = False
@@ -674,28 +678,11 @@ def run_session(cfg: Config, prompt: str, *, cwd: str, env: dict, timeout: int) 
 # ----------------------------------------------------------------------------- council
 
 
-def load_env_keys(cfg: Config, names: tuple[str, ...] = ("VENICE_COUNCIL_KEY", "VENICE_API_KEY")) -> None:
-    """Cron has no ~/.env in its environment; read ONLY the Venice keys into THIS
-    process (the session env is whitelisted separately and never sees them)."""
-    if any(os.environ.get(n) for n in names) or not os.path.isfile(cfg.env_file):
-        return
-    with open(cfg.env_file, encoding="utf-8", errors="ignore") as fh:
-        for ln in fh:
-            ln = ln.strip()
-            if not ln or ln.startswith("#") or "=" not in ln:
-                continue
-            k, v = ln.split("=", 1)
-            k = k.strip().removeprefix("export ").strip()
-            if k in names and k not in os.environ:
-                os.environ[k] = v.strip().strip("'\"")
-
-
 def council_review(cfg: Config, diff_text: str, *, item_id: str) -> dict:
     """C3: the same code-review panel `council review --diff` runs, in-process. Returns
     {ok, summary, markdown}. Never raises — a review failure is itself the verdict."""
     try:
-        load_env_keys(cfg)
-        from council.config import get_api_key, load_panels, truncate
+        from council.config import load_panels, truncate
         from council.engine import run_panel
         from council.render import render_markdown
         from council.synthesize import synthesize
@@ -703,9 +690,9 @@ def council_review(cfg: Config, diff_text: str, *, item_id: str) -> dict:
         from council.venice import VeniceClient
         settings, panels = load_panels(None)
         try:
-            key = get_api_key()
-        except SystemExit:
-            return {"ok": False, "summary": "REVIEW FAILED: no Venice key (VENICE_COUNCIL_KEY/VENICE_API_KEY)", "markdown": ""}
+            key = load_venice_key("review", env_path=cfg.env_file)
+        except VeniceKeyError as exc:
+            return {"ok": False, "summary": f"REVIEW FAILED: {exc}", "markdown": ""}
         client = VeniceClient(key, timeout=settings.timeout)
         panel = panels["code-review"]
         full_ctx = f"Review this:\n\n{diff_text}"
@@ -1228,6 +1215,8 @@ def cmd_rework(args, cfg: Config) -> int:
         cfg.budget_usd = args.budget_usd
     if args.model:
         cfg.model = args.model
+    if args.effort:
+        cfg.effort = args.effort
     if args.no_notify:
         cfg.tg_enabled = False
     cfg.keep_worktree = args.keep_worktree
@@ -1643,7 +1632,8 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--item-timeout", type=int, default=None, help="seconds per item (default 3600)")
     w.add_argument("--deadline", type=int, default=None, help="seconds for the whole run (default 10800)")
     w.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd per session (default 20; 0 = none)")
-    w.add_argument("--model", help="model for the sessions (default: the CLI default)")
+    w.add_argument("--model", help="model for the sessions (default: sonnet)")
+    w.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: medium)")
     w.add_argument("--no-council", action="store_true", help="skip the council review (tests/debugging)")
     w.add_argument("--no-notify", action="store_true", help="no Telegram summary")
     w.add_argument("--keep-worktree", action="store_true", help="leave the session worktree in place")
@@ -1653,7 +1643,8 @@ def build_parser() -> argparse.ArgumentParser:
     rw.add_argument("item", help="active item id")
     rw.add_argument("--item-timeout", type=int, default=None, help="seconds for the session (default 3600)")
     rw.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd for the session (default 20; 0 = none)")
-    rw.add_argument("--model", help="model for the session (default: the CLI default)")
+    rw.add_argument("--model", help="model for the session (default: sonnet)")
+    rw.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: medium)")
     rw.add_argument("--no-council", action="store_true", help="skip the council review (tests/debugging)")
     rw.add_argument("--no-notify", action="store_true", help="no Telegram summary")
     rw.add_argument("--keep-worktree", action="store_true", help="leave the session worktree in place")
@@ -1697,6 +1688,8 @@ def main(argv=None) -> int:
             cfg.budget_usd = args.budget_usd
         if args.model:
             cfg.model = args.model
+        if args.effort:
+            cfg.effort = args.effort
         if args.no_notify:
             cfg.tg_enabled = False
         cfg.keep_worktree = args.keep_worktree

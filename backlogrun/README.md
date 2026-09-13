@@ -23,7 +23,8 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
     backlog-run list
 
 `work` flags: `--max-items` (2) · `--item-timeout` seconds (3600) · `--deadline` seconds
-(10800) · `--budget-usd` per session (20; 0 = none) · `--model` · `--no-council` ·
+(10800) · `--budget-usd` per session (20; 0 = none) · `--model` (sonnet) · `--effort`
+(medium) · `--no-council` ·
 `--no-notify` · `--keep-worktree`. `rework` accepts the same session flags except
 `--max-items` and `--deadline`; it always targets one existing branch.
 
@@ -76,6 +77,9 @@ Environment overrides: `BACKLOG_PATH`, `BACKLOG_RUN_STATE`, `BACKLOG_RUN_PROJECT
 `BACKLOG_RUN_CLAUDE` (binary), `BACKLOG_RUN_GIT=0` (no backlog commits),
 `BACKLOG_RUN_TG=0` (no Telegram), `BACKLOG_RUN_TG_CHAT`, `BACKLOG_RUN_TG_SEND`,
 `BACKLOG_RUN_ENV_FILE` (where the Venice key is read from for the council step).
+
+Council reads only `VENICE_SECOND_OPINION_KEY`. It never falls back to the old
+Council or generic Venice keys. The worker receives none of these credentials.
 
 ## Cron
 

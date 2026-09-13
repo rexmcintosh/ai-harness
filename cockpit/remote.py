@@ -1,4 +1,4 @@
-"""Scoped read-only Notion feeds; no task or account mutation methods."""
+"""Scoped read-only Notion feeds. Explicit completion lives in completion.py."""
 from __future__ import annotations
 
 import json
@@ -81,7 +81,11 @@ def remote_work(config):
                     iid = 'ops:' + (key or row['id'])
                     if terminal:
                         why = 'Closure is recorded in the owner queue. Check the source for the owner’s completion evidence.'
-                batch.append({'id': iid, 'title': title or 'Untitled work', 'why': why or 'Open the source for its current decision.',
+                completion_claim = None
+                if name == 'Romance Ops' and not terminal:
+                    from .completion import offer
+                    completion_claim = offer(config,row,cfg=cfg)
+                batch.append({'_completion_claim':completion_claim,'id': iid, 'title': title or 'Untitled work', 'why': why or 'Open the source for its current decision.',
                               'repo': repo, 'status': status or 'unknown', 'source': name,
                               'source_url': safe_url(row.get('url')), 'created': row.get('created_time', ''),
                               'updated_at': row.get('last_edited_time'), 'backlog_id': linked, 'can_hold': False,

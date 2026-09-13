@@ -135,6 +135,80 @@ function explanationCard(item, kind, statusBadge) {
   return { card: add(card, summary, detail), detail, brief };
 }
 
+const completing = new Set();
+let copyingPrompt = false;
+function copyPromptControl(item) {
+  const wrap = el('div', 'prompt-control');
+  const button = el('button', 'quiet', 'Copy work prompt');
+  button.type = 'button'; button.dataset.promptUrl = item.prompt_url;
+  const status = el('p', 'muted'); status.setAttribute('role', 'status'); status.hidden = true;
+  button.addEventListener('click', async () => {
+    if (copyingPrompt) return;
+    copyingPrompt = true; status.hidden = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const buttons = [...document.querySelectorAll('[data-prompt-url]')];
+    buttons.forEach(b => { b.disabled = true; }); button.textContent = 'Preparing prompt…';
+    try {
+      if (!/^\/api\/work-prompt\/[a-zA-Z0-9._~%:-]+$/.test(item.prompt_url)) throw new Error('The prompt link is unavailable. Refresh the cockpit.');
+      const payload = fetch(item.prompt_url, {cache:'no-store', signal:controller.signal}).then(async response => {
+        if (response.status === 401) { location.assign('/login'); throw new Error('Log in before copying.'); }
+        const data = await response.json();
+        if (!response.ok || typeof data.prompt !== 'string' || !data.prompt.trim()) throw new Error(data.error || 'The prompt could not be read. Try again.');
+        return data;
+      });
+      // Start the clipboard operation during the click, including on Safari.
+      const blob = payload.then(data => new Blob([data.prompt], {type:'text/plain'}));
+      blob.catch(() => {}); // A clipboard refusal must not leave an unhandled fetch rejection.
+      try {
+        if (window.ClipboardItem && navigator.clipboard?.write) await navigator.clipboard.write([new ClipboardItem({'text/plain':blob})]);
+        else await navigator.clipboard.writeText((await payload).prompt);
+        status.textContent = 'Copied. Paste into your normal chat.'; status.hidden = false;
+      } catch (_) {
+        const data = await payload; // Source failures go to the error state, never an old prompt.
+        $('copy-title').textContent = data.title || 'Work prompt'; $('copy-text').value = data.prompt;
+        $('copy-help').textContent = 'Automatic copy was blocked. Click Copy prompt, or copy the selected text.';
+        $('copy-dialog').showModal(); $('copy-text').focus(); $('copy-text').select();
+      }
+    } catch (error) { status.textContent = error.name === 'AbortError' ? 'The task took too long to load. Try copying again.' : error.message; status.hidden = false; }
+    finally { clearTimeout(timeout); copyingPrompt = false; buttons.forEach(b => { b.disabled = false; }); button.textContent = 'Copy work prompt'; }
+  });
+  return add(wrap, button, status);
+}
+
+function completionControl(item) {
+  const wrap = el('div', 'completion-control');
+  const button = el('button', 'quiet', 'Mark complete');
+  button.type = 'button'; button.dataset.completeToken = item.complete_token;
+  const error = el('p', 'error compact-error'); error.setAttribute('role', 'alert');
+  error.hidden = true;
+  wrap.append(button, error);
+  button.addEventListener('click', async () => {
+    const token = item.complete_token;
+    if (completing.has(token)) return;
+    completing.add(token); error.textContent = ''; error.hidden = true;
+    $('completion-notice').hidden = true;
+    const copies = [...document.querySelectorAll('button[data-complete-token]')].filter(b => b.dataset.completeToken === token);
+    copies.forEach(b => { b.disabled = true; b.textContent = 'Saving completion…'; });
+    let complete = false;
+    try {
+      const response = await fetch('/api/operations/complete', {method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRF-Token':csrf}, body:JSON.stringify({token})});
+      if (response.status === 401) { location.assign('/login'); return; }
+      let result = {}; try { result = await response.json(); } catch (_) {}
+      if (!response.ok || !result.verified || result.status !== 'Done') throw new Error(result.error || 'Completion could not be confirmed. Refresh before retrying.');
+      complete = true; copies.forEach(b => { b.textContent = 'Completed'; });
+      $('completion-notice').textContent = 'Marked complete in Notion.'; $('completion-notice').hidden = false;
+      await refresh({ preserveCompletionNotice: true });
+    } catch (failure) { error.textContent = failure.message; error.hidden = false; }
+    finally {
+      completing.delete(token);
+      if (!complete) copies.forEach(b => { b.disabled = false; b.textContent = 'Mark complete'; });
+    }
+  });
+  return wrap;
+}
+
 function populateSelect(select, options, currentValue) {
   select.replaceChildren(...options.map(({ value, label }) => {
     const option = el('option', '', label);
@@ -168,7 +242,9 @@ function briefRow(item, kind) {
     const explanation = explanationCard(item, kind, status);
     if (kind === 'change' && item.summary) explanation.detail.prepend(el('p', 'change-summary', text(item.summary)));
     explanation.detail.append(footer);
+    if (item.prompt_url) explanation.detail.append(copyPromptControl(item));
     row.append(explanation.card);
+    if (kind === 'work' && item.complete_token) row.append(completionControl(item));
   } else {
     row.append(top);
     if (context) row.append(el('p', 'brief-context', context));
@@ -342,6 +418,8 @@ function renderWork() {
   $('work-list').replaceChildren(...rows.map((work) => {
     const explanation = explanationCard(work, 'work', badge(categoryOf(work), text(work.category_label, CATEGORY_LABELS[categoryOf(work)])));
     const detail = explanation.detail;
+    if (work.complete_token) detail.append(completionControl(work));
+    if (work.prompt_url) detail.append(copyPromptControl(work));
     if (work.action_url) detail.append(link(work.action_url, text(work.action_label, 'Open the work')));
     if (work.source_url) detail.append(link(work.source_url, 'Open the source'));
     if (work.hold_token) {
@@ -394,23 +472,29 @@ function render() {
   renderResources();
 }
 
-async function refresh() {
+let refreshGeneration = 0;
+let lastRefresh = 0;
+async function refresh({ preserveCompletionNotice = false } = {}) {
+  if (!preserveCompletionNotice) $('completion-notice').hidden = true;
+  const generation = ++refreshGeneration;
   $('refresh').disabled = true;
   try {
     const response = await fetch('/api/snapshot', { cache: 'no-store' });
     if (response.status === 401) { location.assign('/login'); return; }
     if (!response.ok) throw new Error('The portfolio could not refresh. The previous view remains visible. Try again.');
     const nextSnapshot = await response.json();
+    if (generation !== refreshGeneration) return;
     snapshot = nextSnapshot;
+    lastRefresh = Date.now();
     render();
     $('content').hidden = false;
     $('error').hidden = true;
   } catch (error) {
+    if (generation !== refreshGeneration) return;
     $('error').textContent = error.message;
     $('error').hidden = false;
   } finally {
-    $('loading').hidden = true;
-    $('refresh').disabled = false;
+    if (generation === refreshGeneration) { $('loading').hidden = true; $('refresh').disabled = false; }
   }
 }
 
@@ -438,6 +522,17 @@ async function markBriefReviewed() {
   }
 }
 
+function refreshOnReturn() {
+  if (!document.hidden && snapshot && !completing.size && !$('refresh').disabled && Date.now() - lastRefresh > 60000) refresh();
+}
+window.addEventListener('focus', refreshOnReturn);
+document.addEventListener('visibilitychange', refreshOnReturn);
+$('close-copy').addEventListener('click', () => { $('copy-dialog').close(); $('copy-text').value = ''; });
+$('copy-again').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('copy-text').value); $('copy-help').textContent = 'Copied. Paste into your normal chat.'; }
+  catch (_) { $('copy-help').textContent = 'Copy the selected text with your usual copy command.'; $('copy-text').focus(); $('copy-text').select(); }
+});
+$('copy-dialog').addEventListener('close', () => { $('copy-text').value = ''; });
 $('refresh').addEventListener('click', refresh);
 $('review-brief').addEventListener('click', markBriefReviewed);
 ['filter', 'category-filter', 'initiative-filter', 'work-type-filter'].forEach((id) => $(id).addEventListener(id === 'filter' ? 'input' : 'change', () => { if (snapshot) renderWork(); }));

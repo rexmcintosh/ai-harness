@@ -13,7 +13,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash
 from werkzeug.exceptions import SecurityError
 
-from . import actions, sources, briefing
+from . import actions, sources, briefing, completion, handoff
 
 
 def create_app(config=None):
@@ -29,6 +29,7 @@ def create_app(config=None):
         STATE_ROOT=str(projects / '.backlog-run'), CATALOG_PATH=str(Path(__file__).with_name('portfolio.json')),
         REMOTE_READS=os.environ.get('COCKPIT_REMOTE_READS') == '1',
         ENABLE_ACTIONS=os.environ.get('COCKPIT_ENABLE_ACTIONS') == '1',
+        COMPLETION_ENABLED=os.environ.get('COCKPIT_COMPLETION_ENABLED') == '1',
         DOCS_ROOT=os.environ.get('COCKPIT_DOCS_ROOT', str(Path(__file__).resolve().parent.parent / 'docs')),
         PUBLIC_ORIGIN=os.environ.get('COCKPIT_PUBLIC_ORIGIN', ''),
     )
@@ -100,10 +101,37 @@ def create_app(config=None):
         if checkpoint['available']:
             data['brief']['review_token'] = review_signer.dumps({k: checkpoint[k] for k in ('snapshot', 'baseline')})
         for item in data['work']:
+            claim = item.pop('_completion_claim',None)
+            if claim and app.config['COMPLETION_ENABLED'] and app.config['REMOTE_READS']:
+                item['complete_token'] = completion.signer(app.config).dumps(claim)
             if item.pop('can_hold', False) and app.config['ENABLE_ACTIONS']:
                 item['hold_token'] = signer.dumps({'id': item['id'], 'revision': item['revision'], 'action': 'hold'})
             item.pop('revision', None)
+        for item in data['results']:
+            item.pop('_completion_claim',None)
         return jsonify(data)
+
+    @app.post('/api/operations/complete')
+    def complete_operation():
+        if not app.config['COMPLETION_ENABLED'] or not app.config['REMOTE_READS']:
+            return jsonify(error='Source completion is not enabled in this cockpit.'),403
+        body=request.get_json(silent=True)
+        token=body.get('token') if isinstance(body,dict) else None
+        if not isinstance(token,str) or not token:
+            return jsonify(error='Refresh the task before marking it complete.'),400
+        try:
+            claim=completion.signer(app.config).loads(token,max_age=3600)
+            return jsonify(completion.complete(app.config,claim))
+        except BadSignature:
+            return jsonify(error='This completion control expired or changed. Refresh the task.'),409
+        except completion.CompletionError as exc:
+            app.logger.warning('completion rejected status=%s reason=%s',exc.status,str(exc))
+            return jsonify(error=str(exc)),exc.status
+        except BlockingIOError:
+            return jsonify(error='The source queue is busy. Nothing changed; try again after it finishes.'),409
+        except (OSError,ValueError,KeyError,TypeError,completion.requests.RequestException) as exc:
+            app.logger.warning('completion failed type=%s',type(exc).__name__)
+            return jsonify(error='The source completion could not be confirmed. Refresh before retrying.'),503
 
     @app.post('/api/brief/review')
     def review_brief():
@@ -129,6 +157,15 @@ def create_app(config=None):
             return jsonify(error='Another review is being saved. Refresh and try again.'), 409
         except (OSError, ValueError):
             return jsonify(error='The review save could not be confirmed. Your work is unchanged; refresh before trying again.'), 503
+
+    @app.get('/api/work-prompt/<path:item_key>')
+    def work_prompt(item_key):
+        try:
+            return jsonify(handoff.build(app.config,item_key))
+        except handoff.HandoffError as exc:
+            return jsonify(error=str(exc)),exc.status
+        except (OSError,ValueError,KeyError,TypeError):
+            return jsonify(error='The task context could not be read. Refresh before copying.'),503
 
     @app.get('/work/<item_id>')
     def work_evidence(item_id):

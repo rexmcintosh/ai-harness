@@ -212,6 +212,9 @@ def snapshot(config):
     data = {'generated_at': stamp(), 'initiatives': initiatives, 'results': results,
             'decisions': catalog.get('decisions', []), 'work': work, 'sources': sources,
             'resources': resources(config), 'unmapped_repositories': coverage,
-            'coverage_notes': catalog.get('coverage_notes', []), 'mode': 'Decision controls enabled' if config.get('ENABLE_ACTIONS') else 'Read-only view'}
+            'coverage_notes': catalog.get('coverage_notes', []),
+            'mode': 'Owner controls enabled' if (config.get('ENABLE_ACTIONS') or (config.get('COMPLETION_ENABLED') and config.get('REMOTE_READS'))) else 'Read-only view'}
+    for row in work + results:
+        row['prompt_url'] = '/api/work-prompt/' + quote(briefing.record_key(row), safe='')
     briefing.build(data, config)
     return data

@@ -14,6 +14,7 @@ import pytest
 import yaml
 
 from backlogrun import cli as br
+from backlogrun.venice_keys import VeniceKeyError, load_key as load_venice_key
 
 REAL_COUNCIL_REVIEW = br.council_review
 
@@ -266,6 +267,57 @@ def test_scrubbed_env_has_no_secrets_and_disables_push(world):
     assert env["PATH"].startswith("/opt/node/bin:")
     assert os.path.join(br.HOME, ".local", "bin") in env["PATH"]
     assert env["BACKLOG_RUN"] == "1" and env["TERM"] == "dumb"
+
+
+def test_bounded_worker_defaults_and_explicit_cli_route():
+    cfg = br.Config()
+    assert (cfg.model, cfg.effort, cfg.budget_usd, cfg.item_timeout) == ("sonnet", "medium", 20.0, 3600)
+    args = br.build_parser().parse_args(["work", "--model", "opus", "--effort", "high"])
+    assert args.model == "opus" and args.effort == "high"
+
+
+def test_runner_venice_key_loader_has_no_old_key_fallback(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("VENICE_COUNCIL_KEY=old-council\nVENICE_API_KEY=generic\n")
+    with pytest.raises(VeniceKeyError, match="VENICE_SECOND_OPINION_KEY"):
+        load_venice_key("review", {}, env_file)
+    env_file.write_text("VENICE_SECOND_OPINION_KEY=review-only\nVENICE_CODE_HELPER_KEY=code-only\n")
+    assert load_venice_key("review", {}, env_file) == "review-only"
+    assert load_venice_key("code", {}, env_file) == "code-only"
+
+
+def test_runner_council_requests_exact_review_role_key(world, monkeypatch):
+    cfg = world.build([])
+    calls = []
+    def missing(role, *, env_path):
+        calls.append((role, env_path))
+        raise VeniceKeyError("VENICE_SECOND_OPINION_KEY is missing")
+    monkeypatch.setattr(br, "load_venice_key", missing)
+    result = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x")
+    assert calls == [("review", cfg.env_file)]
+    assert result["ok"] is False and "VENICE_SECOND_OPINION_KEY" in result["summary"]
+
+
+def test_run_session_passes_model_and_effort_without_secrets(world, monkeypatch):
+    cfg = world.build([])
+    cfg.model, cfg.effort = "opus", "high"
+    env = br.scrubbed_env(str(world.repo))
+    captured = {}
+
+    class Proc:
+        returncode = 0
+        pid = 123
+        def communicate(self, prompt, timeout):
+            return json.dumps({"result": "ok"}), ""
+
+    def popen(argv, **kwargs):
+        captured.update(argv=argv, env=kwargs["env"])
+        return Proc()
+
+    monkeypatch.setattr(br.subprocess, "Popen", popen)
+    br.run_session(cfg, "brief", cwd=str(world.repo), env=env, timeout=3)
+    assert captured["argv"][-4:] == ["--model", "opus", "--effort", "high"]
+    assert not any(name.startswith("VENICE_") for name in captured["env"])
 
 
 @pytest.mark.parametrize("url,local", [

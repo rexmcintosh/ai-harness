@@ -12,10 +12,10 @@ const profile = mkdtempSync(resolve(tmpdir(), 'cockpit-ui-'));
 const host = '127.0.0.1';
 const appPort = 8765;
 const debugPort = 9223;
-const state = { fail: false, reviews: 0 };
+const state = { fail: false, reviews: 0, completions: 0, completionFail: true, reads: 0, promptReads: 0, promptFail: false, promptStatus: 200 };
 const work = [
-  { id: 'w/1', title: 'Review the release', repo: 'alpha', status: 'In review', why: 'Checks finished.', source: 'Shared backlog', source_url: '/work/w%2F1', created: '2026-09-12', category: 'review', category_label: 'Needs your review', next_action: 'Read the result.', initiative_id: 'alpha', initiative_name: 'Alpha', work_type: 'improve', evidence_at: '2026-09-13T07:00:00+00:00', owner_surface_status: 'needs_review', owner_brief: { state: 'current', title: 'Decide whether the source fix is ready', context: 'Alpha / Publishing / Source reliability', why: 'The fix protects new publishing work from missing source facts.', progress: 'The code and checks are complete. A review decision remains.', next_step: 'Read the saved result and decide whether to merge.', as_of: '2026-09-13T07:00:00+00:00' } },
-  { id: 'w2', title: 'Engage: 2 To do · 0 bench', repo: 'ops', status: 'To do', why: 'Daily TikTok commenting task.', source: 'Ops control', source_url: 'https://example.test/ops', action_url: 'https://example.test/drafts', action_label: 'Open prepared drafts', created: '2026-09-13T05:40:00+00:00', category: 'queued', category_label: 'Queued', next_action: 'Open TikTok drafts.', initiative_id: '', initiative_name: 'Romance', work_type: 'operate', cadence_label: 'Daily', due_label: 'Due today', evidence_at: '2026-09-13T05:40:00+00:00', owner_brief: { state: 'current', title: 'Comment on today’s TikTok posts', context: 'Romance / Social promotion / Daily engagement', why: 'Daily comments keep the promotion loop active around current books.', progress: 'Two prepared comments are ready.', next_step: 'Open the prepared drafts and post the two comments.', as_of: '2026-09-13T05:40:00+00:00' } },
+  { id: 'w/1', prompt_url: '/api/work-prompt/backlog%3Aw%2F1', title: 'Review the release', repo: 'alpha', status: 'In review', why: 'Checks finished.', source: 'Shared backlog', source_url: '/work/w%2F1', created: '2026-09-12', category: 'review', category_label: 'Needs your review', next_action: 'Read the result.', initiative_id: 'alpha', initiative_name: 'Alpha', work_type: 'improve', evidence_at: '2026-09-13T07:00:00+00:00', owner_surface_status: 'needs_review', owner_brief: { state: 'current', title: 'Decide whether the source fix is ready', context: 'Alpha / Publishing / Source reliability', why: 'The fix protects new publishing work from missing source facts.', progress: 'The code and checks are complete. A review decision remains.', next_step: 'Read the saved result and decide whether to merge.', as_of: '2026-09-13T07:00:00+00:00' } },
+  { id: 'w2', prompt_url: '/api/work-prompt/Romance%20Ops%3Aw2', complete_token: 'complete-today', title: 'Engage: 2 To do · 0 bench', repo: 'ops', status: 'To do', why: 'Daily TikTok commenting task.', source: 'Ops control', source_url: 'https://example.test/ops', action_url: 'https://example.test/drafts', action_label: 'Open prepared drafts', created: '2026-09-13T05:40:00+00:00', category: 'queued', category_label: 'Queued', next_action: 'Open TikTok drafts.', initiative_id: '', initiative_name: 'Romance', work_type: 'operate', cadence_label: 'Daily', due_label: 'Due today', evidence_at: '2026-09-13T05:40:00+00:00', owner_brief: { state: 'current', title: 'Comment on today’s TikTok posts', context: 'Romance / Social promotion / Daily engagement', why: 'Daily comments keep the promotion loop active around current books.', progress: 'Two prepared comments are ready.', next_step: 'Open the prepared drafts and post the two comments.', as_of: '2026-09-13T05:40:00+00:00' } },
   { id: 'w3', title: 'Queue copy edit', repo: 'alpha', status: 'Ready', why: 'Ready to begin.', source: 'Queue', created: '2026-09-11', category: 'queued', category_label: 'Queued', next_action: 'OLD ACTION MUST NEVER APPEAR', initiative_id: 'alpha', initiative_name: 'Alpha', work_type: 'improve', evidence_at: null, owner_brief: { state: 'stale', title: 'Refresh the launch copy plan', context: 'Alpha / Launch / Copy', why: 'The source facts changed after this explanation was written.', progress: 'The copy edit remains queued.', next_step: 'OLD ACTION MUST NEVER APPEAR', as_of: '2026-09-11' } },
   { id: 'w4', title: 'Prepare tomorrow comments', repo: 'ops', status: 'Working', why: 'Routine preparation.', source: 'Ops control', source_url: 'https://example.test/ops', created: '2026-09-13', category: 'running', category_label: 'In progress', initiative_id: '', initiative_name: 'Romance', work_type: 'operate', cadence_label: 'Daily', due_label: 'Due Sep 14', evidence_at: null, owner_brief: { state: 'current', title: 'Prepare tomorrow’s social comments', context: 'Romance / Social promotion / Daily engagement', why: 'Prepared comments make tomorrow’s promotion easier to run.', progress: 'Draft preparation is underway.', next_step: 'Let the preparation run finish.', as_of: '2026-09-13T08:00:00+00:00' } }
 ];
@@ -38,9 +38,29 @@ const server = createServer(async (request, response) => {
     const html = (await readFile(resolve(root, 'cockpit/templates/index.html'), 'utf8')).replace('{{ csrf }}', 'fixture');
     return reply(response, 200, html, 'text/html');
   }
-  if (request.method === 'GET' && request.url === '/api/snapshot') return state.fail ? reply(response, 500, '{}') : reply(response, 200, JSON.stringify(snapshot));
+  if (request.method === 'GET' && request.url === '/api/snapshot') { state.reads++; return state.fail ? reply(response, 500, '{}') : reply(response, 200, JSON.stringify(snapshot)); }
+  if (request.method === 'GET' && request.url.startsWith('/api/work-prompt/')) {
+    state.promptReads++;
+    if (state.promptHang) return;
+    if (state.promptFail) return reply(response, 503, JSON.stringify({error:'Task context unavailable.'}));
+    if (state.promptStatus === 401) return reply(response, 401, '{}');
+    const title = request.url.includes('Romance') ? 'Daily comments' : 'Review the release';
+    return reply(response, 200, JSON.stringify({title, prompt:'Discuss '+title+'\nCurrent source and full review condition.'}));
+  }
   if (request.method === 'GET' && request.url === '/static/app.js') return reply(response, 200, await readFile(resolve(root, 'cockpit/static/app.js'), 'utf8'), 'text/javascript');
   if (request.method === 'GET' && request.url === '/static/app.css') return reply(response, 200, await readFile(resolve(root, 'cockpit/static/app.css'), 'utf8'), 'text/css');
+  if (request.method === 'POST' && request.url === '/api/operations/complete') {
+    let body = '';
+    for await (const part of request) body += part;
+    if (JSON.parse(body).token !== 'complete-today' || request.headers['x-csrf-token'] !== 'fixture') return reply(response, 400, '{}');
+    state.completions++;
+    await delay(150);
+    if (state.completionFail) return reply(response, 503, JSON.stringify({error:'Source completion could not be confirmed.'}));
+    snapshot.work = work.filter(item => item.id !== 'w2');
+    snapshot.brief.operations = [];
+    snapshot.results.push({...work[1], status:'Done', complete_token:null});
+    return reply(response, 200, JSON.stringify({status:'Done', verified:true}));
+  }
   if (request.method === 'POST' && request.url === '/api/brief/review') {
     if (state.expired) return reply(response, 401, '{}');
     let body = '';
@@ -124,6 +144,37 @@ try {
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   await screenshot('/tmp/cockpit-mobile.png');
 
+  // Real clipboard write/read in this isolated browser, then denied-permission fallback.
+  await call('Browser.grantPermissions', {origin:`http://${host}:${appPort}`,permissions:['clipboardReadWrite','clipboardSanitizedWrite']});
+  assert.equal(await evaluate('document.querySelector("#work-list .prompt-control button").tagName'), 'BUTTON');
+  assert.equal(await evaluate('document.body.textContent.includes("Discuss this work")'), false);
+  await evaluate('document.querySelector("#work-list .prompt-control button").click()');
+  await retry(async () => assert.equal(await evaluate('document.querySelector("#work-list .prompt-control [role=status]").textContent'), 'Copied. Paste into your normal chat.'));
+  assert.equal(await evaluate('navigator.clipboard.readText()'), 'Discuss Review the release\nCurrent source and full review condition.');
+  assert.equal(state.promptReads, 1);
+  await evaluate('window.realClipboard=navigator.clipboard;Object.defineProperty(navigator,"clipboard",{configurable:true,value:{write:()=>Promise.reject(new Error("denied")),writeText:()=>Promise.reject(new Error("denied"))}})');
+  await evaluate('document.querySelector("#operations .prompt-control button").click()');
+  await retry(async () => assert.equal(await evaluate('document.getElementById("copy-dialog").open'), true));
+  assert.equal(await evaluate('document.getElementById("copy-text").value'), 'Discuss Daily comments\nCurrent source and full review condition.');
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+  await screenshot('/tmp/cockpit-copy-mobile.png');
+  await evaluate('document.getElementById("copy-again").click()');
+  await retry(async () => assert.equal(await evaluate('document.getElementById("copy-help").textContent'), 'Copy the selected text with your usual copy command.'));
+  await evaluate('document.getElementById("close-copy").click()');
+  assert.equal(await evaluate('document.getElementById("copy-text").value'), '');
+  state.promptFail = true;
+  await evaluate('document.querySelector("#work-list .prompt-control button").click()');
+  await retry(async () => assert.equal(await evaluate('document.querySelector("#work-list .prompt-control [role=status]").textContent'), 'Task context unavailable.'));
+  assert.equal(await evaluate('document.getElementById("copy-dialog").open'), false);
+  assert.equal(state.completions, 0);
+  state.promptFail = false;
+  state.promptHang = true;
+  await evaluate('document.querySelector("#work-list .prompt-control button").click()');
+  await retry(async () => assert.equal(await evaluate('document.querySelector("#work-list .prompt-control [role=status]").textContent'), 'The task took too long to load. Try copying again.'), 400);
+  assert.equal(await evaluate('[...document.querySelectorAll("[data-prompt-url]")].every(b=>!b.disabled)'), true);
+  state.promptHang = false;
+  await evaluate('Object.defineProperty(navigator,"clipboard",{configurable:true,value:window.realClipboard})');
+
   assert.equal(state.reviews, 0);
   await evaluate('(()=>{const e=document.getElementById("category-filter");e.value="queued";e.dispatchEvent(new Event("change"));const t=document.getElementById("work-type-filter");t.value="improve";t.dispatchEvent(new Event("change"))})()');
   assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 1);
@@ -149,6 +200,35 @@ try {
   snapshot.brief.review_token = 'review-token';
   await evaluate('document.getElementById("refresh").click()');
   await retry(async () => assert.equal(await evaluate('document.getElementById("review-brief").hidden'), false));
+  // A routine has one explicit completion action, mirrored in Today and All work.
+  assert.equal(await evaluate('document.querySelector("#operations [data-complete-token]").checkVisibility()'), true);
+  assert.equal(await evaluate('document.querySelector("#operations .completion-control [role=alert]").checkVisibility()'), false);
+  await evaluate('document.querySelector("#operations [data-complete-token]").click();document.querySelector("#work-list [data-complete-token]").click()');
+  assert.equal(await evaluate('[...document.querySelectorAll("[data-complete-token]")].every(b => b.disabled)'), true);
+  await retry(async () => assert.equal(await evaluate('document.querySelector("#operations .completion-control [role=alert]").textContent'), 'Source completion could not be confirmed.'));
+  assert.equal(await evaluate('document.querySelector("#operations .completion-control [role=alert]").checkVisibility()'), true);
+  assert.equal(state.completions, 1);
+  assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 4);
+  state.completionFail = false;
+  await evaluate('document.querySelector("#operations [data-complete-token]").click()');
+  await retry(async () => assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 3));
+  assert.equal(state.completions, 2);
+  assert.equal(await evaluate('document.querySelector("#operations [data-complete-token]")'), null);
+  assert.equal(await evaluate('document.getElementById("completion-notice").textContent'), 'Marked complete in Notion.');
+  assert.equal(await evaluate('document.getElementById("upcoming-operations").textContent.includes("Prepare tomorrow’s social comments")'), true);
+  const priorReads = state.reads;
+  await evaluate('window.dispatchEvent(new Event("focus"))');
+  await delay(100);
+  assert.equal(state.reads, priorReads);
+  await evaluate('const actualNow=Date.now;Date.now=()=>actualNow()+61000;window.dispatchEvent(new Event("focus"))');
+  await retry(async () => assert.equal(state.reads, priorReads + 1));
+  assert.equal(await evaluate('document.getElementById("completion-notice").hidden'), true);
+  state.promptStatus = 401;
+  await evaluate('document.querySelector("#work-list .prompt-control button").click()');
+  await retry(async () => assert.equal(await evaluate('location.pathname'), '/login'));
+  state.promptStatus = 200;
+  await call('Page.navigate', {url:`http://${host}:${appPort}/`});
+  await retry(async () => assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 3));
   state.expired = true;
   await evaluate('document.getElementById("review-brief").click()');
   await retry(async () => assert.equal(await evaluate('location.pathname'), '/login'));
@@ -161,5 +241,5 @@ try {
   await rm(profile, {recursive:true, force:true, maxRetries:10, retryDelay:100});
   await new Promise((resolveClose) => server.close(resolveClose));
 }
-console.log('browser checks passed: contextual work, routine operations, stale safety, combined filters, clear-all, explicit review POST, uncertainty, refresh-error retention, expired-session login, 390px viewport');
+console.log('browser checks passed: contextual work, routine operations, stale safety, combined filters, clear-all, explicit review POST, uncertainty, refresh-error retention, clipboard copy, denied-copy fallback, failed-context handling, verified routine completion, failed-write retention, repeat-click guard, return refresh, expired-session login, 390px viewport');
 console.log('screenshots: /tmp/cockpit-desktop.png /tmp/cockpit-mobile.png');

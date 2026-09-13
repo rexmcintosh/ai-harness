@@ -137,7 +137,7 @@ def build(data, config):
             deps = [row['source']]
             if row.get('owner_surface_status'):
                 deps.append('Romance Ops')
-            current = {k: row.get(k, '') for k in ('id', 'title', 'initiative_name', 'status', 'source', 'source_url', 'evidence_at')}
+            current = {k: row.get(k, '') for k in ('id', 'title', 'initiative_name', 'status', 'source', 'source_url', 'prompt_url', 'evidence_at')}
             current.update(terminal=terminal, dependencies=deps,
                            signature=digest({k: row.get(k) for k in ('title', 'status', 'why', 'owner_surface_status', 'completed_at', 'merge_commit', 'deployment_followup')}),
                            detail_signature=digest({'due': row.get('due'), 'context_revision': row.get('context_revision')}))
