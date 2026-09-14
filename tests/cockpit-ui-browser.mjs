@@ -28,6 +28,28 @@ const snapshot = {
   initiatives: [], decisions: [], sources: [], coverage_notes: [], unmapped_repositories: [], resources: { detail: 'Fixture', usage: [] }
 };
 
+const profileFixture = {
+  state: 'available', as_of: '2026-09-14T09:00:00Z', review_by: '2026-09-28T09:00:00Z',
+  summary: 'Prepare a small teaching pilot.', scope: 'Test product only', next_step: 'Check the teaching loop.',
+  message: 'A prepared assessment of dated evidence.', mapping_issues: [], unmapped_work: [work[2]],
+  sources: [{ id: 'rules', title: 'Teaching rules', url: 'https://example.test/rules', state: 'dated', as_of: '2026-09-14T09:00:00Z', note: 'Authored rules only.' }],
+  capabilities: [{ id: 'product', title: 'Product development', level: 1, recorded_level: 1, target: 3, target_basis: 'proposed', note: 'Rules are defined.', next_step: 'Check real delivery.', evidence: ['rules'], evidence_state: 'recorded' }],
+  outcomes: [{ id: 'IS-01', title: 'Learning lasts', state: 'unknown', recorded_state: 'unknown', note: 'Learner results have not been observed.', next_step: 'Observe a delayed fresh answer.', evidence: [], evidence_state: 'needs_review' }],
+  requirements: [
+    { id: 'rules', title: 'Teaching rules prepared', state: 'verified', recorded_state: 'verified', satisfied: true, critical: true, capability: 'product', outcomes: ['IS-01'], note: 'Authored rules are present.', next_step: 'Use the rules.', evidence: ['rules'], evidence_state: 'recorded', dependency_gaps: [], depends_on: [], work: [] },
+    { id: 'delivery', title: 'Teaching loop works', state: 'defined', recorded_state: 'defined', satisfied: false, critical: true, capability: 'product', outcomes: ['IS-01'], note: 'Delivery still needs a check.', next_step: 'Run the complete learning loop.', evidence: ['rules'], evidence_state: 'recorded', dependency_gaps: [], depends_on: ['rules'], work: [work[0]] },
+    { id: 'costs', title: 'Operating costs understood', state: 'unknown', recorded_state: 'unknown', satisfied: false, critical: true, capability: 'product', outcomes: ['IS-01'], note: 'Cost evidence is missing.', next_step: 'Measure the pilot cost.', evidence: [], evidence_state: 'needs_review', dependency_gaps: ['delivery'], depends_on: ['delivery'], work: [] }
+  ],
+  workstreams: [{ id: 'tutor', title: 'Tutor pilot', purpose: 'Test the teaching loop.', stages: [
+    { id: 'pilot', title: 'Pilot', definition: 'One complete learning loop.', basis: 'proposed', requirements: ['rules', 'delivery'], state: 'needs_work', counts: { verified: 1, total: 2, unknown: 0, remaining: 1 }, critical_gaps: ['delivery'], dependency_gaps: [] },
+    { id: 'launch', title: 'Wider use', definition: 'Operate within a measured cost.', basis: 'proposed', requirements: ['costs'], state: 'unknown', counts: { verified: 0, total: 1, unknown: 1, remaining: 0 }, critical_gaps: ['costs'], dependency_gaps: ['delivery'] }
+  ] }]
+};
+snapshot.initiatives = [
+  { id: 'alpha', name: 'Alpha', purpose: 'Useful independent learning.', repos: ['alpha'], profile: profileFixture },
+  { id: 'unassessed', name: 'Unassessed venture', purpose: 'A separate venture.', repos: [], profile: { state: 'missing', message: 'A readiness assessment has not been prepared.', unmapped_work: [] } }
+];
+
 function reply(response, code, body, type = 'application/json') {
   response.writeHead(code, { 'Content-Type': type });
   response.end(body);
@@ -48,6 +70,7 @@ const server = createServer(async (request, response) => {
     return reply(response, 200, JSON.stringify({title, prompt:'Discuss '+title+'\nCurrent source and full review condition.'}));
   }
   if (request.method === 'GET' && request.url === '/static/app.js') return reply(response, 200, await readFile(resolve(root, 'cockpit/static/app.js'), 'utf8'), 'text/javascript');
+  if (request.method === 'GET' && request.url === '/static/initiatives.js') return state.initiativeScriptFail ? reply(response, 503, '{}') : reply(response, 200, await readFile(resolve(root, 'cockpit/static/initiatives.js'), 'utf8'), 'text/javascript');
   if (request.method === 'GET' && request.url === '/static/app.css') return reply(response, 200, await readFile(resolve(root, 'cockpit/static/app.css'), 'utf8'), 'text/css');
   if (request.method === 'POST' && request.url === '/api/operations/complete') {
     let body = '';
@@ -120,6 +143,46 @@ try {
   await call('Runtime.enable');
   await call('Page.enable');
   await retry(async () => assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 4));
+  // Initiative readiness follows requirements; changing a view never changes work.
+  assert.equal(await evaluate('document.querySelectorAll(".initiative-choice").length'), 2);
+  assert.equal(await evaluate('document.querySelector(".stage-choice").textContent.includes("1 of 2 checks verified")'), true);
+  assert.equal(await evaluate('document.querySelector("#initiative-panel").textContent.includes("Teaching loop works")'), true);
+  await evaluate('document.querySelectorAll(".stage-choice")[1].click()');
+  assert.equal(await evaluate('document.querySelector(".stage-detail").textContent.includes("Operating costs understood")'), true);
+  assert.equal(await evaluate('document.querySelector(".stage-detail").textContent.includes("No task linked")'), true);
+  assert.equal(await evaluate('document.querySelector(".stage-detail").textContent.includes("Teaching loop works")'), true);
+  await evaluate('document.querySelector("[data-initiative-view=strength]").click()');
+  assert.equal(await evaluate('document.querySelector(".maturity-scale").textContent.includes("Defined")'), true);
+  assert.equal(await evaluate('document.querySelector("#initiative-body").textContent.includes("Proposed target: Dependable")'), true);
+  await evaluate('document.querySelector("[data-initiative-view=outcomes]").click()');
+  assert.equal(await evaluate('document.querySelector("#initiative-body").textContent.includes("Learning lasts")'), true);
+  assert.equal(await evaluate('document.querySelector("#initiative-body .badge").textContent'), 'Unknown');
+  await evaluate('document.querySelector("[data-initiative-view=work]").click()');
+  assert.equal(await evaluate('document.querySelector("#initiative-body").textContent.includes("Decide whether the source fix is ready")'), true);
+  assert.equal(await evaluate('document.querySelector("#initiative-body").textContent.includes("Work not yet mapped")'), true);
+  assert.equal(state.promptReads, 0);
+  assert.equal(state.completions, 0);
+  assert.equal(state.reviews, 0);
+  await evaluate('document.querySelectorAll(".initiative-choice")[1].click()');
+  assert.equal(await evaluate('document.querySelector("#initiative-panel").textContent.includes("A readiness assessment has not been prepared")'), true);
+  await evaluate('location.hash="initiative-%61lpha"');
+  await retry(async () => assert.equal(await evaluate('document.querySelector("#initiative-panel h3").textContent'), 'Alpha'));
+  await evaluate('document.querySelector(".initiative-choice").click();document.querySelector("[data-initiative-view=readiness]").click()');
+  await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  await evaluate('document.getElementById("initiatives").scrollIntoView()');
+  await screenshot('/tmp/cockpit-readiness-desktop.png');
+  await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+  await screenshot('/tmp/cockpit-readiness-mobile.png');
+  await evaluate('document.getElementById("main").scrollIntoView()');
+  state.initiativeScriptFail = true;
+  await call('Page.reload', { ignoreCache: true });
+  await retry(async () => assert.equal(await evaluate('document.querySelectorAll("#work-list .work-row").length'), 4));
+  assert.equal(await evaluate('document.getElementById("initiative-list").textContent.includes("readiness view could not load")'), true);
+  assert.equal(await evaluate('document.getElementById("resource-view").textContent.includes("Cash and allocation")'), true);
+  state.initiativeScriptFail = false;
+  await call('Page.reload', { ignoreCache: true });
+  await retry(async () => assert.equal(await evaluate('document.querySelectorAll(".stage-choice").length'), 2));
   assert.equal(await evaluate('document.querySelector(".attention-disclosure").open'), false);
   assert.equal(await evaluate('document.getElementById("operations").textContent.includes("Comment on today’s TikTok posts")'), true);
   assert.equal(await evaluate('document.getElementById("operations").textContent.includes("Due today")'), true);

@@ -11,7 +11,7 @@ from urllib.parse import quote
 import yaml
 
 from .actions import revision
-from . import briefing, context
+from . import briefing, context, readiness
 
 
 def stamp():
@@ -166,6 +166,12 @@ def snapshot(config):
     except (OSError, ValueError, yaml.YAMLError):
         catalog = {}
         catalog_source = source_record('Portfolio direction and decisions', config['CATALOG_PATH'], 'unavailable', 'Direction could not be read.')
+    for initiative in catalog.get('initiatives', []):
+        repos = initiative.get('repos', [])
+        if not isinstance(repos, list) or not all(isinstance(repo, str) for repo in repos):
+            initiative['repos'] = []
+            initiative['catalog_error'] = 'Repository links have an invalid format.'
+            catalog_source.update(status='unavailable', detail='Some initiative repository links are invalid. Source work remains visible.')
     work, backlog_source = local_work(config)
     results, archive_source = archived_results(config)
     sources = [catalog_source, backlog_source, archive_source, *health_sources(config, catalog)]
@@ -209,12 +215,13 @@ def snapshot(config):
     for row in results:
         briefing.enrich(row, initiatives, terminal=True)
         context.attach(row, explanations)
+    for row in work + results:
+        row['prompt_url'] = '/api/work-prompt/' + quote(briefing.record_key(row), safe='')
+    readiness.attach(config, initiatives, work, results, sources)
     data = {'generated_at': stamp(), 'initiatives': initiatives, 'results': results,
             'decisions': catalog.get('decisions', []), 'work': work, 'sources': sources,
             'resources': resources(config), 'unmapped_repositories': coverage,
             'coverage_notes': catalog.get('coverage_notes', []),
             'mode': 'Owner controls enabled' if (config.get('ENABLE_ACTIONS') or (config.get('COMPLETION_ENABLED') and config.get('REMOTE_READS'))) else 'Read-only view'}
-    for row in work + results:
-        row['prompt_url'] = '/api/work-prompt/' + quote(briefing.record_key(row), safe='')
     briefing.build(data, config)
     return data

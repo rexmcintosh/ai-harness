@@ -53,7 +53,8 @@ function badge(value, label) {
 
 function link(url, label) {
   const value = text(url);
-  const safeInternal = /^\/decisions\/[a-zA-Z0-9_.-]+$/.test(value) || /^\/work\/[a-zA-Z0-9._~%-]+$/.test(value);
+  const safeInternal = /^\/decisions\/[a-zA-Z0-9_.-]+$/.test(value) || /^\/work\/[a-zA-Z0-9._~%-]+$/.test(value)
+    || /^\/initiatives\/[a-zA-Z0-9_.-]+\/sources\/[a-zA-Z0-9_.-]+$/.test(value);
   if (!value || !(value.startsWith('https://') || value.startsWith('http://') || safeInternal)) return el('span', 'muted', label);
   const anchor = el('a', 'text-link', label);
   anchor.href = value;
@@ -331,17 +332,21 @@ function renderBrief() {
 }
 
 function renderInitiatives() {
-  const initiatives = list(snapshot.initiatives);
-  $('initiative-list').replaceChildren(...initiatives.map((initiative) => {
-    const row = el('article', 'initiative');
-    const heading = add(el('div', 'initiative-heading'), el('h3', '', text(initiative.name, 'Unnamed initiative')), badge(initiative.assessment || 'unassessed'));
-    const intent = add(el('div', 'initiative-intent'), el('p', '', text(initiative.purpose, 'The current Ideal State has not been linked.')), initiative.ideal_url ? link(initiative.ideal_url, 'Ideal State') : el('small', '', 'No verified Ideal State link connected'));
-    const evidence = add(el('div', 'initiative-evidence'), el('p', '', text(initiative.evidence, 'Outcome evidence is not connected.')), el('small', '', `Baseline evidence: ${fmt(initiative.observed_at)}`));
-    const count = list(snapshot.work).filter((work) => work.initiative_id === initiative.id || (!work.initiative_id && list(initiative.repos).includes(work.repo))).length;
-    add(row, heading, intent, evidence, el('p', 'initiative-count', `${count} live item${count === 1 ? '' : 's'}`));
-    return row;
-  }));
-  if (!initiatives.length) $('initiative-list').append(empty('No initiative baselines are connected.'));
+  if (typeof window.CockpitInitiatives?.render !== 'function') {
+    $('initiative-list').replaceChildren(el('p', 'error', 'The readiness view could not load. Refresh to try again. All work remains below.'),
+      ...list(snapshot.initiatives).map((item) => add(el('article', 'initiative'), el('h3', '', item.name), el('p', '', item.purpose))));
+    return;
+  }
+  window.CockpitInitiatives.render(snapshot, { el, add, list, text, badge, link, fmt, ownerBrief, copyPromptControl,
+    showWork: (id) => {
+      $('filter').value = ''; $('category-filter').value = 'all'; $('work-type-filter').value = 'all';
+      if (![...$('initiative-filter').options].some((option) => option.value === id)) {
+        const option = el('option', '', list(snapshot.initiatives).find((i) => i.id === id)?.name || id);
+        option.value = id; $('initiative-filter').append(option);
+      }
+      $('initiative-filter').value = id; renderWork(); location.hash = 'work'; $('initiative-filter').focus();
+    }
+  });
 }
 
 function renderReferenceCases() {

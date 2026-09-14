@@ -6,6 +6,7 @@
   <meta name="csrf-token" content="{{ csrf }}">
   <title>Portfolio | Today</title>
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/initiatives.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -39,6 +40,7 @@
         <details class="brief-disclosure attention-disclosure"><summary><span id="attention-title">Awaiting review</span><span id="attention-count" class="muted"></span></summary><div id="attention"></div></details>
         <details class="brief-disclosure results-disclosure"><summary><span>All recorded results</span><span id="all-results-count" class="muted"></span></summary><div><p id="results-archive-note" class="muted"></p><div id="all-results"></div></div></details>
       </section>
+      <section id="initiatives" aria-labelledby="initiatives-title"><div class="section-title"><div><h2 id="initiatives-title">Initiatives</h2><p>Readiness, operating strength, and the path to the Ideal State.</p></div></div><div id="initiative-list"></div></section>
       <section id="work" aria-labelledby="work-title">
         <div class="section-title"><div><h2 id="work-title">All work</h2><p>Every active item from connected sources.</p></div><span id="work-total"></span></div>
         <div class="work-tools" role="group" aria-label="Work filters">
@@ -50,7 +52,6 @@
         </div>
         <p id="work-count" class="result-count" aria-live="polite"></p><div id="work-list"></div><p id="empty" class="empty-state" hidden>No work matches these filters. Clear the filters to see all work.</p>
       </section>
-      <section id="initiatives" aria-labelledby="initiatives-title"><div class="section-title"><div><h2 id="initiatives-title">Initiative baselines</h2><p>Dated context beside current live work counts.</p></div></div><div id="initiative-list"></div></section>
       <section id="reference-cases" aria-labelledby="reference-title"><details class="reference-cases"><summary><span id="reference-title">Dated reference cases</span><span id="reference-count" class="muted"></span></summary><div id="decisions"></div></details></section>
       <section id="operations" aria-labelledby="operations-title"><div class="section-title"><div><h2 id="operations-title">Connected sources</h2><p>Source health and evidence coverage.</p></div></div><div id="sources"></div><div id="coverage" class="coverage"></div></section>
       <section id="resources" aria-labelledby="resources-title"><div class="section-title"><div><h2 id="resources-title">Resources and monthly review</h2><p>Recorded use stays separate from cash and outcomes.</p></div></div><div id="resource-view"></div></section>
