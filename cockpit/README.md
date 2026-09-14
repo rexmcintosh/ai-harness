@@ -133,3 +133,85 @@ The handoff carries selected evidence fields, never a whole snapshot or action t
 Clipboard writes begin in the click handler, with the read result supplied as a Promise. A denied or unavailable clipboard opens a selectable-text dialog with an explicit Copy prompt retry. A source error produces no stale fallback prompt. See [MDN Clipboard API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API) for browser permission differences. Only a successful clipboard result shows Copied.
 
 Validate with `python -m pytest tests/test_cockpit_handoff.py -q` and `node tests/cockpit-ui-browser.mjs`. Cover exact context, full review conditions, changed sources, duplicate/missing records, removed execution routes, real clipboard copy, denied permissions, failed reads, manual fallback and mobile fit.
+
+## Initiative readiness maps
+
+Initiatives now appear before All work. Each prepared assessment offers **Ready to
+use**, **Operating strength**, **Ideal State**, and **Work ahead** views. Products
+and pilots have separate stage maps. Each segment represents one requirement;
+counts refer to verified checks, not overall completion or effort. Opening a
+requirement shows its evidence, prerequisites, next step, and exact linked work.
+Gaps without tasks and active work without a supported mapping remain visible.
+
+`COCKPIT_INITIATIVES_PATH` selects the private assessment file, defaulting to
+`<projects>/.cockpit/initiative-profiles.json`. Keep it outside Git and package
+artifacts, with mode 0600. A preview uses its own assessment file. This is authored
+assessment data, not another task queue. It does not write to Notion, run models,
+create tasks, change an Ideal State, or authorize a release.
+
+The version 1 JSON envelope is `{"version": 1, "initiatives": {"catalog-id": profile}}`.
+A profile contains:
+
+- `as_of` and `review_by`: timezone-qualified timestamps; the assessment must not
+  be future-dated and review must follow assessment. Expired claims become Unknown.
+- `summary`, `scope`, `next_step`, and optional `target_scope`: plain owner context.
+- `sources`: unique `id`, `title`, `as_of`, `note`, and either an external `url`
+  with a `revision` label, or a project-relative Markdown `path` with `sha256`.
+  External sources retain the last inspection date; refresh does not fetch them.
+  Local documents are checked against their recorded SHA-256 on each read.
+- `capabilities`: unique `id`, `title`, `level`, `target`, `target_basis`, `note`,
+  `evidence` source IDs, and `next_step`. Levels and targets are integer 0 through 4,
+  or null for Unknown/unset. Basis is `agreed` or `proposed`. The visible levels are
+  Missing, Defined, Used, Dependable, Improving; no maximum level is required.
+- `outcomes`: unique `id`, `title`, `state`, `note`, `evidence`, `next_step`. States
+  are `unknown`, `partial`, `supported`, or `contradicted`; support is within the
+  stated evidence scope. Completed tasks never promote these states.
+- `requirements`: unique `id`, `title`, `state`, Boolean `critical`, one
+  `capability` ID, `outcomes` IDs, `evidence` IDs, `note`, `next_step`, and
+  `depends_on` requirement IDs. States are `unknown`, `missing`, `defined`, `built`,
+  `verified`, `blocked`. Dependencies must exist and cannot form cycles.
+- `workstreams`: unique `id`, `title`, `purpose`, and `stages`. Each stage has a
+  locally unique `id`, `title`, `definition`, `basis`, and `requirements` IDs.
+  Empty stages are Unknown. A stage is verified only when every listed check and
+  all its prerequisites have supported verification; explicit critical gaps and
+  dependencies outside that stage remain visible. No new release gate is created.
+- `work_links`: existing `source`, exact `id`, `revision` copied from that record's
+  current `context_revision`, and associated `requirements` IDs. Read the full
+  work and review before binding a mapping. Changed, duplicate, foreign-initiative,
+  and missing records cannot inherit an old mapping. Active unmatched work appears
+  in Work not yet mapped. Closed records can be linked as results without changing
+  readiness. No signed action controls are embedded in assessment work links.
+
+Every claim other than Unknown needs readable dated evidence. A changed or
+missing local source makes its dependent claims Unknown, while preserving the
+previous level/state and explanation for inspection. Affected next steps ask for
+evidence review. Prepared assessments have a finite review date because external
+sources and real-world outcomes can change without a local file edit. This is
+source fidelity, not independent proof of every historical statement in a file.
+The Attain preparation specifically avoids treating unchecked items in an older
+launch checklist as present-day findings when later records contradict them.
+
+`/initiatives/<initiative>/sources/<source>` displays an authenticated, escaped
+local source document. It accepts configured IDs only, limits documents to 500 KB,
+and rejects absolute paths, parent traversal, and targets outside the projects
+root. Each path component is opened relative to its parent with symlink following
+disabled. Reads are bounded on the opened file, use explicit UTF-8, and hash the
+same bytes that are displayed. A changed document displays a notice. Private source paths do not enter the
+snapshot. Malformed profiles fail individually without hiding source work. The
+whole prepared assessment contributes to the existing brief review fingerprint,
+so an old tab cannot acknowledge an unseen assessment change.
+
+Unknown source IDs return 404. An unreadable or malformed configured source
+returns 503; its log identifies the error type without document content. A bad
+requirement does not prevent inspection of a valid source. Broad profile file
+permissions appear as a source issue without hiding work. Authors should replace
+the complete assessment atomically: write UTF-8 to a temporary file in the same
+directory, set mode 0600, then use `os.replace`. Do not edit the live JSON in place.
+A failed `initiatives.js` load shows a plain fallback and lets the remaining
+cockpit sections render.
+
+Validate with `python -m pytest tests/test_cockpit_readiness.py -q` and the existing
+`node tests/cockpit-ui-browser.mjs`. Tests cover missing/invalid/expired evidence,
+source revision changes, prerequisites, supported readiness, safe work mapping,
+source access, unchanged files, unseen assessment changes, initiative/stage/view
+navigation, missing-task gaps, existing work controls, and a 390px viewport.

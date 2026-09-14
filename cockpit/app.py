@@ -13,7 +13,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash
 from werkzeug.exceptions import SecurityError
 
-from . import actions, sources, briefing, completion, handoff
+from . import actions, sources, briefing, completion, handoff, readiness
 
 
 def create_app(config=None):
@@ -37,6 +37,7 @@ def create_app(config=None):
     app.config.setdefault('ARCHIVE_PATH', str(Path(app.config['BACKLOG_PATH']).with_name('archive.yaml')))
     app.config.setdefault('BRIEF_STATE_PATH', os.environ.get('COCKPIT_BRIEF_STATE_PATH', str(Path(app.config['PROJECTS_ROOT']) / '.cockpit' / 'review.json')))
     app.config.setdefault('CONTEXT_PATH', os.environ.get('COCKPIT_CONTEXT_PATH', str(Path(app.config['PROJECTS_ROOT']) / '.cockpit' / 'work-context.json')))
+    app.config.setdefault('INITIATIVES_PATH', os.environ.get('COCKPIT_INITIATIVES_PATH', str(Path(app.config['PROJECTS_ROOT']) / '.cockpit' / 'initiative-profiles.json')))
     if len(app.config['SECRET_KEY']) < 32 or not app.config['PASSWORD_HASH']:
         raise ValueError('Set a strong cockpit signing key and owner password hash before starting')
     signer = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='portfolio-owner-action')
@@ -93,6 +94,17 @@ def create_app(config=None):
     @app.get('/')
     def index():
         return render_template('index.html', csrf=session['csrf'])
+
+    @app.get('/initiatives/<initiative_id>/sources/<source_id>')
+    def initiative_source(initiative_id, source_id):
+        try:
+            document = readiness.source_document(app.config, initiative_id, source_id)
+        except readiness.SourceNotFound:
+            abort(404)
+        except readiness.SourceUnavailable as exc:
+            app.logger.warning('initiative source unavailable: %s', str(exc))
+            abort(503)
+        return render_template('initiative-source.html', document=document)
 
     @app.get('/api/snapshot')
     def snapshot():
