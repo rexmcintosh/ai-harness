@@ -20,6 +20,11 @@
                                          lost to fenced distill output, quarantine still-
                                          unreadable artifacts, clear stale people/ routes
   rollback --ts <stamp>                  restore ~/.claude from a promote backup
+  reconcile-phantom [--apply] [--folds-dir D]
+                                         one-time cleanup of the phantom ~/wiki/wiki/ tree
+                                         (dry-run default): fold curated text into the
+                                         real articles, merge markers, git rm the phantoms,
+                                         commit on master. Never pushes.
 """
 from __future__ import annotations
 
@@ -99,6 +104,10 @@ def main(argv=None) -> int:
     rq = sub.add_parser("requeue"); rq.add_argument("session_id")
     fx = sub.add_parser("fixup-triage"); fx.add_argument("--apply", action="store_true")
     rb = sub.add_parser("rollback"); rb.add_argument("--ts", required=True)
+    rp = sub.add_parser("reconcile-phantom")
+    rp.add_argument("--apply", action="store_true")
+    rp.add_argument("--folds-dir", type=Path, default=_REPO / "docs" / "loom-phantom-wiki-folds",
+                    help="dir of <real-rel-path>.md fold files appended to the real articles")
 
     args = parser.parse_args(argv)
     cfg = default_config()
@@ -183,6 +192,18 @@ def main(argv=None) -> int:
         print(json.dumps(triage_fixup(cfg, apply=args.apply), cls=_PathEncoder)); return 0
     if args.cmd == "rollback":
         res = rollback(backups_dir=cfg.loom_dir / "promote-backups", ts=args.ts)
+        print(json.dumps(res, cls=_PathEncoder)); return 0
+    if args.cmd == "reconcile-phantom":
+        from .phantom import PhantomError, apply as phantom_apply, plan as phantom_plan
+        if not args.apply:
+            print(json.dumps(phantom_plan(cfg.wiki_master, folds_dir=args.folds_dir),
+                             cls=_PathEncoder)); return 0
+        try:
+            res = phantom_apply(cfg.wiki_master, folds_dir=args.folds_dir,
+                                lock_path=cfg.loom_dir / ".run.lock",
+                                shadow_root=cfg.wiki_worktree)
+        except PhantomError as e:
+            print(json.dumps({"applied": False, "error": str(e)})); return 1
         print(json.dumps(res, cls=_PathEncoder)); return 0
     return 1
 
