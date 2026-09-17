@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+# agents — at-a-glance status of your per-project Claude Code tmux sessions,
+#          with optional Telegram nudges when one needs you.
+#
+#   agents              one-shot dashboard (blocked/waiting float to the top)
+#   agents once         one poll; nudge sessions that JUST started needing you (for cron)
+#   agents watch [S]    loop every S seconds (default 30), nudging on transitions
+#   agents test-nudge   send a test Telegram message and exit
+#
+# State is inferred from each session's VISIBLE tmux pane. The Claude Code UI
+# randomizes its verb ("Forging/Baked/Cooked/…"), so detection keys off the
+# *fixed* UI strings, never the verb:
+#   BLOCKED  a permission/approval modal is up  → agent is frozen, needs you NOW
+#   WAITING  a turn finished, nothing in flight → your reply is needed
+#   WORKING  a turn is in flight ("esc to interrupt" on screen) → leave it alone
+#   IDLE     empty prompt, nothing pending
+#
+# Telegram token: read from ~/.claude/channels/telegram/.env (TELEGRAM_BOT_TOKEN).
+# Chat id: $AGENTS_TG_CHAT (defaults to the allowlisted DM id).
+set -uo pipefail
+
+TG_ENV="${AGENTS_TG_ENV:-$HOME/.claude/channels/telegram/.env}"
+TG_CHAT="${AGENTS_TG_CHAT:-7735693897}"
+STATE_DIR="${AGENTS_STATE_DIR:-$HOME/.cache/agents}"
+SKIP_ATTACHED="${AGENTS_SKIP_ATTACHED:-1}"   # in once/watch, don't nudge sessions you're attached to
+TG_SEND="${AGENTS_TG_SEND:-$HOME/projects/build-ai-automation-workflow/bin/tg-send}"
+
+have_tmux() { tmux ls >/dev/null 2>&1; }
+
+# "<attached-count> <session-name>" per line
+sessions() { tmux ls -F '#{session_attached} #{session_name}' 2>/dev/null; }
+
+# classify SESSION -> prints one of: BLOCKED WORKING WAITING IDLE GONE
+classify() {
+  local sess="$1" pane tail
+  pane="$(tmux capture-pane -t "$sess" -p -J 2>/dev/null)" || { echo GONE; return; }
+  tail="$(printf '%s\n' "$pane" | sed 's/[[:space:]]*$//' | grep -v '^$' | tail -15)"
+
+  # 1) permission / selection modal — agent is frozen (ASCII-only signals, cron-safe)
+  if printf '%s\n' "$tail" | grep -qE 'Esc to cancel|Enter to select|Do you want to (proceed|create|make|run|apply)'; then
+    echo BLOCKED; return
+  fi
+  # 2) a turn is actively in flight
+  if printf '%s\n' "$tail" | grep -qF 'esc to interrupt'; then
+    echo WORKING; return
+  fi
+  # 3) a turn just completed and nothing is in flight -> ball's in your court.
+  #    Primary signal: a "<glyph> <Capitalized-verb> for <N>m <N>s" status line.
+  if printf '%s\n' "$tail" | grep -qE '^[^A-Za-z]*[A-Z][a-z]+ for [0-9]+m [0-9]+s$|^[^A-Za-z]*[A-Z][a-z]+ for [0-9]+s$|How is Claude doing this session|new task\? /clear|say "do it"'; then
+    echo WAITING; return
+  fi
+  echo IDLE
+}
+
+# last thing the agent said (for dashboard context), trimmed;
+# skip the feedback-survey line, which is noise
+ctx() {
+  tmux capture-pane -t "$1" -p -J 2>/dev/null \
+    | grep -E '^[[:space:]]*●' \
+    | grep -vE 'How is Claude doing this session' \
+    | tail -1 \
+    | sed 's/^[[:space:]]*●[[:space:]]*//; s/[[:space:]]*$//' | cut -c1-52
+}
+
+emoji() { case "$1" in BLOCKED) printf '🔴';; WAITING) printf '🟠';; WORKING) printf '🟡';; IDLE) printf '⚪';; *) printf '⚫';; esac; }
+rank()  { case "$1" in BLOCKED) echo 0;; WAITING) echo 1;; WORKING) echo 2;; IDLE) echo 3;; *) echo 9;; esac; }
+
+dashboard() {
+  have_tmux || { echo "no tmux server running"; return 1; }
+  local need=0 work=0 idle=0 rows="" att sess state
+  while read -r att sess; do
+    [ -n "${sess:-}" ] || continue
+    state="$(classify "$sess")"
+    [ "$state" = GONE ] && continue
+    case "$state" in BLOCKED|WAITING) need=$((need+1));; WORKING) work=$((work+1));; IDLE) idle=$((idle+1));; esac
+    local star=""; [ "$att" != "0" ] && star="*"
+    rows+="$(rank "$state")|$state|$sess$star"$'\n'
+  done < <(sessions)
+
+  printf '%s' "$rows" | sort -t'|' -k1,1n -k3,3 | while IFS='|' read -r r state disp; do
+    [ -n "${disp:-}" ] || continue
+    local note=""
+    case "$state" in
+      BLOCKED) note="approve/deny — $(ctx "${disp%\*}")";;
+      WAITING) note="$(ctx "${disp%\*}")"; [ -n "$note" ] || note="your reply needed";;
+      WORKING) note="busy";;
+      IDLE)    note="empty prompt";;
+    esac
+    printf '%s  %-8s %-22s %s\n' "$(emoji "$state")" "$state" "$disp" "$note"
+  done
+  printf '\n\033[2m%d need you · %d working · %d idle   (* = you'"'"'re attached)\033[0m\n' "$need" "$work" "$idle"
+}
+
+tg_send() {
+  local text="$1"
+  [ -x "$TG_SEND" ] || { echo "tg-send unavailable; check AGENTS_TG_SEND or the shared checkout" >&2; return 1; }
+  TG_SEND_RECEIPT_OUTPUT=1 TG_ENV="$TG_ENV" "$TG_SEND" "$TG_CHAT" "$text"
+}
+
+# Preserve existing state names for ordinary tmux sessions. Hash any unusual
+# name so slashes, dot components, and replacement collisions cannot escape or
+# alias another session's files.
+state_key() {
+  local sess="$1"
+  case "$sess" in
+    *[!A-Za-z0-9_-]*)
+      printf 'session.%s' "$(printf '%s' "$sess" | sha256sum | cut -d' ' -f1)"
+      ;;
+    *) printf '%s' "$sess" ;;
+  esac
+}
+
+# Replace TARGET atomically, then sync both the file and containing directory.
+# Bytes arrive on stdin. A failed replace leaves the old target untouched.
+durable_replace() {
+  local target="$1"
+  python3 -c '
+import os
+import sys
+import tempfile
+
+target = sys.argv[1]
+directory = os.path.dirname(target)
+temporary = None
+try:
+    fd, temporary = tempfile.mkstemp(prefix="." + os.path.basename(target) + ".tmp.", dir=directory)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(sys.stdin.buffer.read())
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, target)
+    directory_fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+except Exception as error:
+    if temporary is not None:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+    print(f"cannot persist {target}: {error}", file=sys.stderr)
+    raise SystemExit(1)
+' "$target"
+}
+
+write_delivery() {
+  local target="$1" status="$2" need="$3"
+  printf '{"version":1,"status":"%s","need":"%s"}\n' "$status" "$need" |
+    durable_replace "$target"
+}
+
+delivery_status() {
+  local target="$1"
+  python3 -c '
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as stream:
+        record = json.load(stream)
+    status = record.get("status")
+    print(status if status in {"attempting", "uncertain", "failed"} else "invalid")
+except (OSError, ValueError, AttributeError):
+    print("invalid")
+' "$target"
+}
+
+accepted_receipt() {
+  python3 -c '
+import json
+import sys
+
+try:
+    receipt = json.load(sys.stdin)
+except (ValueError, TypeError):
+    raise SystemExit(1)
+accepted = (
+    isinstance(receipt, dict)
+    and receipt.get("status") == "accepted"
+    and isinstance(receipt.get("message_ids"), list)
+    and bool(receipt["message_ids"])
+    and all(isinstance(value, int) and not isinstance(value, bool) for value in receipt["message_ids"])
+)
+raise SystemExit(0 if accepted else 1)
+'
+}
+
+poll_session() (
+  local att="$1" sess="$2" silent="$3"
+  local key f delivery receipt_file state prev receipt rc status head
+  key="$(state_key "$sess")"
+  f="$STATE_DIR/$key"
+  delivery="$STATE_DIR/delivery-$key.json"
+  receipt_file="$STATE_DIR/receipt-$key.json"
+
+  exec 9>"$STATE_DIR/.locks/$key.lock" || return 1
+  flock -n -E 75 9
+  local lock_rc=$?
+  [ "$lock_rc" -ne 75 ] || return 0
+  [ "$lock_rc" -eq 0 ] || { echo "agents: lock infrastructure failed for $sess" >&2; return 1; }
+
+  if [ "$SKIP_ATTACHED" = "1" ] && [ "$att" != "0" ]; then
+    rm -f "$f"
+    return 0
+  fi
+
+  state="$(classify "$sess")"
+  case "$state" in
+    BLOCKED|WAITING)
+      prev=""; [ -f "$f" ] && prev="$(cat "$f")"
+      [ "$prev" = "$state" ] && return 0
+
+      if [ -e "$delivery" ]; then
+        status="$(delivery_status "$delivery")"
+        case "$status" in
+          failed) ;;
+          *) echo "agents: unresolved delivery for $sess; inspect $delivery" >&2; return 1 ;;
+        esac
+      fi
+
+      if [ "$silent" = "silent" ]; then
+        printf '%s' "$state" | durable_replace "$f" >/dev/null
+        return 0
+      fi
+
+      head="🟠 $sess is waiting for you"
+      [ "$state" = BLOCKED ] && head="🔴 $sess needs approval"
+
+      # This intent must reach disk before the sender starts. An interruption
+      # therefore leaves attempting evidence, which is never replayed blindly.
+      write_delivery "$delivery" attempting "$state" || return 1
+
+      receipt="$(tg_send "$head"$'\n'"$(ctx "$sess")"$'\n'"→ tmux a -t $sess")"
+      rc=$?
+      if [ "$rc" -ne 0 ]; then
+        if [ "$rc" -eq 1 ] || [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ]; then status=failed; else status=uncertain; fi
+        write_delivery "$delivery" "$status" "$state" >/dev/null || true
+        return 1
+      fi
+
+      if ! printf '%s' "$receipt" | accepted_receipt; then
+        write_delivery "$delivery" uncertain "$state" >/dev/null || true
+        return 1
+      fi
+
+      if ! printf '%s\n' "$receipt" | durable_replace "$receipt_file" >/dev/null; then
+        write_delivery "$delivery" uncertain "$state" >/dev/null || true
+        return 1
+      fi
+
+      if ! printf '%s' "$state" | durable_replace "$f" >/dev/null; then
+        write_delivery "$delivery" uncertain "$state" >/dev/null || true
+        return 1
+      fi
+      rm -f "$delivery"
+      ;;
+    *)
+      rm -f "$f" "$delivery" "$receipt_file"
+      ;;
+  esac
+)
+
+# one poll pass; edge-triggered Telegram nudges (no repeat while state persists).
+# poll_nudge silent  → record current states WITHOUT sending (for priming).
+poll_nudge() {
+  local silent="${1:-}" att sess failed=0
+  have_tmux || return 0
+  mkdir -p "$STATE_DIR/.locks" || return 1
+  while read -r att sess; do
+    [ -n "${sess:-}" ] || continue
+    poll_session "$att" "$sess" "$silent" || failed=1
+  done < <(sessions)
+  return "$failed"
+}
+
+case "${1:-dashboard}" in
+  ""|dashboard|ls|status) dashboard ;;
+  once)  poll_nudge ;;
+  prime) poll_nudge silent; echo "primed $(ls -1 "$STATE_DIR" 2>/dev/null | wc -l | tr -d ' ') needy session(s) — cron will stay quiet until states change" ;;
+  watch) shift; iv="${1:-30}"; echo "watching every ${iv}s — Ctrl-C to stop"; while :; do poll_nudge; sleep "$iv"; done ;;
+  test-nudge) tg_send "agents ✅ test nudge — $(tmux ls 2>/dev/null | wc -l | tr -d ' ') sessions live" ;;
+  -h|--help|help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "usage: agents [dashboard|once|watch [sec]|test-nudge]" >&2; exit 2 ;;
+esac
