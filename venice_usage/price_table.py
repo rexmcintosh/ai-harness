@@ -33,19 +33,19 @@ the cache shapes above were taken from.
 
 from __future__ import annotations
 
-REFRESHED_AT = "2026-09-12"
+REFRESHED_AT = "2026-09-17"
 CATALOGUE_URL = "https://api.venice.ai/api/v1/models"
 BILLING_URL = "https://api.venice.ai/api/v1/billing/usage-history"
-BILLING_WINDOW = "2026-08-22..2026-09-13"
+BILLING_WINDOW = "2026-08-27..2026-09-18"
 STALE_AFTER_DAYS = 30
 
 # DIEM per 1,000,000 tokens.
 PRICES: dict[str, dict[str, float]] = {
-    "claude-fable-5": {"input": 12.0, "output": 60.0, "cache_read": 1.2, "cache_write_5m": 15.0},
+    "claude-fable-5": {"input": 12.0, "output": 60.0, "cache_read": 1.2, "cache_write_5m": 15.0, "cache_write_1h": 24.0},
     "claude-fable-5-1": {"input": 12.0, "output": 60.0, "cache_read": 0.3, "cache_write_5m": 15.0},
     "claude-opus-4-6": {"input": 6.0, "output": 30.0, "cache_read": 0.6, "cache_write": 7.5},
     "claude-opus-4-7": {"input": 6.0, "output": 30.0, "cache_read": 0.6, "cache_write": 7.5},
-    "claude-opus-4-8": {"input": 6.0, "output": 30.0, "cache_read": 0.6, "cache_write_5m": 7.5},
+    "claude-opus-4-8": {"input": 6.0, "output": 30.0, "cache_read": 0.6, "cache_write_5m": 7.5, "cache_write_1h": 12.0},
     "claude-opus-5": {"input": 6.0, "output": 30.0, "cache_read": 0.6, "cache_write_5m": 7.5},
     "claude-sonnet-4-6": {"input": 3.6, "output": 18.0, "cache_read": 0.36, "cache_write": 4.5},
     "claude-sonnet-5": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write_5m": 3.75, "cache_write_1h": 6.0},
@@ -77,8 +77,13 @@ PRICES: dict[str, dict[str, float]] = {
 
 # Seen in the ledger, not token-priced: the caller logs a real --usd.
 UNPRICED: dict[str, str] = {
+    "flux-2-max": "image model — no token pricing published",
     "gemini-omni-flash-1-1-image-to-video": "video model — no token pricing published",
     "gpt-image-2": "image model — no token pricing published",
+    "gpt-image-2-5-flare": "image model — no token pricing published",
+    "gpt-image-2-5-flare-edit": "inpaint model — no token pricing published",
+    "gpt-image-2-5-sunburst": "image model — no token pricing published",
+    "gpt-image-2-5-sunburst-edit": "inpaint model — no token pricing published",
     "kling-o3-pro-image-to-video": "video model — no token pricing published",
 }
 
@@ -87,7 +92,7 @@ UNPRICED: dict[str, str] = {
 UNKNOWN: tuple[str, ...] = ("m", "served-id", "test-model")
 
 # Every model id this table was generated to cover.
-COVERS: tuple[str, ...] = ("claude-fable-5", "claude-fable-5-1", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-4-6", "claude-sonnet-5", "deepseek-v4-1-flash", "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-pro-0813", "gemini-3-1-pro-preview", "gemini-3-5-flash", "gemini-omni-flash-1-1-image-to-video", "gpt-image-2", "grok-4-3", "grok-4-6", "kimi-k2-6", "kimi-k3", "kling-o3-pro-image-to-video", "m", "mistral-small-2603", "openai-gpt-53-codex", "openai-gpt-54", "openai-gpt-55", "openai-gpt-56-luna", "openai-gpt-56-sol", "openai-gpt-6-astra", "qwen-3-7-max", "qwen-3-8-max", "qwen3-235b-a22b-instruct-2507", "qwen3-coder-480b-a35b-instruct-turbo", "served-id", "test-model", "z-ai-glm-5-3", "zai-org-glm-5", "zai-org-glm-5-2")
+COVERS: tuple[str, ...] = ("claude-fable-5", "claude-fable-5-1", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-4-6", "claude-sonnet-5", "deepseek-v4-1-flash", "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-pro-0813", "flux-2-max", "gemini-3-1-pro-preview", "gemini-3-5-flash", "gemini-omni-flash-1-1-image-to-video", "gpt-image-2", "gpt-image-2-5-flare", "gpt-image-2-5-flare-edit", "gpt-image-2-5-sunburst", "gpt-image-2-5-sunburst-edit", "grok-4-3", "grok-4-6", "kimi-k2-6", "kimi-k3", "kling-o3-pro-image-to-video", "m", "mistral-small-2603", "openai-gpt-53-codex", "openai-gpt-54", "openai-gpt-55", "openai-gpt-56-luna", "openai-gpt-56-sol", "openai-gpt-6-astra", "qwen-3-7-max", "qwen-3-8-max", "qwen3-235b-a22b-instruct-2507", "qwen3-coder-480b-a35b-instruct-turbo", "served-id", "test-model", "z-ai-glm-5-3", "zai-org-glm-5", "zai-org-glm-5-2")
 
 # Above-threshold context tiers, recorded not applied.
 EXTENDED: dict[str, dict[str, float]] = {
@@ -102,9 +107,9 @@ EXTENDED: dict[str, dict[str, float]] = {
 
 # Observed rates from /billing/usage-history.
 BILLED: dict[str, dict[str, float]] = {
-    "claude-fable-5": {"cache_read": 1.2, "cache_write_5m": 15.0, "input": 12.0, "output": 60.0},
+    "claude-fable-5": {"cache_read": 1.2, "cache_write_1h": 24.0, "cache_write_5m": 15.0, "input": 12.0, "output": 60.0},
     "claude-fable-5-1": {"cache_read": 0.3, "cache_write_5m": 15.0, "input": 12.0, "output": 60.0},
-    "claude-opus-4-8": {"cache_read": 0.6, "cache_write_5m": 7.5, "input": 6.0, "output": 30.0},
+    "claude-opus-4-8": {"cache_read": 0.6, "cache_write_1h": 12.0, "cache_write_5m": 7.5, "input": 6.0, "output": 30.0},
     "claude-opus-5": {"cache_write_5m": 7.5, "input": 6.0, "output": 30.0},
     "claude-sonnet-5": {"cache_read": 0.3, "cache_write_1h": 6.0, "cache_write_5m": 3.75, "input": 3.0, "output": 15.0},
     "deepseek-v4-1-flash": {"input": 0.375, "output": 1.5},
@@ -120,7 +125,7 @@ BILLED: dict[str, dict[str, float]] = {
     "openai-gpt-54": {"cache_read": 0.313, "input": 3.13, "output": 18.8},
     "openai-gpt-55": {"input": 6.25, "output": 37.5},
     "openai-gpt-56-luna": {"input": 0.26666667, "output": 1.6},
-    "openai-gpt-56-sol": {"cache_write": 3.125, "input": 2.5, "output": 12.5},
+    "openai-gpt-56-sol": {"cache_read": 0.25, "cache_write": 3.125, "input": 2.5, "output": 12.5},
     "openai-gpt-6-astra": {"cache_write": 12.5, "input": 10.0, "output": 50.0},
     "qwen-3-7-max": {"cache_write": 3.35, "input": 2.7, "output": 8.05},
     "qwen-3-8-max": {"cache_read": 0.3125, "cache_write": 3.125, "input": 2.5, "output": 7.5},

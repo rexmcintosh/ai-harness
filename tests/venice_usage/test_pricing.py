@@ -83,8 +83,7 @@ def test_ledger_ids_the_catalogue_never_published_are_named_not_hidden():
 
 # --------------------------------------------------------------- the cache --
 def test_the_anthropic_family_bills_ttl_segmented_cache_writes():
-    # claude-sonnet-5 is the one model this account has ever been billed a 1h
-    # write for: 6.00 = 2.00x its 3.00 input, against 3.75 = 1.25x for the 5m.
+    # 6.00 = 2.00x its 3.00 input, against 3.75 = 1.25x for the 5m.
     row = price_row("claude-sonnet-5")
     assert row["cache_write_5m"] == 3.75
     assert row["cache_write_1h"] == 6.0
@@ -92,9 +91,19 @@ def test_the_anthropic_family_bills_ttl_segmented_cache_writes():
 
 
 def test_no_one_hour_rate_is_invented_for_a_model_never_billed_one():
-    row = price_row("claude-opus-4-8")
+    # claude-opus-5 has only ever been billed the 5m write on this account.
+    # (claude-opus-4-8 and claude-fable-5 held this role until the 2026-09-17
+    # refresh, when real 1h SKUs appeared on the bills for both. The rule is
+    # the invariant below, not any one model — the table is generated.)
+    row = price_row("claude-opus-5")
     assert row["cache_write_5m"] == 7.5          # billed, 1.25x the 6.00 input
     assert "cache_write_1h" not in row           # never billed -> never guessed
+
+
+def test_every_one_hour_rate_in_the_table_came_from_a_bill():
+    for model, row in pt.PRICES.items():
+        if "cache_write_1h" in row:
+            assert "cache_write_1h" in pt.BILLED.get(model, {}), model
 
 
 def test_a_model_outside_the_anthropic_family_bills_one_un_suffixed_write():
