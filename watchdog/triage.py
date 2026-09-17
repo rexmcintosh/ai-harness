@@ -141,7 +141,9 @@ def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
             continue
         args = row["args"].strip()
         executable = args.split()[0].rsplit("/", 1)[-1]
-        if not executable.startswith(command):
+        # `codex` and its helpers (`codex-code-mode`), but not unrelated
+        # neighbours like `codexctl` or `codexd`.
+        if executable != command and not executable.startswith(f"{command}-"):
             continue
         minutes = _etime_minutes(row["etime"])
         if minutes is not None and minutes < min_hours * 60:

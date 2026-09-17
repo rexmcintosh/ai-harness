@@ -242,3 +242,13 @@ def test_orphan_check_reports_an_orphan_whose_elapsed_time_is_unreadable():
     assert out.level == "warn"
     assert "unknown" in out.summary
     assert "pid 777" in out.evidence
+
+
+def test_orphan_check_does_not_match_neighbouring_command_names():
+    out = check_orphan_processes(
+        _ps(
+            "801       1  10-00:00:00 /usr/local/bin/codexctl daemon",
+            "802       1  10-00:00:00 codexd --serve",
+        )
+    )
+    assert out.level == "ok"

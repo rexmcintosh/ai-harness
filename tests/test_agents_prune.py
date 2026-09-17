@@ -35,6 +35,9 @@ case "$1 $2" in
     echo "stopped $2"
     ;;
   "rm "*)
+    if [ "${FAKE_RM_HANGS:-}" = "$2" ]; then
+      sleep 30
+    fi
     if [ "${FAKE_RM_REFUSES:-}" = "$2" ]; then
       echo "refusing: worktree has unpushed commits; pass --discard-unpushed abc123@wt-1" >&2
       exit 1
@@ -314,3 +317,19 @@ def test_dry_run_preview_uses_the_configured_cli(tmp_path):
     )
 
     assert f"{stub} stop aaaa1111" in result.stdout
+
+
+def test_a_hung_removal_is_bounded_and_reported(tmp_path):
+    result, calls = run_agents(
+        tmp_path,
+        [session(id="aaaa1111"), session(id="bbbb2222")],
+        "prune",
+        "--yes",
+        FAKE_RM_HANGS="aaaa1111",
+        AGENTS_CLAUDE_TIMEOUT_SEC="1",
+    )
+
+    assert result.returncode == 1
+    assert "timed out" in result.stdout
+    # the sweep carries on past the hung one
+    assert "rm bbbb2222" in calls

@@ -370,8 +370,19 @@ bg_dashboard() {
 
 # Close finished background sessions: stop (frees the process) then rm (frees
 # the list entry and, only when safe, the worktree). Dry-run unless --yes.
+# Everything prune leans on beyond bash itself. Say which one is missing rather
+# than failing later in a way that looks like "no sessions".
+require_tools() {
+  local tool missing=""
+  for tool in timeout python3 flock; do
+    command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+  done
+  [ -z "$missing" ] || { echo "agents: missing required tool(s):$missing" >&2; return 1; }
+}
+
 prune() {
   local yes=0 older=-1 arg
+  require_tools || return 1
   while [ $# -gt 0 ]; do
     case "$1" in
       -y|--yes) yes=1 ;;
@@ -428,8 +439,10 @@ prune() {
   while IFS=$'\t' read -r id name; do
     [ -n "${id:-}" ] || continue
     # An already-exited session has nothing to stop; rm is what clears it.
-    "$CLAUDE_BIN" stop "$id" >/dev/null 2>&1
-    out="$("$CLAUDE_BIN" rm "$id" 2>&1)"; rc=$?
+    # Both calls are bounded: one hung CLI must not stall the whole sweep.
+    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" stop "$id" >/dev/null 2>&1
+    out="$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" rm "$id" 2>&1)"; rc=$?
+    [ "$rc" -ne 124 ] || out="timed out after ${CLAUDE_TIMEOUT}s"
     if [ "$rc" -ne 0 ]; then
       # Keep it. --discard-unpushed / --force-remove-worktree are the operator's
       # call, never this script's.
