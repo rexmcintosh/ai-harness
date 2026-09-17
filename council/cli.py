@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import sys
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 from .config import load_panels, get_api_key, Settings, truncate, resolve_budget
@@ -96,6 +97,7 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
 
 def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -> int:
     p = argparse.ArgumentParser(prog="council")
+    p.add_argument("--version", action="version", version=f"%(prog)s {_pkg_version('council')}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("ask", help="ask the council a question")

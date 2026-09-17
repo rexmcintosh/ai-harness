@@ -190,3 +190,12 @@ def test_review_explicit_panel_overrides_autopick(tmp_path, member_json):
              _settings=settings, _panels=panels, _client=client)
     models = {c["model"] for c in client.calls}
     assert "code1" in models and "doc1" not in models
+
+
+def test_version_flag_prints_installed_version(capsys):
+    import pytest
+    from importlib.metadata import version
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert version("council") in capsys.readouterr().out
