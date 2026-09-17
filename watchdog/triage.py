@@ -87,6 +87,86 @@ def check_service_active(name: str, systemctl_output: str) -> CheckStatus:
     return CheckStatus(f"svc:{name}", "crit", f"service {name} is {state or 'unknown'}")
 
 
+# `ps -eo pid,ppid,etime,args` row: pid, ppid, [[dd-]hh:]mm:ss, then the command.
+_PS_ROW = re.compile(r"^\s*(?P<pid>\d+)\s+(?P<ppid>\d+)\s+(?P<etime>[\d:-]+)\s+(?P<args>\S.*)$")
+
+
+def _etime_minutes(raw: str) -> int | None:
+    """`ps` ELAPSED ([[dd-]hh:]mm:ss) as whole minutes, or None if unparsable."""
+    days, _, rest = raw.rpartition("-")
+    try:
+        parts = [int(p) for p in rest.split(":")]
+        offset = int(days) * 1440 if days else 0
+    except ValueError:
+        return None
+    if len(parts) == 3:
+        hours, minutes, _seconds = parts
+    elif len(parts) == 2:
+        hours, (minutes, _seconds) = 0, parts
+    else:
+        return None
+    return offset + hours * 60 + minutes
+
+
+def _age(minutes: int) -> str:
+    if minutes < 0:
+        return "unknown"
+    if minutes >= 1440:
+        return f"{minutes // 1440}d"
+    if minutes >= 60:
+        return f"{minutes // 60}h"
+    return f"{minutes}m"
+
+
+def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
+                           command: str = "codex") -> CheckStatus:
+    """Leaked `codex` processes: reparented to init (PPID 1) and still running.
+
+    The Codex CLI on PATH is a Node wrapper around a native binary. When the
+    calling session dies, or a helper's timeout kills the wrapper, the native
+    binary survives with PPID 1 and nobody is waiting for its answer. Two such
+    reviews (47 and 18 days old) were found by hand on 2026-09-17.
+
+    warn — one or more orphans at or past ``min_hours``.
+    ok   — none, or ``ps`` produced nothing usable (never invent a failure).
+
+    Report only. Killing a process is the operator's call, per the watchdog's
+    no-remediation rule.
+    """
+    name = f"proc:{command}-orphans" if command != "codex" else "proc:orphans"
+    found: list[tuple[int, str, str]] = []
+    for line in ps_output.splitlines():
+        row = _PS_ROW.match(line)
+        if not row or row["ppid"] != "1":
+            continue
+        args = row["args"].strip()
+        executable = args.split()[0].rsplit("/", 1)[-1]
+        # `codex` and its helpers (`codex-code-mode`), but not unrelated
+        # neighbours like `codexctl` or `codexd`.
+        if executable != command and not executable.startswith(f"{command}-"):
+            continue
+        minutes = _etime_minutes(row["etime"])
+        if minutes is not None and minutes < min_hours * 60:
+            continue
+        # An unreadable ELAPSED field is reported, not dropped: an orphan that
+        # `ps` prints oddly would otherwise stay invisible forever.
+        found.append((minutes if minutes is not None else -1, row["pid"], args))
+
+    if not found:
+        return CheckStatus(name, "ok", f"no orphaned {command} processes")
+
+    found.sort(reverse=True)
+    oldest = _age(found[0][0])
+    return CheckStatus(
+        name,
+        "warn",
+        f"{len(found)} orphaned {command} process(es), oldest {oldest}",
+        evidence="\n".join(
+            f"pid {pid} {_age(minutes)} {args[:80]}" for minutes, pid, args in found[:5]
+        ),
+    )
+
+
 # Match error words, but NOT when they're a key in a key=value metric line
 # (e.g. "failed=0", "error=0") — those are counters, not errors. The (?!=)
 # lookahead excludes the `=` case while still matching "FAILED rc=1", "error:", etc.

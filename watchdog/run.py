@@ -25,6 +25,7 @@ from .triage import (
     check_cron_log,
     check_disk,
     check_meet_freshness,
+    check_orphan_processes,
     check_service_active,
     triage,
 )
@@ -201,6 +202,8 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
 
     for unit in SERVICES:
         out.append(check_service_active(unit, _cmd(["systemctl", "is-active", unit])))
+
+    out.append(check_orphan_processes(_cmd(["ps", "-eo", "pid,ppid,etime,args"])))
 
     for label, path in CRON_LOGS:
         text = _read(path)
