@@ -333,3 +333,15 @@ def test_a_hung_removal_is_bounded_and_reported(tmp_path):
     assert "timed out" in result.stdout
     # the sweep carries on past the hung one
     assert "rm bbbb2222" in calls
+
+
+def test_a_session_id_with_an_odd_shape_is_ignored(tmp_path):
+    result, calls = run_agents(
+        tmp_path,
+        [session(id="aaaa1111\tbbbb"), session(id="ok22"), session(id="a b; rm -rf /")],
+        "prune",
+        "--yes",
+    )
+
+    assert result.returncode == 0
+    assert calls[1:] == ["stop ok22", "rm ok22"]

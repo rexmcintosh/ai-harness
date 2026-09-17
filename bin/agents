@@ -313,7 +313,11 @@ for row in rows:
     if not isinstance(row, dict) or row.get("kind") != "background":
         continue
     ident = row.get("id")
+    # The id becomes a TSV field and then a command argument, so accept only
+    # the shape ids actually have. Anything else is not safe to act on.
     if not isinstance(ident, str) or not ident:
+        continue
+    if not all(c.isalnum() or c in "-_" for c in ident):
         continue
     started = row.get("startedAt")
     age = int((now - started) / 60000) if isinstance(started, (int, float)) else -1
@@ -403,6 +407,17 @@ prune() {
   done
 
   local me rows plan="" targets=0 closed=0 failed=0 id state alive age name out rc
+
+  # Lock before listing, not after: the plan and the actions it drives have to
+  # be one critical section, or a concurrent prune makes the plan stale.
+  if [ "$yes" = 1 ]; then
+    mkdir -p "$STATE_DIR" 2>/dev/null ||
+      { echo "agents prune: cannot create the state directory $STATE_DIR" >&2; return 1; }
+    exec 8>"$STATE_DIR/.prune.lock" ||
+      { echo "agents prune: cannot open the prune lock in $STATE_DIR" >&2; return 1; }
+    flock -n 8 || { echo "agents prune: another prune is already running" >&2; return 1; }
+  fi
+
   me="$(self_id)"
   # Fail closed: an unanswered query must never read as "nothing to prune".
   if ! rows="$(bg_rows)"; then
@@ -430,11 +445,6 @@ prune() {
     echo 'dry run — nothing closed. Re-run with: agents prune --yes'
     return 0
   fi
-
-  # One pruner at a time: parallel sweeps would race on the same ids.
-  mkdir -p "$STATE_DIR" 2>/dev/null
-  exec 8>"$STATE_DIR/.prune.lock" || return 1
-  flock -n 8 || { echo "agents prune: another prune is already running" >&2; return 1; }
 
   while IFS=$'\t' read -r id name; do
     [ -n "${id:-}" ] || continue
