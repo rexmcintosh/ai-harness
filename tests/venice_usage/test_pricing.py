@@ -91,19 +91,31 @@ def test_the_anthropic_family_bills_ttl_segmented_cache_writes():
 
 
 def test_no_one_hour_rate_is_invented_for_a_model_never_billed_one():
-    # claude-opus-5 has only ever been billed the 5m write on this account.
-    # (claude-opus-4-8 and claude-fable-5 held this role until the 2026-09-17
-    # refresh, when real 1h SKUs appeared on the bills for both. The rule is
-    # the invariant below, not any one model — the table is generated.)
-    row = price_row("claude-opus-5")
-    assert row["cache_write_5m"] == 7.5          # billed, 1.25x the 6.00 input
-    assert "cache_write_1h" not in row           # never billed -> never guessed
+    """A 5m-only biller must never grow a guessed 1h rate.
+
+    Pinning one model went stale: claude-opus-4-8 and claude-fable-5 held this
+    role until the 2026-09-17 refresh, when real 1h SKUs showed up on the bills
+    for both. So pick whoever currently fits instead of naming a model.
+    """
+    five_m_only = [m for m, billed in pt.BILLED.items()
+                   if "cache_write_5m" in billed and "cache_write_1h" not in billed]
+    assert five_m_only, "no 5m-only biller left to check this rule against"
+    for model in five_m_only:
+        assert "cache_write_1h" not in price_row(model), model
 
 
-def test_every_one_hour_rate_in_the_table_came_from_a_bill():
-    for model, row in pt.PRICES.items():
-        if "cache_write_1h" in row:
-            assert "cache_write_1h" in pt.BILLED.get(model, {}), model
+def test_the_one_hour_rates_are_exactly_the_billed_ones():
+    """Both directions, and the number itself.
+
+    PRICES -> BILLED catches an invented rate. BILLED -> PRICES catches the
+    quieter bug: a real 1h write that never made it into the table, which
+    under-values every report that uses it.
+    """
+    priced = {m for m, row in pt.PRICES.items() if "cache_write_1h" in row}
+    billed = {m for m, row in pt.BILLED.items() if "cache_write_1h" in row}
+    assert priced == billed
+    for model in priced:
+        assert pt.PRICES[model]["cache_write_1h"] == pt.BILLED[model]["cache_write_1h"], model
 
 
 def test_a_model_outside_the_anthropic_family_bills_one_un_suffixed_write():
