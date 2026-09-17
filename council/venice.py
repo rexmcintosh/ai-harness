@@ -24,7 +24,7 @@ class VeniceClient:
                  retries=2, backoff=1.5, post=None, temperature=0.2,
                  max_completion_tokens=None, transport_is_real=None):
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_COUNCIL_KEY, VENICE_API_KEY)")
         self.api_key = api_key
         # Default output ceiling for every call this client makes, so no call
         # site can be left unbounded by omission. Individual calls (the chair,

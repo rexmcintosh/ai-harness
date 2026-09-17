@@ -158,3 +158,10 @@ def test_complete_logging_survives_missing_venice_usage_package(tmp_path, monkey
         return _resp("ok", usage={"prompt_tokens": 1, "completion_tokens": 1})
     c = VeniceClient(api_key="k", post=fake_post)
     assert c.complete("m", "s", "u") == "ok"
+
+
+def test_requires_key_and_names_the_council_var_first():
+    with pytest.raises(VeniceError) as exc:
+        VeniceClient(api_key="")
+    msg = str(exc.value)
+    assert msg.index("VENICE_COUNCIL_KEY") < msg.index("VENICE_API_KEY")

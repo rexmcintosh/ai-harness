@@ -53,8 +53,9 @@ def test_get_api_key_reads_env(monkeypatch):
 
 def test_get_api_key_missing(monkeypatch):
     monkeypatch.delenv("VENICE_API_KEY", raising=False)
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         get_api_key()
+    assert exc.value.code == 2
 
 
 def test_truncate_keeps_head_and_tail():
@@ -92,8 +93,13 @@ def test_get_api_key_treats_blank_as_unset(monkeypatch):
     assert get_api_key() == "default-key"
 
 
-def test_get_api_key_exits_when_neither_is_set(monkeypatch):
+def test_get_api_key_exits_when_neither_is_set(monkeypatch, capsys):
     monkeypatch.delenv("VENICE_COUNCIL_KEY", raising=False)
     monkeypatch.delenv("VENICE_API_KEY", raising=False)
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         get_api_key()
+    assert exc.value.code == 2
+    # The hint must point the operator at the project key first, not just the
+    # generic fallback, and must never echo a key value.
+    err = capsys.readouterr().err
+    assert "VENICE_COUNCIL_KEY" in err

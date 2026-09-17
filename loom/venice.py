@@ -23,7 +23,7 @@ class VeniceClient:
                  post: Optional[Callable] = None,
                  transport_is_real: Optional[bool] = None) -> None:
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_LOOM_KEY, VENICE_API_KEY)")
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout
