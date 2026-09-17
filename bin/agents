@@ -5,7 +5,13 @@
 #   agents              one-shot dashboard (blocked/waiting float to the top)
 #   agents once         one poll; nudge sessions that JUST started needing you (for cron)
 #   agents watch [S]    loop every S seconds (default 30), nudging on transitions
+#   agents prune        list finished Claude BACKGROUND sessions; --yes closes them
 #   agents test-nudge   send a test Telegram message and exit
+#
+# tmux panes are only half the picture: `claude --bg` sessions live outside tmux,
+# stay listed after /exit, and keep their process alive. The dashboard lists them
+# under "background", and `prune` closes the finished ones (stop + rm). Pruning
+# never runs from cron — only when you ask for it.
 #
 # State is inferred from each session's VISIBLE tmux pane. The Claude Code UI
 # randomizes its verb ("Forging/Baked/Cooked/…"), so detection keys off the
@@ -24,6 +30,7 @@ TG_CHAT="${AGENTS_TG_CHAT:-7735693897}"
 STATE_DIR="${AGENTS_STATE_DIR:-$HOME/.cache/agents}"
 SKIP_ATTACHED="${AGENTS_SKIP_ATTACHED:-1}"   # in once/watch, don't nudge sessions you're attached to
 TG_SEND="${AGENTS_TG_SEND:-$HOME/projects/build-ai-automation-workflow/bin/tg-send}"
+CLAUDE_BIN="${AGENTS_CLAUDE_BIN:-claude}"
 
 have_tmux() { tmux ls >/dev/null 2>&1; }
 
@@ -275,12 +282,155 @@ poll_nudge() {
   return "$failed"
 }
 
+# --- Claude background sessions -------------------------------------------
+# A `claude --bg` session is not a tmux pane: /exit leaves it listed with
+# state=done and its process still alive, and an exited one stays in the list
+# until it is removed. One TSV row per background session:
+#   <id>\t<state>\t<alive 1|0>\t<age-minutes>\t<name>
+# A missing or unhappy `claude` CLI yields no rows, never an error.
+bg_rows() {
+  "$CLAUDE_BIN" agents --json --all 2>/dev/null | python3 -c '
+import json
+import sys
+import time
+
+try:
+    rows = json.load(sys.stdin)
+except (ValueError, TypeError):
+    raise SystemExit(0)
+if not isinstance(rows, list):
+    raise SystemExit(0)
+now = time.time() * 1000
+for row in rows:
+    if not isinstance(row, dict) or row.get("kind") != "background":
+        continue
+    ident = row.get("id")
+    if not isinstance(ident, str) or not ident:
+        continue
+    started = row.get("startedAt")
+    age = int((now - started) / 60000) if isinstance(started, (int, float)) else -1
+    name = "".join(
+        c for c in str(row.get("name") or "") if c.isprintable() and c != "\t"
+    )
+    state = row.get("state") or ""
+    alive = 1 if row.get("pid") else 0
+    print("\t".join([ident, str(state), str(alive), str(age), name[:48]]))
+' 2>/dev/null
+}
+
+fmt_age() {
+  local m="${1:--1}"
+  case "$m" in ''|*[!0-9-]*) printf '?'; return;; esac
+  if   [ "$m" -lt 0 ];    then printf '?'
+  elif [ "$m" -lt 60 ];   then printf '%dm' "$m"
+  elif [ "$m" -lt 1440 ]; then printf '%dh' "$((m / 60))"
+  else                         printf '%dd' "$((m / 1440))"
+  fi
+}
+
+# The background session this very command is running inside, if any — pruning
+# it would kill the prune.
+self_id() { [ -n "${CLAUDE_JOB_DIR:-}" ] && basename "$CLAUDE_JOB_DIR" || printf ''; }
+
+bg_dashboard() {
+  local rows me finished=0 id state alive age name mark label
+  rows="$(bg_rows)"
+  [ -n "$rows" ] || return 0
+  me="$(self_id)"
+  printf '\n\033[2mbackground (claude --bg):\033[0m\n'
+  while IFS=$'\t' read -r id state alive age name; do
+    [ -n "${id:-}" ] || continue
+    case "$state" in
+      done)
+        if [ "$alive" = "1" ]; then mark='⏹'; label=FINISHED; else mark='⚫'; label=EXITED; fi
+        [ "$id" = "$me" ] || finished=$((finished + 1))
+        ;;
+      working) mark='🟡'; label=WORKING ;;
+      *)       mark='⚪'; label="$(printf '%s' "${state:-?}" | tr '[:lower:]' '[:upper:]')" ;;
+    esac
+    [ "$id" != "$me" ] || name="$name (this session)"
+    printf '%s  %-8s %-10s %-4s %s\n' "$mark" "$label" "$id" "$(fmt_age "$age")" "$name"
+  done <<< "$rows"
+  [ "$finished" -eq 0 ] ||
+    printf '\033[2m%d finished background session(s) still listed — close them with: agents prune\033[0m\n' "$finished"
+  return 0
+}
+
+# Close finished background sessions: stop (frees the process) then rm (frees
+# the list entry and, only when safe, the worktree). Dry-run unless --yes.
+prune() {
+  local yes=0 older=-1 arg
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -y|--yes) yes=1 ;;
+      --older-than|--older-than=*)
+        case "$1" in
+          --older-than=*) arg="${1#*=}" ;;
+          *) shift; arg="${1:-}" ;;
+        esac
+        case "$arg" in
+          ''|*[!0-9]*) echo "agents prune: --older-than takes whole minutes" >&2; return 2 ;;
+        esac
+        older="$arg"
+        ;;
+      -h|--help) echo "usage: agents prune [--yes] [--older-than <minutes>]"; return 0 ;;
+      *) echo "usage: agents prune [--yes] [--older-than <minutes>]" >&2; return 2 ;;
+    esac
+    shift
+  done
+
+  local me rows plan="" targets=0 closed=0 failed=0 id state alive age name out rc
+  me="$(self_id)"
+  rows="$(bg_rows)"
+  while IFS=$'\t' read -r id state alive age name; do
+    [ -n "${id:-}" ] || continue
+    [ "$state" = done ] || continue                    # never touch a live turn
+    [ "$id" != "$me" ] || { printf '⏭  %-10s skipped: this session\n' "$id"; continue; }
+    if [ "$older" -ge 0 ] && { [ "$age" -lt 0 ] || [ "$age" -lt "$older" ]; }; then continue; fi
+    plan+="$id"$'\t'"$name"$'\n'
+    targets=$((targets + 1))
+  done <<< "$rows"
+
+  [ "$targets" -gt 0 ] || { echo "nothing to prune — no finished background sessions"; return 0; }
+
+  if [ "$yes" != 1 ]; then
+    printf 'would close %d finished background session(s):\n' "$targets"
+    while IFS=$'\t' read -r id name; do
+      [ -n "${id:-}" ] || continue
+      printf '  %-10s %s\n' "$id" "$name"
+      printf '      claude stop %s && claude rm %s\n' "$id" "$id"
+    done <<< "$plan"
+    echo 'dry run — nothing closed. Re-run with: agents prune --yes'
+    return 0
+  fi
+
+  while IFS=$'\t' read -r id name; do
+    [ -n "${id:-}" ] || continue
+    # An already-exited session has nothing to stop; rm is what clears it.
+    "$CLAUDE_BIN" stop "$id" >/dev/null 2>&1
+    out="$("$CLAUDE_BIN" rm "$id" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+      # Keep it. --discard-unpushed / --force-remove-worktree are the operator's
+      # call, never this script's.
+      failed=$((failed + 1))
+      printf '⚠  kept %s (%s): %s\n' "$id" "$name" "$(printf '%s\n' "$out" | head -1)"
+    else
+      closed=$((closed + 1))
+      printf '✔  closed %s (%s)\n' "$id" "$name"
+    fi
+  done <<< "$plan"
+
+  printf 'closed %d, kept %d\n' "$closed" "$failed"
+  [ "$failed" -eq 0 ] || return 1
+}
+
 case "${1:-dashboard}" in
-  ""|dashboard|ls|status) dashboard ;;
+  ""|dashboard|ls|status) dashboard; bg_dashboard ;;
+  prune) shift; prune "$@" ;;
   once)  poll_nudge ;;
   prime) poll_nudge silent; echo "primed $(ls -1 "$STATE_DIR" 2>/dev/null | wc -l | tr -d ' ') needy session(s) — cron will stay quiet until states change" ;;
   watch) shift; iv="${1:-30}"; echo "watching every ${iv}s — Ctrl-C to stop"; while :; do poll_nudge; sleep "$iv"; done ;;
   test-nudge) tg_send "agents ✅ test nudge — $(tmux ls 2>/dev/null | wc -l | tr -d ' ') sessions live" ;;
-  -h|--help|help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
-  *) echo "usage: agents [dashboard|once|watch [sec]|test-nudge]" >&2; exit 2 ;;
+  -h|--help|help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "usage: agents [dashboard|prune [--yes]|once|watch [sec]|test-nudge]" >&2; exit 2 ;;
 esac
