@@ -27,6 +27,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
 | `cron:*` | loom + MeetTrack logs | error markers in the recent tail (warn) |
+| `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 
 Error-marker matching ignores `key=value` counters (e.g. `failed=0`) so metric lines
 don't read as failures.
