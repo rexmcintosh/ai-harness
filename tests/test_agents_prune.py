@@ -17,6 +17,14 @@ STUB = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_CLAUDE_CALLS"
 case "$1 $2" in
   "agents --json")
+    if [ -n "${FAKE_LIST_FAILS:-}" ]; then
+      echo "claude: could not reach the session daemon" >&2
+      exit 1
+    fi
+    if [ -n "${FAKE_LIST_GARBAGE:-}" ]; then
+      echo "not json at all"
+      exit 0
+    fi
     cat "$FAKE_CLAUDE_JSON"
     ;;
   "stop "*)
@@ -263,3 +271,46 @@ def test_cron_entrypoint_never_prunes(tmp_path):
 
     assert "stop aaaa1111" not in calls
     assert "rm aaaa1111" not in calls
+
+
+def test_prune_fails_closed_when_the_session_list_cannot_be_read(tmp_path):
+    result, calls = run_agents(
+        tmp_path, [session()], "prune", "--yes", FAKE_LIST_FAILS="1"
+    )
+
+    assert result.returncode == 1
+    assert "cannot list" in result.stderr
+    assert "nothing to prune" not in result.stdout
+    assert [c for c in calls if c.startswith(("stop", "rm"))] == []
+
+
+def test_prune_fails_closed_on_an_unreadable_answer(tmp_path):
+    result, calls = run_agents(
+        tmp_path, [session()], "prune", "--yes", FAKE_LIST_GARBAGE="1"
+    )
+
+    assert result.returncode == 1
+    assert [c for c in calls if c.startswith(("stop", "rm"))] == []
+
+
+def test_dashboard_says_so_when_the_session_list_cannot_be_read(tmp_path):
+    result, _ = run_agents(tmp_path, [session()], "dashboard", FAKE_LIST_FAILS="1")
+
+    assert "could not read claude sessions" in result.stdout
+
+
+def test_dashboard_keeps_the_tmux_exit_status(tmp_path):
+    # no tmux server in the test environment -> dashboard fails -> status survives
+    result, _ = run_agents(tmp_path, [session()], "dashboard")
+
+    assert result.returncode == 1
+    assert "no tmux server running" in result.stdout
+
+
+def test_dry_run_preview_uses_the_configured_cli(tmp_path):
+    stub = tmp_path / "bin" / "claude"
+    result, _ = run_agents(
+        tmp_path, [session(id="aaaa1111")], "prune", AGENTS_CLAUDE_BIN=str(stub)
+    )
+
+    assert f"{stub} stop aaaa1111" in result.stdout

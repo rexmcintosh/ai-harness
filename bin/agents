@@ -5,7 +5,8 @@
 #   agents              one-shot dashboard (blocked/waiting float to the top)
 #   agents once         one poll; nudge sessions that JUST started needing you (for cron)
 #   agents watch [S]    loop every S seconds (default 30), nudging on transitions
-#   agents prune        list finished Claude BACKGROUND sessions; --yes closes them
+#   agents prune        list finished Claude BACKGROUND sessions (dry run)
+#                       --yes closes them; --older-than <min> filters by age
 #   agents test-nudge   send a test Telegram message and exit
 #
 # tmux panes are only half the picture: `claude --bg` sessions live outside tmux,
@@ -31,6 +32,7 @@ STATE_DIR="${AGENTS_STATE_DIR:-$HOME/.cache/agents}"
 SKIP_ATTACHED="${AGENTS_SKIP_ATTACHED:-1}"   # in once/watch, don't nudge sessions you're attached to
 TG_SEND="${AGENTS_TG_SEND:-$HOME/projects/build-ai-automation-workflow/bin/tg-send}"
 CLAUDE_BIN="${AGENTS_CLAUDE_BIN:-claude}"
+CLAUDE_TIMEOUT="${AGENTS_CLAUDE_TIMEOUT_SEC:-20}"   # a hung CLI must not freeze the dashboard
 
 have_tmux() { tmux ls >/dev/null 2>&1; }
 
@@ -287,9 +289,15 @@ poll_nudge() {
 # state=done and its process still alive, and an exited one stays in the list
 # until it is removed. One TSV row per background session:
 #   <id>\t<state>\t<alive 1|0>\t<age-minutes>\t<name>
-# A missing or unhappy `claude` CLI yields no rows, never an error.
+# Exit status matters: 0 means "asked and answered" (zero rows is a real answer),
+# 1 means the CLI could not be asked or gave nonsense. Callers must not read a
+# failure as an empty list — that is a false clean bill of health.
 bg_rows() {
-  "$CLAUDE_BIN" agents --json --all 2>/dev/null | python3 -c '
+  local raw rc
+  raw="$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" agents --json --all 2>/dev/null)"
+  rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  printf '%s' "$raw" | python3 -c '
 import json
 import sys
 import time
@@ -297,9 +305,9 @@ import time
 try:
     rows = json.load(sys.stdin)
 except (ValueError, TypeError):
-    raise SystemExit(0)
+    raise SystemExit(3)      # unreadable answer is a failure, not "no sessions"
 if not isinstance(rows, list):
-    raise SystemExit(0)
+    raise SystemExit(3)
 now = time.time() * 1000
 for row in rows:
     if not isinstance(row, dict) or row.get("kind") != "background":
@@ -315,7 +323,7 @@ for row in rows:
     state = row.get("state") or ""
     alive = 1 if row.get("pid") else 0
     print("\t".join([ident, str(state), str(alive), str(age), name[:48]]))
-' 2>/dev/null
+'
 }
 
 fmt_age() {
@@ -329,12 +337,16 @@ fmt_age() {
 }
 
 # The background session this very command is running inside, if any — pruning
-# it would kill the prune.
+# it would kill the prune. This is a second belt: the state=done filter is the
+# real protection, since a session that is still running is never state=done.
 self_id() { [ -n "${CLAUDE_JOB_DIR:-}" ] && basename "$CLAUDE_JOB_DIR" || printf ''; }
 
 bg_dashboard() {
   local rows me finished=0 id state alive age name mark label
-  rows="$(bg_rows)"
+  if ! rows="$(bg_rows)"; then
+    printf '\n\033[2mbackground: could not read claude sessions (CLI missing, hung, or unhappy)\033[0m\n'
+    return 0
+  fi
   [ -n "$rows" ] || return 0
   me="$(self_id)"
   printf '\n\033[2mbackground (claude --bg):\033[0m\n'
@@ -381,7 +393,11 @@ prune() {
 
   local me rows plan="" targets=0 closed=0 failed=0 id state alive age name out rc
   me="$(self_id)"
-  rows="$(bg_rows)"
+  # Fail closed: an unanswered query must never read as "nothing to prune".
+  if ! rows="$(bg_rows)"; then
+    echo "agents prune: cannot list background sessions — is \`$CLAUDE_BIN agents --json\` working?" >&2
+    return 1
+  fi
   while IFS=$'\t' read -r id state alive age name; do
     [ -n "${id:-}" ] || continue
     [ "$state" = done ] || continue                    # never touch a live turn
@@ -398,11 +414,16 @@ prune() {
     while IFS=$'\t' read -r id name; do
       [ -n "${id:-}" ] || continue
       printf '  %-10s %s\n' "$id" "$name"
-      printf '      claude stop %s && claude rm %s\n' "$id" "$id"
+      printf '      %s stop %s && %s rm %s\n' "$CLAUDE_BIN" "$id" "$CLAUDE_BIN" "$id"
     done <<< "$plan"
     echo 'dry run — nothing closed. Re-run with: agents prune --yes'
     return 0
   fi
+
+  # One pruner at a time: parallel sweeps would race on the same ids.
+  mkdir -p "$STATE_DIR" 2>/dev/null
+  exec 8>"$STATE_DIR/.prune.lock" || return 1
+  flock -n 8 || { echo "agents prune: another prune is already running" >&2; return 1; }
 
   while IFS=$'\t' read -r id name; do
     [ -n "${id:-}" ] || continue
@@ -425,12 +446,12 @@ prune() {
 }
 
 case "${1:-dashboard}" in
-  ""|dashboard|ls|status) dashboard; bg_dashboard ;;
+  ""|dashboard|ls|status) dashboard; dash_rc=$?; bg_dashboard; exit "$dash_rc" ;;
   prune) shift; prune "$@" ;;
   once)  poll_nudge ;;
   prime) poll_nudge silent; echo "primed $(ls -1 "$STATE_DIR" 2>/dev/null | wc -l | tr -d ' ') needy session(s) — cron will stay quiet until states change" ;;
   watch) shift; iv="${1:-30}"; echo "watching every ${iv}s — Ctrl-C to stop"; while :; do poll_nudge; sleep "$iv"; done ;;
   test-nudge) tg_send "agents ✅ test nudge — $(tmux ls 2>/dev/null | wc -l | tr -d ' ') sessions live" ;;
-  -h|--help|help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//' ;;
-  *) echo "usage: agents [dashboard|prune [--yes]|once|watch [sec]|test-nudge]" >&2; exit 2 ;;
+  -h|--help|help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "usage: agents [dashboard|prune [--yes] [--older-than <min>]|once|watch [sec]|test-nudge]" >&2; exit 2 ;;
 esac

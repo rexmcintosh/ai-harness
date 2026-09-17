@@ -109,6 +109,8 @@ def _etime_minutes(raw: str) -> int | None:
 
 
 def _age(minutes: int) -> str:
+    if minutes < 0:
+        return "unknown"
     if minutes >= 1440:
         return f"{minutes // 1440}d"
     if minutes >= 60:
@@ -142,9 +144,11 @@ def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
         if not executable.startswith(command):
             continue
         minutes = _etime_minutes(row["etime"])
-        if minutes is None or minutes < min_hours * 60:
+        if minutes is not None and minutes < min_hours * 60:
             continue
-        found.append((minutes, row["pid"], args))
+        # An unreadable ELAPSED field is reported, not dropped: an orphan that
+        # `ps` prints oddly would otherwise stay invisible forever.
+        found.append((minutes if minutes is not None else -1, row["pid"], args))
 
     if not found:
         return CheckStatus(name, "ok", f"no orphaned {command} processes")

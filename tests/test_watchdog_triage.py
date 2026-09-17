@@ -234,3 +234,11 @@ def test_orphan_check_survives_unusable_ps_output():
     for text in ("", PS_HEADER + "\n", "ps: command not found\n", "garbage\n\n"):
         out = check_orphan_processes(text)
         assert out.level == "ok"
+
+
+def test_orphan_check_reports_an_orphan_whose_elapsed_time_is_unreadable():
+    # a dropped row would hide the orphan forever; report it with an unknown age
+    out = check_orphan_processes(_ps(f"777       1  12-34-56 {CODEX}"))
+    assert out.level == "warn"
+    assert "unknown" in out.summary
+    assert "pid 777" in out.evidence
