@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -341,7 +342,10 @@ def test_validation_rejects_generated_bytecode_like_any_other_extra_file(tmp_pat
 
 def test_validation_rejects_a_symlink_inside_the_snapshot(tmp_path):
     fixture_dir = _synthetic_snapshot_with_its_own_tests(tmp_path)
-    (fixture_dir / "head" / "linked.py").symlink_to(fixture_dir / "head" / "tests" / "test_archived.py")
+    try:
+        os.symlink(fixture_dir / "head" / "tests" / "test_archived.py", fixture_dir / "head" / "linked.py")
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"this platform cannot create a symlink here: {exc!r}")
 
     with pytest.raises(ValueError, match="snapshot contains symlink"):
         harness.validate_fixture(harness.load_fixture(fixture_dir))

@@ -15,27 +15,28 @@ RED - unmodified main 8d07c2c, clean detached checkout, zero .pyc files before t
 
 Collected node ids, python -m pytest --collect-only -q (PYTHONDONTWRITEBYTECODE=1)
                                    main 8d07c2c    this branch
-  tests/                               1268           1275   (+7 new tests, listed below)
+  tests/                               1268           1276   (+8 new tests, listed below)
   setup/claude-codex-mirror/             23             23
   watchdog/                               6              6
   tools/regress/fixtures/                 9              0
-  total                                1306           1304
+  total                                1306           1305
   intended ids on main missing from this branch: 0   (sorted id lists compared with comm)
 
 GREEN - this branch, from the worktree root
   command : python -m pytest -q
-  result  : 1303 passed, 1 skipped                          (exit 0)
+  result  : 1304 passed, 1 skipped                          (exit 0)
   after   : git status --porcelain --ignored tools/regress/fixtures   -> empty
             find tools/regress/fixtures -name __pycache__ -o -name '*.pyc' -> empty
   log     : green-branch-broad-pytest.log
   header  : rootdir = the worktree, configfile = pyproject.toml; council, diem, loom
             and tools.regress.harness all import from the worktree under pytest.
 
-New tests (4 fail and 3 pass before the pyproject.toml change; all 7 pass after)
+New tests (4 fail and 4 pass before the pyproject.toml change; all 8 pass after)
   tests/test_pytest_discovery.py::test_discovery_never_collects_archived_snapshot_tests
       [explicit-parent-path-from-root] [bare-pytest-from-a-subdirectory] [explicit-fixtures-directory]
   tests/test_pytest_discovery.py::test_norecursedirs_adds_the_snapshots_without_dropping_pytest_defaults
   tests/test_pytest_discovery.py::test_the_probe_sees_real_tests_and_a_snapshot_really_carries_tests
+  tests/test_pytest_discovery.py::test_restated_defaults_equal_the_installed_pytest_builtin_default
   tests/test_regress.py::test_validation_rejects_generated_bytecode_like_any_other_extra_file
   tests/test_regress.py::test_validation_rejects_a_symlink_inside_the_snapshot
 
@@ -45,3 +46,13 @@ snapshot. tests/test_venice_review_refactor.py already holds all 9 names plus 4 
 
 Known limit: a path that names the archived test file or its own tests/ directory still
 collects it. pytest skips every ignore rule for paths given on the command line.
+
+Review follow-up (same day)
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set for the collect-only probes. Proof it changes nothing,
+  pytest 9.0.3, venv python (no third-party plugins) and system python3 (anyio-4.13.0):
+    every probe                      : identical node ids and exit codes with and without it
+    simulated regression (-o norecursedirs=".* node_modules", path tools)
+                                     : the 9 archived ids are seen either way, identical lists
+    full repo collection, venv python: 1304 ids either way, identical lists
+  Built-in default read through public API (pytest_configure hook + config.getini in a
+  throwaway rootdir): *.egg .* _darcs build CVS dist node_modules venv {arch}

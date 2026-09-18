@@ -37,7 +37,22 @@ pythonpath = ["."]
 # hash-validated snapshots of other repos; some carry their own tests/test_*.py.
 # Collecting one imports it, which writes __pycache__ into the snapshot and makes
 # harness.validate_fixture (correctly) reject it. Keep the validator strict; keep
-# pytest out. Patterns match the absolute path, so they hold from any directory.
+# pytest out.
+#
+# Why the two patterns hold from any working directory (read in pytest 9.0.3 source):
+# - _pytest/main.py pytest_ignore_collect tests each directory's ABSOLUTE path with
+#   fnmatch_ex(pattern, path) for every norecursedirs pattern.
+# - _pytest/pathlib.py fnmatch_ex: a pattern with no path separator is matched against
+#   the directory's basename only (that is how "build" or ".*" work). A pattern WITH a
+#   separator is matched against the full path string, and a relative pattern gets "*/"
+#   prepended first. fnmatch's "*" also matches "/".
+# - So "tools/regress/fixtures" is tested as "*/tools/regress/fixtures" against the full
+#   path; the current directory never enters into it. The "/*" pattern covers every
+#   directory below, for when the fixtures directory itself is named on the command line.
+# - Proof from a subdirectory: tests/test_pytest_discovery.py, case
+#   "bare-pytest-from-a-subdirectory" (runs a bare pytest with cwd=tools/regress).
+# - Limit: pytest skips all ignore rules for a path named on the command line, so naming
+#   the archived test file or its own tests/ directory still collects it.
 norecursedirs = [
     "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
     "tools/regress/fixtures", "tools/regress/fixtures/*",
