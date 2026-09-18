@@ -291,3 +291,55 @@ def test_out_of_scope_paths_are_named_in_code_not_only_in_a_test():
     for path in ("/home/dev/projects/sat-prep/tmp/bento-sync.log", "/home/dev/projects/ai-harness/bebop/logs/cron.log",
                  "/home/dev/projects/.session-gc/rent-verification.log", "relative/path.log", ""):
         assert not js.in_scope(path), path
+
+
+# --- test isolation ---------------------------------------------------------
+
+def test_a_plain_main_call_in_a_test_never_reaches_the_real_api(monkeypatch, tmp_path, capsys):
+    # Regression (2026-09-18): once shadow mode was enabled in monitors.toml, every test
+    # that called run.main() made real Jev calls with the real key and wrote records with
+    # a fake test clock into the live watchdog/logs/jev-shadow.jsonl.
+    import watchdog.run as run
+    for var, name in (("WATCHDOG_STATE", "s.json"), ("WATCHDOG_PENDING", "p.json"),
+                      ("WATCHDOG_DELIVERY_LAST", "l.json"), ("WATCHDOG_METRICS", "m.json")):
+        monkeypatch.setenv(var, str(tmp_path / name))
+    calls = []
+
+    class Opener:
+        def open(self, request, timeout=None):
+            calls.append(request.full_url)
+            raise OSError("blocked in tests")
+    monkeypatch.setattr(js, "_OPENER", Opener())
+    run.main([])
+    assert calls == []
+
+
+def test_an_enabled_shadow_pass_in_a_test_writes_under_the_temp_log_dir(monkeypatch, tmp_path, capsys):
+    # The enabled path end to end, with only the socket faked: the record must land in
+    # the per-test WATCHDOG_LOG_DIR that conftest sets, never in the live watchdog/logs.
+    import io
+    import os
+    import watchdog.run as run
+    for var, name in (("WATCHDOG_STATE", "s.json"), ("WATCHDOG_PENDING", "p.json"),
+                      ("WATCHDOG_DELIVERY_LAST", "l.json"), ("WATCHDOG_METRICS", "m.json")):
+        monkeypatch.setenv(var, str(tmp_path / name))
+    monkeypatch.delenv("WATCHDOG_JEV_SHADOW")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    log = tmp_path / "job.log"; log.write_text("job done rc=0\n")
+    monkeypatch.setattr(run, "CRON_LOGS", [])
+    monkeypatch.setattr(run, "collect", lambda now, prior: ([], {}))
+    monkeypatch.setattr(run, "_load_monitors",
+                        lambda: {"jev_shadow": {"enabled": True, "logs": [{"name": "job", "log": str(log)}]}})
+    sent = []
+
+    class Opener:
+        def open(self, request, timeout=None):
+            sent.append((request.full_url, request.get_header("Authorization")))
+            return io.BytesIO(json.dumps(_good_reply(0.05, 0.05)).encode())
+    monkeypatch.setattr(js, "_OPENER", Opener())
+    run.main([])
+    assert sent == [(js.URL, "Bearer test-key")]
+    log_dir = os.environ["WATCHDOG_LOG_DIR"]
+    assert log_dir.startswith(str(tmp_path))
+    (rec,) = [json.loads(l) for l in open(os.path.join(log_dir, "jev-shadow.jsonl"))]
+    assert rec["log"] == "job" and rec["jev_band"] == "ok"

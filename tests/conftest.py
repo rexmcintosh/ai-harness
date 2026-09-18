@@ -10,6 +10,17 @@ def _isolate_venice_usage_ledger(tmp_path, monkeypatch):
     monkeypatch.setenv("VENICE_USAGE_DB", str(tmp_path / "venice-usage-test.db"))
 
 
+@pytest.fixture(autouse=True)
+def _no_live_jev_shadow(tmp_path, monkeypatch):
+    """No test may reach the real TypeSafe API or write the live watchdog shadow log.
+    watchdog.run.main() runs the Jev shadow pass whenever monitors.toml enables it and
+    ~/.env holds a key, so the kill switch is on for every test and the log dir is a
+    temp dir. A test of the wiring itself deletes WATCHDOG_JEV_SHADOW and patches
+    jev_shadow.shadow_pass / load_key."""
+    monkeypatch.setenv("WATCHDOG_JEV_SHADOW", "0")
+    monkeypatch.setenv("WATCHDOG_LOG_DIR", str(tmp_path / "watchdog-logs"))
+
+
 class FakeClient:
     """Stand-in for VeniceClient. Scripted responses keyed by model name,
     or a single default. Records calls for assertions."""
