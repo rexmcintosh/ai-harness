@@ -715,6 +715,31 @@ def test_rework_does_not_repeat_a_review_held_in_both_note_and_prompt():
     assert br.review_notes({"prompt": f"Do it.\n\n{line}\n", "note": line}) == [line]
 
 
+def test_review_notes_split_only_on_dated_markers_and_keep_a_long_review_whole():
+    # A review may run to several paragraphs and may quote the phrase itself; only a dated
+    # "Rex's review (YYYY-MM-DD):" line starts a new note, so no owner text is cut off.
+    first = ("Rex's review (2026-01-03): tighten the tests.\n\nSecond paragraph of the same review.\n"
+             "Rex's review (the older one) still stands.")
+    second = "Rex's review (2026-01-05): rename the flag"
+    assert br.review_notes({"prompt": f"Do it.\n\n{first}\n\n{second}\n"}) == [first, second]
+
+
+def test_rework_dry_run_turns_a_git_failure_into_the_one_sentence_refusal(world, capsys, monkeypatch):
+    cfg = world.build([item("2026-01-01-a", status="held", branch="claude/bl-a")])
+    worked_branch(world.repo, "claude/bl-a")
+    real_git = br.git
+
+    def flaky(repo, *args, **kw):
+        if args[:1] == ("rev-parse",):
+            raise br.GitError("fatal: ambiguous argument 'claude/bl-a'")
+        return real_git(repo, *args, **kw)
+    monkeypatch.setattr(br, "git", flaky)
+    assert br.cmd_rework(rework_args("2026-01-01-a", "--dry-run"), cfg) == 1
+    captured = capsys.readouterr()
+    assert captured.err.strip().startswith("rework 2026-01-01-a: could not read branch claude/bl-a")
+    assert "REWORK" not in captured.out
+
+
 def test_drop_deletes_branch_journals_and_archives(world):
     cfg = world.build([item("2026-01-01-a", status="held", branch="claude/bl-a", note="runner: HELD")])
     worked_branch(world.repo, "claude/bl-a")

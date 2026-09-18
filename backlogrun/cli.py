@@ -562,13 +562,17 @@ def write_session_settings(cfg: Config) -> None:
         json.dump({"mcpServers": {}}, fh)
 
 
-REVIEW_START_RE = re.compile(r"^Rex's review \(", re.MULTILINE)
+REVIEW_START_RE = re.compile(r"^Rex's review \(\d{4}-\d{2}-\d{2}\):", re.MULTILINE)
 
 
 def review_notes(item: dict) -> list[str]:
     """The owner's review notes on an already-worked item, oldest first. The ops loop appends
-    each one to the prompt as a "Rex's review (<date>): ..." paragraph; `hold` files one as
-    the note. A note that only repeats a prompt paragraph is not listed twice."""
+    each one to the END of the prompt as a "Rex's review (<date>): ..." paragraph; `hold`
+    files one as the note. A note that only repeats a prompt paragraph is not listed twice.
+
+    A note runs from its dated marker to the next dated marker (or the end of the prompt),
+    never to the first blank line: a review may span paragraphs, and cutting the owner's
+    words short is worse than repeating hand-added trailing text the prompt already shows."""
     prompt = str(item.get("prompt") or "")
     starts = [m.start() for m in REVIEW_START_RE.finditer(prompt)]
     notes = [prompt[a:b].strip() for a, b in zip(starts, starts[1:] + [len(prompt)])]
@@ -1248,7 +1252,11 @@ def _rework_dry_run(iid: str, cfg: Config) -> int:
     if target is None:
         return 1
     item, p = target
-    head = git(p.repo, "rev-parse", p.branch).strip()
+    try:
+        head = git(p.repo, "rev-parse", p.branch).strip()
+    except GitError as exc:   # the branch moved or vanished after the plan: still a refusal
+        print(f"rework {iid}: could not read branch {p.branch}: {str(exc).strip()[:200]}", file=sys.stderr)
+        return 1
     ahead = git(p.repo, "rev-list", "--count", f"{p.base}..{p.branch}", check=False).strip() or "?"
     budget = f"${cfg.budget_usd:g}" if cfg.budget_usd else "none"
     print(f"backlog-run rework dry-run — {now_stamp()} — {cfg.item_timeout}s, budget {budget}")

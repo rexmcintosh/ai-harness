@@ -166,7 +166,9 @@ commits, so an accidental re-work of a reviewed branch by the clock stays imposs
   `--- REVIEW TO ADDRESS ---` section, oldest first, built from every
   `Rex's review (<date>): ...` paragraph in the item's `prompt` (the Romance Ops "Changes"
   action appends them) plus the item's `note` when it starts with `Rex's review` and is not
-  already listed. Without any review note the section is omitted.
+  already listed. Without any review note the section is omitted. Only a dated marker
+  (`Rex's review (YYYY-MM-DD):` at the start of a line) opens a note, and a note runs to the
+  next dated marker or the end of the prompt, so a multi-paragraph review stays whole.
 - **`--dry-run`** prints the target (status, repo, branch, head, commits ahead, worktree,
   number of review notes) after the same refusal checks. It takes no lock, creates no
   worktree, starts no session and writes nothing, so `reviewed_sha` stays intact.
