@@ -1,0 +1,71 @@
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 16%]
+........................................................................ [ 22%]
+........................................................................ [ 27%]
+........................................................................ [ 33%]
+........................................................................ [ 38%]
+........................................................................ [ 44%]
+................................................................s....... [ 49%]
+........................................................................ [ 55%]
+........................................................................ [ 60%]
+.........................F.............................................. [ 66%]
+........................................................................ [ 71%]
+........................................................................ [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 99%]
+..........                                                               [100%]
+=================================== FAILURES ===================================
+________ test_committed_fixtures_are_complete_and_match_their_manifest _________
+
+    def test_committed_fixtures_are_complete_and_match_their_manifest():
+        fixtures = harness.load_fixtures(FIXTURES)
+    
+        # `fixtures/` holds the pinned golden set AND the chair bake-off's own case;
+        # every committed fixture must still hash-validate.
+        assert [fixture.fixture_id for fixture in fixtures] == ["aris-pr1", "baw-pr11", "stw-pr11"]
+        assert {f.fixture_id: f.expected_blocking for f in fixtures} == {
+            "aris-pr1": 0, "baw-pr11": 2, "stw-pr11": 0,
+        }
+        assert all(len(fixture.base) == 40 and len(fixture.head) == 40 for fixture in fixtures)
+        for fixture in fixtures:
+>           harness.validate_fixture(fixture)
+
+tests/test_regress.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+fixture = Fixture(root=PosixPath('/tmp/claude-1000/-home-dev-projects-ai-harness--claude-worktrees-ai-harness-backlog-53340d/195...ce_review_refactor.py': {'bytes': 3807, 'sha256': 'e7839e10b73cc65f9b973b619131277ceb9e3d2b9ee5eb731a82ad16c5c72d43'}})
+
+    def validate_fixture(fixture: Fixture) -> None:
+        if not fixture.fixture_id:
+            raise ValueError("fixture_id is required")
+        if not fixture.repo or fixture.pr < 1:
+            raise ValueError(f"invalid source provenance for {fixture.fixture_id}")
+        for label, commit in (("base", fixture.base), ("head", fixture.head)):
+            if not re.fullmatch(r"[0-9a-f]{40}", commit):
+                raise ValueError(f"{fixture.fixture_id} has invalid {label} commit")
+        if fixture.expected_blocking < 0:
+            raise ValueError(f"{fixture.fixture_id} has negative expected_blocking")
+        if not fixture.diff_path.is_file() or fixture.diff_path.is_symlink():
+            raise ValueError(f"{fixture.fixture_id} change.diff is missing or unsafe")
+        if _sha256(fixture.diff_path) != fixture.diff_sha256:
+            raise ValueError(f"{fixture.fixture_id} change.diff hash mismatch")
+    
+        declared = set(fixture.head_files)
+        actual: set[str] = set()
+        for path in fixture.head_dir.rglob("*"):
+            if path.is_symlink():
+                raise ValueError(f"{fixture.fixture_id} snapshot contains symlink")
+            if path.is_file():
+                actual.add(path.relative_to(fixture.head_dir).as_posix())
+        if actual != declared:
+>           raise ValueError(f"{fixture.fixture_id} snapshot files differ from manifest")
+E           ValueError: baw-pr11 snapshot files differ from manifest
+
+tools/regress/harness.py:161: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_regress.py::test_committed_fixtures_are_complete_and_match_their_manifest
+1 failed, 1304 passed, 1 skipped in 57.83s
+exit=1

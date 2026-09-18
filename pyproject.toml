@@ -31,3 +31,14 @@ cockpit = ["portfolio.json", "templates/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Setting norecursedirs REPLACES pytest's built-in list, so the first line restates the
+# pytest defaults verbatim (".*" keeps discovery out of .venv/ and .claude/worktrees/).
+# The second line is the actual change. tools/regress/fixtures/ holds byte-exact,
+# hash-validated snapshots of other repos; some carry their own tests/test_*.py.
+# Collecting one imports it, which writes __pycache__ into the snapshot and makes
+# harness.validate_fixture (correctly) reject it. Keep the validator strict; keep
+# pytest out. Patterns match the absolute path, so they hold from any directory.
+norecursedirs = [
+    "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
+    "tools/regress/fixtures", "tools/regress/fixtures/*",
+]
