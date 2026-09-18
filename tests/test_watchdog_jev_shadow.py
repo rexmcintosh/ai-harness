@@ -291,3 +291,24 @@ def test_out_of_scope_paths_are_named_in_code_not_only_in_a_test():
     for path in ("/home/dev/projects/sat-prep/tmp/bento-sync.log", "/home/dev/projects/ai-harness/bebop/logs/cron.log",
                  "/home/dev/projects/.session-gc/rent-verification.log", "relative/path.log", ""):
         assert not js.in_scope(path), path
+
+
+# --- test isolation ---------------------------------------------------------
+
+def test_a_plain_main_call_in_a_test_never_reaches_the_real_api(monkeypatch, tmp_path, capsys):
+    # Regression (2026-09-18): once shadow mode was enabled in monitors.toml, every test
+    # that called run.main() made real Jev calls with the real key and wrote records with
+    # a fake test clock into the live watchdog/logs/jev-shadow.jsonl.
+    import watchdog.run as run
+    for var, name in (("WATCHDOG_STATE", "s.json"), ("WATCHDOG_PENDING", "p.json"),
+                      ("WATCHDOG_DELIVERY_LAST", "l.json"), ("WATCHDOG_METRICS", "m.json")):
+        monkeypatch.setenv(var, str(tmp_path / name))
+    calls = []
+
+    class Opener:
+        def open(self, request, timeout=None):
+            calls.append(request.full_url)
+            raise OSError("blocked in tests")
+    monkeypatch.setattr(js, "_OPENER", Opener())
+    run.main([])
+    assert calls == []
