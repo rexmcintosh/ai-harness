@@ -29,16 +29,14 @@ Local evidence resolves the scheduler timezone: cron `3.0pl1-184ubuntu2` schedul
 | active | every 10 min; 06:00 UTC; declared `CRON_TZ=Europe/Lisbon` not scheduler-effective (added by 2026-09-18) | `/home/dev/projects/romance-empire/scripts/ops-tick.sh`; `/home/dev/projects/romance-empire/scripts/ops-compose.sh` | Romance Empire Notion ops loop | [romance-ops-loop.md](romance-ops-loop.md) |
 | active (user timer) | two minutes after the prior run ends (`OnUnitInactiveSec=2min`) | `attain-work-queue.timer` → `attain-work-queue.service` → `~/.local/share/attain-work-queue/current/bin/notion-work-queue tick` | Attain Prep Notion work queue | [notion-work-queue.md](notion-work-queue.md) |
 | external | daily after activation and startup + 5 min | `launchpadlib-cache-clean.timer` → `/usr/lib/systemd/user/launchpadlib-cache-clean.service`; enabled by the root-owned link in `/etc/systemd/user/timers.target.wants/` | OS-owned cache cleanup | It deletes cache files older than 30 days under `~/.launchpadlib`. It is not a project automation loop and has no project owner or contract here. |
-| dormant | every 10 min when enabled; `disabled` and absent from the 2026-09-18 timer listing; last elapsed 2026-08-26 10:16 UTC | `~/.config/systemd/user/telegram-orphan-reaper.timer` → `telegram-orphan-reaper.service` → `~/.local/bin/telegram-orphan-reaper.sh` | Romance Empire Notion ops loop | romance-ops-loop.md v1.0 | Yes: one `tick ... errors 0` line every ten minutes, one `compose: ... telegram sent` line per day, and a Result with evidence on every acted row. | No. Move the contract to the owning repository; no independent escalation when ticks stop. |
-| Attain Prep Notion work queue | notion-work-queue.md | Yes: a Ready task ends with a linked result, readiness state and review evidence. | No. It states its own retirement test. |
-| Telegram MCP orphan reaper | [telegram-orphan-reaper.md](telegram-orphan-reaper.md); owner decision: re-enable or remove |
+| dormant | every 10 min when enabled; `disabled` and absent from the 2026-09-18 timer listing; last elapsed 2026-08-26 10:16 UTC | `~/.config/systemd/user/telegram-orphan-reaper.timer` → `telegram-orphan-reaper.service` → `~/.local/bin/telegram-orphan-reaper.sh` | Telegram MCP orphan reaper | [telegram-orphan-reaper.md](telegram-orphan-reaper.md); owner decision: re-enable or remove |
 | dormant | daily when enabled; no enablement link on disk | `/usr/lib/systemd/user/systemd-tmpfiles-clean.timer` | OS-owned temp cleanup | Unit file shipped by systemd, not linked from any `timers.target.wants`, and absent from the 2026-09-05 timer listing. Not a project loop; no action. |
 
 Not loops, listed so nobody re-discovers them: `~/.config/systemd/user/session-bridge.service` is a persistent service (restart-always, wanted by `default.target`), and `home-dev-mnt-mini.mount` / `.automount` are mount units. They have no schedule and are outside this index.
 
 ## Inventory totals
 
-- 28 active cron entries, grouped into 18 lifecycle contracts (17 contract documents plus the discover run contract inside the MeetTrack record).
+- 28 active cron entries, grouped into 18 lifecycle contracts (17 contract documents plus the discover run contract inside the MeetTrack record). Lines per lifecycle, as counted in the live crontab on 2026-09-18: Bebop 2, MeetTrack discover 1, watchdog 1, security sweep 1, DIEM drain 4, agents nudge 1, Loom 1, session-gc 2, preamble reapply 1, rent verification 1, Swimtrack engine 2, Ultimate Portugal engine 4, feedback sync 1, parent digest 1, backlog runner 1, Bento sync 1, engage scanner 1, Romance ops loop 2. The sum is 28.
 - 2 commented, explicitly paused MeetTrack entries, grouped into one paused lifecycle with a written retirement question.
 - 2 active user timers: the Attain Prep work queue (contract: notion-work-queue.md) and one explicitly external to this project.
 - 1 dormant user timer with a contract and a pending owner decision; 1 dormant OS timer unit, out of scope.
@@ -67,11 +65,13 @@ The July assessment's Correction A: a loop that cannot state a measurable succes
 | Attain Prep Bento sync | attainprep-bento-sync.md v1.0 | Yes: `bento_synced_at` updates and each planned send fired once or recorded quiet. | No. |
 | Backlog runner | backlog-run.md v1.0 | Yes: a run record, a review file, and an item transition consistent with the outcome. | No. |
 | Engage scanner | engage-scanner.md v1.0 | Yes: `notion: N row(s) created` and `wrote N target(s)` per run, with the rows in Notion. | No. Move the contract to the owning repository. |
+| Romance Empire Notion ops loop | romance-ops-loop.md v1.0 | Yes: one `tick ... errors 0` line every ten minutes, one `compose: ... telegram sent` line per day, and a Result with evidence on every acted row. | No. Move the contract to the owning repository; no independent escalation when ticks stop. |
+| Attain Prep Notion work queue | notion-work-queue.md | Yes: a Ready task ends with a linked result, readiness state and review evidence. | No. It states its own retirement test. |
 | Telegram MCP orphan reaper | telegram-orphan-reaper.md v1.0 (dormant) | Yes: zero Telegram MCP `bun` processes without a live `claude` ancestor after each tick. | Not by this rule. **Dormant since 2026-08-26**; owner decides re-enable or remove by 2026-09-25. On 2026-09-18 no Telegram MCP `bun` process was running at all, so no orphan was present. |
 | launchpadlib cache clean | none (external) | OS-owned. | Out of scope. |
 | systemd-tmpfiles-clean | none (external, not enabled) | OS-owned. | Out of scope. |
 
-Result: no active project loop fails the Correction A test. The two flagged entries are both already stopped (two paused MeetTrack lines, one dormant timer) and each needs one owner decision, recorded in its document.
+Result: no active project loop fails the Correction A test. Two lifecycles are flagged, and both are already stopped: MeetTrack supervise and ingest (two paused cron lines) and the Telegram orphan reaper (one dormant timer). Each needs one owner decision, recorded in its document. Two active loops carry open repair items: MeetTrack discover has no run evidence on the host, and the Romance ops loop has no independent escalation.
 
 ## Re-verifying this inventory
 
@@ -84,7 +84,7 @@ crontab -l | grep -vE '^\s*#|^\s*$|^[A-Za-z_]+=' | awk '{for(i=6;i<=NF;i++) prin
 systemctl --user list-timers --all --no-pager
 ```
 
-The table is confirmed when the first count is 28, the second is 2 (the MeetTrack supervise and ingest lines), every command printed by the third line appears in an Entrypoint cell above, and the timer list shows exactly `attain-work-queue.timer` and `launchpadlib-cache-clean.timer`. Any other line is a new or changed loop and needs a row here before it is treated as covered. The older check, a diff against `~/projects/.session-gc/crontab.backup.20260907150315`, now shows the rename to `ai-harness` and the three 2026-09-18 changes, so it is no longer an empty-diff test.
+These are quick drift checks for a person, not a parser: the second pattern only recognises commented lines that start with a digit or `*` field, and the timer list shows loaded timers only. The table is confirmed when the first count is 28, the second is 2 (the MeetTrack supervise and ingest lines), every command printed by the third line appears in an Entrypoint cell above, and the timer list shows exactly `attain-work-queue.timer` and `launchpadlib-cache-clean.timer`. Any other line is a new or changed loop and needs a row here before it is treated as covered. The older check, a diff against `~/projects/.session-gc/crontab.backup.20260907150315`, now shows the rename to `ai-harness` and the three 2026-09-18 changes, so it is no longer an empty-diff test.
 
 ## Cross-cutting gaps and retirement candidates
 
