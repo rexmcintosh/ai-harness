@@ -30,7 +30,7 @@ TG_ENV="${AGENTS_TG_ENV:-$HOME/.claude/channels/telegram/.env}"
 TG_CHAT="${AGENTS_TG_CHAT:-7735693897}"
 STATE_DIR="${AGENTS_STATE_DIR:-$HOME/.cache/agents}"
 SKIP_ATTACHED="${AGENTS_SKIP_ATTACHED:-1}"   # in once/watch, don't nudge sessions you're attached to
-TG_SEND="${AGENTS_TG_SEND:-$HOME/projects/build-ai-automation-workflow/bin/tg-send}"
+TG_SEND="${AGENTS_TG_SEND:-$HOME/projects/ai-harness/bin/tg-send}"
 CLAUDE_BIN="${AGENTS_CLAUDE_BIN:-claude}"
 CLAUDE_TIMEOUT="${AGENTS_CLAUDE_TIMEOUT_SEC:-20}"   # a hung CLI must not freeze the dashboard
 

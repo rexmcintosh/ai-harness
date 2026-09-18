@@ -52,5 +52,5 @@ ready for it.
 Run the first `--run` from the **main checkout on `main`** (not a worktree), so you can
 watch the agent + the council CI gate end to end on a small issue.
 ```
-cd /home/dev/projects/build-ai-automation-workflow && ./fixit/run-fixit.sh --issue "..." --run
+cd /home/dev/projects/ai-harness && ./fixit/run-fixit.sh --issue "..." --run
 ```

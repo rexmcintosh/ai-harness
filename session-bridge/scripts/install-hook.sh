@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SETTINGS="$HOME/.claude/settings.json"
-CMD="/usr/local/bin/bun /home/dev/projects/build-ai-automation-workflow/session-bridge/hook/stop-hook.ts"
+CMD="/usr/local/bin/bun /home/dev/projects/ai-harness/session-bridge/hook/stop-hook.ts"
 
 mkdir -p "$(dirname "$SETTINGS")"
 [ -f "$SETTINGS" ] || printf '{}' > "$SETTINGS"

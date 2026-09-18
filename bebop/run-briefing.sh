@@ -52,8 +52,8 @@ PROMPT="${PROMPT//\{\{CHAT_ID\}\}/$CHAT_ID}"
 # Empty when nothing needs him — the silence is deliberate, and is what keeps the
 # line meaningful on the mornings it does appear.
 LOOM_LINE=""
-LOOM_PENDING="/home/dev/projects/build-ai-automation-workflow/loom/pending.json"
-LOOM_PY="/home/dev/projects/build-ai-automation-workflow/.venv/bin/python"
+LOOM_PENDING="/home/dev/projects/ai-harness/loom/pending.json"
+LOOM_PY="/home/dev/projects/ai-harness/.venv/bin/python"
 if [ -r "$LOOM_PENDING" ] && [ -x "$LOOM_PY" ]; then
   LOOM_LINE=$("$LOOM_PY" - "$LOOM_PENDING" <<'PY' 2>/dev/null || true
 import json, sys
@@ -126,7 +126,7 @@ if [ $SEND_OK -eq 1 ]; then
   exit 0
 else
   echo "[$TS] mode=$MODE rc=$RC result=\"${RESULT_1LINE:0:90}\" $USAGE" >> "$LOG"
-  "$TG_SEND" "$CHAT_ID" "⚠️ Bebop $MODE briefing failed (rc=$RC). Check ~/projects/build-ai-automation-workflow/bebop/logs/." || true
+  "$TG_SEND" "$CHAT_ID" "⚠️ Bebop $MODE briefing failed (rc=$RC). Check ~/projects/ai-harness/bebop/logs/." || true
   echo "FAILED rc=$RC result=$RESULT" >&2
   exit 1
 fi

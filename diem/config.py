@@ -61,9 +61,9 @@ class DiemConfig:
     reset: str = "01:00"
     state_dir: Path = Path.home() / ".local/state/diem"
     outputs_dir: Path = Path.home() / ".local/state/diem/outputs"
-    loom_repo: Path = Path.home() / "projects/build-ai-automation-workflow"
+    loom_repo: Path = Path.home() / "projects/ai-harness"
     loom_cmd: list[str] = field(default_factory=lambda: [
-        str(Path.home() / "projects/build-ai-automation-workflow/.venv/bin/python"),
+        str(Path.home() / "projects/ai-harness/.venv/bin/python"),
         "-m", "loom.cli", "backfill"])
     seeds: dict = field(default_factory=lambda: dict(_DEFAULT_SEEDS))
     telegram: dict | None = None

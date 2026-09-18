@@ -13,7 +13,7 @@ rexmcintosh/santa-amaro-home-renovation
 rexmcintosh/aris-management-website
 rexmcintosh/blkout-dice-roller
 rexmcintosh/bubblepop-art
-rexmcintosh/build-ai-automation-workflow
+rexmcintosh/ai-harness
 rexmcintosh/combat-arms-transition
 rexmcintosh/crypto-portfolio
 rexmcintosh/dump
