@@ -48,6 +48,12 @@ def _tree(root: Path) -> dict:
     return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
 
 
+def _with_lock_file(tree: dict) -> dict:
+    # The lock is taken before state.json is read, so a content refusal leaves loom's
+    # (empty, gitignored) .run.lock behind and nothing else.
+    return {**tree, str(Path("loom") / ".run.lock"): b""}
+
+
 def _run(triage, repo, tmp_path, **kw):
     kw.setdefault("running_check", lambda: False)
     return triage.apply(repo, backup_dir=tmp_path / "backup", **kw)
@@ -67,7 +73,7 @@ def test_refuses_when_the_state_file_does_not_know_the_bm2_sessions(triage, repo
     before = _tree(repo)
     assert _run(triage, repo, tmp_path) == 1
     assert BM2_A in capsys.readouterr().err
-    assert _tree(repo) == before
+    assert _tree(repo) == _with_lock_file(before)
 
 
 def test_refuses_while_a_loom_run_is_live_or_holds_the_lock(triage, repo, tmp_path, capsys):
@@ -78,8 +84,7 @@ def test_refuses_while_a_loom_run_is_live_or_holds_the_lock(triage, repo, tmp_pa
         fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert _run(triage, repo, tmp_path) == 1
     assert ".run.lock" in capsys.readouterr().err
-    before[str(Path("loom") / ".run.lock")] = b""
-    assert _tree(repo) == before
+    assert _tree(repo) == _with_lock_file(before)
 
 
 def test_apply_salvages_settles_and_backs_up_before_deleting(triage, repo, tmp_path):
@@ -115,4 +120,65 @@ def test_refuses_to_overwrite_a_different_artifact_already_in_learnings(triage, 
     before = _tree(repo)
     assert _run(triage, repo, tmp_path) == 1
     assert "differs" in capsys.readouterr().err
-    assert _tree(repo) == before
+    assert _tree(repo) == _with_lock_file(before)
+
+
+# ── partial failure: one line, exit 1, and a plain re-run finishes the job ────────────────
+def test_a_failed_backup_never_marks_the_session_settled_and_a_rerun_finishes(triage, repo, tmp_path, capsys, monkeypatch):
+    real_copy = triage.shutil.copy2
+
+    def broken_copy(*args, **kw):
+        raise OSError("disk full")
+    monkeypatch.setattr(triage.shutil, "copy2", broken_copy)
+    assert _run(triage, repo, tmp_path) == 1
+    err = capsys.readouterr().err.strip()
+    assert len(err.splitlines()) == 1 and "back up" in err and "disk full" in err and BM2_A in err
+    # no split-brain: the file is still in quarantine, so the session must still say so
+    assert (repo / "loom" / "quarantine" / f"{BM2_A}.md").exists()
+    assert _state(repo)[BM2_A]["state"] == "quarantined"
+
+    monkeypatch.setattr(triage.shutil, "copy2", real_copy)
+    assert _run(triage, repo, tmp_path) == 0
+    assert not list((repo / "loom" / "quarantine").glob("bm2-*"))
+    assert all(_state(repo)[sid]["state"] == "committed" for sid in (BM2_A, BM2_B))
+
+
+def test_a_failed_state_write_is_one_line_and_a_rerun_finishes(triage, repo, tmp_path, capsys, monkeypatch):
+    real_advance = triage.LoomState.advance
+    calls = []
+
+    def flaky(self, sid, state):
+        calls.append(sid)
+        if len(calls) == 2:
+            raise OSError("read-only file system")
+        return real_advance(self, sid, state)
+    monkeypatch.setattr(triage.LoomState, "advance", flaky)
+    assert _run(triage, repo, tmp_path) == 1
+    err = capsys.readouterr().err.strip()
+    assert len(err.splitlines()) == 1 and "read-only file system" in err
+
+    monkeypatch.setattr(triage.LoomState, "advance", real_advance)
+    assert _run(triage, repo, tmp_path) == 0
+    state = _state(repo)
+    assert all(state[f"{sid}-salvage"]["state"] == "distilled" and state[sid]["state"] == "committed"
+               for sid in (BM2_A, BM2_B))
+    assert not list((repo / "loom" / "quarantine").glob("bm2-*"))
+
+
+def test_refuses_a_state_file_that_does_not_parse(triage, repo, tmp_path, capsys):
+    (repo / "loom" / "state.json").write_text("{ not json")
+    before = _tree(repo)
+    assert _run(triage, repo, tmp_path) == 1
+    assert "does not parse" in capsys.readouterr().err
+    assert _tree(repo) == _with_lock_file(before)
+
+
+def test_the_lock_is_taken_before_the_state_file_is_read(triage, repo, tmp_path, capsys):
+    # A state file a live run is halfway through replacing must never be judged: with the
+    # lock held elsewhere the refusal is about the lock, not about what state.json holds.
+    (repo / "loom" / "state.json").write_text("{ not json")
+    with open(repo / "loom" / ".run.lock", "w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert _run(triage, repo, tmp_path) == 1
+    err = capsys.readouterr().err
+    assert ".run.lock" in err and "parse" not in err

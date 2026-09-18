@@ -11,18 +11,24 @@ What it does, in this order, and only after every preflight check passed:
   1. Writes the two salvage artifacts (facts found only in the malformed bm2-* drafts)
      into loom/learnings/ under new ids and marks those ids 'distilled', so the next
      backfill weaves them. An id already at 'distilled' or later is left alone.
-  2. Marks the two bm2-* session ids 'committed' (their quarantine is settled).
-  3. Copies each malformed bm2-* quarantine file to the backup directory, verifies the
+  2. Copies each malformed bm2-* quarantine file to the backup directory, verifies the
      copy, and only then deletes it from loom/quarantine/.
+  3. Marks that bm2-* session id 'committed' (its quarantine is settled).
 
 Preflight (any failure: one line on stderr, exit 1, nothing written):
-  - loom/state.json exists under the target repo and already knows both bm2-* ids. This
-    is the guard against a wrong or renamed path: an earlier draft pointed at the repo's
-    previous name and would have built a fresh loom/ tree there and reported success.
-  - both salvage sources parse with loom's own `_parse_learnings`;
-  - an artifact already in loom/learnings/ under a salvage id has identical content;
+  - loom/state.json exists under the target repo. This is the guard against a wrong or
+    renamed path: an earlier draft pointed at the repo's previous name and would have
+    built a fresh loom/ tree there and reported success;
   - no loom absorb/backfill/promote process is running, and loom/.run.lock is free. The
-    lock is held for the whole apply.
+    lock is taken BEFORE state.json is read and held for the whole apply;
+  - state.json parses and already knows both bm2-* ids;
+  - both salvage sources parse with loom's own `_parse_learnings`;
+  - an artifact already in loom/learnings/ under a salvage id has identical content.
+
+If a step fails after the preflight (disk full, read-only file system), the script prints
+one line naming the step and exits 1. Completed steps stay; every step checks whether it
+is already done, so a plain re-run finishes the job. A session is marked 'committed' only
+after its malformed file is backed up and gone, never the other way round.
 
 Safe to re-run: a second run changes nothing.
 
@@ -70,11 +76,13 @@ def _salvage_text(bm2_id: str) -> str:
 
 
 def _preflight(repo: Path) -> dict[str, str]:
-    """Every check that can fail, before the first write. Returns {salvage id: text}."""
+    """Every check that can fail, before the first write. Called with loom/.run.lock held,
+    so no loom run can be replacing state.json while it is read. Returns {salvage id: text}."""
     state_path = repo / "loom" / "state.json"
-    if not state_path.is_file():
-        raise Refusal(f"no loom state.json under {repo}; point --repo at the live checkout")
-    known = json.loads(state_path.read_text() or "{}")
+    try:
+        known = json.loads(state_path.read_text() or "{}")
+    except ValueError as exc:
+        raise Refusal(f"{state_path} does not parse ({exc})") from exc
     missing = [sid for sid in BM2_IDS if sid not in known]
     if missing:
         raise Refusal(f"{state_path} does not know {', '.join(missing)}; wrong data directory?")
@@ -94,38 +102,53 @@ def _write_atomic(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def _settle(repo: Path, backup_dir: Path, texts: dict[str, str], log: Callable[[str], None]) -> None:
+def _settle(repo: Path, backup_dir: Path, texts: dict[str, str], log: Callable[[str], None],
+            doing: list[str]) -> None:
+    """Each step is skipped when already done, so a re-run after a failure picks up where
+    it stopped. `doing[0]` names the step in flight for the failure line."""
     loom = repo / "loom"
+    doing[0] = "open loom/state.json"
     state = LoomState(loom / "state.json")             # loom's own locked, atomic writer
     for new_id, text in texts.items():
         artifact = loom / "learnings" / f"{new_id}.md"
         if not artifact.exists():
+            doing[0] = f"write {artifact.name}"
             artifact.parent.mkdir(exist_ok=True)
             _write_atomic(artifact, text)
             log(f"wrote {artifact}")
         if _STAGE_ORDER[state.state_of(new_id)] < _STAGE_ORDER["distilled"]:
+            doing[0] = f"mark {new_id} distilled"
             state.advance(new_id, "distilled")
             log(f"state[{new_id}] -> distilled")
     for bm2_id in BM2_IDS:
-        if state.state_of(bm2_id) != "committed":
-            state.advance(bm2_id, "committed")
-            log(f"state[{bm2_id}] -> committed (quarantine settled)")
+        # File first, state second: a session is only called settled once its malformed
+        # draft is safely out of quarantine. The reverse order could leave state saying
+        # "committed" beside a file that is still there.
         stale = loom / "quarantine" / f"{bm2_id}.md"
         if stale.exists():
+            doing[0] = f"back up {stale.name}"
             backup_dir.mkdir(parents=True, exist_ok=True)
             kept = backup_dir / stale.name
             shutil.copy2(stale, kept)
             if kept.read_bytes() != stale.read_bytes():
-                raise RuntimeError(f"backup of {stale} does not match; nothing deleted")
+                raise OSError(f"backup {kept} does not match the original; nothing deleted")
+            doing[0] = f"delete {stale.name} from quarantine"
             stale.unlink()
             log(f"moved {stale} -> {kept}")
+        if state.state_of(bm2_id) != "committed":
+            doing[0] = f"mark {bm2_id} committed"
+            state.advance(bm2_id, "committed")
+            log(f"state[{bm2_id}] -> committed (quarantine settled)")
 
 
 def apply(repo: Path = DEFAULT_REPO, *, backup_dir: Path = DEFAULT_BACKUP,
           running_check: Callable[[], bool] = loom_running, log: Callable[[str], None] = print) -> int:
     repo, backup_dir = Path(repo), Path(backup_dir)
+    doing = ["preflight"]
     try:
-        texts = _preflight(repo)
+        # Path guard before anything is created, the lock file included.
+        if not (repo / "loom" / "state.json").is_file():
+            raise Refusal(f"no loom state.json under {repo}; point --repo at the live checkout")
         if running_check():
             raise Refusal("a loom absorb/backfill/promote is running; retry later")
         with open(repo / "loom" / ".run.lock", "w") as lock:
@@ -134,11 +157,17 @@ def apply(repo: Path = DEFAULT_REPO, *, backup_dir: Path = DEFAULT_BACKUP,
             except OSError:
                 raise Refusal("another loom run holds loom/.run.lock; retry later") from None
             try:
-                _settle(repo, backup_dir, texts, log)
+                texts = _preflight(repo)
+                _settle(repo, backup_dir, texts, log, doing)
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
     except Refusal as why:
         print(f"refusing: {why}", file=sys.stderr)
+        return 1
+    except Exception as exc:   # noqa: BLE001 - live data: one line, no traceback, safe to re-run
+        why = " ".join(f"{type(exc).__name__}: {exc}".split())
+        print(f"failed at step '{doing[0]}': {why}. Completed steps are kept; fix the cause and re-run.",
+              file=sys.stderr)
         return 1
     log("done")
     return 0
