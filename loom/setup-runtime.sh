@@ -15,7 +15,7 @@
 # editable install rooted here. Idempotent: safe to re-run to repair the clone or venv.
 set -euo pipefail
 
-SHARED="/home/dev/projects/build-ai-automation-workflow"
+SHARED="/home/dev/projects/ai-harness"
 RUNTIME="/home/dev/loom-runtime"
 PY="${PYTHON:-python3}"
 

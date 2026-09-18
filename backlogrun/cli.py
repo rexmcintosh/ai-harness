@@ -116,7 +116,7 @@ class Config:
     tg_enabled: bool = field(default_factory=lambda: os.environ.get("BACKLOG_RUN_TG") != "0")
     tg_chat: str = field(default_factory=lambda: _env("BACKLOG_RUN_TG_CHAT", TG_CHAT_DEFAULT))
     tg_send: str = field(default_factory=lambda: _env(
-        "BACKLOG_RUN_TG_SEND", os.path.join(PROJECTS, "build-ai-automation-workflow", "bin", "tg-send")))
+        "BACKLOG_RUN_TG_SEND", os.path.join(PROJECTS, "ai-harness", "bin", "tg-send")))
     env_file: str = field(default_factory=lambda: _env("BACKLOG_RUN_ENV_FILE", os.path.join(HOME, ".env")))
     model: str = "sonnet"
     effort: str = "medium"

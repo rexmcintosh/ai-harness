@@ -33,7 +33,7 @@ from .metrics import sum_counter, count_matches, check_budget, parse_count_heade
 
 # Default to the MAIN checkout so the installed cron job watches production, not
 # a worktree. Override with WATCHDOG_BASE for testing/relocation.
-BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/build-ai-automation-workflow"))
+BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
 
 # Cron logs to scan for error markers: (label, path).
 CRON_LOGS = [

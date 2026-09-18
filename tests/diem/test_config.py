@@ -10,8 +10,8 @@ TOML = textwrap.dedent("""
     reset = "01:00"
     state_dir = "{state}"
     outputs_dir = "{out}"
-    loom_repo = "/home/dev/projects/build-ai-automation-workflow"
-    loom_cmd = ["/home/dev/projects/build-ai-automation-workflow/.venv/bin/python", "-m", "loom.cli", "backfill"]
+    loom_repo = "/home/dev/projects/ai-harness"
+    loom_cmd = ["/home/dev/projects/ai-harness/.venv/bin/python", "-m", "loom.cli", "backfill"]
 
     [[checkpoints]]
     time = "21:00"

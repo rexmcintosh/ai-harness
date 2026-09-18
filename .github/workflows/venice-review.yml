@@ -32,7 +32,7 @@ jobs:
       # available with the approved merge and push of this branch.
       # Bump intentionally on each council release.
       - name: Install council
-        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@1f9871d07786b897b186fe3ad24203efb2ed1c07"
+        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/ai-harness@1f9871d07786b897b186fe3ad24203efb2ed1c07"
 
       - name: Compute diff
         id: diff

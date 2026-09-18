@@ -19,7 +19,7 @@ index 34b4d7f..5ebfbef 100644
 +      # Bump intentionally on each council release.
        - name: Install council
 -        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@4a01298dcce2734115ac57f02592146969d76f48"
-+        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@026900319c4deb479d6c9abe01fd537ac5ac09a4"
++        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/ai-harness@026900319c4deb479d6c9abe01fd537ac5ac09a4"
  
        - name: Compute diff
          id: diff

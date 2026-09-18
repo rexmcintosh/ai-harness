@@ -29,7 +29,7 @@
 # session-end event). Proposed, NOT installed:
 #
 #   CRON_TZ=UTC
-#   20 3 * * *  /home/dev/projects/build-ai-automation-workflow/scripts/venice-usage-backfill.sh \
+#   20 3 * * *  /home/dev/projects/ai-harness/scripts/venice-usage-backfill.sh \
 #                 >> /home/dev/.local/state/venice-usage/backfill.log 2>&1
 #   CRON_TZ=Europe/Lisbon
 #

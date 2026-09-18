@@ -87,7 +87,7 @@ Council or generic Venice keys. The worker receives none of these credentials.
 
 ## Install / update
 
-    pipx install --force ~/projects/build-ai-automation-workflow
+    pipx install --force ~/projects/ai-harness
 
 ## Tests
 

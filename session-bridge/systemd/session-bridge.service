@@ -6,7 +6,7 @@ StartLimitIntervalSec=120
 StartLimitBurst=6
 
 [Service]
-ExecStart=/usr/local/bin/bun run /home/dev/projects/build-ai-automation-workflow/session-bridge/src/main.ts
+ExecStart=/usr/local/bin/bun run /home/dev/projects/ai-harness/session-bridge/src/main.ts
 Restart=always
 RestartSec=10
 
