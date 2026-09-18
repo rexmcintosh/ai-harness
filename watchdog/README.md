@@ -26,11 +26,34 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | loom + MeetTrack logs | error markers in the recent tail (warn) |
+| `cron:*` | loom (`loom/logs/runs.log`) + MeetTrack logs | error markers in the recent tail (warn) |
+| `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 
-Error-marker matching ignores `key=value` counters (e.g. `failed=0`) so metric lines
-don't read as failures.
+Error-marker matching ignores `key=value` counters (e.g. `failed=0`), empty JSON counters
+(`"failed": 0`, `"error": null`) and JSON per-item data lists (`"quarantined_items": [...]`,
+`"articles": [...]`) so metric lines and standing item notes don't read as failures. A
+missing log is skipped (the job may be paused); the coverage check names what was missing.
+
+## Jev shadow mode (shadow only)
+
+`jev_shadow.py` asks Jev (TypeSafe's typed judge, pinned to `jev-1.13.0`) the question
+the regex answers: does this log tail show a failure a person should look at? Each
+answer is appended to `logs/jev-shadow.jsonl` beside the regex's verdict. **Nothing reads
+that file back.** No status, alert or escalation depends on it, it runs after the poll's
+result is emitted, it is skipped on `--dry-run`, and any failure in it is swallowed.
+
+- Turn off: `enabled = false` under `[jev_shadow]` in `monitors.toml`, or
+  `WATCHDOG_JEV_SHADOW=0`. With no `TYPESAFE_API_KEY` (environment or `~/.env`) it does nothing.
+- What is sent: the last 50 lines, redacted (emails, customer rows, mail subjects, JSON
+  item lists, URL queries, token-like strings, social handles). Only the redacted tail is stored.
+- Which logs: the alerting `CRON_LOGS` plus the shadow-only list in `monitors.toml`.
+  Data scope is public and operations data only. Do not add a log that carries
+  customer, student, personal-email or financial detail.
+- A tail is judged once, when it changes. One pass is capped at 20 seconds.
+- Compare the two: `python3 -m watchdog.jev_shadow report`. Bands: under 0.3 ok, 0.7 and
+  over alert, between them gray. Those lines came from one replay of 116 real tails
+  (`docs/jev-assessment-2026-09-18.md`, Test 4) and are what the shadow data is for re-checking.
 
 ## Spike monitoring (rate/volume, not just failures)
 

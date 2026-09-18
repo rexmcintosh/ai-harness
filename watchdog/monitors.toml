@@ -54,3 +54,70 @@ tables        = ["results", "splits", "swimmers"]
 stale_warn_min     = 20
 stale_crit_min     = 75
 launch_overdue_min = 30
+
+# --- Jev shadow mode (SHADOW ONLY) ------------------------------------------
+# A second opinion on cron-log tails from Jev (TypeSafe), written to
+# watchdog/logs/jev-shadow.jsonl next to the regex rule's verdict. Nothing reads that
+# file back: no status, no alert, no escalation. See watchdog/jev_shadow.py and
+# docs/jev-assessment-2026-09-18.md. Compare with: python3 -m watchdog.jev_shadow report
+# Kill switch: enabled = false here, or WATCHDOG_JEV_SHADOW=0 in the environment.
+#
+# The alerting CRON_LOGS in run.py are always shadowed. The logs below are shadowed
+# ONLY: the regex rule's verdict on them is recorded for comparison and never alerts.
+# Data scope (owner, 2026-09-18): public and operations data only. Do not list a log
+# that carries customer, student, personal-email or financial detail (sat-prep,
+# bebop, rent). tests/test_watchdog_jev_shadow.py enforces the obvious ones.
+[jev_shadow]
+enabled = true
+
+[[jev_shadow.logs]]
+name = "loom-err"
+log  = "/home/dev/projects/ai-harness/loom/logs/runs.log.err"
+
+[[jev_shadow.logs]]
+name = "watchdog-cron"
+log  = "/home/dev/projects/ai-harness/watchdog/logs/cron.log"
+
+[[jev_shadow.logs]]
+name = "council-sweep"
+log  = "/home/dev/projects/ai-harness/council/logs/sweep.cron.log"
+
+[[jev_shadow.logs]]
+name = "diem-drain"
+log  = "/home/dev/.local/state/diem/drain.log"
+
+[[jev_shadow.logs]]
+name = "backlog-run"
+log  = "/home/dev/projects/.backlog-run/cron.log"
+
+[[jev_shadow.logs]]
+name = "ops-tick"
+log  = "/home/dev/.local/state/ops/tick.log"
+
+[[jev_shadow.logs]]
+name = "ops-compose"
+log  = "/home/dev/.local/state/ops/compose.log"
+
+[[jev_shadow.logs]]
+name = "engage-scan"
+log  = "/home/dev/.local/state/engage/scan.log"
+
+[[jev_shadow.logs]]
+name = "writing-engine-morning"
+log  = "/home/dev/projects/.session-gc/writing-engine-morning.log"
+
+[[jev_shadow.logs]]
+name = "writing-engine-poller"
+log  = "/home/dev/projects/.session-gc/writing-engine-poller.log"
+
+[[jev_shadow.logs]]
+name = "swimtrack-engine-morning"
+log  = "/home/dev/projects/.session-gc/swimtrack-engine-morning.log"
+
+[[jev_shadow.logs]]
+name = "swimtrack-engine-poller"
+log  = "/home/dev/projects/.session-gc/swimtrack-engine-poller.log"
+
+[[jev_shadow.logs]]
+name = "session-gc-sweep"
+log  = "/home/dev/projects/.session-gc/sweep.log"

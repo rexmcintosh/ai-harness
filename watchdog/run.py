@@ -30,6 +30,7 @@ from .triage import (
     check_service_active,
     triage,
 )
+from . import jev_shadow
 from .metrics import sum_counter, count_matches, check_budget, parse_count_header, check_rate
 
 # Default to the MAIN checkout so the installed cron job watches production, not
@@ -221,6 +222,38 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
     return out, new_metrics
 
 
+def shadow_logs(monitors: dict) -> list[tuple[str, str, str]]:
+    """(label, text, the regex rule's level) for every readable log Jev shadows: the
+    alerting CRON_LOGS plus the shadow-only extras in monitors.toml. The extras get
+    the rule's verdict for comparison only; they never become a status."""
+    extra = [(item.get("name"), Path(item.get("log", "")))
+             for item in (monitors.get("jev_shadow") or {}).get("logs", [])]
+    out = []
+    for label, path in [*CRON_LOGS, *extra]:
+        text = _read(path)
+        if label and text is not None:
+            out.append((label, text, check_cron_log(label, text).level))
+    return out
+
+
+def run_jev_shadow(now_epoch: int) -> None:
+    """Shadow only: writes watchdog/logs/jev-shadow.jsonl and nothing reads it back.
+    Off unless monitors.toml turns it on; WATCHDOG_JEV_SHADOW=0 is the kill switch."""
+    try:
+        monitors = _load_monitors()
+        if not (monitors.get("jev_shadow") or {}).get("enabled"):
+            return
+        if os.environ.get("WATCHDOG_JEV_SHADOW") == "0":
+            return
+        log_dir = Path(os.environ.get("WATCHDOG_LOG_DIR", str(BASE / "watchdog" / "logs")))
+        jev_shadow.shadow_pass(shadow_logs(monitors), now_epoch=now_epoch,
+                               key=jev_shadow.load_key(),
+                               log_path=log_dir / "jev-shadow.jsonl",
+                               state_path=log_dir / "jev-shadow-state.json")
+    except Exception:  # noqa: BLE001 - a shadow must never break the poll it watches
+        pass
+
+
 def format_report(fired: list[CheckStatus]) -> str:
     """Render fired checks worst-first into the investigator's briefing text."""
     ordered = sorted(fired, key=lambda s: -LEVELS.get(s.level, 0))
@@ -347,6 +380,8 @@ def main(argv=None) -> int:
         "checked": len(statuses),
     }
     print("WATCHDOG_JSON:" + json.dumps(payload))
+    if not dry_run:
+        run_jev_shadow(now)   # after the result is emitted: it cannot change it
     return 0
 
 

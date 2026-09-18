@@ -57,3 +57,79 @@ def test_collect_reports_log_coverage(monkeypatch, tmp_path):
     statuses, _ = run.collect(1_800_000_000, {})
     coverage = [s for s in statuses if s.name == "cron-logs:coverage"]
     assert len(coverage) == 1 and coverage[0].level == "warn"
+
+
+# --- Jev shadow wiring: it may watch, it may never steer ---------------------
+
+def _main_env(monkeypatch, tmp_path, run):
+    for var, name in (("WATCHDOG_STATE", "state.json"), ("WATCHDOG_PENDING", "pending.json"),
+                      ("WATCHDOG_DELIVERY_LAST", "last.json"), ("WATCHDOG_METRICS", "metrics.json")):
+        monkeypatch.setenv(var, str(tmp_path / name))
+    monkeypatch.delenv("WATCHDOG_JEV_SHADOW", raising=False)
+    monkeypatch.setattr(run, "collect", lambda now, prior: ([CheckStatus("disk", "ok", "fine")], {}))
+
+
+def test_shadow_logs_cover_cron_logs_and_extra_logs_with_the_rules_verdict(monkeypatch, tmp_path):
+    import watchdog.run as run
+    (tmp_path / "a.log").write_text("run FAILED rc=1\n")
+    (tmp_path / "b.log").write_text("all good\n")
+    monkeypatch.setattr(run, "CRON_LOGS", [("a", tmp_path / "a.log"), ("gone", tmp_path / "gone.log")])
+    monitors = {"jev_shadow": {"logs": [{"name": "b", "log": str(tmp_path / "b.log")}]}}
+    assert run.shadow_logs(monitors) == [("a", "run FAILED rc=1\n", "warn"), ("b", "all good\n", "ok")]
+
+
+def test_main_runs_the_shadow_pass_and_output_is_unchanged(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": False}})
+    run.main([]); without = capsys.readouterr().out
+
+    calls = []
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": True}})
+    monkeypatch.setattr(run.jev_shadow, "load_key", lambda: "k")
+    monkeypatch.setattr(run.jev_shadow, "shadow_pass", lambda logs, **kw: calls.append(kw) or 1)
+    run.main([]); with_shadow = capsys.readouterr().out
+    assert len(calls) == 1
+    assert with_shadow == without
+
+
+def test_main_dry_run_never_calls_jev(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    calls = []
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": True}})
+    monkeypatch.setattr(run.jev_shadow, "shadow_pass", lambda logs, **kw: calls.append(1))
+    run.main(["--dry-run"])
+    assert calls == []
+
+
+def test_main_survives_a_shadow_pass_that_raises(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": True}})
+    def boom(logs, **kw):
+        raise RuntimeError("anything")
+    monkeypatch.setattr(run.jev_shadow, "shadow_pass", boom)
+    assert run.main([]) == 0
+    assert "WATCHDOG_JSON:" in capsys.readouterr().out
+
+
+def test_shadow_is_off_unless_the_config_turns_it_on(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    calls = []
+    monkeypatch.setattr(run, "_load_monitors", lambda: {})
+    monkeypatch.setattr(run.jev_shadow, "shadow_pass", lambda logs, **kw: calls.append(1))
+    run.main([])
+    assert calls == []
+
+
+def test_env_kill_switch_beats_the_config(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    monkeypatch.setenv("WATCHDOG_JEV_SHADOW", "0")
+    calls = []
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": True}})
+    monkeypatch.setattr(run.jev_shadow, "shadow_pass", lambda logs, **kw: calls.append(1))
+    run.main([])
+    assert calls == []

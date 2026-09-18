@@ -286,3 +286,18 @@ def test_log_coverage_ok_when_some_logs_are_readable_and_names_the_missing():
 
 def test_log_coverage_ok_when_nothing_is_configured():
     assert check_log_coverage(found=[], missing=[]).level == "ok"
+
+
+def test_cron_log_ignores_words_inside_json_data_lists():
+    # loom repeats its standing quarantine list and promoted article names in every
+    # run summary. Those strings are data about items, not the outcome of this run.
+    log = ('[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 4, "failed": 0, "quarantined_items": '
+           '[["22f8#2", "dead-letter: repeated weave exceptions"], ["bm2#2", "weave failed guards after retry"]], '
+           '"limit_hit": false}\n'
+           '[2026-09-18T03:00:02+01:00] promote rc=0 {"promoted": true, "articles": ["patterns/error-handling.md"]}\n')
+    assert check_cron_log("loom", log).level == "ok"
+
+
+def test_cron_log_still_fires_when_the_run_itself_failed_next_to_a_data_list():
+    log = '[2026-09-18T03:00:01+01:00] rc=1 {"distilled": 0, "failed": 3, "quarantined_items": [["a#1", "x"]]}\n'
+    assert check_cron_log("loom", log).level == "warn"
