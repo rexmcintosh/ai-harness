@@ -1,0 +1,930 @@
+[
+ {
+  "id": "engage-scan-05",
+  "seconds": 0.706,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.19,
+  "input_tokens": 2088,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "backlog-run-00",
+  "seconds": 0.718,
+  "needs_human": 0.82,
+  "latest_run_failed": 0.86,
+  "input_tokens": 1999,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "backlog-run-03",
+  "seconds": 0.746,
+  "needs_human": 0.76,
+  "latest_run_failed": 0.2,
+  "input_tokens": 1878,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-07",
+  "seconds": 0.657,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.07,
+  "input_tokens": 670,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-07",
+  "seconds": 0.697,
+  "needs_human": 0.7,
+  "latest_run_failed": 0.75,
+  "input_tokens": 1439,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-08",
+  "seconds": 0.656,
+  "needs_human": 0.34,
+  "latest_run_failed": 0.08,
+  "input_tokens": 1260,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-10",
+  "seconds": 0.666,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.96,
+  "input_tokens": 1530,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-08",
+  "seconds": 0.628,
+  "needs_human": 0.02,
+  "latest_run_failed": 0.03,
+  "input_tokens": 945,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-05",
+  "seconds": 0.585,
+  "needs_human": 0.86,
+  "latest_run_failed": 0.14,
+  "input_tokens": 1222,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-06",
+  "seconds": 0.627,
+  "needs_human": 0.25,
+  "latest_run_failed": 0.04,
+  "input_tokens": 2303,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-03",
+  "seconds": 0.585,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.09,
+  "input_tokens": 1837,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-01",
+  "seconds": 0.809,
+  "needs_human": 0.84,
+  "latest_run_failed": 0.17,
+  "input_tokens": 1222,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-04",
+  "seconds": 0.641,
+  "needs_human": 0.53,
+  "latest_run_failed": 0.06,
+  "input_tokens": 1770,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-02",
+  "seconds": 0.6,
+  "needs_human": 0.14,
+  "latest_run_failed": 0.05,
+  "input_tokens": 1649,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-04",
+  "seconds": 0.557,
+  "needs_human": 0.63,
+  "latest_run_failed": 0.72,
+  "input_tokens": 1423,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-00",
+  "seconds": 0.599,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.16,
+  "input_tokens": 1383,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-04",
+  "seconds": 0.572,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.12,
+  "input_tokens": 1276,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "ops-tick-03",
+  "seconds": 0.604,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.05,
+  "input_tokens": 2146,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-11",
+  "seconds": 0.587,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1550,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-05",
+  "seconds": 0.608,
+  "needs_human": 0.48,
+  "latest_run_failed": 0.38,
+  "input_tokens": 1999,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-02",
+  "seconds": 0.636,
+  "needs_human": 0.87,
+  "latest_run_failed": 0.29,
+  "input_tokens": 1840,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-02",
+  "seconds": 0.586,
+  "needs_human": 0.88,
+  "latest_run_failed": 0.09,
+  "input_tokens": 1154,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-00",
+  "seconds": 0.582,
+  "needs_human": 0.09,
+  "latest_run_failed": 0.06,
+  "input_tokens": 2084,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-06",
+  "seconds": 1.034,
+  "needs_human": 0.13,
+  "latest_run_failed": 0.16,
+  "input_tokens": 1229,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-02",
+  "seconds": 0.61,
+  "needs_human": 0.83,
+  "latest_run_failed": 0.32,
+  "input_tokens": 1119,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "backlog-run-02",
+  "seconds": 0.577,
+  "needs_human": 0.42,
+  "latest_run_failed": 0.18,
+  "input_tokens": 1990,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-11",
+  "seconds": 0.599,
+  "needs_human": 0.62,
+  "latest_run_failed": 0.72,
+  "input_tokens": 1452,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-00",
+  "seconds": 0.768,
+  "needs_human": 0.04,
+  "latest_run_failed": 0.05,
+  "input_tokens": 3032,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-03",
+  "seconds": 0.682,
+  "needs_human": 0.14,
+  "latest_run_failed": 0.05,
+  "input_tokens": 2001,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-08",
+  "seconds": 0.652,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1428,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-00",
+  "seconds": 0.602,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1519,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-09",
+  "seconds": 0.608,
+  "needs_human": 0.28,
+  "latest_run_failed": 0.05,
+  "input_tokens": 1530,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-10",
+  "seconds": 0.628,
+  "needs_human": 0.38,
+  "latest_run_failed": 0.49,
+  "input_tokens": 1433,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-07",
+  "seconds": 0.629,
+  "needs_human": 0.02,
+  "latest_run_failed": 0.03,
+  "input_tokens": 945,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-10",
+  "seconds": 0.646,
+  "needs_human": 0.1,
+  "latest_run_failed": 0.13,
+  "input_tokens": 1079,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-04",
+  "seconds": 0.61,
+  "needs_human": 0.86,
+  "latest_run_failed": 0.14,
+  "input_tokens": 996,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-09",
+  "seconds": 0.632,
+  "needs_human": 0.03,
+  "latest_run_failed": 0.04,
+  "input_tokens": 1296,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-01",
+  "seconds": 0.665,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.1,
+  "input_tokens": 2195,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-15",
+  "seconds": 0.6,
+  "needs_human": 0.76,
+  "latest_run_failed": 0.16,
+  "input_tokens": 955,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-07",
+  "seconds": 0.631,
+  "needs_human": 0.09,
+  "latest_run_failed": 0.05,
+  "input_tokens": 2345,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-09",
+  "seconds": 0.584,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.08,
+  "input_tokens": 911,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-12",
+  "seconds": 0.634,
+  "needs_human": 0.97,
+  "latest_run_failed": 0.95,
+  "input_tokens": 1545,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-05",
+  "seconds": 0.637,
+  "needs_human": 0.18,
+  "latest_run_failed": 0.15,
+  "input_tokens": 1184,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-00",
+  "seconds": 0.541,
+  "needs_human": 0.85,
+  "latest_run_failed": 0.14,
+  "input_tokens": 1222,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-09",
+  "seconds": 0.671,
+  "needs_human": 0.78,
+  "latest_run_failed": 0.63,
+  "input_tokens": 1632,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-03",
+  "seconds": 0.589,
+  "needs_human": 0.86,
+  "latest_run_failed": 0.16,
+  "input_tokens": 907,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-07",
+  "seconds": 0.625,
+  "needs_human": 0.05,
+  "latest_run_failed": 0.11,
+  "input_tokens": 2012,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-05",
+  "seconds": 0.608,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.12,
+  "input_tokens": 1276,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-15",
+  "seconds": 0.778,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.98,
+  "input_tokens": 1473,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-09",
+  "seconds": 0.624,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.98,
+  "input_tokens": 1509,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-14",
+  "seconds": 0.56,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.96,
+  "input_tokens": 1346,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-01",
+  "seconds": 0.59,
+  "needs_human": 0.84,
+  "latest_run_failed": 0.17,
+  "input_tokens": 4614,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-13",
+  "seconds": 0.677,
+  "needs_human": 0.11,
+  "latest_run_failed": 0.12,
+  "input_tokens": 1053,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-04",
+  "seconds": 0.638,
+  "needs_human": 0.79,
+  "latest_run_failed": 0.18,
+  "input_tokens": 937,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-00",
+  "seconds": 0.58,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1929,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-00",
+  "seconds": 0.585,
+  "needs_human": 0.13,
+  "latest_run_failed": 0.04,
+  "input_tokens": 1639,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-03",
+  "seconds": 0.592,
+  "needs_human": 0.12,
+  "latest_run_failed": 0.14,
+  "input_tokens": 1116,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-08",
+  "seconds": 0.619,
+  "needs_human": 0.03,
+  "latest_run_failed": 0.05,
+  "input_tokens": 1371,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-06",
+  "seconds": 0.571,
+  "needs_human": 0.09,
+  "latest_run_failed": 0.25,
+  "input_tokens": 1900,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-01",
+  "seconds": 0.604,
+  "needs_human": 0.76,
+  "latest_run_failed": 0.12,
+  "input_tokens": 882,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-10",
+  "seconds": 0.558,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.16,
+  "input_tokens": 747,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-11",
+  "seconds": 0.68,
+  "needs_human": 0.02,
+  "latest_run_failed": 0.04,
+  "input_tokens": 945,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-05",
+  "seconds": 0.709,
+  "needs_human": 0.84,
+  "latest_run_failed": 0.22,
+  "input_tokens": 790,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-12",
+  "seconds": 0.617,
+  "needs_human": 0.03,
+  "latest_run_failed": 0.05,
+  "input_tokens": 1333,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "ops-tick-02",
+  "seconds": 0.632,
+  "needs_human": 0.08,
+  "latest_run_failed": 0.06,
+  "input_tokens": 2163,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-07",
+  "seconds": 0.607,
+  "needs_human": 0.04,
+  "latest_run_failed": 0.08,
+  "input_tokens": 1369,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-06",
+  "seconds": 0.625,
+  "needs_human": 0.44,
+  "latest_run_failed": 0.74,
+  "input_tokens": 1390,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "ops-tick-00",
+  "seconds": 0.672,
+  "needs_human": 0.65,
+  "latest_run_failed": 0.12,
+  "input_tokens": 2419,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "ops-tick-04",
+  "seconds": 0.634,
+  "needs_human": 0.09,
+  "latest_run_failed": 0.11,
+  "input_tokens": 2145,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-06",
+  "seconds": 0.615,
+  "needs_human": 0.08,
+  "latest_run_failed": 0.1,
+  "input_tokens": 701,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-02",
+  "seconds": 0.942,
+  "needs_human": 0.3,
+  "latest_run_failed": 0.15,
+  "input_tokens": 1846,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-11",
+  "seconds": 0.621,
+  "needs_human": 0.05,
+  "latest_run_failed": 0.07,
+  "input_tokens": 754,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-06",
+  "seconds": 0.68,
+  "needs_human": 0.36,
+  "latest_run_failed": 0.13,
+  "input_tokens": 1118,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-04",
+  "seconds": 0.689,
+  "needs_human": 0.97,
+  "latest_run_failed": 0.95,
+  "input_tokens": 1545,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-07",
+  "seconds": 0.668,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1401,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-00",
+  "seconds": 0.616,
+  "needs_human": 0.91,
+  "latest_run_failed": 0.56,
+  "input_tokens": 1161,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-01",
+  "seconds": 0.627,
+  "needs_human": 0.22,
+  "latest_run_failed": 0.05,
+  "input_tokens": 2169,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-03",
+  "seconds": 0.593,
+  "needs_human": 0.84,
+  "latest_run_failed": 0.2,
+  "input_tokens": 1222,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-03",
+  "seconds": 0.654,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.13,
+  "input_tokens": 1276,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-03",
+  "seconds": 0.615,
+  "needs_human": 0.54,
+  "latest_run_failed": 0.18,
+  "input_tokens": 1173,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-06",
+  "seconds": 0.594,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1431,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-08",
+  "seconds": 0.612,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.07,
+  "input_tokens": 754,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-03",
+  "seconds": 0.622,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.98,
+  "input_tokens": 1486,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-11",
+  "seconds": 0.616,
+  "needs_human": 0.08,
+  "latest_run_failed": 0.11,
+  "input_tokens": 1108,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-poller-01",
+  "seconds": 0.631,
+  "needs_human": 0.82,
+  "latest_run_failed": 0.43,
+  "input_tokens": 1119,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "ops-tick-01",
+  "seconds": 0.646,
+  "needs_human": 0.1,
+  "latest_run_failed": 0.13,
+  "input_tokens": 2145,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-00",
+  "seconds": 0.609,
+  "needs_human": 0.92,
+  "latest_run_failed": 0.95,
+  "input_tokens": 775,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-01",
+  "seconds": 0.641,
+  "needs_human": 0.34,
+  "latest_run_failed": 0.74,
+  "input_tokens": 1415,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "backlog-run-01",
+  "seconds": 0.607,
+  "needs_human": 0.92,
+  "latest_run_failed": 0.44,
+  "input_tokens": 1255,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "engage-scan-04",
+  "seconds": 0.613,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.11,
+  "input_tokens": 2043,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-06",
+  "seconds": 0.58,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.14,
+  "input_tokens": 1225,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-05",
+  "seconds": 0.596,
+  "needs_human": 0.17,
+  "latest_run_failed": 0.04,
+  "input_tokens": 1824,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-02",
+  "seconds": 0.61,
+  "needs_human": 0.37,
+  "latest_run_failed": 0.52,
+  "input_tokens": 1433,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-03",
+  "seconds": 0.593,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.78,
+  "input_tokens": 2533,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-09",
+  "seconds": 0.65,
+  "needs_human": 0.03,
+  "latest_run_failed": 0.04,
+  "input_tokens": 945,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-13",
+  "seconds": 0.62,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.98,
+  "input_tokens": 1509,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-04",
+  "seconds": 0.607,
+  "needs_human": 0.03,
+  "latest_run_failed": 0.04,
+  "input_tokens": 1312,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-06",
+  "seconds": 0.633,
+  "needs_human": 0.06,
+  "latest_run_failed": 0.05,
+  "input_tokens": 1598,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-01",
+  "seconds": 0.602,
+  "needs_human": 0.04,
+  "latest_run_failed": 0.13,
+  "input_tokens": 1270,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-02",
+  "seconds": 0.784,
+  "needs_human": 0.09,
+  "latest_run_failed": 0.05,
+  "input_tokens": 4499,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-10",
+  "seconds": 0.606,
+  "needs_human": 0.02,
+  "latest_run_failed": 0.03,
+  "input_tokens": 945,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-05",
+  "seconds": 0.622,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.98,
+  "input_tokens": 1542,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-04",
+  "seconds": 0.609,
+  "needs_human": 0.65,
+  "latest_run_failed": 0.58,
+  "input_tokens": 1575,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-02",
+  "seconds": 0.651,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1432,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-08",
+  "seconds": 0.616,
+  "needs_human": 0.39,
+  "latest_run_failed": 0.1,
+  "input_tokens": 1889,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "watchdog-cron-02",
+  "seconds": 0.578,
+  "needs_human": 0.83,
+  "latest_run_failed": 0.18,
+  "input_tokens": 989,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "bento-sync-02",
+  "seconds": 0.631,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.84,
+  "input_tokens": 955,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "swimtrack-engine-morning-07",
+  "seconds": 0.637,
+  "needs_human": 0.07,
+  "latest_run_failed": 0.04,
+  "input_tokens": 1629,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "backlog-run-04",
+  "seconds": 0.593,
+  "needs_human": 0.95,
+  "latest_run_failed": 0.9,
+  "input_tokens": 1617,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "meettrack-supervise-01",
+  "seconds": 0.629,
+  "needs_human": 0.96,
+  "latest_run_failed": 0.97,
+  "input_tokens": 1375,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-05",
+  "seconds": 0.62,
+  "needs_human": 0.43,
+  "latest_run_failed": 0.74,
+  "input_tokens": 1390,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "diem-drain-14",
+  "seconds": 0.602,
+  "needs_human": 0.24,
+  "latest_run_failed": 0.24,
+  "input_tokens": 993,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-01",
+  "seconds": 0.63,
+  "needs_human": 0.16,
+  "latest_run_failed": 0.05,
+  "input_tokens": 2321,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-08",
+  "seconds": 0.642,
+  "needs_human": 0.45,
+  "latest_run_failed": 0.71,
+  "input_tokens": 1389,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "writing-engine-morning-09",
+  "seconds": 0.58,
+  "needs_human": 0.9,
+  "latest_run_failed": 0.1,
+  "input_tokens": 2284,
+  "model": "jev-1.13.0"
+ },
+ {
+  "id": "loom-runs-err-00",
+  "seconds": 0.61,
+  "needs_human": 0.42,
+  "latest_run_failed": 0.67,
+  "input_tokens": 1416,
+  "model": "jev-1.13.0"
+ }
+]

@@ -24,11 +24,13 @@ from .triage import (
     check_bebop_runs,
     check_cron_log,
     check_disk,
+    check_log_coverage,
     check_meet_freshness,
     check_orphan_processes,
     check_service_active,
     triage,
 )
+from . import jev_shadow
 from .metrics import sum_counter, count_matches, check_budget, parse_count_header, check_rate
 
 # Default to the MAIN checkout so the installed cron job watches production, not
@@ -37,7 +39,7 @@ BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
 
 # Cron logs to scan for error markers: (label, path).
 CRON_LOGS = [
-    ("loom", BASE / "loom" / "logs" / "absorb.log"),
+    ("loom", BASE / "loom" / "logs" / "runs.log"),   # what loom/run-absorb.sh writes
     ("meettrack-ingest", Path("/home/dev/projects/splash_poller/logs/ingest_entries.cron.log")),
     ("meettrack-supervise", Path("/home/dev/projects/splash_poller/logs/supervise.cron.log")),
 ]
@@ -205,14 +207,58 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
 
     out.append(check_orphan_processes(_cmd(["ps", "-eo", "pid,ppid,etime,args"])))
 
+    found, missing = [], []
     for label, path in CRON_LOGS:
         text = _read(path)
-        if text is not None:  # absent log = job may not be installed here; skip
-            out.append(check_cron_log(label, text))
+        if text is None:  # absent log = job may be paused or not installed here; skip
+            missing.append(label)
+            continue
+        found.append(label)
+        out.append(check_cron_log(label, text))
+    out.append(check_log_coverage(found, missing))
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)
     return out, new_metrics
+
+
+def shadow_logs(monitors: dict) -> list[tuple[str, str, str]]:
+    """(label, text, the regex rule's level) for every readable log Jev shadows: the
+    alerting CRON_LOGS plus the shadow-only extras in monitors.toml. The extras get
+    the rule's verdict for comparison only; they never become a status."""
+    extra = [(item.get("name"), Path(item.get("log", "")))
+             for item in (monitors.get("jev_shadow") or {}).get("logs", [])]
+    out, labels = [], set()
+    for label, path in [*CRON_LOGS, *extra]:
+        if not label or label in labels:   # shadow state is keyed by label: first source wins
+            continue
+        if not jev_shadow.in_scope(path):  # never send a log outside the agreed data scope
+            continue
+        text = _read(path)
+        if text is not None:
+            labels.add(label)
+            out.append((label, text, check_cron_log(label, text).level))
+    return out
+
+
+def run_jev_shadow(now_epoch: int) -> None:
+    """Shadow only: writes watchdog/logs/jev-shadow.jsonl and nothing reads it back.
+    Off unless monitors.toml turns it on; WATCHDOG_JEV_SHADOW=0 is the kill switch."""
+    try:
+        monitors = _load_monitors()
+        if not (monitors.get("jev_shadow") or {}).get("enabled"):
+            return
+        if os.environ.get("WATCHDOG_JEV_SHADOW") == "0":
+            return
+        key = jev_shadow.load_key()
+        if not key:
+            return
+        log_dir = Path(os.environ.get("WATCHDOG_LOG_DIR", str(BASE / "watchdog" / "logs")))
+        jev_shadow.shadow_pass(shadow_logs(monitors), now_epoch=now_epoch, key=key,
+                               log_path=log_dir / "jev-shadow.jsonl",
+                               state_path=log_dir / "jev-shadow-state.json")
+    except Exception:  # noqa: BLE001 - a shadow must never break the poll it watches
+        pass
 
 
 def format_report(fired: list[CheckStatus]) -> str:
@@ -341,6 +387,8 @@ def main(argv=None) -> int:
         "checked": len(statuses),
     }
     print("WATCHDOG_JSON:" + json.dumps(payload))
+    if not dry_run:
+        run_jev_shadow(now)   # after the result is emitted: it cannot change it
     return 0
 
 

@@ -3,6 +3,7 @@ from watchdog.triage import (
     CheckStatus,
     check_bebop_runs,
     check_cron_log,
+    check_log_coverage,
     check_disk,
     check_orphan_processes,
     check_service_active,
@@ -252,3 +253,51 @@ def test_orphan_check_does_not_match_neighbouring_command_names():
         )
     )
     assert out.level == "ok"
+
+
+def test_cron_log_ignores_json_zero_counters():
+    # loom and diem write JSON summaries; a zero or null counter is not an error.
+    log = '[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 3, "failed": 0, "error": null, "errors": []}\n'
+    assert check_cron_log("loom", log).level == "ok"
+
+
+def test_cron_log_still_fires_on_nonzero_json_counter():
+    log = '[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 3, "failed": 2}\n'
+    assert check_cron_log("loom", log).level == "warn"
+
+
+def test_cron_log_still_fires_on_json_error_message():
+    assert check_cron_log("diem", '   "error": "timeout after 900s (deadline backstop)"\n').level == "warn"
+
+
+# --- check_log_coverage -----------------------------------------------------
+
+def test_log_coverage_warns_when_no_configured_log_is_readable():
+    st = check_log_coverage(found=[], missing=["loom", "meettrack-ingest"])
+    assert st.level == "warn"
+    assert "loom" in st.summary
+
+
+def test_log_coverage_ok_when_some_logs_are_readable_and_names_the_missing():
+    st = check_log_coverage(found=["loom"], missing=["meettrack-ingest"])
+    assert st.level == "ok"
+    assert "meettrack-ingest" in st.summary
+
+
+def test_log_coverage_ok_when_nothing_is_configured():
+    assert check_log_coverage(found=[], missing=[]).level == "ok"
+
+
+def test_cron_log_ignores_words_inside_json_data_lists():
+    # loom repeats its standing quarantine list and promoted article names in every
+    # run summary. Those strings are data about items, not the outcome of this run.
+    log = ('[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 4, "failed": 0, "quarantined_items": '
+           '[["22f8#2", "dead-letter: repeated weave exceptions"], ["bm2#2", "weave failed guards after retry"]], '
+           '"limit_hit": false}\n'
+           '[2026-09-18T03:00:02+01:00] promote rc=0 {"promoted": true, "articles": ["patterns/error-handling.md"]}\n')
+    assert check_cron_log("loom", log).level == "ok"
+
+
+def test_cron_log_still_fires_when_the_run_itself_failed_next_to_a_data_list():
+    log = '[2026-09-18T03:00:01+01:00] rc=1 {"distilled": 0, "failed": 3, "quarantined_items": [["a#1", "x"]]}\n'
+    assert check_cron_log("loom", log).level == "warn"

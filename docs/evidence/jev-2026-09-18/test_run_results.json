@@ -1,0 +1,186 @@
+[
+  {
+    "id": "swim-meet",
+    "seconds": 0.649,
+    "response": {
+      "model": "jev-1.13.0",
+      "answers": {
+        "category": {
+          "type": "choice",
+          "choice": "family",
+          "confidence": 0.98,
+          "probabilities": {
+            "work": 0.01,
+            "family": 0.99,
+            "money": 0.0,
+            "none_of_these": 0.0,
+            "promo": 0.0
+          }
+        },
+        "needs_reply_today": {
+          "type": "noul",
+          "noul": 0.97
+        },
+        "importance": {
+          "type": "score",
+          "score": 2.99,
+          "confidence": 0.99,
+          "legend": {
+            "0": "Safe to ignore: bulk mail with no personal stake",
+            "1": "Low: personal or relevant, but nothing is lost by waiting a week",
+            "2": "Medium: should be handled this week",
+            "3": "High: real cost or a missed event if not handled in a day or two"
+          },
+          "probabilities": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0,
+            "3": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 627,
+        "output_tokens": 87
+      }
+    }
+  },
+  {
+    "id": "newsletter",
+    "seconds": 0.615,
+    "response": {
+      "model": "jev-1.13.0",
+      "answers": {
+        "category": {
+          "type": "choice",
+          "choice": "promo",
+          "confidence": 1.0,
+          "probabilities": {
+            "money": 0.0,
+            "work": 0.0,
+            "none_of_these": 0.0,
+            "promo": 1.0,
+            "family": 0.0
+          }
+        },
+        "needs_reply_today": {
+          "type": "noul",
+          "noul": 0.08
+        },
+        "importance": {
+          "type": "score",
+          "score": 0.39,
+          "confidence": 0.61,
+          "legend": {
+            "0": "Safe to ignore: bulk mail with no personal stake",
+            "1": "Low: personal or relevant, but nothing is lost by waiting a week",
+            "2": "Medium: should be handled this week",
+            "3": "High: real cost or a missed event if not handled in a day or two"
+          },
+          "probabilities": {
+            "0": 0.81,
+            "1": 0.07,
+            "2": 0.04,
+            "3": 0.08
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 601,
+        "output_tokens": 87
+      }
+    }
+  },
+  {
+    "id": "invoice",
+    "seconds": 0.588,
+    "response": {
+      "model": "jev-1.13.0",
+      "answers": {
+        "category": {
+          "type": "choice",
+          "choice": "money",
+          "confidence": 1.0,
+          "probabilities": {
+            "work": 0.0,
+            "promo": 0.0,
+            "none_of_these": 0.0,
+            "money": 1.0,
+            "family": 0.0
+          }
+        },
+        "needs_reply_today": {
+          "type": "noul",
+          "noul": 0.07
+        },
+        "importance": {
+          "type": "score",
+          "score": 2.82,
+          "confidence": 0.82,
+          "legend": {
+            "0": "Safe to ignore: bulk mail with no personal stake",
+            "1": "Low: personal or relevant, but nothing is lost by waiting a week",
+            "2": "Medium: should be handled this week",
+            "3": "High: real cost or a missed event if not handled in a day or two"
+          },
+          "probabilities": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.17,
+            "3": 0.83
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 599,
+        "output_tokens": 87
+      }
+    }
+  },
+  {
+    "id": "vague",
+    "seconds": 0.632,
+    "response": {
+      "model": "jev-1.13.0",
+      "answers": {
+        "category": {
+          "type": "choice",
+          "choice": "work",
+          "confidence": 1.0,
+          "probabilities": {
+            "money": 0.0,
+            "none_of_these": 0.0,
+            "work": 1.0,
+            "promo": 0.0,
+            "family": 0.0
+          }
+        },
+        "needs_reply_today": {
+          "type": "noul",
+          "noul": 0.04
+        },
+        "importance": {
+          "type": "score",
+          "score": 1.04,
+          "confidence": 0.96,
+          "legend": {
+            "0": "Safe to ignore: bulk mail with no personal stake",
+            "1": "Low: personal or relevant, but nothing is lost by waiting a week",
+            "2": "Medium: should be handled this week",
+            "3": "High: real cost or a missed event if not handled in a day or two"
+          },
+          "probabilities": {
+            "0": 0.0,
+            "1": 0.96,
+            "2": 0.04,
+            "3": 0.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 592,
+        "output_tokens": 87
+      }
+    }
+  }
+]

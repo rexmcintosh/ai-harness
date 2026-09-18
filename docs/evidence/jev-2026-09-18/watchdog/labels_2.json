@@ -1,0 +1,408 @@
+[
+  {
+    "id": "engage-scan-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Self-correcting content gate retries; no crash, normal scan completion."
+  },
+  {
+    "id": "bento-sync-01",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "JWT issued-at-future auth errors on families/beta_answers table syncs."
+  },
+  {
+    "id": "bento-sync-10",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Three clean sync runs, no failed lines, normal counts."
+  },
+  {
+    "id": "watchdog-cron-11",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All ticks report all checks ok, no escalations."
+  },
+  {
+    "id": "bento-sync-05",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "JWT issued-at-future auth failure on beta_answers sync."
+  },
+  {
+    "id": "diem-drain-12",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All backfill items ok:true, error:null throughout."
+  },
+  {
+    "id": "ops-tick-02",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All ticks show errors 0, no failures."
+  },
+  {
+    "id": "diem-drain-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible backfill items ok:true; list cuts off mid-run."
+  },
+  {
+    "id": "loom-runs-err-06",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError every item; no run boundary shown."
+  },
+  {
+    "id": "ops-tick-00",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "One YAML read failure self-healed next tick; errors stayed 0."
+  },
+  {
+    "id": "ops-tick-04",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All ticks clean, errors 0 throughout."
+  },
+  {
+    "id": "bento-sync-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Three clean sync runs, no failures."
+  },
+  {
+    "id": "swimtrack-engine-morning-02",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Runs completed; only upstream rate-limit and stale-draft findings."
+  },
+  {
+    "id": "bento-sync-11",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Three clean sync runs, no failures."
+  },
+  {
+    "id": "watchdog-cron-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Escalations delivered successfully; no delivery failures shown."
+  },
+  {
+    "id": "meettrack-supervise-04",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Supabase DNS resolution failure crashes job; unresolved at cutoff."
+  },
+  {
+    "id": "meettrack-supervise-07",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase connection failure, ends mid-traceback."
+  },
+  {
+    "id": "writing-engine-poller-00",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "medium",
+    "reason": "Poller result explicitly 'failed' for tax-advisory-portugal slug."
+  },
+  {
+    "id": "swimtrack-engine-morning-01",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Rate-limited source and self-corrected digest bug; runs completed normally."
+  },
+  {
+    "id": "watchdog-cron-03",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Alert delivery FAILED (rc=127) 4 times; last visible tick ok."
+  },
+  {
+    "id": "writing-engine-poller-03",
+    "needs_human": false,
+    "latest_run_failed": null,
+    "confidence": "low",
+    "reason": "Only deploy warnings shown; no result or error visible."
+  },
+  {
+    "id": "swimtrack-engine-morning-03",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Run completed and pushed; reports pre-existing stale drafts."
+  },
+  {
+    "id": "meettrack-supervise-06",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same recurring Supabase connection failure, unresolved at cutoff."
+  },
+  {
+    "id": "bento-sync-08",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Three clean sync runs, no failures."
+  },
+  {
+    "id": "meettrack-supervise-03",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Connection failure repeats after retry; still failing at cutoff."
+  },
+  {
+    "id": "diem-drain-11",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All ran items ok:true; skips are budget/deadline by design."
+  },
+  {
+    "id": "writing-engine-poller-01",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "medium",
+    "reason": "Publishes succeeded but outcome notification email failed."
+  },
+  {
+    "id": "ops-tick-01",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All ticks clean, errors 0 throughout."
+  },
+  {
+    "id": "bento-sync-00",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "low",
+    "reason": "JWT auth failure on beta_answers; window cuts off before recovery shown."
+  },
+  {
+    "id": "loom-runs-err-01",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError; no run boundary visible."
+  },
+  {
+    "id": "backlog-run-01",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "One work session FAILED via timeout; last visible report sent fine."
+  },
+  {
+    "id": "engage-scan-04",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Normal filtering/drops and self-correcting gate retries; no crash."
+  },
+  {
+    "id": "diem-drain-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible backfill items ok:true, no errors."
+  },
+  {
+    "id": "writing-engine-morning-05",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Rate-limited source noted; runs completed and pushed normally."
+  },
+  {
+    "id": "loom-runs-err-02",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError; no run boundary visible."
+  },
+  {
+    "id": "loom-runs-err-03",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "high",
+    "reason": "LLM connection lost, cascading distill failures quarantining many items."
+  },
+  {
+    "id": "watchdog-cron-09",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All checks ok throughout, no escalations."
+  },
+  {
+    "id": "meettrack-supervise-13",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Supabase DNS resolution failure, unresolved at window end."
+  },
+  {
+    "id": "diem-drain-04",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible items ok:true, no errors; list cuts off."
+  },
+  {
+    "id": "swimtrack-engine-morning-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Rate-limited sources noted; drafts pass gates, pushed normally."
+  },
+  {
+    "id": "diem-drain-01",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible items ok:true; run cuts off before final item detail."
+  },
+  {
+    "id": "loom-runs-02",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Every daily run rc=0, failed:0 explicitly for weeks."
+  },
+  {
+    "id": "watchdog-cron-10",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All checks ok throughout, no escalations or failures."
+  },
+  {
+    "id": "meettrack-supervise-05",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same recurring Supabase connection failure, unresolved at cutoff."
+  },
+  {
+    "id": "writing-engine-morning-04",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Link-checker false alarm verified fine; branch-policy skip by design."
+  },
+  {
+    "id": "meettrack-supervise-02",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same recurring Supabase connection failure, unresolved at cutoff."
+  },
+  {
+    "id": "swimtrack-engine-morning-08",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Branch-block skip by design; run completed, reported gate mismatch."
+  },
+  {
+    "id": "watchdog-cron-02",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Alert delivery FAILED once (rc=127); last ticks show ok."
+  },
+  {
+    "id": "bento-sync-02",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "medium",
+    "reason": "Nine Gateway Timeout failures across almost all tables this run."
+  },
+  {
+    "id": "swimtrack-engine-morning-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Self-corrected digest miscount; rate-limited sources, run completed."
+  },
+  {
+    "id": "backlog-run-04",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Unhandled YAML parse error crashes backlog-run cli entirely."
+  },
+  {
+    "id": "meettrack-supervise-01",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same recurring Supabase connection failure, unresolved at cutoff."
+  },
+  {
+    "id": "loom-runs-err-05",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError; no run boundary visible."
+  },
+  {
+    "id": "diem-drain-14",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Balance below floor by design; no-op cycles, not failures."
+  },
+  {
+    "id": "writing-engine-morning-01",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Multiple runs complete normally, drafts pass gates, pushed to main."
+  },
+  {
+    "id": "loom-runs-err-08",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError; no run boundary visible."
+  },
+  {
+    "id": "writing-engine-morning-09",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Prior run hit credit exhaustion (rc=1); another killed mid-draft."
+  },
+  {
+    "id": "loom-runs-err-00",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSONDecodeError; no run boundary visible."
+  }
+]

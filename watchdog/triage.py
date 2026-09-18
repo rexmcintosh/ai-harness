@@ -172,18 +172,68 @@ def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
 # lookahead excludes the `=` case while still matching "FAILED rc=1", "error:", etc.
 _ERROR_MARKERS = re.compile(
     r"traceback|exception|\b(?:error|failed|critical)\b(?!=)", re.IGNORECASE)
+# Same idea for JSON summaries (loom, diem): `"failed": 0`, `"error": null`, `"errors": []`
+# are empty counters. Blank them before matching; a non-empty value still fires.
+_JSON_EMPTY_COUNTER = re.compile(
+    r'"(?:errors?|failed|failures?|critical|exceptions?)"\s*:\s*(?:0|null|false|\[\]|\{\}|"")(?![\w.])',
+    re.IGNORECASE)
+# ...and JSON lists of per-item data (`"quarantined_items": [[id, reason], ...]`,
+# `"articles": [names]`): standing item notes and file names, not this run's outcome.
+_JSON_DATA_LIST = re.compile(r'"(?:articles|\w+_items)"\s*:\s*\[')
+
+
+def strip_json_data_lists(line: str) -> str:
+    """Cut each data list out, brackets matched by depth (the lists nest) and quoted
+    strings skipped. An unclosed list (a truncated line) is cut to the end."""
+    out, pos = [], 0
+    for m in _JSON_DATA_LIST.finditer(line):
+        if m.start() < pos:
+            continue
+        depth, i, quoted = 1, m.end(), False
+        while i < len(line) and depth:
+            ch = line[i]
+            if quoted:
+                if ch == "\\":
+                    i += 1
+                elif ch == '"':
+                    quoted = False
+            elif ch == '"':
+                quoted = True
+            elif ch == "[":
+                depth += 1
+            elif ch == "]":
+                depth -= 1
+            i += 1
+        out.append(line[pos:m.start()])
+        pos = i
+    out.append(line[pos:])
+    return "".join(out)
+
+
+def _outcome_text(line: str) -> str:
+    return _JSON_EMPTY_COUNTER.sub("", strip_json_data_lists(line))
 
 
 def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50) -> CheckStatus:
     """Scan the tail of a cron log for error markers. Tail-only so an old, since-
     resolved error doesn't fire forever."""
     tail = log_text.splitlines()[-tail_lines:]
-    hits = [ln for ln in tail if _ERROR_MARKERS.search(ln)]
+    hits = [ln for ln in tail if _ERROR_MARKERS.search(_outcome_text(ln))]
     if hits:
         return CheckStatus(f"cron:{name}", "warn",
                            f"{len(hits)} error marker(s) in recent {name} log",
                            evidence="\n".join(hits[-5:]))
     return CheckStatus(f"cron:{name}", "ok", f"{name} log clean")
+
+
+def check_log_coverage(found: list[str], missing: list[str]) -> CheckStatus:
+    """A missing log is skipped (the job may be paused or not installed here), but
+    if NONE of the configured logs is readable the log check is blind: say so."""
+    if missing and not found:
+        return CheckStatus("cron-logs:coverage", "warn",
+                           f"no configured cron log is readable (missing: {', '.join(missing)})")
+    note = f"; missing: {', '.join(missing)}" if missing else ""
+    return CheckStatus("cron-logs:coverage", "ok", f"{len(found)} cron log(s) read{note}")
 
 
 def _iso_epoch(ts: str | None) -> float | None:
