@@ -731,12 +731,13 @@ def test_rework_dry_run_turns_a_git_failure_into_the_one_sentence_refusal(world,
 
     def flaky(repo, *args, **kw):
         if args[:1] == ("rev-parse",):
-            raise br.GitError("fatal: ambiguous argument 'claude/bl-a'")
+            raise br.GitError("fatal: ambiguous argument 'claude/bl-a'\nUse '--' to separate paths\n")
         return real_git(repo, *args, **kw)
     monkeypatch.setattr(br, "git", flaky)
     assert br.cmd_rework(rework_args("2026-01-01-a", "--dry-run"), cfg) == 1
     captured = capsys.readouterr()
     assert captured.err.strip().startswith("rework 2026-01-01-a: could not read branch claude/bl-a")
+    assert len(captured.err.strip().splitlines()) == 1      # a multi-line git error stays one sentence
     assert "REWORK" not in captured.out
 
 

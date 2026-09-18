@@ -1255,7 +1255,8 @@ def _rework_dry_run(iid: str, cfg: Config) -> int:
     try:
         head = git(p.repo, "rev-parse", p.branch).strip()
     except GitError as exc:   # the branch moved or vanished after the plan: still a refusal
-        print(f"rework {iid}: could not read branch {p.branch}: {str(exc).strip()[:200]}", file=sys.stderr)
+        why = re.sub(r"\s+", " ", str(exc)).strip()[:200]
+        print(f"rework {iid}: could not read branch {p.branch}: {why}", file=sys.stderr)
         return 1
     ahead = git(p.repo, "rev-list", "--count", f"{p.base}..{p.branch}", check=False).strip() or "?"
     budget = f"${cfg.budget_usd:g}" if cfg.budget_usd else "none"
