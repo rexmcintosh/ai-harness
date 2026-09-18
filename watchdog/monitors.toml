@@ -55,7 +55,9 @@ tables        = ["results", "splits", "swimmers"]
 # of its 40 published events looks perfectly healthy. Warn on 3 uncovered
 # events, or on 15% of them (two minimum, so the one event being parsed right
 # now is never an alert). Both are quiet while the counters are NULL — only the
-# PDF writer reports them.
+# PDF writer reports them — and while their coverage_at is older than
+# stale_warn_min, so last weekend's snapshot can never raise this weekend's
+# alarm. Add coverage_max_age_min here to give that bound its own value.
 [meet_freshness]
 stale_warn_min     = 20
 stale_crit_min     = 75
