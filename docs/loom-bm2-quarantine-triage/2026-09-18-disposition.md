@@ -6,7 +6,7 @@ Backlog item: 2026-08-25-loom-triage-two-malformed-bm2-artifacts.
 
 `loom`'s runtime state (`loom/state.json`, `loom/learnings/`, `loom/quarantine/`)
 is gitignored (`loom/.gitignore`) and `loom/cli.py` hardcodes its repo root to
-`~/projects/build-ai-automation-workflow` regardless of cwd. So the actual
+`~/projects/ai-harness` regardless of cwd (the repository's name since 2026-09-18). So the actual
 quarantine files, state.json and the learnings directory referenced by this
 backlog item live only in the **main checkout**, never in a worktree, and are
 never tracked by git. A worktree-scoped session cannot touch them (rule 1) and
@@ -89,24 +89,33 @@ quarantine entry is left for its existing review queue.
 
 ## Operator step (remaining, outward of this branch)
 
-Run from the **main checkout**:
+Run it when no loom run is live (the DIEM drain slots end at 23:50 UTC; absorb starts at
+02:00 UTC). From any checkout of this branch:
 
-    cd ~/projects/build-ai-automation-workflow
-    python3 .claude/worktrees/bl-loom-triage-two-malformed-bm2-artifacts/docs/loom-bm2-quarantine-triage/apply.py
+    python3 docs/loom-bm2-quarantine-triage/apply.py
 
-(Or copy `apply.py` and the two `salvage-*.md` files into the main checkout
-first if the worktree has since been cleaned up — the script only reads them
-relative to its own location.)
+It targets the live data under `~/projects/ai-harness/loom/` by default (`--repo` points it
+elsewhere; `--backup-dir` moves the backups). The script reads the two `salvage-*.md`
+files beside it.
 
-`apply.py` is idempotent and does exactly this, per id:
+Before it writes anything it checks that `loom/state.json` exists there and already knows
+both bm2-* ids, that both salvage files parse with loom's own `_parse_learnings`, that no
+different artifact already sits under a salvage id, that no loom process is running, and
+that `loom/.run.lock` is free. It holds that lock while it works. Any failed check prints
+one line and exits 1 with nothing written. The first check matters: the repository was
+renamed to `ai-harness` on 2026-09-18, and the first draft of this script still pointed at
+the old name, where it would have created an empty `loom/` tree and reported success.
 
-1. Write `loom/learnings/<bm2-id>-salvage.md` from the corresponding
-   `salvage-*.md` file here, if not already present.
-2. Set `loom/state.json[<bm2-id>-salvage].state = "distilled"` so the next
-   `absorb`/`backfill` weaves it.
-3. Set `loom/state.json[<bm2-id>].state = "committed"` (quarantine settled).
-4. Delete `loom/quarantine/<bm2-id>.md`.
+Then, per id, and safe to re-run:
 
-After running it, `loom/quarantine` contains no `bm2-*` files, and the two
-salvage learnings ride the normal weave/backfill like any other distilled
-session.
+1. Write `loom/learnings/<bm2-id>-salvage.md` from the matching `salvage-*.md`, if absent.
+2. Advance `<bm2-id>-salvage` to `distilled` through loom's own `LoomState` writer, unless
+   it is already `distilled` or later. A salvage that a later backfill has woven is never
+   pulled back, so a re-run cannot cause a duplicate weave.
+3. Advance `<bm2-id>` to `committed` (quarantine settled).
+4. Copy `loom/quarantine/<bm2-id>.md` to `~/.local/state/loom/quarantine-resolved/`, verify
+   the copy byte for byte, then delete the original.
+
+After it runs, `loom/quarantine` contains no `bm2-*` files, and the two salvage learnings
+ride the normal weave like any other distilled session. `tests/loom/test_bm2_triage_apply.py`
+covers each refusal, the happy path, the re-run, and the backup.
