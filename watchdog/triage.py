@@ -195,9 +195,39 @@ def _iso_epoch(ts: str | None) -> float | None:
         return None
 
 
+# One published event without results is the normal in-flight state: a
+# ResultList appears and the next tick parses it. The share rule therefore needs
+# two before it can fire; the flat rule is what catches the 3-of-40 shape, which
+# is under any sane percentage and is exactly what the heartbeat cannot see.
+_COVERAGE_SHARE_MIN_GAP = 2
+
+
+def _coverage_complaint(row, label, gap_warn, gap_pct):
+    """'this live meet is writing, but blind' — or None.
+
+    Silent on NULL counters by design: only the PDF writer can list a meet's
+    published events, so the fragment and Lenex writers leave those two NULL,
+    and a gap that was never measured must never alert.
+    """
+    errors = row.get("last_tick_errors")
+    if errors:
+        return f"{row.get('sr_meet_id')} {label} {errors} event/row error(s) last tick"
+    published, covered = row.get("events_published"), row.get("events_with_results")
+    if published is None or covered is None:
+        return None
+    gap = published - covered
+    if gap <= 0:
+        return None
+    if gap >= gap_warn or (gap >= _COVERAGE_SHARE_MIN_GAP
+                           and gap * 100 >= gap_pct * published):
+        return f"{row.get('sr_meet_id')} {label} {covered}/{published} events have results"
+    return None
+
+
 def check_meet_freshness(rows, now_epoch, *,
                          stale_warn_min: int = 20, stale_crit_min: int = 75,
                          launch_overdue_min: int = 30,
+                         coverage_gap_warn: int = 3, coverage_gap_pct: int = 15,
                          racing_start: int = 8, racing_end: int = 22) -> CheckStatus:
     """The ABSENCE alert MeetTrack never had: every other check fires on 'too
     much'; a dead poller, a wedged writer, and an idle Saturday all used to
@@ -211,6 +241,11 @@ def check_meet_freshness(rows, now_epoch, *,
               covering the never-ingested case) is older than the floor.
               A long lunch break can trip this; one 6h-cooldown ping during a
               national championship beats silence — tune from rehearsals.
+      warn  — a live meet with a writer whose last tick reported errors, or
+              whose published events outrun the ones holding results by
+              `coverage_gap_warn` (or `coverage_gap_pct` of them). The
+              heartbeat cannot see this: 37 of 40 events inserting on every
+              tick looks exactly like a healthy meet.
       warn  — a live-by-date meet still 'discovered'/'queued' with no status
               movement for `launch_overdue_min` (the supervisor should have
               dispatched it within one 5-minute tick).
@@ -223,7 +258,7 @@ def check_meet_freshness(rows, now_epoch, *,
     today = local.date().isoformat()
     racing = racing_start <= local.hour < racing_end
 
-    failed, stale, unlaunched = [], [], []
+    failed, stale, blind, unlaunched = [], [], [], []
     worst_stale_min = 0.0
     for r in rows:
         status = r.get("ingest_status")
@@ -245,6 +280,10 @@ def check_meet_freshness(rows, now_epoch, *,
             if age_min is not None and age_min >= stale_warn_min:
                 stale.append(f"{r.get('sr_meet_id')} {name} quiet {age_min:.0f}m")
                 worst_stale_min = max(worst_stale_min, age_min)
+            # Only a meet with a writer can have reported coverage at all.
+            gap = _coverage_complaint(r, name, coverage_gap_warn, coverage_gap_pct)
+            if gap:
+                blind.append(gap)
         elif status in ("discovered", "queued"):
             if age_min is not None and age_min >= launch_overdue_min:
                 unlaunched.append(f"{r.get('sr_meet_id')} {name} unlaunched {age_min:.0f}m")
@@ -258,6 +297,13 @@ def check_meet_freshness(rows, now_epoch, *,
         return CheckStatus("meets.freshness", level,
                            f"{len(stale)} live meet(s) gone quiet during racing hours",
                            evidence="\n".join(stale[:5]))
+    if blind:
+        # A writer that stopped (above) is worse news than one still writing;
+        # both beat a meet that never launched, because this one is losing
+        # events while the pool is racing.
+        return CheckStatus("meets.freshness", "warn",
+                           f"{len(blind)} live meet(s) missing events during racing hours",
+                           evidence="\n".join(blind[:5]))
     if unlaunched:
         return CheckStatus("meets.freshness", "warn",
                            f"{len(unlaunched)} live meet(s) awaiting launch too long",
