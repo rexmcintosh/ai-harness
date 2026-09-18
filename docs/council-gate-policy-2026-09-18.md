@@ -45,6 +45,9 @@ Two readings matter:
 - `tests/test_gate.py`: the reduced-tier bar (critical c8 yes, high c8 and c9 yes, high c7
   no, critical c5 no); a confirmed high c9 blocks; a refuted high c9 does not; a high c7 or
   critical c7 cannot block even when the chair lists it.
+- `tests/test_gate.py`, two `test_known_gap_*` tests: they pin today's behaviour for the
+  provenance gap below (an unrelated chair block counts once any eligible finding exists,
+  on both tiers), so it cannot drift silently. The provenance change should flip them.
 - `tests/test_review.py`: the same three outcomes end to end through `run_pr_review` on a
   `tools/` diff.
 - `tests/test_acceptance_audit.py`: unchanged and green. The historical PR #11 and `ROOT`

@@ -115,3 +115,25 @@ def test_reduced_tier_low_confidence_high_never_blocks_even_if_chair_lists_it():
 
 def test_reduced_tier_low_confidence_critical_still_cannot_block():
     assert decide_blocking(_results_with("critical", 7), _syn(blocks=[("p", "critical", "x")]), tier="reduced") == 0
+
+
+# ── KNOWN GAP, pinned on purpose: confirmed blocks are not tied to panel findings ────────
+# docs/council-gate-policy-2026-09-18.md ("Separate gap"). Until the provenance branch
+# lands, the gate asks only "is there ANY eligible panel finding?" and then counts every
+# block the chair lists. These two tests document that behaviour so it cannot drift
+# silently; the provenance change is expected to flip both to the stricter count.
+def test_known_gap_an_unrelated_chair_block_counts_once_any_reduced_tier_high_is_eligible():
+    panel = _results_with("high", 9)                       # eligible: "p"
+    syn = _syn(blocks=[("something the panel never raised", "high", "chair's own idea")])
+    assert decide_blocking(panel, syn, tier="reduced") == 1
+
+
+def test_known_gap_a_multi_high_panel_counts_whatever_the_chair_lists():
+    panel = [MemberResult("Adversary", "grok", "oppose", "h",
+                          findings=[Finding("real defect", "high", 9), Finding("hedged worry", "high", 7)])]
+    # The chair confirms the INELIGIBLE c7 finding and an extra one; both count today
+    # because the eligible c9 finding opens the gate for the whole list.
+    syn = _syn(blocks=[("hedged worry", "high", "x"), ("unrelated", "high", "y")])
+    assert decide_blocking(panel, syn, tier="reduced") == 2
+    assert decide_blocking(panel, syn, tier="full") == 2   # the same gap already exists on the full tier
+
