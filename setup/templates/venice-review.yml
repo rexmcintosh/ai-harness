@@ -27,7 +27,7 @@ jobs:
       # Bump intentionally on each council release. (When published to PyPI,
       # simplify to a pinned: pip install "council==X.Y.Z".)
       - name: Install council
-        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@4a01298dcce2734115ac57f02592146969d76f48"
+        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/ai-harness@4a01298dcce2734115ac57f02592146969d76f48"
 
       - name: Compute diff
         id: diff

@@ -31,7 +31,9 @@ SW_PROPOSED = PROPOSALS / "venice-review.yml.swimtrack-website.proposed"
 # `council` alone: no venice_usage, so no `venice-usage` command and no usage
 # logging at all on the runner.
 OLD_PIN = "4a01298dcce2734115ac57f02592146969d76f48"
-PIN_RE = re.compile(r"build-ai-automation-workflow@([0-9a-f]{40})\"")
+# The repo was renamed build-ai-automation-workflow -> ai-harness on 2026-09-18.
+# Repos not yet rolled out still carry the old URL, which GitHub redirects.
+PIN_RE = re.compile(r"(?:build-ai-automation-workflow|ai-harness)@([0-9a-f]{40})\"")
 
 
 def _pins(text: str) -> list[str]:

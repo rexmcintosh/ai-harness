@@ -12,7 +12,7 @@ git config --local user.name "Loom"
 # paths correctly and returns nonzero when a secret is found.
 # detect-secrets is not on PATH in the git hook environment, so we use the
 # explicit venv binary path.
-DETECT_SECRETS_HOOK="/home/dev/projects/build-ai-automation-workflow/.venv/bin/detect-secrets-hook"
+DETECT_SECRETS_HOOK="/home/dev/projects/ai-harness/.venv/bin/detect-secrets-hook"
 HOOK=".git/hooks/pre-commit"
 cat > "$HOOK" <<EOF
 #!/usr/bin/env bash

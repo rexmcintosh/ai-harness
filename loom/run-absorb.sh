@@ -17,7 +17,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # RUNTIME = this script's clone (pinned to main). DATA_REPO = shared repo (state/ledger/logs).
 RUNTIME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATA_REPO="/home/dev/projects/build-ai-automation-workflow"
+DATA_REPO="/home/dev/projects/ai-harness"
 PY="$RUNTIME/.venv/bin/python"
 # loom is not a declared package (the editable install maps only `council`), so bind
 # `import loom`/`import council` to the runtime clone explicitly — never via CWD, which

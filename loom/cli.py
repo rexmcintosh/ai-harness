@@ -48,7 +48,7 @@ from .run import Config, absorb
 from .state import LoomState
 
 _HOME = Path.home()
-_REPO = _HOME / "projects" / "build-ai-automation-workflow"
+_REPO = _HOME / "projects" / "ai-harness"
 _LOOM = _REPO / "loom"
 
 

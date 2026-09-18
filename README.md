@@ -1,4 +1,6 @@
-# build-ai-automation-workflow
+# ai-harness
+
+Formerly `build-ai-automation-workflow` (renamed 2026-09-18). Older docs use the old name.
 
 Home of the VPS + Venice AI multi-agent PR review setup, plus the automation workflow built on top of it.
 

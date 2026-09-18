@@ -61,7 +61,7 @@
       "id": "harness",
       "name": "Shared operating harness",
       "repos": [
-        "build-ai-automation-workflow",
+        "ai-harness",
         "backlog",
         "vps-tools",
         "harness-engineering",
