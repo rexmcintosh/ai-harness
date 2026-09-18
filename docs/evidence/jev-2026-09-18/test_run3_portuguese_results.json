@@ -1,0 +1,218 @@
+[
+  {
+    "case": "visa",
+    "expect": true,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.99,
+        "probabilities": {
+          "select": 1.0,
+          "quick_hit": 0.0,
+          "reject": 0.0
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.95,
+        "probabilities": {
+          "quick_hit": 0.02,
+          "reject": 0.01,
+          "select": 0.97
+        }
+      }
+    }
+  },
+  {
+    "case": "tax",
+    "expect": true,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.97,
+        "probabilities": {
+          "select": 0.98,
+          "quick_hit": 0.01,
+          "reject": 0.01
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.97,
+        "probabilities": {
+          "quick_hit": 0.01,
+          "select": 0.98,
+          "reject": 0.01
+        }
+      }
+    }
+  },
+  {
+    "case": "football",
+    "expect": false,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "quick_hit",
+        "confidence": 0.6,
+        "probabilities": {
+          "select": 0.0,
+          "reject": 0.26,
+          "quick_hit": 0.74
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "quick_hit",
+        "confidence": 0.7,
+        "probabilities": {
+          "select": 0.0,
+          "reject": 0.19,
+          "quick_hit": 0.81
+        }
+      }
+    }
+  },
+  {
+    "case": "celeb",
+    "expect": false,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "reject",
+        "confidence": 0.44,
+        "probabilities": {
+          "reject": 0.63,
+          "select": 0.0,
+          "quick_hit": 0.37
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "reject",
+        "confidence": 0.32,
+        "probabilities": {
+          "reject": 0.54,
+          "quick_hit": 0.45,
+          "select": 0.01
+        }
+      }
+    }
+  },
+  {
+    "case": "rent",
+    "expect": true,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.72
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.35,
+        "probabilities": {
+          "reject": 0.04,
+          "quick_hit": 0.39,
+          "select": 0.57
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.87
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "select",
+        "confidence": 0.94,
+        "probabilities": {
+          "select": 0.96,
+          "quick_hit": 0.04,
+          "reject": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "politics",
+    "expect": false,
+    "pt": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "quick_hit",
+        "confidence": 0.42,
+        "probabilities": {
+          "select": 0.0,
+          "reject": 0.39,
+          "quick_hit": 0.61
+        }
+      }
+    },
+    "en": {
+      "useful": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "decision": {
+        "type": "choice",
+        "choice": "quick_hit",
+        "confidence": 0.3,
+        "probabilities": {
+          "reject": 0.47,
+          "quick_hit": 0.53,
+          "select": 0.0
+        }
+      }
+    }
+  }
+]

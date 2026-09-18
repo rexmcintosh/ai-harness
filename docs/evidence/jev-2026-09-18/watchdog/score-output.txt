@@ -1,0 +1,29 @@
+windows=116  label true=54  false=62
+regex today            right= 79/116 (68%)  missed failures= 5  false alarms=32  caught=49  quiet-correct=30
+jev >= 0.3             right=107/116 (92%)  missed failures= 0  false alarms= 9  caught=54  quiet-correct=53
+jev >= 0.5             right=104/116 (90%)  missed failures= 8  false alarms= 4  caught=46  quiet-correct=58
+jev >= 0.7             right=106/116 (91%)  missed failures=10  false alarms= 0  caught=44  quiet-correct=62
+jev >= 0.9             right= 86/116 (74%)  missed failures=30  false alarms= 0  caught=24  quiet-correct=62
+
+per source (regex right / jev@0.5 right / n):
+  backlog-run                 2 /  4 /  5
+  bento-sync                 12 / 12 / 12
+  diem-drain                  3 / 16 / 16
+  engage-scan                 7 /  8 /  8
+  loom-runs                   1 /  3 /  3
+  loom-runs-err              12 /  5 / 12
+  meettrack-supervise        16 / 16 / 16
+  ops-tick                    4 /  4 /  5
+  swimtrack-engine-morning    2 /  8 / 10
+  watchdog-cron              12 / 12 / 12
+  writing-engine-morning      1 /  9 / 10
+  writing-engine-poller       7 /  7 /  7
+
+calibration of jev needs_human:
+  0.0-0.1: n= 38  actually failures=  0
+  0.1-0.3: n= 15  actually failures=  0
+  0.3-0.7: n= 19  actually failures= 10
+  0.7-0.9: n= 20  actually failures= 20
+  0.9-1.0: n= 24  actually failures= 24
+
+latest_run_failed: jev right 95/97
