@@ -40,3 +40,20 @@ def test_format_report_orders_crit_before_warn():
     ]
     report = format_report(fired)
     assert report.index("crit-thing") < report.index("warn-thing")
+
+
+def test_loom_cron_log_points_at_the_file_loom_writes():
+    # run-absorb.sh writes loom/logs/runs.log; "absorb.log" never existed, so the check read nothing.
+    from watchdog.run import CRON_LOGS
+    paths = {label: str(path) for label, path in CRON_LOGS}
+    assert paths["loom"].endswith("loom/logs/runs.log")
+
+
+def test_collect_reports_log_coverage(monkeypatch, tmp_path):
+    import watchdog.run as run
+    monkeypatch.setattr(run, "CRON_LOGS", [("gone", tmp_path / "gone.log")])
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    monkeypatch.setattr(run, "collect_metrics", lambda now, prior: ([], {}))
+    statuses, _ = run.collect(1_800_000_000, {})
+    coverage = [s for s in statuses if s.name == "cron-logs:coverage"]
+    assert len(coverage) == 1 and coverage[0].level == "warn"

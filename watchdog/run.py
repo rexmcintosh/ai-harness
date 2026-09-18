@@ -24,6 +24,7 @@ from .triage import (
     check_bebop_runs,
     check_cron_log,
     check_disk,
+    check_log_coverage,
     check_meet_freshness,
     check_orphan_processes,
     check_service_active,
@@ -37,7 +38,7 @@ BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
 
 # Cron logs to scan for error markers: (label, path).
 CRON_LOGS = [
-    ("loom", BASE / "loom" / "logs" / "absorb.log"),
+    ("loom", BASE / "loom" / "logs" / "runs.log"),   # what loom/run-absorb.sh writes
     ("meettrack-ingest", Path("/home/dev/projects/splash_poller/logs/ingest_entries.cron.log")),
     ("meettrack-supervise", Path("/home/dev/projects/splash_poller/logs/supervise.cron.log")),
 ]
@@ -205,10 +206,15 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
 
     out.append(check_orphan_processes(_cmd(["ps", "-eo", "pid,ppid,etime,args"])))
 
+    found, missing = [], []
     for label, path in CRON_LOGS:
         text = _read(path)
-        if text is not None:  # absent log = job may not be installed here; skip
-            out.append(check_cron_log(label, text))
+        if text is None:  # absent log = job may be paused or not installed here; skip
+            missing.append(label)
+            continue
+        found.append(label)
+        out.append(check_cron_log(label, text))
+    out.append(check_log_coverage(found, missing))
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)
