@@ -133,3 +133,13 @@ def test_env_kill_switch_beats_the_config(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run.jev_shadow, "shadow_pass", lambda logs, **kw: calls.append(1))
     run.main([])
     assert calls == []
+
+
+def test_shadow_logs_drops_a_second_source_that_reuses_a_label(monkeypatch, tmp_path):
+    # Shadow state is keyed by label: two files under one label would mask each other.
+    import watchdog.run as run
+    (tmp_path / "a.log").write_text("first\n")
+    (tmp_path / "other.log").write_text("second\n")
+    monkeypatch.setattr(run, "CRON_LOGS", [("a", tmp_path / "a.log")])
+    monitors = {"jev_shadow": {"logs": [{"name": "a", "log": str(tmp_path / "other.log")}]}}
+    assert run.shadow_logs(monitors) == [("a", "first\n", "ok")]

@@ -146,6 +146,15 @@ def _load_json(path) -> dict:
         return {}
 
 
+def _save_json(path, data: dict) -> None:
+    """Atomic: a killed or failed write leaves the last good state, never half a file
+    (a corrupt state would read as empty and re-send every tail)."""
+    target = Path(path)
+    tmp = target.with_name(target.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(tmp, target)
+
+
 def _agree(regex_level: str, jev_band: str) -> bool | None:
     if jev_band == "gray":
         return None
@@ -188,8 +197,7 @@ def shadow_pass(logs, *, now_epoch: int, key: str | None, log_path, state_path,
                 handle.write(json.dumps(record) + "\n")
             seen[label] = digest
             written += 1
-        if written:
-            Path(state_path).write_text(json.dumps(seen, indent=2) + "\n")
+            _save_json(state_path, seen)       # per record: a kill mid-pass re-sends nothing
     except Exception:  # noqa: BLE001
         pass
     return written

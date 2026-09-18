@@ -232,3 +232,30 @@ def test_redact_removes_nested_item_lists_whole():
     out = js.redact(line)
     assert "private note" not in out and "about a person" not in out
     assert '"limit_hit": false' in out
+
+
+# --- state durability (council review 2026-09-18) ---------------------------
+
+def test_state_is_saved_after_each_record_so_a_kill_mid_pass_does_not_resend(tmp_path):
+    def judge(tail, key):
+        if "second" in tail:
+            raise KeyboardInterrupt          # the process dies during the second log
+        return {"needs_human": 0.1, "latest_run_failed": 0.1}
+    try:
+        _pass(tmp_path, [("a", "first\n", "ok"), ("b", "second\n", "ok")], judge)
+    except KeyboardInterrupt:
+        pass
+    state = json.loads((tmp_path / "jev-shadow-state.json").read_text())
+    assert "a" in state and "b" not in state
+
+
+def test_a_failed_state_write_keeps_the_last_good_state(tmp_path, monkeypatch):
+    judge = lambda tail, key: {"needs_human": 0.1, "latest_run_failed": 0.1}
+    _pass(tmp_path, [("a", "one\n", "ok")], judge)
+    good = (tmp_path / "jev-shadow-state.json").read_text()
+    import os as _os
+    def no_replace(src, dst):
+        raise OSError("disk full")
+    monkeypatch.setattr(_os, "replace", no_replace)
+    _pass(tmp_path, [("a", "two\n", "ok")], judge)          # must not raise, must not corrupt
+    assert (tmp_path / "jev-shadow-state.json").read_text() == good

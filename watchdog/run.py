@@ -228,10 +228,13 @@ def shadow_logs(monitors: dict) -> list[tuple[str, str, str]]:
     the rule's verdict for comparison only; they never become a status."""
     extra = [(item.get("name"), Path(item.get("log", "")))
              for item in (monitors.get("jev_shadow") or {}).get("logs", [])]
-    out = []
+    out, labels = [], set()
     for label, path in [*CRON_LOGS, *extra]:
+        if not label or label in labels:   # shadow state is keyed by label: first source wins
+            continue
         text = _read(path)
-        if label and text is not None:
+        if text is not None:
+            labels.add(label)
             out.append((label, text, check_cron_log(label, text).level))
     return out
 
