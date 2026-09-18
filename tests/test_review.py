@@ -49,12 +49,33 @@ def test_unconfirmed_candidate_does_not_block(member_json):
     assert unavailable is False
 
 
-def test_dev_tooling_high_finding_does_not_block(member_json):
-    # Blast-radius (F6): a high c9 on a tools/ change isn't a candidate, so even a
-    # chair that lists it cannot block (reproduces PR #11).
+def test_dev_tooling_confident_high_blocks_when_the_chair_confirms_it(member_json):
+    # Blast-radius (F6) as amended 2026-09: a high c>=8 on a tools/ change is eligible,
+    # and a chair that verifies it against the code blocks the merge (baw-pr11).
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="ownership",
+                             findings=[("deletes comments it does not own", "high", 9)]),
+        "c": _chair("request changes", blocking=[("deletes comments it does not own", "high", "verified")]),
+    })
+    _, blocking, unavailable = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")
+    assert blocking == 1 and unavailable is False
+
+
+def test_dev_tooling_high_the_chair_refutes_does_not_block(member_json):
     client = FakeClient(by_model={
         "code1": member_json(stance="oppose", headline="node compat",
                              findings=[("breaks on old Node", "high", 9)]),
+        "c": _chair("approve: engines pins Node >= 22.12", blocking=()),
+    })
+    _, blocking, unavailable = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")
+    assert blocking == 0 and unavailable is False
+
+
+def test_dev_tooling_low_confidence_high_does_not_block(member_json):
+    # A hedged high (c7) is not eligible on any tier, so even a chair that lists it cannot block.
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="node compat",
+                             findings=[("breaks on old Node", "high", 7)]),
         "c": _chair("request changes", blocking=[("breaks on old Node", "high", "x")]),
     })
     _, blocking, _ = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")

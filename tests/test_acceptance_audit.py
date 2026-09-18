@@ -31,8 +31,8 @@ def _chair(rec, blocking=()):
 
 
 # AC1 + AC3 — PR #11 (dev tooling): the Node-compat block was moot under engines>=22.12.0.
-# Reduced tier means the Adversary's high findings aren't even candidates, and the
-# grounded chair confirms nothing -> the change that was blocked 4x now PASSES.
+# The Adversary's confident highs are eligible on the reduced tier (policy 2026-09), but the
+# grounded chair confirms nothing -> the change that was blocked 4x still PASSES.
 def test_pr11_dev_tooling_no_longer_blocks():
     diff = ("diff --git a/tools/i18n/translate.mjs b/tools/i18n/translate.mjs\n"
             "--- a/tools/i18n/translate.mjs\n+++ b/tools/i18n/translate.mjs\n"

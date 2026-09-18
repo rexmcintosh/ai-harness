@@ -28,6 +28,9 @@ three cases, and it is forced by a fact the design did not check: `stw-pr11`
 and `baw-pr11` both change only developer-tooling paths, so `risk_tier` is
 "reduced", no panel finding in either is `critical`, and `decide_blocking`
 therefore returns 0 for every candidate no matter what the chair says.
+(True of the gate as it stood on 2026-09-12. The reduced bar has admitted a
+high at confidence >= 8 since docs/council-gate-policy-2026-09-18.md; the saved
+runs are replayed under that bar in tests/test_gate_policy_replay.py.)
 
 Usage
 -----
