@@ -222,8 +222,7 @@ def test_shipped_config_shadows_operations_logs_only():
     paths = [item["log"] for item in cfg["logs"]]
     assert paths and all(p.startswith("/") for p in paths)
     assert len({item["name"] for item in cfg["logs"]}) == len(cfg["logs"])
-    for banned in ("sat-prep", "bento", "bebop", "attainprep", "tax", "finance", "rent"):
-        assert not any(banned in p for p in paths), banned
+    assert all(js.in_scope(p) for p in paths)
 
 
 def test_redact_removes_nested_item_lists_whole():
@@ -259,3 +258,36 @@ def test_a_failed_state_write_keeps_the_last_good_state(tmp_path, monkeypatch):
     monkeypatch.setattr(_os, "replace", no_replace)
     _pass(tmp_path, [("a", "two\n", "ok")], judge)          # must not raise, must not corrupt
     assert (tmp_path / "jev-shadow-state.json").read_text() == good
+
+
+# --- council review round 2: redaction edges and outbound integrity ---------
+
+def test_redact_drops_a_customer_row_that_has_a_timestamp_prefix():
+    out = js.redact("2026-09-18 02:00:01 INFO  mary@example.com | Norris | seat trialing")
+    assert "Norris" not in out and "example.com" not in out
+
+
+def test_redact_drops_a_customer_row_with_tabs_or_no_spaces():
+    assert "Norris" not in js.redact("mary@example.com|Norris|seat trialing")
+    assert "Norris" not in js.redact('\t"mary@example.com"\t| Norris | seat')
+
+
+def test_redact_cuts_an_unclosed_item_list_to_the_end_of_the_line():
+    out = js.redact('rc=0 {"failed": 0, "quarantined_items": [["id#1", "private note that the logger trunc')
+    assert "private note" not in out and '"failed": 0' in out
+
+
+def test_judge_rejects_a_reply_from_a_different_model_version():
+    reply = _good_reply(); reply["model"] = "jev-1.14.0"
+    assert js.judge("tail", key="k", transport=lambda *a: reply) is None
+
+
+def test_redirects_are_refused_so_the_key_never_follows_one():
+    assert js._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://elsewhere.example/") is None
+
+
+def test_out_of_scope_paths_are_named_in_code_not_only_in_a_test():
+    assert js.in_scope("/home/dev/.local/state/diem/drain.log")
+    for path in ("/home/dev/projects/sat-prep/tmp/bento-sync.log", "/home/dev/projects/ai-harness/bebop/logs/cron.log",
+                 "/home/dev/projects/.session-gc/rent-verification.log", "relative/path.log", ""):
+        assert not js.in_scope(path), path

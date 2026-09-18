@@ -143,3 +143,21 @@ def test_shadow_logs_drops_a_second_source_that_reuses_a_label(monkeypatch, tmp_
     monkeypatch.setattr(run, "CRON_LOGS", [("a", tmp_path / "a.log")])
     monitors = {"jev_shadow": {"logs": [{"name": "a", "log": str(tmp_path / "other.log")}]}}
     assert run.shadow_logs(monitors) == [("a", "first\n", "ok")]
+
+
+def test_shadow_logs_refuses_an_out_of_scope_log_even_if_the_config_lists_it(monkeypatch, tmp_path):
+    import watchdog.run as run
+    bad = tmp_path / "sat-prep" / "bento-sync.log"; bad.parent.mkdir(); bad.write_text("rows\n")
+    monkeypatch.setattr(run, "CRON_LOGS", [])
+    assert run.shadow_logs({"jev_shadow": {"logs": [{"name": "bento", "log": str(bad)}]}}) == []
+
+
+def test_no_log_is_read_for_the_shadow_when_there_is_no_key(monkeypatch, tmp_path, capsys):
+    import watchdog.run as run
+    _main_env(monkeypatch, tmp_path, run)
+    reads = []
+    monkeypatch.setattr(run, "_load_monitors", lambda: {"jev_shadow": {"enabled": True}})
+    monkeypatch.setattr(run.jev_shadow, "load_key", lambda: None)
+    monkeypatch.setattr(run, "shadow_logs", lambda monitors: reads.append(1) or [])
+    run.main([])
+    assert reads == []

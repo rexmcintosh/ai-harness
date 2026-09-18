@@ -60,12 +60,22 @@ QUESTIONS = {
 }
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_CUSTOMER_ROW = re.compile(r"^\s*\S+@\S+\s*\|")
+_CUSTOMER_ROW = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+[\"']?\s*\|")   # "email | name | ..." anywhere in the line
 _MAIL_LINE = re.compile(r"^\s*(mailed|would mail|skipped)\b")
 _URL_QUERY = re.compile(r"(https?://[^\s?\"']+)\?[^\s\"']+")
 _TOKENISH = re.compile(r"\b[A-Za-z0-9_\-]{40,}\b")
 _HANDLE = re.compile(r"(?<![\w.])@[A-Za-z0-9_.]{3,}")
 _MAX_LINE = 300
+
+# Data scope (owner, 2026-09-18): public and operations data only. A path holding any of
+# these is refused at run time, whatever monitors.toml says. Extend it; never trim it.
+OUT_OF_SCOPE = ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
+                "swimtrack-coach", "gmail", "mail")
+
+
+def in_scope(path) -> bool:
+    text = str(path or "")
+    return text.startswith("/") and not any(word in text.lower() for word in OUT_OF_SCOPE)
 
 
 def _redact_line(line: str) -> str:
@@ -99,12 +109,21 @@ def band(p: float) -> str:
     return "ok" if p < OK_BELOW else ("alert" if p >= ALERT_FROM else "gray")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """urllib re-sends the Authorization header on a redirect. Refuse them all."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _http_post(req: dict, key: str, timeout: float) -> dict:
     request = urllib.request.Request(
         URL, data=json.dumps(req).encode(), method="POST",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                  "User-Agent": "ai-harness-watchdog-shadow/1"})
-    with urllib.request.urlopen(request, timeout=timeout) as resp:
+    with _OPENER.open(request, timeout=timeout) as resp:
         return json.loads(resp.read())
 
 
@@ -113,6 +132,8 @@ def judge(tail: str, key: str, transport=_http_post) -> dict | None:
     started = time.perf_counter()
     try:
         reply = transport(build_request(tail), key, TIMEOUT_SECONDS)
+        if reply.get("model") != MODEL:        # a server-side fallback would mix versions into the data
+            return None
         answers = reply["answers"]
         return {
             "needs_human": float(answers["needs_human"]["noul"]),

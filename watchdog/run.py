@@ -232,6 +232,8 @@ def shadow_logs(monitors: dict) -> list[tuple[str, str, str]]:
     for label, path in [*CRON_LOGS, *extra]:
         if not label or label in labels:   # shadow state is keyed by label: first source wins
             continue
+        if not jev_shadow.in_scope(path):  # never send a log outside the agreed data scope
+            continue
         text = _read(path)
         if text is not None:
             labels.add(label)
@@ -248,9 +250,11 @@ def run_jev_shadow(now_epoch: int) -> None:
             return
         if os.environ.get("WATCHDOG_JEV_SHADOW") == "0":
             return
+        key = jev_shadow.load_key()
+        if not key:
+            return
         log_dir = Path(os.environ.get("WATCHDOG_LOG_DIR", str(BASE / "watchdog" / "logs")))
-        jev_shadow.shadow_pass(shadow_logs(monitors), now_epoch=now_epoch,
-                               key=jev_shadow.load_key(),
+        jev_shadow.shadow_pass(shadow_logs(monitors), now_epoch=now_epoch, key=key,
                                log_path=log_dir / "jev-shadow.jsonl",
                                state_path=log_dir / "jev-shadow-state.json")
     except Exception:  # noqa: BLE001 - a shadow must never break the poll it watches
