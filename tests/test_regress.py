@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -302,6 +303,52 @@ def test_manifest_schema_and_integer_types_are_strict(tmp_path):
 
     with pytest.raises(ValueError, match="manifest"):
         harness.load_fixture(fixture_dir)
+
+
+def _synthetic_snapshot_with_its_own_tests(tmp_path):
+    fixture_dir = tmp_path / "synthetic"
+    (fixture_dir / "head" / "tests").mkdir(parents=True)
+    (fixture_dir / "head" / "tests" / "test_archived.py").write_text("def test_archived():\n    assert True\n")
+    (fixture_dir / "change.diff").write_text(
+        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-a\n+b\n"
+    )
+    harness.write_manifest(
+        fixture_dir,
+        fixture_id="synthetic",
+        repo="example.invalid/repo",
+        pr=1,
+        base="a" * 40,
+        head="b" * 40,
+        expected_blocking=0,
+    )
+    harness.validate_fixture(harness.load_fixture(fixture_dir))
+    return fixture_dir
+
+
+def test_validation_rejects_generated_bytecode_like_any_other_extra_file(tmp_path):
+    """Archived tests stay out of pytest discovery (pyproject.toml `norecursedirs`).
+
+    That is the whole correction. The validator must keep rejecting the bytecode
+    a stray import leaves behind, not learn to look past `__pycache__`.
+    """
+    fixture_dir = _synthetic_snapshot_with_its_own_tests(tmp_path)
+    cache = fixture_dir / "head" / "tests" / "__pycache__"
+    cache.mkdir()
+    (cache / "test_archived.cpython-312-pytest-9.0.3.pyc").write_bytes(b"\x00")
+
+    with pytest.raises(ValueError, match="snapshot files differ from manifest"):
+        harness.validate_fixture(harness.load_fixture(fixture_dir))
+
+
+def test_validation_rejects_a_symlink_inside_the_snapshot(tmp_path):
+    fixture_dir = _synthetic_snapshot_with_its_own_tests(tmp_path)
+    try:
+        os.symlink(fixture_dir / "head" / "tests" / "test_archived.py", fixture_dir / "head" / "linked.py")
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"this platform cannot create a symlink here: {exc!r}")
+
+    with pytest.raises(ValueError, match="snapshot contains symlink"):
+        harness.validate_fixture(harness.load_fixture(fixture_dir))
 
 
 @pytest.mark.parametrize("estimate", ["nan", "inf", "-inf"])
