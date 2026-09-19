@@ -94,7 +94,7 @@ def _jev_note(findings, jev_repo):
     """Shadow only: which of the reported findings would Jev also group? Runs AFTER the
     chair's summary and never touches `findings`. The sweep itself cannot know which
     repository its chunks came from, so the caller names it (`jev_repo`); without a name,
-    or for a repo outside the data-scope rule, nothing is sent."""
+    or for a repo that is not on the council's allow list, nothing is sent."""
     if not jev_repo:
         return None
     try:

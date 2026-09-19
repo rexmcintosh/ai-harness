@@ -96,8 +96,11 @@ with the findings Jev would also group. This is **shadow mode**: the answers are
 logged (`~/.local/state/council/jev-shadow.jsonl`, ids and numbers only) and nothing reads
 them. The panel, the chair, the gate, `run_pr_review` and every exit code are unchanged.
 Every call goes through the shared client (`jev/`, `docs/contracts/jev.md`). `COUNCIL_JEV=0`
-turns it off, and so does the shared `JEV_DISABLED=1`; no `TYPESAFE_API_KEY`, or a repository
-outside the data rule in `council/jev.py`, means no call and byte-identical output. Details, the data rule and what
+turns it off, and so does the shared `JEV_DISABLED=1`. Scope is an allow list of repositories
+(`IN_SCOPE_REPOS` in `council/jev.py`, the five the signals were measured on; adding one is
+an owner decision). No `TYPESAFE_API_KEY`, or a repository that is not on the list, means no
+call and byte-identical output. Text on stdin, or a diff saved outside any repository, is
+judged by the working directory's repository alone. Details, the data rule and what
 is deliberately not built: `docs/council-jev-shadow-2026-09-19.md`.
 
 ## Secret

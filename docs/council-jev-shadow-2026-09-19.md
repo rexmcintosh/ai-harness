@@ -19,8 +19,8 @@ these three jobs), `docs/council-gate-policy-2026-09-18.md` (the provenance gap)
    `review_status`, review readiness, `backlog-run approve` or any exit code.
 4. One switch turns all of it off: `COUNCIL_JEV=0`. The shared switch `JEV_DISABLED=1`, which
    turns every Jev caller on the machine off, works too. With a switch off, without a key,
-   or for a repository outside the data rule, the output is byte-identical to the output
-   before this change.
+   or for a repository that is not on the allow list, the output is byte-identical to the
+   output before this change.
 5. Every call goes through the shared client in the `jev` package. The council has no HTTP
    client of its own.
 
@@ -74,11 +74,40 @@ addresses, URL query strings and long token-shaped strings are removed from the 
 request, the answer options included.
 
 The owner's data rule of 2026-09-19 allows council text, code snippets and diffs to go to
-TypeSafe for council work. Two groups of repositories are never sent: those that hold
-student, customer, mail, tax or finance data, and the romance repositories (unpublished
-manuscripts). The word list is the shared one, `OUT_OF_SCOPE` in `jev/scope.py`. The list of
-repository names, `OUT_OF_SCOPE_REPOS`, is in `council/jev.py`. Each exists once, and the
-offline harness imports both from `council/jev.py`.
+TypeSafe for council work. The council applies it as an **allow list** of repositories. A
+deny list is not fail-closed: a new private repository would be in scope until someone
+remembered to add its name. With an allow list, a repository nobody has decided about gets
+no Jev call.
+
+The allow list is `IN_SCOPE_REPOS` in `council/jev.py`. It holds the five repositories of the
+offline test dataset, which are the repositories the signals were measured on:
+
+- `ai-harness`
+- `swimtrack`
+- `swimtrack-website`
+- `ultimate-portugal`
+- `aris-management-website`
+
+A repository is in scope only when all three checks pass:
+
+1. Its name is on the allow list. The match is exact: `ai-harness-fork` and `Ai-Harness` are
+   refused.
+2. Its name is not on the explicit refusal list, `OUT_OF_SCOPE_REPOS` in `council/jev.py`.
+   That list names the repositories that hold student, customer, mail, tax or finance data,
+   and the romance repositories (unpublished manuscripts). It is a second check on purpose:
+   a name that lands on both lists by mistake is still refused. A test checks that the two
+   lists never overlap.
+3. None of the shared out-of-scope words (`OUT_OF_SCOPE` in `jev/scope.py`) appears in the
+   repository name or in the backlog item id. An allowed repository is still refused for an
+   item whose id names private work, for example an id that contains `sat-prep` or `bebop`.
+
+Each list exists once. The offline harness in `tools/jev_council/` imports the rule from
+`council/jev.py`, and it still loads the same 28 reviews and 207 findings as before.
+
+**How to add a repository.** Adding one is an owner decision. After the decision, add the
+name to `IN_SCOPE_REPOS` in `council/jev.py` and to the pinned list in
+`tests/test_council_jev_shadow.py` (`ALLOWED_REPOS`), then refresh the installed command
+(see Rollout). The test pins the list so that it cannot grow by accident.
 
 The shared scope record, `ALLOWED_NOTE` in `jev/scope.py`, now states the council decision in
 one sentence: for council work only, Jev may receive the council's own words (panel
@@ -90,8 +119,8 @@ The romance (manuscript) repositories are kept OUT of the council signals by thi
 even though `jev/scope.py` records unpublished manuscript prose as allowed since 2026-09-19.
 The council decision was given separately from the manuscript decision and did not name
 those repositories, so the stricter reading was kept. If the owner wants council reviews of
-those repositories to get the signals too, it is a one-line change: remove their names from
-`OUT_OF_SCOPE_REPOS` in `council/jev.py`.
+those repositories to get the signals too, the change is small: move their names from
+`OUT_OF_SCOPE_REPOS` to `IN_SCOPE_REPOS` in `council/jev.py`, as described above.
 
 How the repository is decided:
 
@@ -104,14 +133,19 @@ How the repository is decided:
 - `council sweep`: the repository that holds the swept path. The sweep code cannot know
   where its chunks came from, so the command passes the name in. Without a name there is
   no Jev step.
-- A repository that cannot be named is refused. This fails closed.
+- A repository that cannot be named, or that is not on the allow list, is refused. This
+  fails closed.
 
 Limits of the rule that a reader should know:
 
-- It is a deny list. A new private repository is in scope until its name is added to the
-  list. Add it in `council/jev.py` when the repository is created.
-- When review text arrives on standard input, the command can only see the folder it was
-  run in. Text piped in from another repository is judged by that folder.
+- **Text on standard input, or a diff saved outside any repository, is judged by the
+  working directory's repository alone.** The command cannot see where such text came
+  from. If a diff from a private repository is piped into `council review`, or saved under
+  `/tmp` and reviewed, while the working directory is an allowed repository, the signals
+  run on it. To avoid this, run the review from inside the repository the text belongs to,
+  or set `COUNCIL_JEV=0` for that command.
+- The allow list holds names, not locations. A different repository that is given the same
+  directory name as an allowed one is treated as allowed.
 - The question wording was tested on `code-review` panels. `council review` also runs the
   signals for other panels (a single document goes to `spec-review`), where the words "code
   review" and "code change" in the questions fit less well. The log records the panel, so
@@ -235,7 +269,7 @@ call. A typical review makes 10 to 20 calls.
 
 ## Checked on 2026-09-19
 
-- Full test suite: 1586 passed, 1 skipped; 86 of these tests are new. No test reaches the
+- Full test suite: 1611 passed, 1 skipped; 111 of these tests are new. No test reaches the
   network: the suite-wide test configuration sets `JEV_DISABLED=1` and `COUNCIL_JEV=0` and
   sends both logs to temporary files, and the new test file puts a tripwire on the shared
   client's HTTP opener that fails any test that reaches it.

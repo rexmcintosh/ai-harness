@@ -1314,10 +1314,10 @@ def _fake_council(monkeypatch, *, findings=True):
 def test_real_council_adapter_carries_the_jev_verdict_and_changes_nothing_else(world, monkeypatch):
     cfg = world.build([])
     sent = _fake_council(monkeypatch)
-    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="alpha")
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
     assert sent == [] and "jev_shadow" not in off and "Jev" not in off["markdown"]        # kill switch (conftest)
     monkeypatch.setenv("COUNCIL_JEV", "1")
-    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="alpha")
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
     assert on["jev_shadow"] == {"verdict": {"label": "approve_with_conditions", "confidence": 0.91}}
     assert on["review_status"] == off["review_status"] == "unknown"
     assert {k: v for k, v in on.items() if k not in ("jev_shadow", "markdown")} == \
@@ -1329,7 +1329,9 @@ def test_real_council_adapter_carries_the_jev_verdict_and_changes_nothing_else(w
 
 
 @pytest.mark.parametrize("repo,item_id", [("sat-prep", "2026-01-01-a"), ("romance-empire", "2026-01-01-a"),
-                                          (None, "2026-01-01-a"), ("alpha", "2026-01-01-bebop-mail-fix")])
+                                          (None, "2026-01-01-a"), ("ai-harness", "2026-01-01-bebop-mail-fix"),
+                                          ("alpha", "2026-01-01-a"), ("vps-tools", "2026-01-01-a"),
+                                          ("brand-new-repo", "2026-01-01-a")])        # not on the allow list
 def test_out_of_scope_or_unknown_repo_gets_no_jev_call_at_all(world, monkeypatch, repo, item_id):
     cfg = world.build([])
     sent = _fake_council(monkeypatch)
@@ -1342,17 +1344,17 @@ def test_a_jev_outage_leaves_the_review_exactly_as_it_was(world, monkeypatch):
     import jev.client as shared_client
     cfg = world.build([])
     _fake_council(monkeypatch)
-    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness")
     monkeypatch.setenv("COUNCIL_JEV", "1")
 
     def down(req, key, timeout):
         raise OSError("TypeSafe is down")
     monkeypatch.setattr(shared_client, "http_post", down)
-    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness")
     assert "jev_shadow" not in on and {k: v for k, v in on.items() if k != "markdown"} == {k: v for k, v in off.items() if k != "markdown"}
     import council.signals as signals
     monkeypatch.setattr(signals, "collect", lambda *a, **k: 1 / 0)
-    assert REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha") == off
+    assert REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness") == off
 
 
 def test_work_one_names_the_repo_only_to_a_reviewer_that_asks_for_it(world):

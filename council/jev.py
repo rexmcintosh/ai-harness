@@ -12,7 +12,7 @@ usage ledger as project "ai-harness". This module adds what is the council's own
   * its own model pin (contract rule 6: the 0.85 cut was measured on this version),
   * redaction of the WHOLE request, state and questions, before it is handed over,
   * a short timeout and no retries, because a review's time budget is small,
-  * the council's data-scope rule by REPOSITORY, failing closed on an unknown one,
+  * the council's data-scope rule by REPOSITORY: an allow list, so an unknown repo is refused,
   * the council's own kill switch, COUNCIL_JEV=0.
 
 `tools/jev_council` imports from here; nothing here imports from `tools/` or `watchdog/`,
@@ -40,9 +40,21 @@ JevError = _shared.JevError
 _http_post = _client.http_post  # kept for tools/jev_council, which passes it as a transport
 
 # Owner data rule for COUNCIL work (2026-09-19): council text, code snippets and diffs may go
-# to TypeSafe. Two things stay out. (1) Repos that hold student, customer, mail, tax or
-# finance data: the shared word list above. (2) Unpublished manuscripts, so every romance
-# repo: a review of a chapter quotes the plot. Extend these; never trim them.
+# to TypeSafe (recorded in jev/scope.py ALLOWED_NOTE). Scope is an ALLOW list, because a deny
+# list is not fail-closed: a new private repo would be in scope until someone remembered to
+# add its name.
+#
+# These are the five repos in the 2026-09-19 offline test dataset
+# (docs/jev-council-offline-test-2026-09-19.md): the repos the signals were measured on.
+# Adding a repo is an OWNER decision. Extend deliberately; a test pins this list.
+IN_SCOPE_REPOS = frozenset({
+    "ai-harness", "swimtrack", "swimtrack-website", "ultimate-portugal", "aris-management-website"})
+
+# A second, explicit refusal (belt and braces): a name here is refused even if it also lands
+# on the allow list by mistake, and the list documents two decisions. (1) Repos that hold
+# student, customer, mail, tax or finance data. (2) Unpublished manuscripts, so every romance
+# repo: a review of a chapter quotes the plot, and the council decision did not name them.
+# Extend it; never trim it without the owner.
 OUT_OF_SCOPE_REPOS = frozenset({
     "sat-prep", "tax-advisor", "finance-tracker", "swimtrack-coach", "monthly-bidding", "nato-support",
     "romance-empire", "romance-tessacross.com", "romance-elliecalloway.com", "flight-7-publishing",
@@ -50,9 +62,11 @@ OUT_OF_SCOPE_REPOS = frozenset({
 
 
 def in_scope(name: str | None, repo: str | None) -> bool:
-    """May text from this repository go to TypeSafe? `name` is whatever else identifies the
-    work (a backlog item id, a review id); it is checked for the same words. No repo, no."""
-    if not repo or repo in OUT_OF_SCOPE_REPOS:
+    """May council text from this repository go to TypeSafe? Only when the repository is on
+    the allow list (exact name), is not on the explicit refusal list, and none of the shared
+    out-of-scope words appears in the repo name or in `name`: whatever else identifies the
+    work, such as a backlog item id or a review id. No repo, or an unknown repo: no."""
+    if not repo or repo not in IN_SCOPE_REPOS or repo in OUT_OF_SCOPE_REPOS:
         return False
     low = f"{name or ''} {repo}".lower()
     return not any(word in low for word in OUT_OF_SCOPE)

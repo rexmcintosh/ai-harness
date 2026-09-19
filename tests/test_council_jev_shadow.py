@@ -149,12 +149,42 @@ def test_a_failed_call_is_not_retried_inside_a_review(jev_on):
     assert len(tries) == 1                                      # the time budget is for other questions
 
 
+ALLOWED_REPOS = ("ai-harness", "swimtrack", "swimtrack-website", "ultimate-portugal", "aris-management-website")
+HARMLESS_LOOKING_UNKNOWN_REPOS = ("vps-tools", "splash_poller", "brand-new-repo")
+
+
+def test_scope_is_an_allow_list_of_the_repos_the_signals_were_measured_on():
+    # A deny list is not fail-closed: a new private repo would be in scope until someone
+    # remembered to add its name. The list is pinned here so that extending it is deliberate.
+    assert jev.IN_SCOPE_REPOS == frozenset(ALLOWED_REPOS)
+    for repo in ALLOWED_REPOS:
+        assert jev.in_scope("", repo) and jev.in_scope("2026-07-27-time-standards", repo), repo
+
+
+@pytest.mark.parametrize("repo", HARMLESS_LOOKING_UNKNOWN_REPOS + ("Ai-Harness", "ai-harness ", "ai-harness-fork"))
+def test_a_repo_that_is_not_on_the_allow_list_is_refused_however_harmless_it_looks(repo):
+    assert not jev.in_scope("", repo)
+
+
 def test_scope_rule_refuses_private_repos_manuscripts_and_unknown_repos():
     assert jev.in_scope("", "ai-harness") and jev.in_scope("2026-07-27-time-standards", "swimtrack-website")
     for name, repo in (("x", "sat-prep"), ("x", "romance-empire"), ("x", "tax-advisor"),
                        ("2026-09-02-sat-prep-vocab", "ai-harness"), ("x", "finance-tracker"),
                        ("x", None), ("x", "")):
         assert not jev.in_scope(name, repo)
+
+
+@pytest.mark.parametrize("repo", ALLOWED_REPOS)
+def test_an_allowed_repo_is_still_refused_when_the_item_id_names_private_work(repo):
+    for item_id in ("2026-09-02-sat-prep-vocab", "bebop-briefing-fix", "2026-08-01-tax-export", "gmail-filter-cleanup"):
+        assert not jev.in_scope(item_id, repo), (item_id, repo)
+
+
+def test_the_allow_list_and_the_explicit_refusal_list_never_overlap(monkeypatch):
+    assert not jev.IN_SCOPE_REPOS & jev.OUT_OF_SCOPE_REPOS
+    # belt and braces: a name on BOTH lists (a future editing slip) is still refused
+    monkeypatch.setattr(jev, "IN_SCOPE_REPOS", jev.IN_SCOPE_REPOS | {"romance-empire"})
+    assert not jev.in_scope("", "romance-empire")
 
 
 def test_the_offline_harness_shares_the_one_scope_list_and_key_loader():
@@ -434,6 +464,7 @@ def test_the_shadow_log_holds_no_review_text(tmp_path):
     ({"HOME": "/nonexistent-home"}, "ai-harness", ""),                     # no key
     (ON, "sat-prep", ""), (ON, "romance-empire", ""),                      # private data, manuscripts
     (ON, None, ""), (ON, "", ""),                                          # unknown repo: fail closed
+    (ON, "vps-tools", ""), (ON, "splash_poller", ""), (ON, "brand-new-repo", ""),   # not on the allow list
     (ON, "ai-harness", "2026-09-02-sat-prep-vocab"),                       # the item names private work
 ])
 def test_collect_returns_none_and_makes_no_call_when_off_out_of_scope_or_unknown(tmp_path, environ, repo, name):
@@ -616,7 +647,7 @@ def fake_jev_transport(calls):
 @pytest.fixture
 def in_scope_checkout(tmp_path, monkeypatch):
     """A git checkout named like an in-scope repo, as the working directory, with a diff file."""
-    repo = tmp_path / "projects" / "some-tool"
+    repo = tmp_path / "projects" / "swimtrack"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q", "-b", "main")
     (repo / "change.diff").write_text(DIFF)
@@ -663,7 +694,7 @@ def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys,
     wire = json.dumps(calls)
     assert "+new" not in wire and "diff --git" not in wire      # the diff itself is never sent
     (row,) = read_log(Path(__import__("os").environ["COUNCIL_JEV_LOG"]))
-    assert row["repo"] == "some-tool" and row["tier"] == "full" and row["chair_blocks"] == 1
+    assert row["repo"] == "swimtrack" and row["tier"] == "full" and row["chair_blocks"] == 1
     assert row["panel"] == "code-review"
 
 
@@ -686,7 +717,7 @@ def test_a_broken_jev_step_never_changes_the_review_or_its_exit_code(member_json
     assert (rc, out) == (rc_off, off)
 
 
-@pytest.mark.parametrize("folder", ["sat-prep", "romance-empire"])
+@pytest.mark.parametrize("folder", ["sat-prep", "romance-empire", *HARMLESS_LOOKING_UNKNOWN_REPOS])
 def test_review_in_an_out_of_scope_checkout_makes_no_jev_call(member_json, capsys, tmp_path, monkeypatch, folder, jev_on):
     repo = tmp_path / folder
     repo.mkdir()
@@ -797,7 +828,7 @@ def test_collect_sweep_caps_the_pairs_and_refuses_out_of_scope_repos(tmp_path):
     ask = FakeAsk(same=0.1)
     note = signals.collect_sweep("ai-harness", many, environ=ON, ask=ask, log_path=tmp_path / "l.jsonl")
     assert (note["pairs_total"], note["pairs_asked"], note["truncated"], len(ask.calls)) == (66, 40, True, 40)
-    for repo in ("sat-prep", "romance-empire", None):
+    for repo in ("sat-prep", "romance-empire", None, *HARMLESS_LOOKING_UNKNOWN_REPOS):
         quiet = FakeAsk()
         assert signals.collect_sweep(repo, many, environ=ON, ask=quiet, log_path=tmp_path / "l.jsonl") is None
         assert quiet.calls == []
@@ -840,7 +871,8 @@ def test_sweep_with_nothing_to_group_or_a_jev_outage_renders_exactly_as_before(m
     assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
 
 
-@pytest.mark.parametrize("folder,grouped", [("some-tool", True), ("swimtrack-coach", False)])
+@pytest.mark.parametrize("folder,grouped", [("ultimate-portugal", True), ("swimtrack-coach", False),
+                                            ("vps-tools", False), ("brand-new-repo", False)])
 def test_cli_sweep_applies_the_scope_rule_to_the_swept_repo(tmp_path, capsys, monkeypatch, folder, grouped, jev_on):
     repo = tmp_path / folder
     repo.mkdir()

@@ -338,8 +338,8 @@ def collect(context_repo: str | None, results: list[MemberResult], synthesis: Sy
     """Run the three signals for one finished review and append one line to the shadow log.
 
     Call it AFTER synthesize(), so the chair cannot be influenced. Returns None, and sends
-    nothing, when the kill switch is off, there is no key, or the repository (or `name`, a
-    backlog item id) is outside the data-scope rule; an unknown repository is refused.
+    nothing, when the kill switch is off, there is no key, or the repository is not on the
+    allow list in council/jev.py (or `name`, a backlog item id, names private work).
     Never raises: a failed call or a wrongly shaped answer costs that one signal and adds to
     `errors`. `tier` is the gate's blast-radius tier when the input was a diff; it only
     labels a linked finding as eligible or not. `panel` is logged so rows from panels the
