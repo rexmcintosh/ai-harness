@@ -90,12 +90,12 @@ def test_reviews_of_out_of_scope_repos_are_never_loaded():
 
 def test_load_reviews_takes_the_repo_from_the_backlog_map_and_skips_the_rest(tmp_path):
     from tools.jev_council.reviews import load_reviews
-    for name in ("2026-09-11T03Z-2026-07-27-time-standards.md", "2026-09-10T03Z-2026-08-16-math-polish.md",
-                 "2026-09-09T03Z-2026-01-01-unknown.md"):
+    for name in ("2026-09-11T030004.336238Z-2026-07-27-time-standards.md", "2026-09-10T030004.000001Z-2026-08-16-math-polish.md",
+                 "2026-09-09T030004.000001Z-2026-01-01-unknown.md"):
         (tmp_path / name).write_text(REVIEW)
     repo_of = {"2026-07-27-time-standards": "swimtrack-website", "2026-08-16-math-polish": "sat-prep"}
     loaded = load_reviews(tmp_path, repo_of=repo_of)
-    assert [r.rid for r in loaded] == ["2026-09-11T03Z-2026-07-27-time-standards"]
+    assert [r.rid for r in loaded] == ["2026-09-11T030004.336238Z-2026-07-27-time-standards"]
     assert [r.repo for r in loaded] == ["swimtrack-website"]
     assert len(load_reviews(tmp_path, default_repo="ai-harness")) == 3
 
@@ -195,13 +195,27 @@ def test_fixture_run_dry_run_makes_no_call(capsys):
     assert json.loads(capsys.readouterr().out) == {"link": 16, "kinds": 19, "slices": 6}
 
 
-def test_a_real_run_without_an_output_folder_is_refused(monkeypatch, capsys):
-    # Raw answers quote private review text, so they must never default into the repo.
+def test_a_real_run_without_an_output_folder_is_refused_before_anything_is_sent(monkeypatch, capsys):
+    # Raw answers quote private review text, so they never default into the repo, and the
+    # refusal must come BEFORE the first call: text sent for a result that is then thrown
+    # away is the worst of both.
     from tools.jev_council import run as runner
     monkeypatch.setattr(runner, "dataset", lambda: [parse_review(REVIEW, "rid")])
     monkeypatch.setattr(runner.jev, "load_key", lambda: "k")
-    monkeypatch.setattr(runner.ex, "run", lambda *a, **k: {"rows": [], "errors": 0, "input_tokens": 0})
+
+    def must_not_run(*a, **k):
+        raise AssertionError("experiment started without an output folder")
+    monkeypatch.setattr(runner.ex, "run", must_not_run)
     assert runner.main(["verdict"]) == 2 and "--out" in capsys.readouterr().err
+
+
+def test_runner_record_ids_map_to_a_repo_by_exact_item_id_only():
+    from tools.jev_council.reviews import _repo_for
+    repo_of = {"2026-07-27-fix": "swimtrack-website", "2026-08-01-big-2026-07-27-fix": "sat-prep"}
+    assert _repo_for("2026-09-11T030004.336238Z-2026-07-27-fix", repo_of) == "swimtrack-website"
+    assert _repo_for("2026-09-12T030004.000001Z-2026-08-01-big-2026-07-27-fix", repo_of) == "sat-prep"
+    assert _repo_for("2026-07-27-fix", repo_of) == "swimtrack-website"           # legacy copy
+    assert _repo_for("anything-2026-07-27-fix", repo_of) is None                 # no loose suffix match
 
 
 # ── council review 2026-09-19: four fixes ────────────────────────────────────────────────
@@ -232,7 +246,7 @@ def test_scope_is_checked_on_the_final_repo_of_each_file(tmp_path):
 
 def test_duplicate_copies_are_dropped_by_content_not_by_similar_wording(tmp_path):
     from tools.jev_council.reviews import load_reviews, unique_reviews
-    (tmp_path / "2026-09-11T03Z-2026-07-27-a.md").write_text(REVIEW)
+    (tmp_path / "2026-09-11T030004.336238Z-2026-07-27-a.md").write_text(REVIEW)
     (tmp_path / "2026-07-27-a.md").write_text(REVIEW)                       # the runner's legacy copy
     (tmp_path / "2026-07-28-b.md").write_text(REVIEW.replace("over-capture", "over-capture badly"))
     loaded = load_reviews(tmp_path, default_repo="ai-harness")

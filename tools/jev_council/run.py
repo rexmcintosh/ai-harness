@@ -52,17 +52,18 @@ def main(argv=None) -> int:
                   f"pairs={len(ex.cross_seat_pairs(r)):3} blocks={len(r.chair_blocks)}")
         print(f"{len(reviews)} reviews in scope, {sum(len(r.findings) for r in reviews)} findings")
         return 0
-    key = None if args.dry_run else jev.load_key()
-    if not args.dry_run and not key:
-        print("TYPESAFE_API_KEY is not set", file=sys.stderr)
-        return 2
-    result = ex.run(args.experiment, reviews, key=key, dry_run=args.dry_run, log=print)
     if args.dry_run:
-        print(json.dumps(result))
+        print(json.dumps(ex.run(args.experiment, reviews, key=None, dry_run=True)))
         return 0
+    # Every refusal comes BEFORE the first call: nothing is sent for a result we cannot keep.
     if not args.out:
         print("--out DIR is required for a real run (raw answers quote private text)", file=sys.stderr)
         return 2
+    key = jev.load_key()
+    if not key:
+        print("TYPESAFE_API_KEY is not set", file=sys.stderr)
+        return 2
+    result = ex.run(args.experiment, reviews, key=key, log=print)
     args.out.expanduser().mkdir(parents=True, exist_ok=True)
     path = args.out.expanduser() / f"{args.experiment}.json"
     path.write_text(json.dumps(result, indent=1))

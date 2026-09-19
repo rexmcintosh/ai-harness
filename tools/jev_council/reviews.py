@@ -122,12 +122,14 @@ def backlog_repo_map(*yaml_paths: Path) -> dict[str, str]:
     return out
 
 
+_RUN_STAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{6}\.\d+Z-")
+
+
 def _repo_for(rid: str, repo_of: dict[str, str]) -> str | None:
-    # runner records are "<timestamp>-<item id>" or the legacy "<item id>"
-    for item_id, repo in repo_of.items():
-        if rid == item_id or rid.endswith("-" + item_id):
-            return repo
-    return None
+    """Exact item id only. A runner record is "<UTC run stamp>-<item id>" and its legacy copy
+    is "<item id>"; a looser suffix match could hand one item another item's repo and quietly
+    defeat the scope rule."""
+    return repo_of.get(_RUN_STAMP.sub("", rid, count=1))
 
 
 def load_reviews(directory: Path, *, repo_of: dict[str, str] | None = None,
