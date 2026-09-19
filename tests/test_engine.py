@@ -1,3 +1,5 @@
+import pytest
+
 from council.engine import run_panel
 from council.models import Panel, Member
 from tests.conftest import FakeClient
@@ -69,3 +71,45 @@ def test_run_panel_caps_worker_pool():
     finally:
         eng.concurrent.futures.ThreadPoolExecutor = real
     assert captured["max_workers"] == 8
+
+
+# ── a reply that parses but says nothing is a FAILED seat, never a quiet "na" ─────────────
+# Captured 2026-09-19 from deepseek-v4-pro under Venice `response_format: json_object`:
+# the forced-JSON decoder garbles the first key and the model often stops right there. It is
+# valid JSON, so the old engine returned stance "na" with no error, and the code-review panel
+# silently ran without its Security Officer in 34 of 41 saved reviews (2026-08-29..09-19).
+@pytest.mark.parametrize("junk", [
+    '{": ": ", "}',
+    '{": ": "} "}',
+    '{": ": "} is not valid JSON. I\'ll output the JSON object directly."}',
+    "{}",
+    "[]",
+    '"approve"',
+    '{"stance": "", "headline": "  ", "findings": [], "suggestions": []}',
+])
+def test_a_reply_with_no_usable_seat_fields_is_an_error(junk):
+    results = run_panel(_panel(), "x", FakeClient(default=junk))
+    for r in results:
+        assert r.error is not None and "no usable answer" in r.error
+        assert r.stance == "na" and r.headline == "(member errored)" and r.findings == []
+
+
+def test_a_reply_with_a_garbled_stance_key_keeps_its_real_content():
+    # Also captured live: the first key came back as ".stance" but the rest was intact.
+    # The headline and findings are real work, so the seat stays usable (stance unknown).
+    garbled = {".stance": "approve", "headline": "No security risk", "suggestions": [],
+               "findings": [{"point": "p", "severity": "low", "confidence": 8}]}
+    for r in run_panel(_panel(), "x", FakeClient(default=garbled)):
+        assert r.error is None and r.stance == "na"
+        assert r.headline == "No security risk" and len(r.findings) == 1
+
+
+def test_a_seat_is_asked_in_the_json_mode_its_member_declares(member_json):
+    panel = Panel(name="p", description="d", members=[
+        Member("Default", "m1", "sys"),
+        Member("NoForcedJson", "m2", "sys", json_mode=False),
+    ])
+    client = FakeClient(default=member_json())
+    run_panel(panel, "x", client)
+    assert {c["model"]: c["json_mode"] for c in client.calls} == {"m1": True, "m2": False}
+

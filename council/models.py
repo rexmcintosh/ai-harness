@@ -11,6 +11,11 @@ class Member:
     # openai-gpt-53-codex, 17,142 completion tokens at its ledger maximum against
     # grok-4-3's 2,187) can be given its own headroom without raising the panel's.
     max_completion_tokens: int | None = None
+    # Ask Venice for `response_format: json_object`? True for every model that honours it.
+    # False for a model the forced-JSON decoder corrupts: deepseek-v4-pro came back with a
+    # garbled first key, often nothing else, in 0 of 4 usable replies with it on against
+    # 4 of 4 clean with it off (2026-09-19). The prompt still demands JSON either way.
+    json_mode: bool = True
 
 
 @dataclass

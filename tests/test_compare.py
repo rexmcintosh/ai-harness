@@ -67,6 +67,15 @@ def test_compare_tolerates_member_error():
     assert len(errored) == 1 and errored[0].member == "Eng"
 
 
+def test_compare_counts_a_junk_but_valid_vote_as_an_errored_voter():
+    # The garbled forced-JSON reply seen from deepseek-v4-pro: it parses, and it picks nothing.
+    client = FakeClient(by_model={"m1": '{": ": ", "}', "m2": _vote("B", ["B", "A"]),
+                                  "c": _synth("B", ["B", "A"])})
+    res = run_compare("task", CANDIDATES, PANEL, client, chair_model="c")
+    errored = [v for v in res.votes if v.error]
+    assert [v.member for v in errored] == ["Eng"] and "no usable answer" in errored[0].error
+
+
 def test_compare_chair_error_is_surfaced_not_raised():
     client = FakeClient(by_model={"m1": _vote("A", ["A", "B"]),
                                   "m2": _vote("A", ["A", "B"])},

@@ -39,6 +39,11 @@ def synthesize(context: str, results: list[MemberResult], client, *, chair_model
         raw = client.complete(chair_model, system, user, task_type=task_type,
                               max_completion_tokens=max_completion_tokens)
         d = loads_lenient(raw)
+        if not isinstance(d, dict) or not str(d.get("recommendation") or "").strip():
+            # Valid JSON is not an answer. An empty Synthesis with no error reads as "the
+            # chair confirmed nothing", which passes the merge gate; callers fail closed
+            # on `error`, so a chair that said nothing must set it.
+            raise ValueError(f"no usable answer in the chair's reply ({len(raw or '')} chars)")
         dis = [Disagreement(
             topic=str(x.get("topic", "")), type=str(x.get("type", "taste")),
             positions=str(x.get("positions", "")), resolution=str(x.get("resolution", "")),

@@ -103,3 +103,39 @@ def test_get_api_key_exits_when_neither_is_set(monkeypatch, capsys):
     # generic fallback, and must never echo a key value.
     err = capsys.readouterr().err
     assert "VENICE_COUNCIL_KEY" in err
+
+
+def test_member_json_mode_loads_from_toml_and_defaults_to_forced_json(tmp_path):
+    from council.config import load_panels
+    toml = tmp_path / "panels.toml"
+    toml.write_text('''
+[settings]
+chair_model = "c"
+
+[panels.p]
+description = "d"
+
+[[panels.p.members]]
+name = "A"
+model = "m1"
+system = "s"
+
+[[panels.p.members]]
+name = "B"
+model = "m2"
+system = "s"
+json_mode = false
+''')
+    _, panels = load_panels(str(toml))
+    assert [m.json_mode for m in panels["p"].members] == [True, False]
+
+
+def test_shipped_panels_never_force_json_on_deepseek_v4_pro():
+    # Root cause of the empty Security Officer seat: Venice's json_object mode garbles this
+    # model's first key (0 of 4 usable with it on, 4 of 4 clean with it off, 2026-09-19).
+    from council.config import load_panels
+    _, panels = load_panels(None)
+    seats = [(p.name, m.name, m.json_mode) for p in panels.values() for m in p.members
+             if m.model.startswith("deepseek-v4-pro")]
+    assert seats and all(mode is False for _, _, mode in seats), seats
+

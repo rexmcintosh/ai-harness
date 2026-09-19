@@ -34,7 +34,7 @@ class FakeClient:
     def complete(self, model, system, user, *, json_mode=True, task_type="chat",
                  max_completion_tokens=None):
         self.calls.append({"model": model, "system": system, "user": user,
-                           "task_type": task_type,
+                           "task_type": task_type, "json_mode": json_mode,
                            "max_completion_tokens": max_completion_tokens})
         if model in self.raises_for:
             raise RuntimeError(f"boom:{model}")
