@@ -130,3 +130,49 @@ def render_combined(sections, *, rigor: str = "daily") -> str:
             out += ["", f"_{note}_"]
         out += ["", render_markdown(question, syn, results, rigor=rigor), ""]
     return "\n".join(out)
+
+
+JEV_SHADOW_TITLE = "### Jev shadow signals (display only; not used by the chair or the gate)"
+
+
+def _join_names(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def render_jev_shadow(sig, *, chair_status: str | None = None) -> str:
+    """The shadow section for a `council.signals.JevSignals`. It names finding ids, seat
+    names, labels and numbers only, so it can sit in any saved review. It always goes LAST,
+    after the raw panel, so nothing that reads the review above it changes."""
+    by_id = {f["id"]: f for f in sig.findings}
+    out = [JEV_SHADOW_TITLE, "",
+           f"_A second reading by a small model ({sig.model}). It changed nothing above. "
+           f"F1.2 means seat 1, finding 2, in the order the chair saw them._", ""]
+    if sig.verdict:
+        line = f"- Jev reads the chair's verdict as: **{sig.verdict['label']}** ({sig.verdict['confidence']:.2f})"
+        out.append(line + (f"; the chair's own review_status: {chair_status}" if chair_status else ""))
+    for c in sig.clusters:
+        names = [f"{fid} ({by_id.get(fid, {}).get('seat', '?')})" for fid in c["findings"]]
+        score = f"{c['p_min']:.2f}" if c["p_min"] == c["p_max"] else f"{c['p_min']:.2f} to {c['p_max']:.2f}"
+        out.append(f"- {_join_names(names)} look like the same problem ({score}); "
+                   f"raised by {c['seats']} of {sig.seats_answered} seats")
+    if not sig.clusters and sig.pairs_asked:
+        out.append(f"- No two seats raised the same problem ({sig.pairs_asked} pairs checked, cut {sig.cut:.2f})")
+    if sig.truncated or sig.pairs_asked < sig.pairs_total:
+        out.append(f"- Only {sig.pairs_asked} of {sig.pairs_total} finding pairs were checked, the most severe first")
+    for link in sig.block_sources:
+        head = f"- Block {link['block'] + 1} -> "
+        if link["source"] == "none":
+            tail = f"({link['confidence']:.2f})" if link["confidence"] is not None else "(the panel raised no findings)"
+            out.append(f"{head}none of the panel findings {tail}")
+            continue
+        f = by_id.get(link["source"], {})
+        note = {True: ", eligible at this tier", False: ", not eligible at this tier"}.get(link.get("eligible"), "")
+        out.append(f"{head}{link['source']} ({f.get('seat', '?')}, {f.get('severity', '?')} c{f.get('confidence', '?')}"
+                   f"{note}) ({link['confidence']:.2f})")
+    if sig.errors:
+        out.append(f"- {sig.errors} Jev call{'s' if sig.errors != 1 else ''} failed; those answers are missing")
+    if sig.budget_exhausted:
+        out.append(f"- The time budget ran out after {sig.calls} calls; the rest was skipped")
+    if len(out) == 4:
+        out.append("- Nothing to report")
+    return "\n".join(out)

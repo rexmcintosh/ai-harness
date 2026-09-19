@@ -101,10 +101,25 @@ class NumberedFinding:
     text: str
 
 
+def _severity_label(raw) -> str:
+    """The gate's ladder, or "other". A seat can write anything into `severity`, and these
+    labels go into the log and the shadow section, which must hold no free text."""
+    sev = normalize_severity(str(raw))
+    return sev if sev in _SEVERITY_RANK else "other"
+
+
+def _whole_number(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def numbered_findings(results: list[MemberResult]) -> list[NumberedFinding]:
     """Ids come from panel order, never from prose, so one panel always yields the same ids.
     An errored seat has no findings; it still uses up its seat number."""
-    return [NumberedFinding(f"F{n}.{k}", r.member, normalize_severity(f.severity), int(f.confidence), str(f.point))
+    return [NumberedFinding(f"F{n}.{k}", str(r.member), _severity_label(f.severity), _whole_number(f.confidence),
+                            str(f.point))
             for n, r in enumerate(results, 1) if not r.error
             for k, f in enumerate(r.findings, 1)]
 
@@ -122,7 +137,9 @@ def _choice(answers, name: str, allowed) -> tuple[str, float, dict]:
     if label not in allowed:
         raise ValueError(f"{name}: answer {label!r} was not one of the options")
     probabilities = answer.get("probabilities")
-    return label, _probability(answer["confidence"]), probabilities if isinstance(probabilities, dict) else {}
+    known = {k: v for k, v in (probabilities if isinstance(probabilities, dict) else {}).items()
+             if k in allowed and isinstance(v, (int, float)) and not isinstance(v, bool)}
+    return label, _probability(answer["confidence"]), known
 
 
 def _count(stats, key: str, by: int = 1) -> None:

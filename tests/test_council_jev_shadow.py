@@ -222,6 +222,11 @@ def test_finding_ids_follow_panel_order_and_an_errored_seat_keeps_its_number():
         ("F1.1", "Eng Manager", "high", 9), ("F1.2", "Eng Manager", "low", 9), ("F3.1", "Adversary", "med", 8)]
 
 
+def test_a_free_text_severity_never_becomes_a_label():
+    odd = [MemberResult("A", "m", "concerns", "h", findings=[Finding("p", "High", 9), Finding("q", "high: leaks the plot", "8")])]
+    assert [(f.severity, f.confidence) for f in signals.numbered_findings(odd)] == [("high", 9), ("other", 8)]
+
+
 def test_verdict_label_reads_the_recommendation_only():
     ask = FakeAsk()
     out = signals.verdict_label(RECOMMENDATION, ask)
@@ -465,3 +470,214 @@ def test_a_failed_chair_gets_no_verdict_question(tmp_path):
 def test_default_log_path_is_under_local_state_and_the_environment_can_move_it(tmp_path):
     assert signals.log_path_for({"HOME": "/home/someone"}) == Path("/home/someone/.local/state/council/jev-shadow.jsonl")
     assert signals.log_path_for({"COUNCIL_JEV_LOG": str(tmp_path / "x.jsonl")}) == tmp_path / "x.jsonl"
+
+
+# ── the shadow section, and `council review` ─────────────────────────────────────────────
+from council import cli                                                          # noqa: E402
+from council.config import Settings                                              # noqa: E402
+from council.models import Member, Panel                                         # noqa: E402
+from council.render import render_jev_shadow, render_markdown                    # noqa: E402
+from tests.conftest import FakeClient                                            # noqa: E402
+
+TITLE = "### Jev shadow signals (display only; not used by the chair or the gate)"
+
+
+def test_the_shadow_section_names_ids_seats_labels_and_numbers_only(tmp_path):
+    sig = signals.collect("ai-harness", panel_results(), synthesis(BLOCKS), environ=ON, ask=agreeing_ask(),
+                          log_path=tmp_path / "l.jsonl", tier="full")
+    text = render_jev_shadow(sig, chair_status="unknown")
+    assert text.splitlines()[0] == TITLE
+    assert "Jev reads the chair's verdict as: **approve_with_conditions** (0.91)" in text
+    assert "F1.1 (Eng Manager) and F3.1 (Adversary) look like the same problem (0.94); raised by 2 of 2 seats" in text
+    assert "Block 1 -> F1.1 (Eng Manager, high c9, eligible at this tier) (1.00)" in text
+    assert "Block 2 -> none of the panel findings (0.93)" in text
+    for private in (OVER_CAPTURE, SPLITS, RECOMMENDATION, "over-captures", "README"):
+        assert private not in text
+    # saved reviews are parsed back by tools: no line here may look like a panel finding
+    import re
+    assert not [ln for ln in text.splitlines() if re.match(r"^- `[^`]+` \(c\d+\)", ln) or ln.startswith("#### ")]
+
+
+def test_the_shadow_section_says_so_when_a_link_is_not_eligible_or_the_tier_is_unknown(tmp_path):
+    low = FakeAsk(source=("F1.2", 0.8))
+    full = signals.collect("ai-harness", panel_results(), synthesis(BLOCKS[:1]), environ=ON, ask=low,
+                           log_path=tmp_path / "l.jsonl", tier="full")
+    assert "Block 1 -> F1.2 (Eng Manager, low c9, not eligible at this tier) (0.80)" in render_jev_shadow(full)
+    no_tier = signals.collect("ai-harness", panel_results(), synthesis(BLOCKS[:1]), environ=ON, ask=low,
+                              log_path=tmp_path / "l.jsonl")
+    assert "Block 1 -> F1.2 (Eng Manager, low c9) (0.80)" in render_jev_shadow(no_tier)
+
+
+def test_the_shadow_section_groups_three_seats_and_reports_failures(tmp_path):
+    results = panel_results() + [MemberResult("Designer", "m4", "concerns", "h", findings=[Finding(SPLITS + " Again.", "med", 8)])]
+    ask = FakeAsk(same=lambda s: 0.2 if MISSING_TEST in (s["a"], s["b"]) else 0.9)
+    text = render_jev_shadow(signals.collect("ai-harness", results, synthesis(), environ=ON, ask=ask,
+                                             log_path=tmp_path / "l.jsonl"))
+    assert "F1.1 (Eng Manager), F3.1 (Adversary) and F4.1 (Designer) look like the same problem (0.90); raised by 3 of 3 seats" in text
+
+    def down(state, questions):
+        raise jev.JevError("down")
+    failed = render_jev_shadow(signals.collect("ai-harness", panel_results(), synthesis(), environ=ON, ask=down,
+                                               log_path=tmp_path / "l.jsonl"))
+    assert failed.splitlines()[0] == TITLE and "3 Jev calls failed" in failed
+    assert "Jev reads the chair's verdict" not in failed
+
+
+DIFF = ("diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ b/src/app.py\n"
+        "@@ -1 +1 @@\n-old\n+new\n")
+CHAIR = {"recommendation": RECOMMENDATION, "confidence": 7, "consensus": [], "disagreements": [],
+         "cross_panel_themes": [],
+         "blocking_findings": [{"point": "note extraction over-captures", "severity": "high", "why": "slices to the end"}]}
+
+
+def review_world(member_json):
+    settings = Settings(default_panel="code-review", router_model="r", chair_model="c")
+    panels = {"code-review": Panel("code-review", "review", [Member("Eng Manager", "m1", "eng"),
+                                                             Member("Adversary", "m3", "adv")])}
+    client = FakeClient(by_model={"m1": member_json(findings=[(OVER_CAPTURE, "high", 9), (MISSING_TEST, "low", 9)]),
+                                  "m3": member_json(findings=[(SPLITS, "med", 8)]), "c": CHAIR})
+    return settings, panels, client
+
+
+def fake_jev_transport(calls):
+    def transport(req, key, timeout):
+        calls.append(req)
+        q = req["questions"]
+        if "verdict" in q:
+            return _reply({"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91,
+                                       "probabilities": {}}})
+        if "same" in q:
+            same = {req["state"]["a"], req["state"]["b"]} == {OVER_CAPTURE, SPLITS}
+            return _reply({"same": {"type": "noul", "noul": 0.94 if same else 0.12}})
+        return _reply({"source": {"type": "choice", "choice": "F1.1", "confidence": 1.0, "probabilities": {}}})
+    return transport
+
+
+@pytest.fixture
+def in_scope_checkout(tmp_path, monkeypatch):
+    """A git checkout named like an in-scope repo, as the working directory, with a diff file."""
+    repo = tmp_path / "projects" / "some-tool"
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "change.diff").write_text(DIFF)
+    monkeypatch.chdir(repo)
+    return repo
+
+
+def run_review(member_json, capsys, *args):
+    settings, panels, client = review_world(member_json)
+    rc = cli.main(["review", *args], _settings=settings, _panels=panels, _client=client)
+    return rc, capsys.readouterr().out, client
+
+
+def test_review_output_is_byte_identical_to_today_when_the_shadow_is_off(member_json, capsys, in_scope_checkout, monkeypatch):
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")                # a key exists; the switch is off (conftest)
+    rc, out, client = run_review(member_json, capsys, "change.diff", "--format", "md")
+    settings, panels, replay = review_world(member_json)
+    from council.engine import run_panel
+    from council.synthesize import synthesize
+    ctx = f"Review this:\n\n--- change.diff ---\n{DIFF}"
+    results = run_panel(panels["code-review"], ctx, replay)
+    syn = synthesize(ctx, results, replay, chair_model="c")
+    assert out == "[panel: code-review · rigor: daily]\n\n" + render_markdown(ctx[:120], syn, results, rigor="daily") + "\n"
+    assert rc == 0 and calls == [] and "Jev" not in out
+
+
+def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys, in_scope_checkout, monkeypatch):
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    rc_off, off, client_off = run_review(member_json, capsys, "change.diff", "--format", "md")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rc_on, on, client_on = run_review(member_json, capsys, "change.diff", "--format", "md")
+    assert rc_on == rc_off == 0
+    assert on.startswith(off) and on[len(off):].strip().splitlines()[0] == TITLE      # strictly appended
+    assert "raised by 2 of 2 seats" in on and "Block 1 -> F1.1 (Eng Manager, high c9, eligible at this tier) (1.00)" in on
+    by_model = lambda client: sorted(client.calls, key=lambda c: c["model"])     # noqa: E731  (seats run in threads)
+    assert by_model(client_on) == by_model(client_off)          # the panel and the chair saw exactly the same input
+    assert len(calls) == 4 and all(c["model"] == "jev-1.13.0" for c in calls)
+    wire = json.dumps(calls)
+    assert "+new" not in wire and "diff --git" not in wire      # the diff itself is never sent
+    (row,) = read_log(Path(__import__("os").environ["COUNCIL_JEV_LOG"]))
+    assert row["repo"] == "some-tool" and row["tier"] == "full" and row["chair_blocks"] == 1
+
+
+def test_review_in_the_terminal_format_gets_the_section_too(member_json, capsys, in_scope_checkout, monkeypatch):
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport([]))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rc, out, _ = run_review(member_json, capsys, "change.diff")
+    assert rc == 0 and out.rstrip().count(TITLE) == 1 and out.index(TITLE) > out.index("── Raw panel ──")
+
+
+def test_a_broken_jev_step_never_changes_the_review_or_its_exit_code(member_json, capsys, in_scope_checkout, monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    rc_off, off, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+
+    def explode(*a, **k):
+        raise RuntimeError("signals blew up")
+    monkeypatch.setattr(signals, "collect", explode)
+    rc, out, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
+    assert (rc, out) == (rc_off, off)
+
+
+@pytest.mark.parametrize("folder", ["sat-prep", "romance-empire"])
+def test_review_in_an_out_of_scope_checkout_makes_no_jev_call(member_json, capsys, tmp_path, monkeypatch, folder):
+    repo = tmp_path / folder
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "change.diff").write_text(DIFF)
+    monkeypatch.chdir(repo)
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rc, out, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
+    assert rc == 0 and calls == [] and "Jev" not in out
+
+
+def test_review_outside_any_repository_or_of_a_path_in_a_private_repo_makes_no_jev_call(
+        member_json, capsys, tmp_path, in_scope_checkout, monkeypatch):
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    private = tmp_path / "tax-advisor"
+    private.mkdir()
+    _git(private, "init", "-q", "-b", "main")
+    (private / "return.py").write_text("income = 1\n")
+    rc, out, _ = run_review(member_json, capsys, str(private / "return.py"), "--panel", "code-review", "--format", "md")
+    assert rc == 0 and calls == [] and "Jev" not in out          # the working directory is in scope; the file is not
+    plain = tmp_path / "loose"
+    plain.mkdir()
+    (plain / "change.diff").write_text(DIFF)
+    monkeypatch.chdir(plain)
+    rc, out, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
+    assert rc == 0 and calls == [] and "Jev" not in out          # unknown repo: fail closed
+
+
+def test_ask_never_runs_the_shadow(member_json, capsys, in_scope_checkout, monkeypatch):
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    settings, panels, client = review_world(member_json)
+    assert cli.main(["ask", "ship it?", "--panel", "code-review"], _settings=settings, _panels=panels, _client=client) == 0
+    assert calls == [] and "Jev" not in capsys.readouterr().out
+
+
+def test_the_ci_gate_path_never_calls_jev_even_with_a_key(member_json, monkeypatch, in_scope_checkout):
+    from council.review import run_pr_review
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    settings, panels, client = review_world(member_json)
+    body, blocking, unavailable = run_pr_review(DIFF, panels, client, chair_model="c")
+    assert (blocking, unavailable) == (1, False) and calls == [] and "Jev" not in body
+    import council.review as review_module
+    source = Path(review_module.__file__).read_text()
+    assert "jev" not in source.lower() and "signals" not in source

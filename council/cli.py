@@ -70,7 +70,36 @@ def _read_for_review(path_arg: str, cap: int) -> str:
     return "\n\n".join(parts)
 
 
-def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type="chat"):
+def _jev_shadow_section(review_text: str, path):
+    """Display-only Jev signals for `council review` (council/signals.py). Returns a
+    function for _run to call AFTER the chair has answered and the review is printed, so
+    nothing here can reach the panel, the chair or the review text. It never raises and
+    never changes the exit code: any failure means "no section", which is today's output."""
+    def section(results, syn) -> str:
+        try:
+            import os
+            from . import jev, signals
+            from .gate import risk_tier
+            from .render import render_jev_shadow
+            from .routing import changed_paths, split_diff_by_type
+            if not jev.shadow_enabled(os.environ):
+                return ""
+            repo = jev.scope_repo(os.getcwd(), path)
+            if repo is None:                       # out of scope, or a repo we cannot name
+                return ""
+            sys.stdout.flush()                     # the review is out before Jev is asked anything
+            # The gate's tier, computed as run_pr_review does (code slice of a diff). It only
+            # labels a linked finding as eligible or not; without a diff there is no label.
+            code_paths = changed_paths(split_diff_by_type(review_text)[0])
+            sig = signals.collect(repo, results, syn, environ=os.environ,
+                                  tier=risk_tier(code_paths) if code_paths else None)
+            return render_jev_shadow(sig) if sig is not None else ""
+        except Exception:  # noqa: BLE001 - shadow mode must never break a review
+            return ""
+    return section
+
+
+def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type="chat", shadow=None):
     if panel_name is None:
         panel_name = pick_panel(context, panels, client,
                                 router_model=settings.router_model,
@@ -91,6 +120,10 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
     render = render_markdown if fmt == "md" else render_terminal
     print(f"[panel: {panel_name} · rigor: {rigor}]\n")
     print(render(context[:120], syn, results, rigor=rigor))
+    if shadow is not None:                         # `review` only; display and log, nothing else
+        section = shadow(results, syn)
+        if section:
+            print("\n" + section)
     return 0
 
 
@@ -190,7 +223,8 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
                 panel_name = "spec-review"
             else:
                 panel_name = "code-review"
-        return _run(ctx, panel_name, settings, panels, client, args.rigor, args.format)
+        return _run(ctx, panel_name, settings, panels, client, args.rigor, args.format,
+                    shadow=_jev_shadow_section(text, args.path if explicit_path else None))
 
     if args.cmd == "compare":
         from .compare import run_compare
