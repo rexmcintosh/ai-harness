@@ -11,19 +11,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Owner data rule (2026-09-19): council text, code snippets and diffs may go to TypeSafe for
-# council work. Two things stay out. (1) Repos that hold student, customer, mail, tax or
-# finance data: the same words the watchdog shadow refuses (watchdog/jev_shadow.OUT_OF_SCOPE).
-# (2) Unpublished manuscripts, so every romance repo: the Jev assessment lists them as a
-# category that needs its own decision, and a council review of a chapter quotes the plot.
+# The data-scope rule (which repos may be sent to TypeSafe) lives once, in council/jev.py.
 # A saved review's id does not name its repo, so scope is decided from the backlog's
 # id -> repo map, and an id the map does not know is refused.
-OUT_OF_SCOPE = ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
-                "swimtrack-coach", "gmail", "mail")
-OUT_OF_SCOPE_REPOS = frozenset({
-    "sat-prep", "tax-advisor", "finance-tracker", "swimtrack-coach", "monthly-bidding", "nato-support",
-    "romance-empire", "romance-tessacross.com", "romance-elliecalloway.com", "flight-7-publishing",
-    "rmpeacockwriter.com"})
+from council.jev import OUT_OF_SCOPE, OUT_OF_SCOPE_REPOS, in_scope   # noqa: F401  (re-exported)
 
 _REC = re.compile(r"^### Recommendation \(confidence (\d+)/10\)\s*$", re.M)
 _SEAT = re.compile(r"^#### (?P<name>.+?) · (?P<model>\S+) — (?P<stance>\S+)\s*$", re.M)
@@ -61,13 +52,6 @@ class Review:
     seats: list[Seat] = field(default_factory=list)
     findings: list[SeatFinding] = field(default_factory=list)
     chair_blocks: list[dict] = field(default_factory=list)
-
-
-def in_scope(rid: str, repo: str | None) -> bool:
-    if not repo or repo in OUT_OF_SCOPE_REPOS:
-        return False
-    low = f"{rid} {repo}".lower()
-    return not any(word in low for word in OUT_OF_SCOPE)
 
 
 def _bullets(block: str) -> list[str]:

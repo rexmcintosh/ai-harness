@@ -722,9 +722,64 @@ def run_session(cfg: Config, prompt: str, *, cwd: str, env: dict, timeout: int) 
 # ----------------------------------------------------------------------------- council
 
 
-def council_review(cfg: Config, diff_text: str, *, item_id: str) -> dict:
+JEV_VERDICT_LABELS = ("approve", "approve_with_conditions", "request_changes")
+
+
+def _clean_jev_verdict(value: object) -> dict | None:
+    """Only a known label with a probability is ever saved or shown; anything else is dropped."""
+    verdict = value.get("verdict") if isinstance(value, dict) else None
+    if not isinstance(verdict, dict):
+        return None
+    label, confidence = verdict.get("label"), verdict.get("confidence")
+    if (label not in JEV_VERDICT_LABELS or isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1):
+        return None
+    return {"verdict": {"label": label, "confidence": round(float(confidence), 4)}}
+
+
+def _jev_shadow(repo: str | None, item_id: str, results, syn, diff_text: str, status: str) -> tuple[dict | None, str]:
+    """Display-only Jev signals for one finished review (council/signals.py): (record for
+    the inputs file, markdown section). Called AFTER the verdict below is fixed, so nothing
+    here can move `review_status`, `ok`, the summary or the conditions. It runs in THIS
+    process, never in the scrubbed worker session: the key comes from council.jev.load_key
+    (TYPESAFE_API_KEY, else ~/.env read as text). An unknown or out-of-scope repo or item
+    sends nothing. Never raises."""
+    try:
+        from council import signals
+        from council.gate import risk_tier
+        from council.render import render_jev_shadow
+        from council.routing import changed_paths, split_diff_by_type
+        code_paths = changed_paths(split_diff_by_type(diff_text)[0])
+        sig = signals.collect(repo, results, syn, environ=os.environ, name=item_id, panel="code-review",
+                              tier=risk_tier(code_paths) if code_paths else None)
+        if sig is None:
+            return None, ""
+        return _clean_jev_verdict({"verdict": sig.verdict}), render_jev_shadow(sig, chair_status=status)
+    except Exception:  # noqa: BLE001 - shadow mode must never break or change a review
+        return None, ""
+
+
+def _jev_repo_identity(repo_dir: str, declared: object) -> str | None:
+    """WHICH repository the work ran in, for the council's Jev scope rule, or None for "no
+    Jev call". A folder's name proves nothing: a private repo can sit in a folder that is
+    named like an allowed one. So the identity is git's own answer (council.jev.repo_name:
+    the main checkout's name, right inside a linked worktree and through a symlink), and it
+    must ALSO equal the backlog item's `repo` field. Any mismatch, or an identity that
+    cannot be resolved, means None. Never raises."""
+    try:
+        from council import jev as council_jev
+        identity = council_jev.repo_name(repo_dir)
+        wanted = declared.strip() if isinstance(declared, str) else None
+        return identity if identity and wanted and identity == wanted else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def council_review(cfg: Config, diff_text: str, *, item_id: str, repo: str | None = None) -> dict:
     """C3: the same code-review panel `council review --diff` runs, in-process. Returns
-    {ok, summary, markdown}. Never raises — a review failure is itself the verdict."""
+    {ok, summary, markdown}. Never raises — a review failure is itself the verdict.
+    `repo` is the reviewed repository's identity (see _jev_repo_identity); it only decides
+    whether the display-only Jev signals may run (no identity, no Jev)."""
     try:
         from council.config import load_panels, truncate
         from council.engine import run_panel
@@ -771,12 +826,22 @@ def council_review(cfg: Config, diff_text: str, *, item_id: str) -> dict:
             summary = "REVIEW FAILED: " + "; ".join(errors) + "; see review file"
         conditions = list(syn.required_changes or [])
         conditions += [f"{b.point}: {b.why}" for b in syn.blocking_findings]
-        return {"ok": not errors, "summary": summary, "markdown": md,
-                "review_status": status, "blocking_findings": list(dict.fromkeys(conditions)),
-                "review_notes": errors + (["Review input was truncated."] if ctx != full_ctx else [])
-                + (["Review panel was incomplete."] if not complete_panel else [])}
+        rev = {"ok": not errors, "summary": summary, "markdown": md,
+               "review_status": status, "blocking_findings": list(dict.fromkeys(conditions)),
+               "review_notes": errors + (["Review input was truncated."] if ctx != full_ctx else [])
+               + (["Review panel was incomplete."] if not complete_panel else [])}
+        # The verdict above is final. The Jev step only ADDS a display section and a label.
+        shadow, section = _jev_shadow(repo, item_id, results, syn, diff_text, status)
+        if section:
+            rev["markdown"] = md + "\n\n" + section + "\n"
+        if shadow:
+            rev["jev_shadow"] = shadow
+        return rev
     except Exception as e:  # noqa: BLE001 — the verdict IS the failure
         return {"ok": False, "summary": f"REVIEW FAILED: {type(e).__name__}: {str(e)[:300]}", "markdown": ""}
+
+
+council_review.accepts_repo = True   # work_one names the repo only to a reviewer that asks for it
 
 
 # ----------------------------------------------------------------------------- work
@@ -851,6 +916,9 @@ def _save_review(cfg: Config, *, iid: str, stem: str, sha: str, kind: str,
               "review_status": status, "blocking_findings": rev.get("blocking_findings", [] if rev.get("ok") is False else None),
               "required_validations": required, "validations": validations,
               "source_record": os.path.relpath(path, cfg.state_dir)}
+    shadow = _clean_jev_verdict(rev.get("jev_shadow"))
+    if shadow:   # display only: readiness.evaluate never reads this key
+        record["jev_shadow"] = shadow
     _write_json(Path(cfg.reviews_dir) / f"{stem}.inputs.json", record)
     derived = readiness.evaluate(record, branch_sha=sha, state_dir=cfg.state_dir)
     _write_json(Path(cfg.reviews_dir) / f"{stem}.readiness.json", derived)
@@ -913,6 +981,29 @@ def _readiness_lines(info: dict, *, indent: str = "") -> list[str]:
     if info.get("review_path"):
         lines.append(f"{indent}- full review: [{info['review_path']}]({info['review_path']})")
     return lines
+
+
+def _jev_verdict_lines(cfg: Config, info: dict, *, indent: str = "") -> list[str]:
+    """ONE display-only line: how Jev read the chair's verdict in the review that readiness
+    was derived from. It reads the saved inputs record itself, so `_review_readiness`, the
+    report JSON, the approve suggestion and `approve` never see it. Shown only for a known
+    label on the CURRENT branch commit, and hidden again by COUNCIL_JEV=0."""
+    try:
+        from council.jev import switched_off
+        rid, sha = info.get("record_id"), info.get("branch_sha")
+        if switched_off(os.environ) or not _valid_item_id(rid) or not sha:
+            return []
+        record = json.loads((Path(cfg.reviews_dir) / f"{rid}.inputs.json").read_text(encoding="utf-8"))
+        if record.get("record_id") != rid or str(record.get("branch_sha", "")).lower() != str(sha).lower():
+            return []
+        shadow = _clean_jev_verdict(record.get("jev_shadow"))
+        if not shadow:
+            return []
+        verdict = shadow["verdict"]
+        return [f"{indent}- Jev reads the chair's verdict as: {verdict['label']} "
+                f"({verdict['confidence']:.2f}) [shadow, display only]"]
+    except Exception:  # noqa: BLE001 - a display line must never break a report
+        return []
 
 
 def journal(cfg: Config, repo: str, branch: str, sha: str, action: str) -> None:
@@ -1082,7 +1173,11 @@ def work_one(cfg: Config, p: Planned, *, reviewer=None, log=print, continuation:
             else:
                 log("  council review ...")
                 try:
-                    rev = reviewer(cfg, review_input, item_id=iid)
+                    # The repo's identity lets the council decide whether its display-only Jev
+                    # step may run. Injected reviewers keep their (cfg, diff, item_id) contract.
+                    extra = ({"repo": _jev_repo_identity(p.repo, item.get("repo"))}
+                             if getattr(reviewer, "accepts_repo", False) else {})
+                    rev = reviewer(cfg, review_input, item_id=iid, **extra)
                     if not isinstance(rev, dict):
                         raise ValueError("reviewer did not return an object")
                 except Exception as exc:  # a failed reviewer still leaves a reviewable branch
@@ -1389,6 +1484,7 @@ def write_report(cfg: Config) -> str:
         info = _review_readiness(cfg, it)
         review_metadata[it["id"]] = info
         lines.extend(_readiness_lines(info))
+        lines.extend(_jev_verdict_lines(cfg, info))
         if it.get("note"):
             lines.append(f"- note: {it['note']}")
         if it.get("council"):
@@ -1411,6 +1507,7 @@ def write_report(cfg: Config) -> str:
                 info = _review_readiness(cfg, it)
                 review_metadata[it["id"]] = info
                 lines.extend(_readiness_lines(info, indent="  "))
+                lines.extend(_jev_verdict_lines(cfg, info, indent="  "))
             if it.get("note"):
                 lines.append(f"  - {it['note']}")
         lines.append("")
@@ -1469,7 +1566,7 @@ def cmd_show(args, cfg: Config) -> int:
     print(f"diff: {_diff_stat(cfg, it)}")
     print("\n--- prompt ---\n" + str(it.get("prompt") or "").rstrip())
     info = _review_readiness(cfg, it)
-    print("\n" + "\n".join(_readiness_lines(info)))
+    print("\n" + "\n".join(_readiness_lines(info) + _jev_verdict_lines(cfg, info)))
     rev = info.get("review_path")
     if rev and os.path.exists(rev):
         print("\n--- council review ---")

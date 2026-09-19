@@ -26,6 +26,18 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "jev-usage.jsonl"))
 
 
+@pytest.fixture(autouse=True)
+def _no_live_council_jev(tmp_path, monkeypatch):
+    """The council's Jev shadow signals run in `council review`, `council sweep` and
+    backlog-run's council step whenever a key exists, and this machine has one. They go
+    through the shared client, so JEV_DISABLED above already stops every call. On top of
+    that the council's own switch is off and its shadow log is a temp file, so no test writes
+    ~/.local/state/council/. A test of the wiring deletes JEV_DISABLED, sets COUNCIL_JEV=1
+    and replaces jev.client.http_post with a fake (tests/test_council_jev_shadow.py)."""
+    monkeypatch.setenv("COUNCIL_JEV", "0")
+    monkeypatch.setenv("COUNCIL_JEV_LOG", str(tmp_path / "council-jev-shadow.jsonl"))
+
+
 class FakeClient:
     """Stand-in for VeniceClient. Scripted responses keyed by model name,
     or a single default. Records calls for assertions."""

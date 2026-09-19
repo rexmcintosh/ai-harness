@@ -10,17 +10,15 @@ import itertools
 import re
 from dataclasses import dataclass
 
+from council import signals
+from council.signals import VERDICTS, clip as _clip   # noqa: F401  (re-exported)
+
 from . import jev
 from .reviews import Review, SeatFinding
 
-VERDICTS = {
-    "approve": "The chair says to merge now. Anything else it lists is optional, follow-up work, "
-               "or explicitly not a blocker.",
-    "approve_with_conditions": "The chair approves, but names specific fixes that should be made "
-                               "before the merge or before the change is relied on.",
-    "request_changes": "The chair does not approve the change as it stands. It asks for rework, or says "
-                       "to hold, not merge, or not run it until named problems are fixed.",
-}
+# The three questions that tested well (verdict, duplicate pair, block link) are wired into
+# the council in shadow mode, so their validated wording lives once, in council/signals.py.
+# The experiments that did not graduate keep their wording here.
 
 FINDING_KINDS = {
     "concrete_defect": "Names a specific place in the code and a specific wrong behavior that happens "
@@ -47,18 +45,9 @@ class Request:
     questions: dict
 
 
-def _clip(text: str, n: int = 320) -> str:
-    text = " ".join(str(text).split())
-    return text if len(text) <= n else text[: n - 1] + "…"
-
-
 # ── builders ─────────────────────────────────────────────────────────────────────────────
 def verdict_request(r: Review) -> Request:
-    return Request(r.rid, {"recommendation": r.recommendation}, {
-        "verdict": {"type": "choice", "criteria": VERDICTS,
-                    "instructions": "This is the chair's written recommendation at the end of a code review. "
-                                    "What is the chair's verdict on merging the change?"},
-    })
+    return Request(r.rid, *signals.verdict_request(r.recommendation))
 
 
 def finding_request(rid: str, f: SeatFinding) -> Request:
@@ -74,13 +63,8 @@ def finding_request(rid: str, f: SeatFinding) -> Request:
 
 
 def link_request(rid: str, block: dict, findings: list[SeatFinding]) -> Request:
-    options = {f.fid: _clip(f.text) for f in findings}
-    options["none"] = "The chair's blocking problem is about something none of the listed findings raised."
-    return Request(rid, {"block": {"point": block.get("point", ""), "why": _clip(block.get("why", ""), 600)}}, {
-        "source": {"type": "choice", "criteria": options,
-                   "instructions": "A review chair confirmed the blocking problem in `block`. Which one of the "
-                                   "panel findings in the options reports that same problem? Choose none when "
-                                   "no listed finding raised it."}})
+    return Request(rid, *signals.link_request(block.get("point", ""), block.get("why", ""),
+                                              {f.fid: f.text for f in findings}))
 
 
 def cross_seat_pairs(r: Review):
@@ -88,14 +72,7 @@ def cross_seat_pairs(r: Review):
 
 
 def duplicate_request(rid: str, a: SeatFinding, b: SeatFinding) -> Request:
-    return Request(f"{rid}#{a.fid}~{b.fid}", {"a": a.text, "b": b.text}, {
-        "same": {"type": "noul",
-                 "instructions": "Two reviewers wrote findings `a` and `b` about the same code change. "
-                                 "Do they report the same underlying problem?",
-                 "criteria": {"true": "Both point at the same defect or gap, even in different words or "
-                                      "citing different lines of the same code.",
-                              "false": "They are about different problems, even if they concern the same "
-                                       "file or feature."}}})
+    return Request(f"{rid}#{a.fid}~{b.fid}", *signals.duplicate_request(a.text, b.text))
 
 
 def router_request(rid: str, head: str, panels: dict[str, str]) -> Request:

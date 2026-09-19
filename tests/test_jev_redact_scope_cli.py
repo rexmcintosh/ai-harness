@@ -54,6 +54,17 @@ def test_the_scope_note_says_what_the_owner_allowed_and_when():
     assert "manuscript" in scope.ALLOWED_NOTE.lower() and "2026-09-19" in scope.ALLOWED_NOTE
 
 
+def test_the_scope_note_records_the_council_decision_and_its_limit():
+    # The council shadow signals send panel findings, chair text, code snippets and diffs.
+    # Without this sentence a later reader would conclude they break the scope rule.
+    note = " ".join(scope.ALLOWED_NOTE.lower().split())
+    assert "council work" in note and "code snippets and diffs" in note
+    assert "panel findings" in note and "chair text" in note
+    assert "not-allowed list below is unchanged" in note
+    for still_out in ("personal email", "private wiki", "student data", "customer data", "tax records"):
+        assert still_out in note, still_out
+
+
 # --- scope: which repositories' work may be described to Jev -----------------
 
 FIVE = {"ai-harness", "swimtrack", "swimtrack-website", "ultimate-portugal", "aris-management-website"}
