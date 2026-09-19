@@ -78,7 +78,9 @@ by `council.gate`, not by any single panelist:
   longer fails the build. A raw panelist finding can no longer gate on its own.
 - **Blast-radius tiered.** `risk_tier` puts production source on the `full` bar
   (`critical`, or `high` ≥ 8) and developer tooling (`tools/`, `scripts/`, configs) on a
-  `reduced` bar (confident `critical` only). High-risk segments (auth/payment/…) force `full`.
+  `reduced` bar (`critical` or `high`, each only at confidence ≥ 8). The bar decides what is
+  *eligible*; the chair still has to confirm it against the code. High-risk segments
+  (auth/payment/…) force `full`. Decision record: `docs/council-gate-policy-2026-09-18.md`.
 - **Deterministic + fail-closed.** The shim runs the gate at temperature 0. A genuine
   chair/panel outage still fails closed; `COUNCIL_ENFORCE=0` makes findings advisory.
 

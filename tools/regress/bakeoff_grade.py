@@ -13,7 +13,8 @@ Two deliberate departures from the design, both forced by facts it did not check
    developer tooling, so `risk_tier` is "reduced", the tier bar is
    `critical` + c>=8, no panel finding in either is `critical`, and the gate
    returns 0 whatever the chair decides. Grading on the gate count would score
-   those two cells identically for every candidate.
+   those two cells identically for every candidate. (The gate as of 2026-09-12;
+   see docs/council-gate-policy-2026-09-18.md for the later reduced bar.)
 2. Case C's Axis 1 target is the chair's blocking list, not
    `review_status == "changes_requested"`. `REVIEW_SYNTH_OUTPUT` — the gate's
    chair prompt — never asks for `review_status`; only backlog-run's prompt

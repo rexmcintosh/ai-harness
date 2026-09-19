@@ -46,10 +46,15 @@ def test_full_tier_candidate_bar():
     assert is_candidate("med", 10, tier="full") is False           # med never
 
 
-def test_reduced_tier_only_confident_critical_is_candidate():
+def test_reduced_tier_candidate_bar():
+    # Owner policy 2026-09 (gate decision option b): a confident high is ELIGIBLE on dev
+    # tooling too; the chair still has to confirm it. Everything else is unchanged.
     assert is_candidate("critical", 8, tier="reduced") is True
-    assert is_candidate("high", 9, tier="reduced") is False        # highs don't gate dev tooling
-    assert is_candidate("critical", 5, tier="reduced") is False
+    assert is_candidate("high", 9, tier="reduced") is True
+    assert is_candidate("high", 8, tier="reduced") is True
+    assert is_candidate("high", 7, tier="reduced") is False        # a hedged high stays advisory
+    assert is_candidate("critical", 5, tier="reduced") is False    # reduced critical floor kept at 8
+    assert is_candidate("med", 10, tier="reduced") is False
 
 
 def test_candidate_findings_skips_errored_members():
@@ -93,6 +98,42 @@ def test_single_lens_high_does_not_auto_block(member_json=None):
     assert decide_blocking(_results_with("high", 8), _syn(blocks=()), tier="full") == 0
 
 
-def test_reduced_tier_high_never_blocks_even_if_chair_lists_it():
-    # dev-tooling change: a high c9 isn't a candidate, so it can't block (PR #11).
-    assert decide_blocking(_results_with("high", 9), _syn(blocks=[("p", "high", "x")]), tier="reduced") == 0
+def test_reduced_tier_confident_high_blocks_once_the_chair_confirms_it():
+    # baw-pr11: a real high c9 (comment ownership) on a tooling-only change, confirmed by
+    # the chair 3/3, used to return 0 because no panel finding was `critical`.
+    assert decide_blocking(_results_with("high", 9), _syn(blocks=[("p", "high", "verified")]), tier="reduced") == 1
+
+
+def test_reduced_tier_high_the_chair_refuted_does_not_block():
+    # stw-pr11 (the Node-compat false alarm): eligible now, but grounding still drops it.
+    assert decide_blocking(_results_with("high", 9), _syn(blocks=()), tier="reduced") == 0
+
+
+def test_reduced_tier_low_confidence_high_never_blocks_even_if_chair_lists_it():
+    assert decide_blocking(_results_with("high", 7), _syn(blocks=[("p", "high", "x")]), tier="reduced") == 0
+
+
+def test_reduced_tier_low_confidence_critical_still_cannot_block():
+    assert decide_blocking(_results_with("critical", 7), _syn(blocks=[("p", "critical", "x")]), tier="reduced") == 0
+
+
+# ── KNOWN GAP, pinned on purpose: confirmed blocks are not tied to panel findings ────────
+# docs/council-gate-policy-2026-09-18.md ("Separate gap"). Until the provenance branch
+# lands, the gate asks only "is there ANY eligible panel finding?" and then counts every
+# block the chair lists. These two tests document that behaviour so it cannot drift
+# silently; the provenance change is expected to flip both to the stricter count.
+def test_known_gap_an_unrelated_chair_block_counts_once_any_reduced_tier_high_is_eligible():
+    panel = _results_with("high", 9)                       # eligible: "p"
+    syn = _syn(blocks=[("something the panel never raised", "high", "chair's own idea")])
+    assert decide_blocking(panel, syn, tier="reduced") == 1
+
+
+def test_known_gap_a_multi_high_panel_counts_whatever_the_chair_lists():
+    panel = [MemberResult("Adversary", "grok", "oppose", "h",
+                          findings=[Finding("real defect", "high", 9), Finding("hedged worry", "high", 7)])]
+    # The chair confirms the INELIGIBLE c7 finding and an extra one; both count today
+    # because the eligible c9 finding opens the gate for the whole list.
+    syn = _syn(blocks=[("hedged worry", "high", "x"), ("unrelated", "high", "y")])
+    assert decide_blocking(panel, syn, tier="reduced") == 2
+    assert decide_blocking(panel, syn, tier="full") == 2   # the same gap already exists on the full tier
+

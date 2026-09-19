@@ -5,7 +5,7 @@ The v0.2.0 gate was a single-lens OR over raw panelist findings — any one seat
 verified against the code (audit F1/F2/F4/F6). This module replaces that with:
 
   1. severity normalization        — "High"/"blocker" no longer slip the gate (F6)
-  2. blast-radius tier             — dev tooling gates only on confident criticals (F6)
+  2. blast-radius tier             — dev tooling gates only on confident (c>=8) criticals/highs (F6)
   3. tier-aware candidate bar      — the panel must find something serious enough
   4. chair-arbitrated grounding    — only findings the chair confirms (given full
                                      file context) count; it can drop false
@@ -83,10 +83,12 @@ def risk_tier(paths) -> str:
 def is_candidate(severity: str, confidence: int, *, tier: str) -> bool:
     """Does this finding clear the bar to be *eligible* to block, before grounding?
     full:    critical (any confidence) or high with confidence >= 8.
-    reduced: only a confident critical (>= 8) — dev tooling shouldn't gate on robustness highs."""
+    reduced: critical or high, each with confidence >= 8. Dev tooling still never gates on
+             a hedged finding, but a confident high is eligible (owner policy 2026-09,
+             option b): the chair's grounding, not the tier, drops robustness false alarms."""
     sev = normalize_severity(severity)
     if tier == "reduced":
-        return sev == "critical" and confidence >= 8
+        return sev in ("critical", "high") and confidence >= 8
     return sev == "critical" or (sev == "high" and confidence >= 8)
 
 
