@@ -25,8 +25,13 @@ def record(project: str, task: str, model: str, *, ok: bool, input_tokens: int =
         path.parent.mkdir(parents=True, exist_ok=True)
         row = {"ts": int(time.time()), "project": project, "task": task, "model": model, "ok": ok,
                "input_tokens": input_tokens, "cost_usd": round(cost_usd, 8), "seconds": round(seconds, 3)}
-        with open(path, "a") as handle:
-            handle.write(json.dumps(row) + "\n")
+        # O_APPEND and ONE write() per row: small appends are atomic, so two processes writing
+        # at once cannot interleave their lines.
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        try:
+            os.write(fd, (json.dumps(row) + "\n").encode())
+        finally:
+            os.close(fd)
     except Exception:  # noqa: BLE001
         pass
 

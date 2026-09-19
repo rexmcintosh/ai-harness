@@ -228,3 +228,26 @@ def test_usage_summary_groups_by_project_and_task(tmp_path):
 def test_project_and_task_are_required_so_the_ledger_is_never_anonymous(live):
     with pytest.raises(TypeError):
         jev.ask("s", {"q": jev.noul("?")}, transport=lambda *a: reply())
+
+
+# --- council review 2026-09-19 ----------------------------------------------
+
+def test_the_key_is_scrubbed_from_every_error_path_including_exhausted_retries(live, monkeypatch):
+    monkeypatch.setattr(client.time, "sleep", lambda s: None)
+    def leaky(req, key, timeout):
+        raise client.TransientError(f"HTTP 529 echoing Bearer {key}")
+    with pytest.raises(jev.JevError) as err:
+        jev.ask("s", {"q": jev.noul("?")}, project="t", task="unit", transport=leaky, retries=1)
+    assert "test-key" not in str(err.value) and "529" in str(err.value)
+    out = jev.ask_many([{"id": 1, "state": "s"}], {"q": jev.noul("?")}, project="t", task="unit", transport=leaky, retries=0)
+    assert "test-key" not in out[0]["error"]
+
+
+def test_a_ledger_row_is_one_single_append_write(live, monkeypatch):
+    # O_APPEND plus one write() per row is what keeps two processes from interleaving lines.
+    writes = []
+    real = usage.os.write
+    monkeypatch.setattr(usage.os, "write", lambda fd, data: writes.append(data) or real(fd, data))
+    monkeypatch.setenv("JEV_USAGE_LOG", str(live / "u.jsonl"))
+    usage.record("p", "t", "m", ok=True, input_tokens=5)
+    assert len(writes) == 1 and writes[0].endswith(b"\n") and json.loads(writes[0])["project"] == "p"

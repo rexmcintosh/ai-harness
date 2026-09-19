@@ -134,3 +134,14 @@ def test_cli_usage_prints_a_table_from_the_ledger(live, monkeypatch, tmp_path):
 def test_cli_never_prints_the_key(live):
     code, out, err = run_cli(["doctor"])
     assert "test-key" not in out + err
+
+
+def test_cli_turns_any_unexpected_fault_into_one_json_error_line(live, monkeypatch, tmp_path):
+    qfile = tmp_path / "q.json"
+    qfile.write_text(json.dumps({"keep": jev.noul("?")}))
+    def boom(*a, **k):
+        raise MemoryError("anything at all, with test-key inside")
+    monkeypatch.setattr(client, "ask_many", boom)
+    code, out, err = run_cli(["batch", "--project", "up", "--task", "p", "--questions", str(qfile)],
+                             json.dumps({"id": 1, "state": "s"}) + "\n")
+    assert code == 1 and "error" in json.loads(out) and "Traceback" not in err and "test-key" not in out

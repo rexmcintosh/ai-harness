@@ -121,6 +121,11 @@ def http_post(req: dict, key: str, timeout: float) -> dict:
 
 # --- ask ---------------------------------------------------------------------
 
+def _scrub(text: str, key: str | None) -> str:
+    """Every error leaves through here: a transport or an upstream body may echo the key."""
+    return (text.replace(key, "<key>") if key else text)[:300]
+
+
 def ask(state, questions: dict, *, project: str, task: str, model: str | None = None,
         key: str | None = None, timeout: float = TIMEOUT_SECONDS, retries: int = 3,
         transport=None) -> dict:
@@ -154,12 +159,10 @@ def ask(state, questions: dict, *, project: str, task: str, model: str | None = 
         result = {"answers": answers, "input_tokens": tokens,
                   "cost_usd": tokens * PRICE_PER_MTOK_USD / 1e6,
                   "seconds": round(time.perf_counter() - started, 3), "model": model}
-    except JevError:
-        usage.record(project, task, model, ok=False, seconds=time.perf_counter() - started)
-        raise
     except Exception as err:  # noqa: BLE001 - one error type out, and never the key in it
         usage.record(project, task, model, ok=False, seconds=time.perf_counter() - started)
-        raise JevError(f"Jev call failed: {type(err).__name__}: {str(err).replace(key, '<key>')[:200]}") from None
+        text = str(err) if isinstance(err, JevError) else f"Jev call failed: {type(err).__name__}: {err}"
+        raise type(err)(_scrub(text, key)) if isinstance(err, JevError) else JevError(_scrub(text, key)) from None
     usage.record(project, task, model, ok=True, input_tokens=tokens,
                  cost_usd=result["cost_usd"], seconds=result["seconds"])
     return result

@@ -45,11 +45,14 @@ def _batch(args, stdin, stdout) -> int:
             items.append(item)
         except Exception as err:  # noqa: BLE001
             items.append({"id": None, "_bad": f"line {n + 1}: {type(err).__name__}: {str(err)[:120]}"})
-    good = [i for i in items if "_bad" not in i]
-    answers = iter(client.ask_many(good, lambda item: item.get("questions") or shared,
-                                   project=args.project, task=args.task, model=args.model, workers=args.workers))
-    for item in items:                     # one output line per input line, in order
-        _emit(stdout, {"id": None, "error": item["_bad"]} if "_bad" in item else next(answers))
+    good = [(n, i) for n, i in enumerate(items) if "_bad" not in i]
+    answers = client.ask_many([i for _, i in good], lambda item: item.get("questions") or shared,
+                              project=args.project, task=args.task, model=args.model, workers=args.workers)
+    if len(answers) != len(good):
+        raise RuntimeError(f"asked {len(good)} items, got {len(answers)} answers")
+    by_line = {n: answer for (n, _), answer in zip(good, answers)}
+    for n, item in enumerate(items):       # one output line per input line, in order
+        _emit(stdout, by_line[n] if n in by_line else {"id": None, "error": item["_bad"]})
     return 0
 
 
@@ -89,13 +92,19 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     sub.add_parser("usage").add_argument("--days", type=int, default=0)
     sub.add_parser("doctor")
     args = parser.parse_args(argv)
-    if args.cmd == "ask":
-        return _ask(args, stdin, stdout)
-    if args.cmd == "batch":
-        return _batch(args, stdin, stdout)
-    if args.cmd == "usage":
-        return _usage(args, stdout)
-    return _doctor(stdout)
+    try:
+        if args.cmd == "ask":
+            return _ask(args, stdin, stdout)
+        if args.cmd == "batch":
+            return _batch(args, stdin, stdout)
+        if args.cmd == "usage":
+            return _usage(args, stdout)
+        return _doctor(stdout)
+    except BaseException as err:  # noqa: BLE001 - the contract is one JSON line, never a traceback
+        if isinstance(err, (KeyboardInterrupt, SystemExit)):
+            raise
+        _emit(stdout, {"error": client._scrub(f"{type(err).__name__}: {err}", client.load_key())})
+        return 1
 
 
 if __name__ == "__main__":
