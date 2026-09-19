@@ -84,21 +84,43 @@ TS="$(date -Iseconds)"
 # NOTE: headless MCP tool calls require --dangerously-skip-permissions; --allowedTools
 # alone does not authorize them non-interactively. --allowedTools is kept to signal intent
 # and narrow the surface. This box is Rex's own VPS and the prompt is fixed/benign.
-OUT=$("$CLAUDE_BIN" -p "$PROMPT" \
-  --model "$MODEL" \
-  --allowedTools "${ALLOWED[@]}" \
-  --dangerously-skip-permissions \
-  --output-format json 2>>"$LOG.err")
-RC=$?
 
-RESULT=$(printf '%s' "$OUT" | python3 -c "import json,sys
+# --- compose, with ONE retry ------------------------------------------------------
+# The claude.ai Gmail/Calendar connectors are listed by name at session start, but on a
+# slow start they are not callable for the first 30-45s. The agent looks them up ~10
+# times, gives up and answers FAILED (2026-08-26 18:00, 2026-09-18 18:00; the 08-22
+# 07:00 run got through on its 11th lookup). A fresh process a little later connects
+# normally, and state.json has not advanced, so the retry covers the same window.
+# Exactly one retry: a real outage must still reach the failure ping below.
+MAX_ATTEMPTS="${BEBOP_MAX_ATTEMPTS:-2}"
+RETRY_DELAY="${BEBOP_RETRY_DELAY:-90}"
+ATTEMPT=0
+while :; do
+  ATTEMPT=$((ATTEMPT+1))
+  OUT=$("$CLAUDE_BIN" -p "$PROMPT" \
+    --model "$MODEL" \
+    --allowedTools "${ALLOWED[@]}" \
+    --dangerously-skip-permissions \
+    --output-format json 2>>"$LOG.err")
+  RC=$?
+
+  RESULT=$(printf '%s' "$OUT" | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('result','').strip())
 except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null)
-USAGE=$(printf '%s' "$OUT" | python3 -c "import json,sys
+  USAGE=$(printf '%s' "$OUT" | python3 -c "import json,sys
 try:
  d=json.load(sys.stdin); u=d.get('usage',{})
  print('cost_usd=%s in=%s out=%s'%(d.get('total_cost_usd','?'),u.get('input_tokens','?'),u.get('output_tokens','?')))
 except: print('usage=?')" 2>/dev/null)
+
+  if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -qE '^(FAILED|PARSE_ERROR)'; then
+    break                                   # composed a briefing
+  fi
+  [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ] && break
+  echo "attempt $ATTEMPT failed (rc=$RC): $(printf '%s' "$RESULT" | head -c 120 | tr '\n' ' ') - retrying in ${RETRY_DELAY}s" >&2
+  sleep "$RETRY_DELAY"
+done
+[ "$ATTEMPT" -gt 1 ] && USAGE="$USAGE attempts=$ATTEMPT"
 
 # --- send: agent output IS the briefing text (or FAILED:<reason>) ---
 # Success contract for the log stays `rc=0 ... result="SENT..."` — the watchdog's

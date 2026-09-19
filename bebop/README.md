@@ -26,7 +26,8 @@ cron (07:00 + 18:00 Lisbon)
        │     ├─ Gmail  search_threads (important only, since delta)
        │     ├─ Calendar list_events (today / tomorrow)
        │     └─ Telegram reply → sends digest to Rex (chat 7735693897)
-       ├─ logs token cost to logs/runs.log
+       ├─ if the agent answers FAILED (or crashes): wait 90s, run it ONE more time
+       ├─ logs token cost to logs/runs.log (`attempts=2` marks a run that needed the retry)
        └─ advances state.json ONLY on success (failed run never skips email)
 ```
 
@@ -77,3 +78,17 @@ CRON_TZ=Europe/Lisbon
 3. **Tends the knowledge base** — route worth-keeping items into the RexBrain wiki (`~/wiki/`) + memory.
 4. **Takes actions** — draft replies / schedule / update Notion, gated by approve-via-Telegram.
    (Needs a persistent Telegram listener for true two-way — a follow-up to the send-only briefing.)
+
+## Slow connector start and the single retry
+
+The claude.ai Gmail and Calendar connectors are listed by name when the headless session
+starts, but on a slow start they cannot be called for the first 30 to 45 seconds. The
+agent looks the tools up about ten times, gives up, and answers `FAILED: ... tools
+unavailable` (2026-08-26 18:00 and 2026-09-18 18:00; the 2026-08-22 07:00 run got through
+on its 11th lookup). Nothing was wrong with the accounts or the connection.
+
+`run-briefing.sh` therefore runs the agent again once, after `BEBOP_RETRY_DELAY` seconds
+(default 90), when the first answer is `FAILED`, a parse error, empty, or a non-zero exit.
+`state.json` has not advanced, so the retry covers the same email window. A second
+failure sends the usual failure ping. `BEBOP_MAX_ATTEMPTS=1` turns the retry off.
+Tests: `tests/test_bebop_runner.py` (fake `claude` and `tg-send`, temp state and logs).
