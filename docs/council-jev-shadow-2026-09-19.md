@@ -80,11 +80,18 @@ manuscripts). The word list is the shared one, `OUT_OF_SCOPE` in `jev/scope.py`.
 repository names, `OUT_OF_SCOPE_REPOS`, is in `council/jev.py`. Each exists once, and the
 offline harness imports both from `council/jev.py`.
 
-One point needs the owner's eye. The note in `jev/scope.py` records a decision of the same
-day that unpublished manuscript prose may be sent. The rule given for council work keeps the
-romance repositories out. The council follows the stricter rule. If the owner wants council
-reviews of those repositories to get the signals too, remove their names from
-`OUT_OF_SCOPE_REPOS`; nothing else needs to change.
+The shared scope record, `ALLOWED_NOTE` in `jev/scope.py`, now states the council decision in
+one sentence: for council work only, Jev may receive the council's own words (panel
+findings, chair text) and code snippets and diffs. The not-allowed list there is unchanged:
+personal email, the private wiki, children's or student data, customer data, financial and
+tax records. Repositories that hold such data stay out of the council signals.
+
+The romance (manuscript) repositories are kept OUT of the council signals by this change,
+even though `jev/scope.py` records unpublished manuscript prose as allowed since 2026-09-19.
+The council decision was given separately from the manuscript decision and did not name
+those repositories, so the stricter reading was kept. If the owner wants council reviews of
+those repositories to get the signals too, it is a one-line change: remove their names from
+`OUT_OF_SCOPE_REPOS` in `council/jev.py`.
 
 How the repository is decided:
 

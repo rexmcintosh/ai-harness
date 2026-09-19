@@ -7,7 +7,10 @@ from __future__ import annotations
 ALLOWED_NOTE = (
     "Owner decisions. 2026-09-18: public and operations data (public news, public social posts, "
     "marketing copy, public listings, synthetic questions, operations logs). 2026-09-19: unpublished "
-    "manuscript prose is also allowed. NOT allowed: personal email, the private wiki, children's or "
+    "manuscript prose is also allowed. 2026-09-19, for council work only: Jev may also receive the "
+    "council's own words (panel findings, chair text) and code snippets and diffs; the NOT-allowed "
+    "list below is unchanged, and repos that hold such data stay out of the council signals. "
+    "NOT allowed: personal email, the private wiki, children's or "
     "student data, customer data, financial and tax records."
 )
 
