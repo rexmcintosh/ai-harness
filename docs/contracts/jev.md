@@ -87,4 +87,5 @@ One JSON line out per request, in order. A failure is `{"error": "..."}` (exit 1
 |---|---|---|
 | `watchdog/jev_shadow.py` | second opinion beside the cron-log regex, log only | live since 2026-09-19, shadow |
 | `ultimate-portugal/scripts/prefilter-stories.mjs` | gate before the Opus judge, line 0.1 | live since 2026-09-19; still has its own fetch, moves to `jev batch` next |
-| `tools/jev_council/` (branch `claude/jev-council-offline-test`) | offline council experiments | imports the names `watchdog/jev_shadow.py` keeps for it; should move to `import jev` |
+| `backlogrun/gate.py` | hold-only gate before a night-runner session, line 0.7, own model pin | live once merged and reinstalled (2026-09-19) |
+| `tools/jev_council/` | offline council experiments | on main; imports the names `watchdog/jev_shadow.py` keeps for it; should move to `import jev` |
