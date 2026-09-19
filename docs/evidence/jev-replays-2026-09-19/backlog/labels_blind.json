@@ -1,0 +1,1262 @@
+{
+ "made_by": "Claude Opus 5, from title+repo+prompt only, before any Jev call on these questions",
+ "date": "2026-09-19",
+ "labels": {
+  "2026-07-20-shots-dir-retention-prune": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-07-20-shot-transfer-logic-dedupe": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-07-20-reels-poll-queue-lost-update": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-20-reels-legacy-state-records-no-status": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-21-telegram-token-consolidate": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-07-21-hermes-provider-revokes": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-07-23-personal-layer-bakeoff": {
+   "A_outward": true,
+   "A_conf": 0.8,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-23-wiki-retirement-pass": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "low",
+   "C_conf": 0.6
+  },
+  "2026-07-23-freestyle-backmatter-and-builds": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-07-23-freestyle-storefront-books": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-07-23-freestyle-anchor-site-match": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.75
+  },
+  "2026-07-23-swimtrack-bento-email-hook-deploy": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": true,
+   "B_conf": 0.6,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-23-freestyle-reader-magnet": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-23-freestyle-swim-mark-format": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.85
+  },
+  "2026-07-23-tessacross-www-redirect": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-07-23-venice-review-fleet-pass": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-25-first-snow-timeline-advisory-recall": {
+   "A_outward": true,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-26-elliecalloway-preorder-status-flips": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-07-27-time-standards-season-refresh": {
+   "A_outward": true,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-07-27-dsv-discrepancy-decision": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-07-27-flight7-workers-builds-preview-urls": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-27-splashme-json-api-access": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.65
+  },
+  "2026-07-29-resume-spanish-point-series-interview": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-29-spanish-point-primary-source-verification": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.4
+  },
+  "2026-07-29-generalize-research-sweep": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-29-bento-contact-automation": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-07-29-aris-turnstile-contact-form": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-29-claude-visibility-aris-mailbox": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-07-29-meettrack-live-rehearsal": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-07-29-lessons-14-15-pipeline-enforcement": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-29-heron-creek-catalogue-detell": {
+   "A_outward": false,
+   "A_conf": 0.5,
+   "B_selfcontained": false,
+   "B_conf": 0.6,
+   "C_onepass": "low",
+   "C_conf": 0.6
+  },
+  "2026-07-29-still-waters-fresh-arc": {
+   "A_outward": true,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.75,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-08-03-swimtrack-newsletter-from-blueprint": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-08-03-portugal-property-guide": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-03-bless-evergreen-backlog": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-08-03-harden-backlog-cli-contract": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-08-05-fpn-worldaquatics-scrapers": {
+   "A_outward": false,
+   "A_conf": 0.75,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-08-05-n8n-branch-on-type": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.6,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-08-16-shared-data-hardening": {
+   "A_outward": false,
+   "A_conf": 0.75,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-08-16-flash-reminders-decision": {
+   "A_outward": false,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.85
+  },
+  "2026-08-16-math-content-polish": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-16-swimtrack-coach-keepalive": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-08-16-swimtrack-prod-db-backup": {
+   "A_outward": true,
+   "A_conf": 0.5,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.6
+  },
+  "2026-08-25-wiki-life-first-effect-audit": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-26-termius-api-bridge-decision": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.75
+  },
+  "2026-08-29-false-start-finn-epistemic-fix": {
+   "A_outward": false,
+   "A_conf": 0.75,
+   "B_selfcontained": false,
+   "B_conf": 0.6,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-30-pt-2025-substitute-verify": {
+   "A_outward": false,
+   "A_conf": 0.55,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-08-30-nhr-activity-code-review": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-08-30-crypto-pt-substantiation": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-09-02-seo-loop-parked-minors": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-09-02-vocab-in-digest-and-parent-dashboard": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-09-03-stripe-live-cutover": {
+   "A_outward": true,
+   "A_conf": 0.99,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.97
+  },
+  "2026-09-03-clarity-bench-sense-dispositions": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.6,
+   "C_onepass": "low",
+   "C_conf": 0.65
+  },
+  "2026-09-03-feedback-alert-reply-channel": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-04-gmail-connector-engine-mail": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-09-05-affiliate-first-program-wire-in": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-05-affiliate-broaden-surface-decision": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.65
+  },
+  "2026-09-05-checkdraft-homepage-ban-escape-hatch": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-09-05-codex-helper-sandbox-broken-vps": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-09-06-swimtrack-regional-calendar-source": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-09-06-swimtrack-newsletter-via-bento": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-06-swimtrack-auth-email-smtp": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-06-swimtrack-social-media-considerations": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.55,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-09-09-seed-ad-day14-checkpoint": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.7
+  },
+  "2026-09-09-rotate-lwa-client-secret": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-11-us-2025-return-open-asks": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-11-crypto-8949-box-reconciliation": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-09-11-feie-vs-nhr-cpa-question": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-09-11-us-2025-file-return": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": false,
+   "B_conf": 0.9,
+   "C_onepass": "low",
+   "C_conf": 0.97
+  },
+  "2026-09-12-council-chair-model-decision": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-09-12-persona-blind-reader-choice": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": false,
+   "B_conf": 0.95,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-12-refresh-repair-patch-decision": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-09-12-refresh-bounded-iteration": {
+   "A_outward": false,
+   "A_conf": 0.65,
+   "B_selfcontained": true,
+   "B_conf": 0.6,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-09-12-refresh-a6-investigation": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-09-12-venice-swimtrack-coach-key": {
+   "A_outward": true,
+   "A_conf": 0.8,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-12-swimtrack-pr31-deploy-confirmation": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-09-12-venice-discord-draft-decision": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-12-vps-optional-swap-decision": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-09-12-swimtrack-season-pass-release-proof": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.97
+  },
+  "2026-09-13-up-reviewed-worker-deploy": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": true,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-13-attain-flash-reviewed-deploy": {
+   "A_outward": true,
+   "A_conf": 0.97,
+   "B_selfcontained": false,
+   "B_conf": 0.65,
+   "C_onepass": "low",
+   "C_conf": 0.95
+  },
+  "2026-09-16-up-topical-map-coverage-gap-closure": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.6
+  },
+  "2026-09-16-up-property-guide-branch-parked": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-07-27-compact-club-glued-colon-time": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-27-supervisor-pdf-only-meets": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-27-fragment-live-layer-deploy": {
+   "A_outward": false,
+   "A_conf": 0.55,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.45
+  },
+  "2026-07-27-startlist-seedtime-placeholder": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-07-27-anchors-backlink-pass": {
+   "A_outward": true,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-07-30-rent-verification-machinery": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-23-swimtrack-website-shim-guards": {
+   "A_outward": true,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-27-cotation-ffn-explainer-page": {
+   "A_outward": true,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "low",
+   "C_conf": 0.7
+  },
+  "2026-07-30-swimtrack-agent-surface-edge-hardening": {
+   "A_outward": true,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-18-sessiongc-low-findings": {
+   "A_outward": true,
+   "A_conf": 0.55,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-20-swimtrack-no-explicit-any-sweep": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.45
+  },
+  "2026-07-20-cover-characterization-test-skip-in-worktree": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-07-20-image-bake-cross-process-file-locking": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-21-venice-attribution-verify": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-07-20-reels-orphaned-marker-unclearable": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-07-23-loom-resolve-cli": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-23-diem-review-stale-baseline": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-23-swimtrack-update-password-recovery-gate": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": false,
+   "B_conf": 0.55,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-23-liam-day-one-meet-card": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-07-23-liam-card-html-in-repo": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.85
+  },
+  "2026-07-23-council-ci-review-entrypoint": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-23-loom-route-unknown-toplevel-dir": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-23-loom-hold-veto-off-by-one-day": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-27-app-wa-points-truncation": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-31-fix-dev-lint-cloudflare-workers": {
+   "A_outward": true,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-31-i18n-dry-run-print-stale": {
+   "A_outward": true,
+   "A_conf": 0.55,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-31-nudge-borderline-en-articles": {
+   "A_outward": true,
+   "A_conf": 0.75,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-03-ghost-swimmer-rematch-repair": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-08-03-ingest-owner-guard": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.6
+  },
+  "2026-08-23-diem-filler-noop-cap-burn": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "medium",
+   "C_conf": 0.65
+  },
+  "2026-08-29-stripe-durable-idempotency": {
+   "A_outward": false,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-29-stripe-family-checkout-lock": {
+   "A_outward": false,
+   "A_conf": 0.65,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.45
+  },
+  "2026-07-23-freestyle-jacket-blurbs": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-23-loom-target-concentration": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-07-23-new-site-scaffold-deploy-fix": {
+   "A_outward": false,
+   "A_conf": 0.55,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-07-23-swimtrack-recover-auth-test-typing": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.65
+  },
+  "2026-07-25-timeline-gate-freshness-content-hash": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-03-verify-first-unattended-morning-runs": {
+   "A_outward": true,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-08-05-retire-interactive-telegram-listener": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-25-loom-indexer-upsert-stale-summary": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.75
+  },
+  "2026-07-18-sweep-stranded-notify": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-07-23-loom-quarantined-sessions-invisible": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-08-05-readability-lib-gaps": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.65
+  },
+  "2026-08-05-fixrun-starvation-logging": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-08-05-unify-validatedraft": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-08-05-fixall-kv-inertia": {
+   "A_outward": false,
+   "A_conf": 0.65,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-29-aris-contact-minlength-hint": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-18-3am-backlog-runner": {
+   "A_outward": true,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-07-23-council-golden-set-harness": {
+   "A_outward": true,
+   "A_conf": 0.6,
+   "B_selfcontained": true,
+   "B_conf": 0.75,
+   "C_onepass": "low",
+   "C_conf": 0.5
+  },
+  "2026-08-22-loom-content-aware-dedup": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-26-version-vps-loose-scripts": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-08-30-pt-2024-liquidacao-check": {
+   "A_outward": false,
+   "A_conf": 0.7,
+   "B_selfcontained": false,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.8
+  },
+  "2026-08-30-us-2025-return-plan": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-07-23-heron-bisac-fic027270-fix": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.85
+  },
+  "2026-09-11-ops-approve-refused-dirty-checkout": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.65
+  },
+  "2026-09-12-merge-research-consistency-check": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-12-merge-ci-shim-rollout": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-12-merge-chair-bakeoff-evidence": {
+   "A_outward": true,
+   "A_conf": 0.95,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "low",
+   "C_conf": 0.9
+  },
+  "2026-09-04-decision-link-expiry-copy": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.8
+  },
+  "2026-09-05-affiliate-locale-root-links": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.75
+  },
+  "2026-09-05-affiliate-hardening-batch": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-09-10-high-tide-first-person-gate": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-09-10-qc-reports-carry-digest": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-16-flash-ux-polish": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.9,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-07-19-delegate-vscode-slash-command": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": false,
+   "B_conf": 0.85,
+   "C_onepass": "low",
+   "C_conf": 0.85
+  },
+  "2026-07-23-loom-phantom-wiki-tree-reconcile": {
+   "A_outward": true,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  },
+  "2026-08-25-diem-backfill-estimate-poisoning-check": {
+   "A_outward": false,
+   "A_conf": 0.9,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.7
+  },
+  "2026-09-10-backlog-run-rework-command": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.55
+  },
+  "2026-09-12-chair-fixture-test-discovery": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-07-23-cron-loop-contracts": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-08-25-loom-triage-two-malformed-bm2-artifacts": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "high",
+   "C_conf": 0.6
+  },
+  "2026-09-12-council-reduced-tier-policy": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": false,
+   "B_conf": 0.7,
+   "C_onepass": "low",
+   "C_conf": 0.7
+  },
+  "2026-07-23-define-shared-spine-step": {
+   "A_outward": false,
+   "A_conf": 0.85,
+   "B_selfcontained": true,
+   "B_conf": 0.8,
+   "C_onepass": "medium",
+   "C_conf": 0.6
+  },
+  "2026-07-21-venice-keys-polish-followups": {
+   "A_outward": false,
+   "A_conf": 0.8,
+   "B_selfcontained": true,
+   "B_conf": 0.85,
+   "C_onepass": "medium",
+   "C_conf": 0.5
+  }
+ }
+}

@@ -9,6 +9,8 @@ data and free of the environment.
 from __future__ import annotations
 
 import re
+
+from jev.redact import strip_json_data_lists
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -179,35 +181,7 @@ _JSON_EMPTY_COUNTER = re.compile(
     re.IGNORECASE)
 # ...and JSON lists of per-item data (`"quarantined_items": [[id, reason], ...]`,
 # `"articles": [names]`): standing item notes and file names, not this run's outcome.
-_JSON_DATA_LIST = re.compile(r'"(?:articles|\w+_items)"\s*:\s*\[')
-
-
-def strip_json_data_lists(line: str) -> str:
-    """Cut each data list out, brackets matched by depth (the lists nest) and quoted
-    strings skipped. An unclosed list (a truncated line) is cut to the end."""
-    out, pos = [], 0
-    for m in _JSON_DATA_LIST.finditer(line):
-        if m.start() < pos:
-            continue
-        depth, i, quoted = 1, m.end(), False
-        while i < len(line) and depth:
-            ch = line[i]
-            if quoted:
-                if ch == "\\":
-                    i += 1
-                elif ch == '"':
-                    quoted = False
-            elif ch == '"':
-                quoted = True
-            elif ch == "[":
-                depth += 1
-            elif ch == "]":
-                depth -= 1
-            i += 1
-        out.append(line[pos:m.start()])
-        pos = i
-    out.append(line[pos:])
-    return "".join(out)
+# (strip_json_data_lists lives in jev.redact: the Jev shadow cuts the same lists before sending.)
 
 
 def _outcome_text(line: str) -> str:

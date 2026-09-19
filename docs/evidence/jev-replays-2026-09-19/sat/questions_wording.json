@@ -1,0 +1,13 @@
+{
+  "_note": "Fixed BEFORE any Jev output was viewed. Not edited afterward. Used verbatim by run.py.",
+  "state_template": {
+    "with_passage": "Passage:\n{passage}\n\nQuestion:\n{stem}\n\nA. {A}\nB. {B}\nC. {C}\nD. {D}",
+    "without_passage": "Question:\n{stem}\n\nA. {A}\nB. {B}\nC. {C}\nD. {D}"
+  },
+  "choice_instructions": "Read the passage, if one is given, and then the question. Pick the one answer choice that correctly answers the question.",
+  "noul_instructions": "Exactly one of the answer choices, A through D, is defensible as the correct answer to the question.",
+  "noul_criteria": {
+    "true": "Exactly one of the four choices is a defensible correct answer to the question.",
+    "false": "It is not true that exactly one choice is defensible: either none of the four choices is defensible, or two or more of them are."
+  }
+}

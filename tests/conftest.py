@@ -19,6 +19,11 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     jev_shadow.shadow_pass / load_key."""
     monkeypatch.setenv("WATCHDOG_JEV_SHADOW", "0")
     monkeypatch.setenv("WATCHDOG_LOG_DIR", str(tmp_path / "watchdog-logs"))
+    # The same rule for every caller of the shared client: JEV_DISABLED makes jev.ask refuse
+    # before any transport, and the usage ledger goes to a temp file. A test of the enabled
+    # path deletes JEV_DISABLED itself and passes a fake `transport=`.
+    monkeypatch.setenv("JEV_DISABLED", "1")
+    monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "jev-usage.jsonl"))
 
 
 class FakeClient:
