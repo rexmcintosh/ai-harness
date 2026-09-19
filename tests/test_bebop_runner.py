@@ -96,3 +96,24 @@ def test_the_log_line_keeps_the_shape_the_watchdog_parses(tmp_path):
     import time
     proc, calls, sent, log, state = run(tmp_path, ["FAILED: tools unavailable", BRIEFING])
     assert check_bebop_runs("\n".join(log) + "\n", int(time.time())).level == "ok"
+
+
+# --- council review: "exactly one retry" must hold whatever the environment says ----
+
+def test_attempts_are_capped_at_two_even_if_the_env_asks_for_more(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, ["FAILED: tools unavailable"],
+                                        extra_env={"BEBOP_MAX_ATTEMPTS": "5"})
+    assert calls == 2 and proc.returncode == 1
+
+
+def test_a_non_numeric_attempt_count_falls_back_to_the_default(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, ["FAILED: tools unavailable", BRIEFING],
+                                        extra_env={"BEBOP_MAX_ATTEMPTS": "foo"})
+    assert calls == 2 and proc.returncode == 0
+    assert "BEBOP_MAX_ATTEMPTS" in proc.stderr
+
+
+def test_a_non_numeric_delay_falls_back_to_the_default_with_a_warning(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], extra_env={"BEBOP_RETRY_DELAY": "soon"})
+    assert proc.returncode == 0 and calls == 1
+    assert "BEBOP_RETRY_DELAY" in proc.stderr

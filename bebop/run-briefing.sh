@@ -94,6 +94,14 @@ TS="$(date -Iseconds)"
 # Exactly one retry: a real outage must still reach the failure ping below.
 MAX_ATTEMPTS="${BEBOP_MAX_ATTEMPTS:-2}"
 RETRY_DELAY="${BEBOP_RETRY_DELAY:-90}"
+case "$MAX_ATTEMPTS" in
+  1|2) ;;
+  ''|*[!0-9]*) echo "BEBOP_MAX_ATTEMPTS='$MAX_ATTEMPTS' is not a number; using 2" >&2; MAX_ATTEMPTS=2 ;;
+  *) MAX_ATTEMPTS=2 ;;                      # "one retry" is the contract, whatever the env asks
+esac
+case "$RETRY_DELAY" in
+  ''|*[!0-9]*) echo "BEBOP_RETRY_DELAY='$RETRY_DELAY' is not a number; using 90" >&2; RETRY_DELAY=90 ;;
+esac
 ATTEMPT=0
 while :; do
   ATTEMPT=$((ATTEMPT+1))

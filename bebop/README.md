@@ -90,5 +90,6 @@ on its 11th lookup). Nothing was wrong with the accounts or the connection.
 `run-briefing.sh` therefore runs the agent again once, after `BEBOP_RETRY_DELAY` seconds
 (default 90), when the first answer is `FAILED`, a parse error, empty, or a non-zero exit.
 `state.json` has not advanced, so the retry covers the same email window. A second
-failure sends the usual failure ping. `BEBOP_MAX_ATTEMPTS=1` turns the retry off.
+failure sends the usual failure ping. `BEBOP_MAX_ATTEMPTS=1` turns the retry off; any
+other value means 2, so the runner can never loop.
 Tests: `tests/test_bebop_runner.py` (fake `claude` and `tg-send`, temp state and logs).
