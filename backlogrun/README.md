@@ -13,6 +13,7 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
     backlog-run work --dry-run           # what tonight would do; changes nothing
     backlog-run work                     # the nightly run (cron); open -> in_review | held
     backlog-run work --only <id>         # one specific item (also --repo NAME, --max-items N)
+    backlog-run rework <id> --dry-run     # show the rework target; changes nothing
     backlog-run rework <id> --no-notify   # continue its existing held/in_review branch
     backlog-run report                   # morning report, numbered
     backlog-run show 1  |  diff 1        # details / full diff (number from the report, or an id)
@@ -27,6 +28,30 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
 (medium) · `--no-council` ·
 `--no-notify` · `--keep-worktree`. `rework` accepts the same session flags except
 `--max-items` and `--deadline`; it always targets one existing branch.
+
+## Rework
+
+`rework <id>` continues one `held` or `in_review` item on the branch it already has. It is
+the only command that touches a branch with work on it; the nightly `work` still holds
+such items.
+
+It refuses, with one sentence on stderr and exit 1, when:
+
+- the id is not an active item (`not an active item`);
+- the item is `open` (`item is open, not held/in_review`): use `work --only <id>`;
+- the item has no `branch` field matching `claude/bl-<slug>` (`item has no matching
+  backlog-run branch`);
+- the branch is gone (`branch claude/bl-<slug> does not exist`);
+- the repo or its local default branch cannot be resolved.
+
+A refusal changes nothing. `--dry-run` runs the same checks, then prints the status, repo,
+branch, head, commits ahead, worktree path and the number of review notes. It takes no
+lock, starts no session, and leaves `reviewed_sha` alone. A real rework clears
+`reviewed_sha` first, so the branch needs a fresh review before `approve`.
+
+The session prompt ends with a numbered `REVIEW TO ADDRESS` section, oldest first. It
+lists every `Rex's review (<date>): ...` paragraph in the item's prompt, plus the note when
+the note starts with `Rex's review`. No review notes, no section.
 
 ## What the session gets
 

@@ -651,6 +651,96 @@ def test_rework_reuses_branch_preserves_dirty_work_and_runner_contracts(world):
     assert cap["push_rc"] != 0 and "nonexistent" in cap["push_err"]
 
 
+def rework_args(*extra):
+    return br.build_parser().parse_args(["rework", *extra])
+
+
+def test_rework_dry_run_prints_the_plan_and_changes_nothing(world, capsys):
+    cfg = world.build([item("2026-01-01-a", status="in_review", branch="claude/bl-a",
+                            prompt="Do it.\n\nRex's review (2026-01-03): tighten the tests\n")])
+    wt = worked_branch(world.repo, "claude/bl-a")
+    head = mark_reviewed(cfg, world.repo, "claude/bl-a", "2026-01-01-a")
+    git(world.repo, "worktree", "remove", "--force", str(wt))
+    before = Path(cfg.backlog_path).read_text()
+    rc = br.cmd_rework(rework_args("2026-01-01-a", "--dry-run"), cfg)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "REWORK 2026-01-01-a" in out and "in_review" in out
+    assert "branch claude/bl-a" in out and head[:12] in out and "1 commit(s) ahead of main" in out
+    assert "review to address: 1 note(s)" in out
+    # nothing moved: the approval identity survives, no worktree, no run record, no session
+    assert Path(cfg.backlog_path).read_text() == before
+    assert not wt.exists()
+    assert not os.path.exists(cfg.runs_dir) or not os.listdir(cfg.runs_dir)
+    assert not (world.fake_dir / "capture.json").exists()
+
+
+@pytest.mark.parametrize("dry", [(), ("--dry-run",)])
+def test_rework_refuses_open_items_and_missing_branches_in_one_sentence(world, capsys, dry):
+    cfg = world.build([item("2026-01-01-a"),
+                       item("2026-01-02-b", status="held", branch="claude/bl-b", created="2026-01-02"),
+                       item("2026-01-03-c", status="held", created="2026-01-03")])
+    before = Path(cfg.backlog_path).read_text()
+    for iid, why in (("2026-01-01-a", "item is open, not held/in_review"),
+                     ("2026-01-02-b", "branch claude/bl-b does not exist"),
+                     ("2026-01-03-c", "item has no matching backlog-run branch"),
+                     ("2026-09-09-nope", "not an active item")):
+        assert br.cmd_rework(rework_args(iid, "--no-notify", *dry), cfg) == 1
+        err = capsys.readouterr().err.strip()
+        assert err == f"rework {iid}: {why}"
+    assert Path(cfg.backlog_path).read_text() == before
+    assert not (world.fake_dir / "capture.json").exists()
+
+
+def test_rework_prompt_lists_every_owner_review_oldest_first(world):
+    it = item("2026-01-01-a", status="held", branch="claude/bl-a",
+              prompt="Do it.\n\nRex's review (2026-01-03): tighten the tests\nand cover the empty case\n\n"
+                     "Rex's review (2026-01-05): rename the flag\n",
+              note="Rex's review (2026-01-06): keep exit code 1")
+    kw = dict(repo_name="alpha", worktree="/w", branch="claude/bl-a", base="main", minutes=10)
+    text = br.compose_prompt(it, continuation=True, **kw)
+    section = text.split("--- REVIEW TO ADDRESS ---", 1)[1]
+    assert section.index("1. Rex's review (2026-01-03): tighten the tests\nand cover the empty case") \
+        < section.index("2. Rex's review (2026-01-05): rename the flag") \
+        < section.index("3. Rex's review (2026-01-06): keep exit code 1")
+    assert "the last entry is the newest" in section
+    # a runner note is not a review, and a first-time `work` prompt never gets the section
+    assert "REVIEW TO ADDRESS" not in br.compose_prompt({**it, "prompt": "Do it.", "note": "runner: HELD"},
+                                                        continuation=True, **kw)
+    assert "REVIEW TO ADDRESS" not in br.compose_prompt(it, continuation=False, **kw)
+
+
+def test_rework_does_not_repeat_a_review_held_in_both_note_and_prompt():
+    line = "Rex's review (2026-01-03): tighten the tests"
+    assert br.review_notes({"prompt": f"Do it.\n\n{line}\n", "note": line}) == [line]
+
+
+def test_review_notes_split_only_on_dated_markers_and_keep_a_long_review_whole():
+    # A review may run to several paragraphs and may quote the phrase itself; only a dated
+    # "Rex's review (YYYY-MM-DD):" line starts a new note, so no owner text is cut off.
+    first = ("Rex's review (2026-01-03): tighten the tests.\n\nSecond paragraph of the same review.\n"
+             "Rex's review (the older one) still stands.")
+    second = "Rex's review (2026-01-05): rename the flag"
+    assert br.review_notes({"prompt": f"Do it.\n\n{first}\n\n{second}\n"}) == [first, second]
+
+
+def test_rework_dry_run_turns_a_git_failure_into_the_one_sentence_refusal(world, capsys, monkeypatch):
+    cfg = world.build([item("2026-01-01-a", status="held", branch="claude/bl-a")])
+    worked_branch(world.repo, "claude/bl-a")
+    real_git = br.git
+
+    def flaky(repo, *args, **kw):
+        if args[:1] == ("rev-parse",):
+            raise br.GitError("fatal: ambiguous argument 'claude/bl-a'\nUse '--' to separate paths\n")
+        return real_git(repo, *args, **kw)
+    monkeypatch.setattr(br, "git", flaky)
+    assert br.cmd_rework(rework_args("2026-01-01-a", "--dry-run"), cfg) == 1
+    captured = capsys.readouterr()
+    assert captured.err.strip().startswith("rework 2026-01-01-a: could not read branch claude/bl-a")
+    assert len(captured.err.strip().splitlines()) == 1      # a multi-line git error stays one sentence
+    assert "REWORK" not in captured.out
+
+
 def test_drop_deletes_branch_journals_and_archives(world):
     cfg = world.build([item("2026-01-01-a", status="held", branch="claude/bl-a", note="runner: HELD")])
     worked_branch(world.repo, "claude/bl-a")

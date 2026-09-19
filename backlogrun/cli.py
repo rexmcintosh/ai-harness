@@ -562,6 +562,26 @@ def write_session_settings(cfg: Config) -> None:
         json.dump({"mcpServers": {}}, fh)
 
 
+REVIEW_START_RE = re.compile(r"^Rex's review \(\d{4}-\d{2}-\d{2}\):", re.MULTILINE)
+
+
+def review_notes(item: dict) -> list[str]:
+    """The owner's review notes on an already-worked item, oldest first. The ops loop appends
+    each one to the END of the prompt as a "Rex's review (<date>): ..." paragraph; `hold`
+    files one as the note. A note that only repeats a prompt paragraph is not listed twice.
+
+    A note runs from its dated marker to the next dated marker (or the end of the prompt),
+    never to the first blank line: a review may span paragraphs, and cutting the owner's
+    words short is worse than repeating hand-added trailing text the prompt already shows."""
+    prompt = str(item.get("prompt") or "")
+    starts = [m.start() for m in REVIEW_START_RE.finditer(prompt)]
+    notes = [prompt[a:b].strip() for a, b in zip(starts, starts[1:] + [len(prompt)])]
+    note = str(item.get("note") or "").strip()
+    if note.startswith("Rex's review") and note not in notes:
+        notes.append(note)
+    return notes
+
+
 def compose_prompt(item: dict, *, repo_name: str, worktree: str, branch: str, base: str,
                    minutes: int, continuation: bool = False) -> str:
     opening = (
@@ -571,6 +591,11 @@ def compose_prompt(item: dict, *, repo_name: str, worktree: str, branch: str, ba
         "You are `backlog-run`, an unattended nightly Claude Code session. Nobody is watching and "
         "nobody can answer questions. Work the backlog item below to completion on your own, or stop cleanly."
     )
+    notes = review_notes(item) if continuation else []
+    review_section = ("\n--- REVIEW TO ADDRESS ---\n"
+                      "The owner reviewed the earlier work on this branch. Address every point below; "
+                      "the last entry is the newest and wins where two conflict.\n\n"
+                      + "\n\n".join(f"{n}. {text}" for n, text in enumerate(notes, 1)) + "\n") if notes else ""
     continuation_rules = ("""
 12. Never replay a possibly completed external action. Inspect durable state, leave any outward step held, and report the exact check a human must make.
 13. Changes and a resource budget do not grant merge permission. Leave this branch for fresh review and explicit approval.
@@ -615,7 +640,7 @@ Repo: {item.get('repo')}
 Created: {item.get('created')}
 
 {str(item.get('prompt') or '').rstrip()}
-"""
+{review_section}"""
 
 
 def parse_outcome(text: str) -> dict:
@@ -1208,6 +1233,42 @@ def _rework_plan(cfg: Config, item: dict) -> Planned:
     return Planned(item, "rework", repo=repo, branch=branch, worktree=worktree, base=base)
 
 
+def _rework_target(cfg: Config, iid: str) -> tuple[dict, Planned] | None:
+    """The item and its plan, or None once the one-sentence refusal is on stderr."""
+    item = find_item(load_yaml(cfg.backlog_path), iid)
+    if item is None:
+        print(f"rework {iid}: not an active item", file=sys.stderr)
+        return None
+    try:
+        return item, _rework_plan(cfg, item)
+    except ValueError as exc:
+        print(f"rework {iid}: {exc}", file=sys.stderr)
+        return None
+
+
+def _rework_dry_run(iid: str, cfg: Config) -> int:
+    """Same refusals as the real pass; takes no lock, starts no session, writes nothing."""
+    target = _rework_target(cfg, iid)
+    if target is None:
+        return 1
+    item, p = target
+    try:
+        head = git(p.repo, "rev-parse", p.branch).strip()
+    except GitError as exc:   # the branch moved or vanished after the plan: still a refusal
+        why = re.sub(r"\s+", " ", str(exc)).strip()[:200]
+        print(f"rework {iid}: could not read branch {p.branch}: {why}", file=sys.stderr)
+        return 1
+    ahead = git(p.repo, "rev-list", "--count", f"{p.base}..{p.branch}", check=False).strip() or "?"
+    budget = f"${cfg.budget_usd:g}" if cfg.budget_usd else "none"
+    print(f"backlog-run rework dry-run — {now_stamp()} — {cfg.item_timeout}s, budget {budget}")
+    print(f"  REWORK {iid}  (now {item.get('status')})\n"
+          f"        repo {os.path.basename(p.repo)}  branch {p.branch}  head {head[:12]}  "
+          f"({ahead} commit(s) ahead of {p.base})\n"
+          f"        worktree {p.worktree}\n"
+          f"        review to address: {len(review_notes(item))} note(s)")
+    return 0
+
+
 def cmd_rework(args, cfg: Config) -> int:
     if args.item_timeout is not None:
         cfg.item_timeout = args.item_timeout
@@ -1220,16 +1281,13 @@ def cmd_rework(args, cfg: Config) -> int:
     if args.no_notify:
         cfg.tg_enabled = False
     cfg.keep_worktree = args.keep_worktree
+    if args.dry_run:
+        return _rework_dry_run(args.item, cfg)
     with RunLock(cfg):
-        item = find_item(load_yaml(cfg.backlog_path), args.item)
-        if item is None:
-            print(f"rework {args.item}: not an active item", file=sys.stderr)
+        target = _rework_target(cfg, args.item)
+        if target is None:
             return 1
-        try:
-            planned = _rework_plan(cfg, item)
-        except ValueError as exc:
-            print(f"rework {args.item}: {exc}", file=sys.stderr)
-            return 1
+        item, planned = target
 
         # A Changes decision invalidates the old approval identity before any session starts.
         mutate_backlog(cfg, args.item, lambda current: current.pop("reviewed_sha", None))
@@ -1641,6 +1699,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     rw = sub.add_parser("rework", help="continue one held/in_review item on its existing branch")
     rw.add_argument("item", help="active item id")
+    rw.add_argument("--dry-run", action="store_true", help="show the plan; change nothing")
     rw.add_argument("--item-timeout", type=int, default=None, help="seconds for the session (default 3600)")
     rw.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd for the session (default 20; 0 = none)")
     rw.add_argument("--model", help="model for the session (default: sonnet)")

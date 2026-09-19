@@ -143,6 +143,38 @@ not a sandbox).
 `Backlog-Item:`/`Backlog-Branch:` trailers. Session worktrees left by hand-worked items are
 removed when clean; a dirty one keeps its branch and is reported.
 
+## Rework (added 2026-09, dry-run and review section 2026-09-18)
+
+`backlog-run rework <id>` is the only path that may touch a branch that already carries
+work. `plan()` is unchanged: the nightly `work` still holds any item whose branch has
+commits, so an accidental re-work of a reviewed branch by the clock stays impossible.
+
+- **Accepts** one `held` or `in_review` item whose `branch` field equals `claude/bl-<slug>`
+  and whose branch exists locally.
+- **Refuses** with one sentence on stderr and exit 1 (the CLI's refusal code everywhere;
+  75 stays reserved for lock contention): an id that is not active, an `open` item, an item
+  without a matching `branch` field, a missing branch, an unresolvable repo or default
+  branch. A refusal changes nothing.
+- **Runs** the `work` machinery (`work_one(continuation=True)`): the worktree is recreated
+  from the existing branch head (no reset, no new base), pre-existing dirty work is
+  snapshotted in a commit, the session gets the continuation prompt (rules 12 and 13), the
+  branch is council-reviewed, and the item lands `in_review` or `held` like any other run.
+  `reviewed_sha` is cleared before the session starts, so a stale approval identity cannot
+  survive a rework. The item must still hold its starting status at the end, otherwise the
+  result becomes a `runner: CONFLICT` note.
+- **Review to address.** The continuation prompt ends with a numbered
+  `--- REVIEW TO ADDRESS ---` section, oldest first, built from every
+  `Rex's review (<date>): ...` paragraph in the item's `prompt` (the Romance Ops "Changes"
+  action appends them) plus the item's `note` when it starts with `Rex's review` and is not
+  already listed. Without any review note the section is omitted. Only a dated marker
+  (`Rex's review (YYYY-MM-DD):` at the start of a line) opens a note, and a note runs to the
+  next dated marker or the end of the prompt, so a multi-paragraph review stays whole.
+- **`--dry-run`** prints the target (status, repo, branch, head, commits ahead, worktree,
+  number of review notes) after the same refusal checks. It takes no lock, creates no
+  worktree, starts no session and writes nothing, so `reviewed_sha` stays intact.
+- Same safety contract as `work`: RunLock, item timeout, `--budget-usd`, deny rules, no
+  push, one item per invocation.
+
 ## Cron
 
 ```
