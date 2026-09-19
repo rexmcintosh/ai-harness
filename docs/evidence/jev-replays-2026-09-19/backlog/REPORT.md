@@ -396,3 +396,24 @@ database, spend on a paid API, or push to a shared remote.
 | `results.json` | one row per item: outcome, hold class, Jev A/B/C |
 | `results_open_items.json` | supplementary run over the 44 open items (no truth) |
 | `score_output.txt` | raw scoring output |
+
+---
+
+## Addendum, 2026-09-19: the second wording, tried once and not adopted
+
+Before the gate was built, one revised wording (`wording_v2.json`, results in `results_v2.json`)
+was run on the same 157 items. Two changes: an outward step that the done-criteria need counts
+even when a person performs it (and owner-only actions count), and standing house rules about
+merge recommendations are not outward actions.
+
+| | AUC | caught at 0.7 | missed | false holds |
+|---|---|---|---|---|
+| v1 (shipped) | 0.947 | 47 of 53 | 6 | 8 |
+| v2 | 0.956 | 51 of 53 | 2 | 24 |
+
+On the 33 items that really cost a session: v1 holds 8 of the 11 that ended held and 5 of the
+21 that finished; v2 holds 9 and 6. Three of those finished-but-held sessions carried an
+instruction safety rule 2 forbids, under both wordings. v2's extra catches are mostly
+owner-action items that are born `held` and never reach the gate, and it newly holds plain
+writing work ("Write the property cornerstone guide", 0.89). v2 was also written after seeing
+v1's errors, so its numbers flatter it. v1 stays.

@@ -60,6 +60,7 @@ from pathlib import Path
 import yaml
 
 from sessiongc.cli import GitError, default_branch_ref, git, git_ok, parse_worktrees
+from backlogrun import gate as gate_mod
 from backlogrun import readiness
 from backlogrun.venice_keys import VeniceKeyError, load_key as load_venice_key
 
@@ -429,11 +430,17 @@ class Planned:
 
 
 def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
-         repo_filter: str | None = None, max_items: int | None = None) -> list[Planned]:
+         repo_filter: str | None = None, max_items: int | None = None,
+         gate=None, gate_budget: int | None = None) -> list[Planned]:
     """Decide what tonight's run would do, without doing it. Oldest `created` first
     (file order breaks ties). Unworkable items (no repo dir, branch/worktree already
     present) become `hold` — cheap, unbounded. Workable ones are `work` up to
-    max_items; the rest are `defer` (still open, next night)."""
+    max_items; the rest are `defer` (still open, next night).
+
+    `gate(item) -> (hold, reason)` is the pre-session hold gate (backlogrun/gate.py). It is
+    asked only about an item that would otherwise be worked, it can only turn `work` into
+    `hold`, and a held item gives its slot to the next one. After `gate_budget` questions
+    the rest are deferred, so a night of holds cannot turn into a long chain of calls."""
     max_items = cfg.max_items if max_items is None else max_items
     opens = [it for it in items if it.get("status") == "open"]
     if only:
@@ -443,6 +450,8 @@ def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
     opens.sort(key=lambda it: str(it.get("created") or ""))
     out: list[Planned] = []
     worked = 0
+    gate_asked = 0
+    gate_budget = gate_mod.BUDGET if gate_budget is None else gate_budget
     for it in opens:
         iid = str(it.get("id"))
         if not safe_slug(iid):
@@ -472,6 +481,16 @@ def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
         if worked >= max_items:
             out.append(Planned(it, "defer", f"beyond --max-items {max_items}", repo=rp, branch=branch, worktree=wt, base=base))
             continue
+        if gate is not None:
+            if gate_asked >= gate_budget:
+                out.append(Planned(it, "defer", f"gate budget: {gate_budget} items already screened tonight",
+                                   repo=rp, branch=branch, worktree=wt, base=base))
+                continue
+            gate_asked += 1
+            hold, why = gate(it)
+            if hold:
+                out.append(Planned(it, "hold", why, repo=rp, branch=branch))
+                continue
         worked += 1
         out.append(Planned(it, "work", "reclaims an empty leftover branch first" if reclaim else "",
                            repo=rp, branch=branch, worktree=wt, base=base, reclaim=reclaim))
@@ -1156,7 +1175,9 @@ def notify(cfg: Config, text: str) -> str:
 
 def cmd_work(args, cfg: Config) -> int:
     items = load_yaml(cfg.backlog_path)["items"]
-    planned = plan(cfg, items, only=args.only, repo_filter=args.repo, max_items=args.max_items)
+    use_gate = gate_mod.enabled() and not getattr(args, "no_gate", False)
+    planned = plan(cfg, items, only=args.only, repo_filter=args.repo, max_items=args.max_items,
+                   gate=(lambda it: gate_mod.check(it)) if use_gate else None)
     if args.dry_run:
         print(f"backlog-run dry-run — {now_stamp()} — max {cfg.max_items} item(s), {cfg.item_timeout}s each, deadline {cfg.deadline}s")
         if not planned:
@@ -1666,6 +1687,8 @@ def cmd_reopen(args, cfg: Config) -> int:
         item.pop("worked", None)
         if str(item.get("note", "")).startswith("runner:"):
             item.pop("note", None)
+        if getattr(args, "gate_ok", False):
+            item["gate_ok"] = True      # the owner read it: the pre-session gate stays out of the way
     with RunLock(cfg):
         try:
             mutate_backlog(cfg, iid, fn)
@@ -1688,6 +1711,8 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--only", action="append", help="work only this item id (repeatable)")
     w.add_argument("--repo", help="limit to items targeting this repo (dir name)")
     w.add_argument("--item-timeout", type=int, default=None, help="seconds per item (default 3600)")
+    w.add_argument("--no-gate", action="store_true",
+                   help="skip the pre-session hold gate (Jev: does this item need an outward action?)")
     w.add_argument("--deadline", type=int, default=None, help="seconds for the whole run (default 10800)")
     w.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd per session (default 20; 0 = none)")
     w.add_argument("--model", help="model for the sessions (default: sonnet)")
@@ -1723,6 +1748,8 @@ def build_parser() -> argparse.ArgumentParser:
     ho = sub.add_parser("hold", help="open/in_review -> held with a note")
     ho.add_argument("item"); ho.add_argument("note"); ho.set_defaults(func=cmd_hold)
     ro = sub.add_parser("reopen", help="held -> open"); ro.add_argument("item"); ro.set_defaults(func=cmd_reopen)
+    ro.add_argument("--gate-ok", action="store_true",
+                    help="also record that you read it and it is safe unattended: the pre-session gate will not hold it again")
     return p
 
 
