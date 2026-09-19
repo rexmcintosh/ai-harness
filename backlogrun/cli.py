@@ -731,7 +731,7 @@ def _jev_shadow(repo: str | None, item_id: str, results, syn, diff_text: str, st
         from council.render import render_jev_shadow
         from council.routing import changed_paths, split_diff_by_type
         code_paths = changed_paths(split_diff_by_type(diff_text)[0])
-        sig = signals.collect(repo, results, syn, environ=os.environ, name=item_id,
+        sig = signals.collect(repo, results, syn, environ=os.environ, name=item_id, panel="code-review",
                               tier=risk_tier(code_paths) if code_paths else None)
         if sig is None:
             return None, ""

@@ -86,6 +86,19 @@ by `council.gate`, not by any single panelist:
 
 See `docs/council-audit-2026-06-25.md` for the failure modes this replaced.
 
+## Jev shadow signals (display only)
+
+After the chair has answered, `council review` asks Jev (TypeSafe's small typed judge, model
+`jev-1.13.0`) three label-and-score questions and prints the answers as one last section:
+how it reads the chair's verdict, which findings two seats both raised ("raised by 2 of 3
+seats"), and which panel finding each chair block confirms. `council sweep` adds one note
+with the findings Jev would also group. This is **shadow mode**: the answers are shown and
+logged (`~/.local/state/council/jev-shadow.jsonl`, ids and numbers only) and nothing reads
+them. The panel, the chair, the gate, `run_pr_review` and every exit code are unchanged.
+`COUNCIL_JEV=0` turns it off; no `TYPESAFE_API_KEY`, or a repository outside the data rule in
+`council/jev.py`, means no call and byte-identical output. Details, the data rule and what
+is deliberately not built: `docs/council-jev-shadow-2026-09-19.md`.
+
 ## Secret
 
 `VENICE_API_KEY` from the environment / `.env`. Never commit it.

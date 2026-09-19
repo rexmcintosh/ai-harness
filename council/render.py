@@ -176,8 +176,9 @@ def render_jev_shadow(sig, *, chair_status: str | None = None) -> str:
                    f"raised by {c['seats']} of {sig.seats_answered} seats")
     if not sig.clusters and sig.pairs_asked:
         out.append(f"- No two seats raised the same problem ({sig.pairs_asked} pairs checked, cut {sig.cut:.2f})")
-    if sig.truncated or sig.pairs_asked < sig.pairs_total:
-        out.append(f"- Only {sig.pairs_asked} of {sig.pairs_total} finding pairs were checked, the most severe first")
+    if sig.pairs_asked < sig.pairs_total:
+        which = "the most severe first" if sig.truncated else "the rest was skipped"
+        out.append(f"- Only {sig.pairs_asked} of {sig.pairs_total} finding pairs were checked, {which}")
     for link in sig.block_sources:
         head = f"- Block {link['block'] + 1} -> "
         if link["source"] == "none":

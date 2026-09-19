@@ -266,6 +266,7 @@ class JevSignals:
     repo: str
     model: str = jev.MODEL
     item: str = ""                                   # backlog item id, when the caller has one
+    panel: str = ""                                  # the wording was validated on code-review panels
     verdict: dict | None = None                      # {"label", "confidence", "probabilities"}
     seat_agreement: list[dict] = field(default_factory=list)     # pairs at or above the cut
     clusters: list[dict] = field(default_factory=list)
@@ -329,7 +330,8 @@ def _default_ask(environ):
 
 def collect(context_repo: str | None, results: list[MemberResult], synthesis: Synthesis, *,
             environ=None, ask=None, budget_seconds: float = BUDGET_SECONDS, log_path=None,
-            name: str = "", tier: str | None = None, clock=time.monotonic) -> JevSignals | None:
+            name: str = "", panel: str = "", tier: str | None = None,
+            clock=time.monotonic) -> JevSignals | None:
     """Run the three signals for one finished review and append one line to the shadow log.
 
     Call it AFTER synthesize(), so the chair cannot be influenced. Returns None, and sends
@@ -337,14 +339,15 @@ def collect(context_repo: str | None, results: list[MemberResult], synthesis: Sy
     backlog item id) is outside the data-scope rule; an unknown repository is refused.
     Never raises: a failed call or a wrongly shaped answer costs that one signal and adds to
     `errors`. `tier` is the gate's blast-radius tier when the input was a diff; it only
-    labels a linked finding as eligible or not. The result is for display and the log."""
+    labels a linked finding as eligible or not. `panel` is logged so rows from panels the
+    wording was not validated on can be told apart. The result is for display and the log."""
     sig = None
     try:
         environ = os.environ if environ is None else environ
         if not jev.shadow_enabled(environ) or not jev.in_scope(name, context_repo):
             return None
         findings = numbered_findings(results)
-        sig = JevSignals(repo=str(context_repo), item=str(name or ""), tier=tier,
+        sig = JevSignals(repo=str(context_repo), item=str(name or ""), panel=str(panel or ""), tier=tier,
                          seats_answered=sum(1 for r in results if not r.error))
         eligible = {f.fid: (is_candidate(f.severity, f.confidence, tier=tier) if tier else None) for f in findings}
         sig.findings = [{"id": f.fid, "seat": f.seat, "severity": f.severity, "confidence": f.confidence,

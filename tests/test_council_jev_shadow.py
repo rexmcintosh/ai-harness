@@ -361,12 +361,13 @@ def test_collect_gathers_the_three_signals_and_logs_one_line(tmp_path):
 
 def test_the_shadow_log_holds_no_review_text(tmp_path):
     log = tmp_path / "jev.jsonl"
-    signals.collect("ai-harness", panel_results(), synthesis(BLOCKS), environ=ON, ask=agreeing_ask(), log_path=log)
+    signals.collect("ai-harness", panel_results(), synthesis(BLOCKS), environ=ON, ask=agreeing_ask(), log_path=log,
+                    panel="code-review")
     raw = log.read_text()
     for text in (OVER_CAPTURE, SPLITS, MISSING_TEST, RECOMMENDATION, "two edge paths", "parser splits",
                  "over-captures", "README", "nobody on the panel", "UnusableReply", "test-key"):
         assert text not in raw
-    allowed_strings = {"", "review", "ai-harness", "jev-1.13.0", "unknown", "approve_with_conditions", "none",
+    allowed_strings = {"", "review", "ai-harness", "code-review", "jev-1.13.0", "unknown", "approve_with_conditions", "none",
                        "Eng Manager", "Adversary", "high", "low", "med", "F1.1", "F1.2", "F3.1"}
 
     def strings(value):
@@ -523,6 +524,18 @@ def test_the_shadow_section_groups_three_seats_and_reports_failures(tmp_path):
     assert "Jev reads the chair's verdict" not in failed
 
 
+def test_the_shadow_section_says_when_only_some_pairs_were_checked(tmp_path):
+    severities = ["high", "med", "low", "info", "critical", "high", "med", "low"]
+    big = [MemberResult(name, "m", "concerns", "h",
+                        findings=[Finding(f"{name} point {n}", sev, 8) for n, sev in enumerate(severities)])
+           for name in ("A", "B")]
+    sig = signals.collect("ai-harness", big, synthesis(), environ=ON, ask=FakeAsk(), log_path=tmp_path / "l.jsonl")
+    assert (sig.pairs_total, sig.pairs_asked, sig.truncated) == (64, 60, True)
+    text = render_jev_shadow(sig)
+    assert "Only 60 of 64 finding pairs were checked, the most severe first" in text
+    assert "No two seats raised the same problem (60 pairs checked, cut 0.85)" in text
+
+
 DIFF = ("diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ b/src/app.py\n"
         "@@ -1 +1 @@\n-old\n+new\n")
 CHAIR = {"recommendation": RECOMMENDATION, "confidence": 7, "consensus": [], "disagreements": [],
@@ -602,6 +615,7 @@ def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys,
     assert "+new" not in wire and "diff --git" not in wire      # the diff itself is never sent
     (row,) = read_log(Path(__import__("os").environ["COUNCIL_JEV_LOG"]))
     assert row["repo"] == "some-tool" and row["tier"] == "full" and row["chair_blocks"] == 1
+    assert row["panel"] == "code-review"
 
 
 def test_review_in_the_terminal_format_gets_the_section_too(member_json, capsys, in_scope_checkout, monkeypatch):

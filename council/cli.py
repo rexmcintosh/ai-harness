@@ -75,7 +75,7 @@ def _jev_shadow_section(review_text: str, path):
     function for _run to call AFTER the chair has answered and the review is printed, so
     nothing here can reach the panel, the chair or the review text. It never raises and
     never changes the exit code: any failure means "no section", which is today's output."""
-    def section(results, syn) -> str:
+    def section(results, syn, panel_name) -> str:
         try:
             import os
             from . import jev, signals
@@ -91,7 +91,7 @@ def _jev_shadow_section(review_text: str, path):
             # The gate's tier, computed as run_pr_review does (code slice of a diff). It only
             # labels a linked finding as eligible or not; without a diff there is no label.
             code_paths = changed_paths(split_diff_by_type(review_text)[0])
-            sig = signals.collect(repo, results, syn, environ=os.environ,
+            sig = signals.collect(repo, results, syn, environ=os.environ, panel=panel_name,
                                   tier=risk_tier(code_paths) if code_paths else None)
             return render_jev_shadow(sig) if sig is not None else ""
         except Exception:  # noqa: BLE001 - shadow mode must never break a review
@@ -133,9 +133,12 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
     print(f"[panel: {panel_name} · rigor: {rigor}]\n")
     print(render(context[:120], syn, results, rigor=rigor))
     if shadow is not None:                         # `review` only; display and log, nothing else
-        section = shadow(results, syn)
-        if section:
-            print("\n" + section)
+        try:
+            section = shadow(results, syn, panel_name)
+            if section:
+                print("\n" + section)
+        except Exception:  # noqa: BLE001 - not even a closed pipe may change the review's exit code
+            pass
     return 0
 
 
