@@ -423,7 +423,7 @@ def repo_path(cfg: Config, repo: str | None) -> str | None:
 _DATE = r"(\d{4}-\d{2}-\d{2})"
 _NOT_BEFORE_PATTERNS = [re.compile(p, re.IGNORECASE) for p in (
     r"\bnot\s+before\s+" + _DATE,                                              # NOT BEFORE 2026-11-15
-    r"\bdo\s+not\s+(?:run|start|work)\b[^.\n]{0,40}?\bbefore\s+" + _DATE,       # do not run (this) before ...
+    r"\bdo\s+not\s+(?:run|start|work)\b[^.]{0,60}?\bbefore\s+" + _DATE,         # do not run (this item) before ...
     r"\bif\s+today\s+is\s+before\s+" + _DATE,                                  # DATE GATE: if today is before ...
 )]
 
@@ -439,15 +439,36 @@ def _as_date(value) -> date | None:
         return None
 
 
-def not_before(item: dict) -> date | None:
-    """The first day this item may run, or None. An explicit `not_before:` field wins;
-    otherwise the latest run-gating date written in the title or the prompt. A date that
-    does not exist is ignored."""
+def _date_rules(item: dict) -> tuple[list[date], list[str]]:
+    """(readable gate dates, unreadable ones as written). The field counts as one more rule."""
+    good: list[date] = []
+    bad: list[str] = []
     if item.get("not_before") is not None:
-        return _as_date(item["not_before"])
+        d = _as_date(item["not_before"])
+        (good if d else bad).append(d or f"not_before: {item['not_before']!r}")
     text = f"{item.get('title') or ''}\n{item.get('prompt') or ''}"
-    found = [d for pat in _NOT_BEFORE_PATTERNS for m in pat.finditer(text) if (d := _as_date(m.group(1)))]
-    return max(found) if found else None
+    for pat in _NOT_BEFORE_PATTERNS:
+        for m in pat.finditer(text):
+            d = _as_date(m.group(1))
+            (good if d else bad).append(d or m.group(1))
+    return good, bad
+
+
+def not_before(item: dict) -> date | None:
+    """The first day this item may run, or None. A readable `not_before:` field wins;
+    otherwise the latest run-gating date written in the title or the prompt."""
+    field_date = _as_date(item["not_before"]) if item.get("not_before") is not None else None
+    if field_date:
+        return field_date
+    good, _ = _date_rules(item)
+    return max(good) if good else None
+
+
+def date_rule_problem(item: dict) -> str | None:
+    """The owner wrote a date rule that cannot be read (a typo, a day that does not exist).
+    That must hold the item, not let it run early."""
+    _, bad = _date_rules(item)
+    return f"this item has a date rule I cannot read ({', '.join(bad)}); fix the date, then reopen" if bad else None
 
 
 @dataclass
@@ -493,6 +514,10 @@ def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
         iid = str(it.get("id"))
         if not safe_slug(iid):
             out.append(Planned(it, "hold", f"id {iid!r} is not a safe slug for a branch/path; rename it"))
+            continue
+        unreadable = date_rule_problem(it)
+        if unreadable:
+            out.append(Planned(it, "hold", unreadable))
             continue
         first_day = not_before(it)
         if first_day and today < first_day:

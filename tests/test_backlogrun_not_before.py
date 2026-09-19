@@ -40,9 +40,22 @@ def test_several_gates_mean_the_latest_one():
     assert br.not_before({"prompt": "not before 2026-10-01. Also: do not run before 2026-11-01."}) == date(2026, 11, 1)
 
 
-def test_a_date_that_does_not_exist_is_ignored_not_a_crash():
+def test_a_date_rule_that_cannot_be_read_is_a_problem_not_a_silent_pass():
+    # The owner tried to gate the item. A typo must not let it run early.
     assert br.not_before({"prompt": "NOT BEFORE 2026-13-45"}) is None
-    assert br.not_before({"not_before": "soon", "prompt": "p"}) is None
+    assert "2026-13-45" in br.date_rule_problem({"prompt": "NOT BEFORE 2026-13-45"})
+    assert "soon" in br.date_rule_problem({"not_before": "soon", "prompt": "p"})
+    assert br.date_rule_problem({"prompt": "NOT BEFORE 2026-11-15"}) is None
+    assert br.date_rule_problem({"prompt": "no dates here"}) is None
+
+
+def test_a_bad_field_does_not_hide_a_good_date_in_the_prose():
+    assert br.not_before({"not_before": "soon", "prompt": "NOT BEFORE 2026-11-15"}) == date(2026, 11, 15)
+
+
+def test_line_wraps_inside_the_phrase_do_not_hide_it():
+    assert br.not_before({"prompt": "Context first. NOT\nBEFORE 2026-11-15."}) == date(2026, 11, 15)
+    assert br.not_before({"prompt": "do not run this item\n  before 2026-11-16, the data is late"}) == date(2026, 11, 16)
 
 
 # --- inside the plan --------------------------------------------------------
@@ -87,3 +100,11 @@ def test_dry_run_shows_why_it_is_deferred(world, capsys):
     br.cmd_work(work_args("--dry-run"), cfg)
     out = capsys.readouterr().out
     assert "DEFER 2026-01-01-early" in out and "2999-01-01" in out
+
+
+def test_an_unreadable_date_rule_holds_the_item_with_a_reason(world):
+    cfg = world.build([item("2026-01-01-typo", created="2026-01-01", prompt="NOT BEFORE 2026-13-45. run the probe"),
+                       item("2026-01-02-ready", created="2026-01-02")])
+    by = {p.item["id"]: p for p in br.plan(cfg, load_items(cfg), max_items=1, today=TODAY)}
+    assert by["2026-01-01-typo"].action == "hold" and "2026-13-45" in by["2026-01-01-typo"].reason
+    assert by["2026-01-02-ready"].action == "work"
