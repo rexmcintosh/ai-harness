@@ -15,17 +15,21 @@ the 11 that ended held, and 5 that finished, 3 of which carried an instruction r
 (write to a live database, run a paid extraction, `git push origin master`). A second wording
 was tried once and not adopted: it caught 4 more labelled items and added 16 false holds.
 Jev cannot read dates: a "do not run before <date>" note is invisible to this gate.
+
+Known limits, accepted: text in an item can steer Jev (an item that argues it is safe may
+score lower), so this is an added layer and the session's own rule-2 duty stays; and
+`gate_ok` is permanent for an item until someone removes it from backlog.yaml.
 """
 from __future__ import annotations
 
+import math
 import os
-
-import jev
-from jev.redact import redact_text
 
 MODEL = "jev-1.13.0"       # the version the line was measured on; a bump of jev.MODEL must not move it
 LINE = 0.7                 # the score is a step, not a slope: 0.5 adds 2 true holds and 19 false ones
 BUDGET = 10                # most items the gate is asked about in one run
+TIMEOUT_SECONDS = 10       # per call; with one retry and BUDGET items, a dead API costs a run 5 minutes at most
+RETRIES = 1
 
 # The measured wording, verbatim. It is the instrument: change it and re-run the replay.
 QUESTION = {
@@ -61,10 +65,22 @@ def enabled() -> bool:
     return os.environ.get("BACKLOG_GATE", "").lower() not in ("off", "0", "false")
 
 
+def _jev():
+    """Imported on use: a missing or broken jev package must mean "no gate", never a runner
+    that cannot start (cli.py imports this module at the top)."""
+    import jev
+    from jev.redact import redact_text
+    return jev, redact_text
+
+
 def item_state(item: dict) -> dict:
     """Only what the judgement needs. Never the runner note, the council verdict or the outcome."""
-    return {"repository": str(item.get("repo") or "none"), "title": str(item.get("title") or ""),
-            "task": redact_text(str(item.get("prompt") or ""))}
+    try:
+        _, redact = _jev()
+    except Exception:  # noqa: BLE001
+        redact = lambda text: text      # noqa: E731 - nothing is sent in that case: check() stops first
+    return {"repository": str(item.get("repo") or "none"), "title": redact(str(item.get("title") or "")),
+            "task": redact(str(item.get("prompt") or ""))}
 
 
 def check(item: dict, *, ask=None) -> tuple[bool, str]:
@@ -73,10 +89,14 @@ def check(item: dict, *, ask=None) -> tuple[bool, str]:
     if item.get("gate_ok") is True:
         return False, ""
     try:
-        got = (ask or jev.try_ask)(item_state(item), {"outward": QUESTION},
-                                   project="backlog-run", task="outward-gate", model=MODEL)
-        p = float(got["answers"]["outward"]["noul"])
+        ask = ask or _jev()[0].try_ask
+        got = ask(item_state(item), {"outward": QUESTION}, project="backlog-run", task="outward-gate",
+                  model=MODEL, timeout=TIMEOUT_SECONDS, retries=RETRIES)
+        p = got["answers"]["outward"]["noul"]
     except Exception:  # noqa: BLE001 - no answer is never a hold
+        return False, ""
+    # Only a real probability can hold. nan, inf, a bool, a string or 1.7 is "no answer".
+    if isinstance(p, bool) or not isinstance(p, (int, float)) or not math.isfinite(p) or not 0.0 <= p <= 1.0:
         return False, ""
     if p < LINE:
         return False, ""

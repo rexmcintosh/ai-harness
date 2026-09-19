@@ -147,3 +147,31 @@ def test_reopen_with_gate_ok_records_the_owners_decision(world):
     assert br.cmd_reopen(br.build_parser().parse_args(["reopen", "2026-01-01-a", "--gate-ok"]), cfg) == 0
     (it,) = load_items(cfg)
     assert it["status"] == "open" and it["gate_ok"] is True
+
+
+# --- council review 2026-09-19: fail-open at the edges ----------------------
+
+@pytest.mark.parametrize("bogus", [float("nan"), float("inf"), -0.2, 1.7, "high", None, True])
+def test_a_score_that_is_not_a_real_probability_never_holds(bogus):
+    assert gate.check({"id": "x", "prompt": "p"}, ask=lambda *a, **k: answer(bogus)) == (False, "")
+
+
+def test_the_call_is_short_and_retried_at_most_once_so_a_slow_api_cannot_stall_the_night():
+    seen = {}
+    gate.check({"id": "x", "prompt": "p"}, ask=lambda *a, **k: seen.update(k) or answer(0.1))
+    assert seen["timeout"] <= 10 and seen["retries"] <= 1
+    assert gate.BUDGET * (seen["retries"] + 1) * seen["timeout"] <= 300      # worst case for a whole run: 5 minutes
+
+
+def test_a_missing_or_broken_jev_package_means_no_gate_not_a_broken_runner(monkeypatch):
+    def broken():
+        raise ImportError("no module named jev")
+    monkeypatch.setattr(gate, "_jev", broken)
+    assert gate.check({"id": "x", "prompt": "deploy to production"}) == (False, "")
+    assert gate.item_state({"id": "x", "title": "mail rex@example.com", "prompt": "p"})["title"] == "mail rex@example.com"
+
+
+def test_the_title_is_redacted_like_the_prompt():
+    seen = {}
+    gate.check({"id": "x", "title": "ask rex@example.com", "prompt": "p"}, ask=lambda state, q, **k: seen.update(state) or answer(0.1))
+    assert seen["title"] == "ask <email>"
