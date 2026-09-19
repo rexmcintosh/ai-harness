@@ -22,83 +22,43 @@ import os
 import re
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
-from .triage import strip_json_data_lists
+import jev
+from jev import client as _client
+from jev.redact import _EMAIL, _TOKENISH, _URL_QUERY  # noqa: F401  (kept: tools/jev_council imports them)
+from jev.redact import redact_log as redact
+from jev.scope import OUT_OF_SCOPE, in_scope  # noqa: F401
 
-URL = "https://api.typesafe.ai/v1/systemone"
-MODEL = "jev-1.13.0"
+# One place talks to TypeSafe: jev/client.py. These names are kept for callers and tests
+# written against the first version of this module.
+URL = jev.URL
+MODEL = jev.MODEL
+load_key = _client.load_key
+_http_post = _client.http_post
+_NoRedirect = _client._NoRedirect
+_OPENER = _client._OPENER
 TAIL_LINES = 50            # same window check_cron_log reads
 TIMEOUT_SECONDS = 8
 BUDGET_SECONDS = 20        # whole pass; an outage must not stall the poll
 OK_BELOW, ALERT_FROM = 0.3, 0.7   # read off the first replay; shadow data exists to re-check them
 
 QUESTIONS = {
-    "needs_human": {
-        "type": "noul",
-        "instructions": "This is a window of lines from a scheduled job's log. "
-                        "Does it show a job failure that a person should look at?",
-        "criteria": {
-            "true": "A job crashed, gave up, timed out, exited with a non-zero code, could not reach a "
-                    "service it needs, could not deliver its output, or did not complete its work",
-            "false": "The jobs completed their work. Counters equal to zero (failed=0, \"error\": null), "
-                     "errors that an automatic retry fixed, error words that appear only inside titles, "
-                     "story text, file names or data, a job that reports an upstream source was down but "
-                     "completes normally, and normal skipped, held or deferred outcomes are not failures",
-        },
-    },
-    "latest_run_failed": {
-        "type": "noul",
-        "instructions": "Look only at the last run visible at the end of this log window. "
-                        "Did that last run end in failure?",
-        "criteria": {
-            "true": "The last run crashed, gave up, timed out, or exited with a non-zero code",
-            "false": "The last run completed its work, or the window ends without any sign that the last run failed",
-        },
-    },
+    "needs_human": jev.noul(
+        "This is a window of lines from a scheduled job's log. "
+        "Does it show a job failure that a person should look at?",
+        true="A job crashed, gave up, timed out, exited with a non-zero code, could not reach a "
+             "service it needs, could not deliver its output, or did not complete its work",
+        false="The jobs completed their work. Counters equal to zero (failed=0, \"error\": null), "
+              "errors that an automatic retry fixed, error words that appear only inside titles, "
+              "story text, file names or data, a job that reports an upstream source was down but "
+              "completes normally, and normal skipped, held or deferred outcomes are not failures"),
+    "latest_run_failed": jev.noul(
+        "Look only at the last run visible at the end of this log window. "
+        "Did that last run end in failure?",
+        true="The last run crashed, gave up, timed out, or exited with a non-zero code",
+        false="The last run completed its work, or the window ends without any sign that the last run failed"),
 }
-
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_CUSTOMER_ROW = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+[\"']?\s*\|")   # "email | name | ..." anywhere in the line
-_MAIL_LINE = re.compile(r"^\s*(mailed|would mail|skipped)\b")
-_URL_QUERY = re.compile(r"(https?://[^\s?\"']+)\?[^\s\"']+")
-_TOKENISH = re.compile(r"\b[A-Za-z0-9_\-]{40,}\b")
-_HANDLE = re.compile(r"(?<![\w.])@[A-Za-z0-9_.]{3,}")
-_MAX_LINE = 300
-
-# Data scope (owner, 2026-09-18): public and operations data only. A path holding any of
-# these is refused at run time, whatever monitors.toml says. Extend it; never trim it.
-OUT_OF_SCOPE = ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
-                "swimtrack-coach", "gmail", "mail")
-
-
-def in_scope(path) -> bool:
-    text = str(path or "")
-    return text.startswith("/") and not any(word in text.lower() for word in OUT_OF_SCOPE)
-
-
-def _redact_line(line: str) -> str:
-    if _CUSTOMER_ROW.search(line):
-        return "  <customer row removed>"
-    if _MAIL_LINE.search(line):
-        return re.sub(r":.*$", ": <subject removed>", _EMAIL.sub("<email>", line))[:_MAX_LINE]
-    line = strip_json_data_lists(line)      # wiki article names, per-item notes
-    line = _EMAIL.sub("<email>", line)
-    line = _URL_QUERY.sub(r"\1?<query removed>", line)
-    line = _TOKENISH.sub("<token>", line)
-    line = _HANDLE.sub("@<handle>", line)
-    return line[:_MAX_LINE]
-
-
-def redact(text: str) -> str:
-    """Strip personal and secret-shaped detail. Runs of removed rows collapse to one line."""
-    out: list[str] = []
-    for line in (_redact_line(ln) for ln in text.splitlines()):
-        if line.startswith("  <customer row") and out and out[-1] == line:
-            continue
-        out.append(line)
-    return "\n".join(out)
 
 
 def build_request(tail: str) -> dict:
@@ -109,55 +69,21 @@ def band(p: float) -> str:
     return "ok" if p < OK_BELOW else ("alert" if p >= ALERT_FROM else "gray")
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """urllib re-sends the Authorization header on a redirect. Refuse them all."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+def judge(tail: str, key: str, transport=None) -> dict | None:
+    """One Jev call through the shared client. None on ANY failure (and when JEV_DISABLED
+    is set): no retry here, the next changed tail gets its own try."""
+    got = jev.try_ask(tail, QUESTIONS, project="watchdog", task="cron-log-shadow", key=key,
+                      timeout=TIMEOUT_SECONDS, retries=0, transport=transport)
+    if not got:
         return None
-
-
-_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
-def _http_post(req: dict, key: str, timeout: float) -> dict:
-    request = urllib.request.Request(
-        URL, data=json.dumps(req).encode(), method="POST",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                 "User-Agent": "ai-harness-watchdog-shadow/1"})
-    with _OPENER.open(request, timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
-def judge(tail: str, key: str, transport=_http_post) -> dict | None:
-    """One Jev call. None on ANY failure: no retry, the next changed tail gets its own try."""
-    started = time.perf_counter()
     try:
-        reply = transport(build_request(tail), key, TIMEOUT_SECONDS)
-        if reply.get("model") != MODEL:        # a server-side fallback would mix versions into the data
-            return None
-        answers = reply["answers"]
         return {
-            "needs_human": float(answers["needs_human"]["noul"]),
-            "latest_run_failed": float(answers["latest_run_failed"]["noul"]),
-            "model": reply.get("model"),
-            "input_tokens": (reply.get("usage") or {}).get("input_tokens"),
-            "seconds": round(time.perf_counter() - started, 3),
+            "needs_human": float(got["answers"]["needs_human"]["noul"]),
+            "latest_run_failed": float(got["answers"]["latest_run_failed"]["noul"]),
+            "model": got["model"], "input_tokens": got["input_tokens"], "seconds": got["seconds"],
         }
     except Exception:  # noqa: BLE001 - shadow mode must never break a poll
         return None
-
-
-def load_key(env_file=None) -> str | None:
-    """TYPESAFE_API_KEY from the environment, else from ~/.env read as text (no shell)."""
-    value = os.environ.get("TYPESAFE_API_KEY")
-    if value:
-        return value
-    try:
-        for line in Path(env_file or Path.home() / ".env").read_text().splitlines():
-            if line.startswith("TYPESAFE_API_KEY="):
-                return line.split("=", 1)[1].strip().strip("\"'") or None
-    except OSError:
-        pass
-    return None
 
 
 def _load_json(path) -> dict:

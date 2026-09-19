@@ -17,13 +17,14 @@ backlog-run = "backlogrun.cli:main"
 notion-work-queue = "workqueue.cli:main"
 venice-usage = "venice_usage.cli:main"
 portfolio-cockpit = "cockpit.__main__:main"
+jev = "jev.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["council", "diem", "sessiongc", "backlogrun", "venice_usage", "workqueue", "cockpit"]
+packages = ["council", "diem", "sessiongc", "backlogrun", "venice_usage", "workqueue", "cockpit", "jev"]
 
 [tool.setuptools.package-data]
 council = ["panels.toml"]

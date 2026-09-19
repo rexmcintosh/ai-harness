@@ -71,7 +71,8 @@ def _good_reply(needs=0.9, latest=0.8):
                         "latest_run_failed": {"type": "noul", "noul": latest}}}
 
 
-def test_judge_returns_the_two_probabilities():
+def test_judge_returns_the_two_probabilities(monkeypatch):
+    monkeypatch.delenv("JEV_DISABLED")          # opt in: the shared off switch is on in every test
     got = js.judge("tail", key="k", transport=lambda req, key, timeout: _good_reply(0.91, 0.12))
     assert got["needs_human"] == 0.91 and got["latest_run_failed"] == 0.12
     assert got["input_tokens"] == 1500
@@ -309,7 +310,8 @@ def test_a_plain_main_call_in_a_test_never_reaches_the_real_api(monkeypatch, tmp
         def open(self, request, timeout=None):
             calls.append(request.full_url)
             raise OSError("blocked in tests")
-    monkeypatch.setattr(js, "_OPENER", Opener())
+    import jev.client
+    monkeypatch.setattr(jev.client, "_OPENER", Opener())   # the one opener every caller shares
     run.main([])
     assert calls == []
 
@@ -324,6 +326,7 @@ def test_an_enabled_shadow_pass_in_a_test_writes_under_the_temp_log_dir(monkeypa
                       ("WATCHDOG_DELIVERY_LAST", "l.json"), ("WATCHDOG_METRICS", "m.json")):
         monkeypatch.setenv(var, str(tmp_path / name))
     monkeypatch.delenv("WATCHDOG_JEV_SHADOW")
+    monkeypatch.delenv("JEV_DISABLED")
     monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
     log = tmp_path / "job.log"; log.write_text("job done rc=0\n")
     monkeypatch.setattr(run, "CRON_LOGS", [])
@@ -336,10 +339,25 @@ def test_an_enabled_shadow_pass_in_a_test_writes_under_the_temp_log_dir(monkeypa
         def open(self, request, timeout=None):
             sent.append((request.full_url, request.get_header("Authorization")))
             return io.BytesIO(json.dumps(_good_reply(0.05, 0.05)).encode())
-    monkeypatch.setattr(js, "_OPENER", Opener())
+    import jev.client
+    monkeypatch.setattr(jev.client, "_OPENER", Opener())
     run.main([])
     assert sent == [(js.URL, "Bearer test-key")]
     log_dir = os.environ["WATCHDOG_LOG_DIR"]
     assert log_dir.startswith(str(tmp_path))
     (rec,) = [json.loads(l) for l in open(os.path.join(log_dir, "jev-shadow.jsonl"))]
     assert rec["log"] == "job" and rec["jev_band"] == "ok"
+
+
+def test_the_shared_off_switch_stops_the_shadow_even_when_the_watchdog_switch_is_on(monkeypatch):
+    calls = []
+    assert js.judge("tail", key="k", transport=lambda *a: calls.append(1)) is None     # JEV_DISABLED=1 in tests
+    assert calls == []
+
+
+def test_shadow_calls_are_recorded_in_the_shared_usage_ledger(monkeypatch, tmp_path):
+    monkeypatch.delenv("JEV_DISABLED")
+    monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "u.jsonl"))
+    js.judge("tail", key="k", transport=lambda req, key, timeout: _good_reply())
+    (row,) = [json.loads(l) for l in (tmp_path / "u.jsonl").read_text().splitlines()]
+    assert (row["project"], row["task"], row["ok"]) == ("watchdog", "cron-log-shadow", True)
