@@ -17,29 +17,22 @@ from pathlib import Path
 
 from . import experiments as ex
 from . import jev
-from .reviews import Review, backlog_repo_map, load_reviews
+from .reviews import Review, backlog_repo_map, load_reviews, unique_reviews
 
 RUNNER_REVIEWS = Path("~/projects/.backlog-run/reviews")
-EVIDENCE = {   # folder -> the one repo every review in it belongs to, or a per-file map
-    "~/projects/backlog/reports/evidence/2026-09-18-ai-harness-session": {
-        "swimtrack": "swimtrack", "swimweb": "swimtrack-website", "*": "ai-harness"},
-    "~/projects/backlog/reports/evidence/2026-09-19-council-empty-seat": {"*": "ai-harness"},
+EVIDENCE = {   # folder -> (repo of each named review, repo of every other review in it)
+    "~/projects/backlog/reports/evidence/2026-09-18-ai-harness-session":
+        ({"swimtrack": "swimtrack", "swimweb": "swimtrack-website"}, "ai-harness"),
+    "~/projects/backlog/reports/evidence/2026-09-19-council-empty-seat": ({}, "ai-harness"),
 }
 BACKLOG = ("~/projects/backlog/backlog.yaml", "~/projects/backlog/archive.yaml")
 
 
 def dataset() -> list[Review]:
     reviews = load_reviews(RUNNER_REVIEWS, repo_of=backlog_repo_map(*BACKLOG))
-    for folder, repos in EVIDENCE.items():
-        for r in load_reviews(Path(folder), default_repo=repos["*"]):
-            r.repo = repos.get(r.rid, repos["*"])
-            reviews.append(r)
-    seen, unique = set(), []
-    for r in reviews:                       # the runner keeps a legacy copy of its latest review
-        if r.recommendation not in seen:
-            seen.add(r.recommendation)
-            unique.append(r)
-    return unique
+    for folder, (named, default) in EVIDENCE.items():
+        reviews += load_reviews(Path(folder), repo_of=named, default_repo=default)
+    return unique_reviews(reviews)
 
 
 def main(argv=None) -> int:

@@ -40,7 +40,9 @@ def _redact_state(state):
 
 
 def ask(state, questions: dict, *, key: str, transport=_http_post, retries: int = 2) -> dict:
-    req = {"state": _redact_state(state), "model": MODEL, "questions": questions}
+    # Questions carry review text too (a link request lists findings as its options), so the
+    # whole request is redacted. Dict KEYS are option ids and question names: left alone.
+    req = {"state": _redact_state(state), "model": MODEL, "questions": _redact_state(questions)}
     started, last = time.perf_counter(), None
     for attempt in range(retries + 1):
         try:

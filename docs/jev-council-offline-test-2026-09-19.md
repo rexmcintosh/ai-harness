@@ -42,7 +42,12 @@ today's behaviour, and it starts in shadow mode.
   `swimtrack-website`, `ultimate-portugal` and `aris-management-website`.
 - Known-answer sets: the three regression fixtures (19 findings with a known outcome) and
   the 2026-09-12 chair bake-off (4 distinct chair blocks, all confirming one known finding).
-- Emails, URL query strings and long token-shaped strings are removed before sending.
+- Emails, URL query strings and long token-shaped strings are removed from the whole request
+  before sending, the question options included. (In the first run the options of the 16
+  link requests were not yet covered; a check afterwards found that redaction would have
+  changed none of those 19 fixture findings, so nothing of that kind went out.)
+- Duplicate copies are dropped by file content, so two different reviews that share a
+  verdict sentence are both kept.
 
 ## Results
 
@@ -65,7 +70,7 @@ unknown` today, so the morning report cannot say which items are ready.
 
 A second question in the same call, "can it be merged exactly as it is?", behaved badly: it
 read optional suggestions as requirements and scored many clean approvals near 0.1. It is
-dropped. This is the literal-reading weak spot; wording needs test cases before it is trusted.
+dropped from the harness. This is the literal-reading weak spot; wording needs test cases before it is trusted.
 
 ### 2. Tie a chair block to a panel finding: works
 

@@ -5,6 +5,7 @@ backlog repo's evidence folders. Nothing here is copied into the repo.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -52,6 +53,7 @@ class SeatFinding:
 class Review:
     rid: str
     repo: str = ""
+    checksum: str = ""      # of the file's review content; identical copies share it
     panel: str = ""
     recommendation: str = ""
     rec_confidence: int = 0
@@ -135,11 +137,27 @@ def load_reviews(directory: Path, *, repo_of: dict[str, str] | None = None,
     out = []
     for p in sorted(Path(directory).expanduser().glob("*.md")):
         rid = p.stem.replace(".council", "")
-        repo = default_repo or _repo_for(rid, repo_of or {})
+        # A named repo wins over the folder default, and scope is judged on that FINAL repo,
+        # so one out-of-scope file inside a trusted folder is still refused.
+        repo = _repo_for(rid, repo_of or {}) or default_repo
         if not in_scope(rid, repo):
             continue
-        r = parse_review(p.read_text(encoding="utf-8", errors="replace"), rid)
+        text = p.read_text(encoding="utf-8", errors="replace")
+        r = parse_review(text, rid)
         if r.recommendation:
             r.repo = repo
+            body = text[text.index("### Recommendation"):]
+            r.checksum = hashlib.sha256(body.encode()).hexdigest()
+            out.append(r)
+    return out
+
+
+def unique_reviews(reviews: list[Review]) -> list[Review]:
+    """Drop byte-identical copies (the runner keeps a legacy copy of its latest review).
+    Two different reviews that happen to share a verdict sentence are both kept."""
+    seen, out = set(), []
+    for r in reviews:
+        if r.checksum not in seen:
+            seen.add(r.checksum)
             out.append(r)
     return out

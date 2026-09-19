@@ -58,9 +58,6 @@ def verdict_request(r: Review) -> Request:
         "verdict": {"type": "choice", "criteria": VERDICTS,
                     "instructions": "This is the chair's written recommendation at the end of a code review. "
                                     "What is the chair's verdict on merging the change?"},
-        "merge_as_is": {"type": "noul",
-                        "instructions": "Does the chair say the change can be merged exactly as it is, "
-                                        "with nothing required first?"},
     })
 
 

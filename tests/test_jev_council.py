@@ -202,3 +202,43 @@ def test_a_real_run_without_an_output_folder_is_refused(monkeypatch, capsys):
     monkeypatch.setattr(runner.jev, "load_key", lambda: "k")
     monkeypatch.setattr(runner.ex, "run", lambda *a, **k: {"rows": [], "errors": 0, "input_tokens": 0})
     assert runner.main(["verdict"]) == 2 and "--out" in capsys.readouterr().err
+
+
+# ── council review 2026-09-19: four fixes ────────────────────────────────────────────────
+def test_redaction_covers_the_questions_too_not_only_the_state():
+    # link and duplicate requests put finding text into the answer options.
+    sent = {}
+
+    def transport(req, key, timeout):
+        sent.update(req)
+        return {"model": jev.MODEL, "answers": {}, "usage": {}}
+    secret = "B" * 50
+    jev.ask("state", {"q": {"type": "choice", "instructions": f"see {secret}",
+                            "criteria": {"F1.1": f"mail dev@example.com token {secret}", "none": "no"}}},
+            key="k", transport=transport)
+    wire = json.dumps(sent)
+    assert secret not in wire and "dev@example.com" not in wire
+    assert set(sent["questions"]["q"]["criteria"]) == {"F1.1", "none"}      # option ids survive
+
+
+def test_scope_is_checked_on_the_final_repo_of_each_file(tmp_path):
+    from tools.jev_council.reviews import load_reviews
+    for name in ("gate2.council.md", "mathfix.council.md"):
+        (tmp_path / name).write_text(REVIEW)
+    # one file in a trusted folder belongs to an out-of-scope repo: it must not load
+    loaded = load_reviews(tmp_path, repo_of={"mathfix": "sat-prep"}, default_repo="ai-harness")
+    assert [(r.rid, r.repo) for r in loaded] == [("gate2", "ai-harness")]
+
+
+def test_duplicate_copies_are_dropped_by_content_not_by_similar_wording(tmp_path):
+    from tools.jev_council.reviews import load_reviews, unique_reviews
+    (tmp_path / "2026-09-11T03Z-2026-07-27-a.md").write_text(REVIEW)
+    (tmp_path / "2026-07-27-a.md").write_text(REVIEW)                       # the runner's legacy copy
+    (tmp_path / "2026-07-28-b.md").write_text(REVIEW.replace("over-capture", "over-capture badly"))
+    loaded = load_reviews(tmp_path, default_repo="ai-harness")
+    assert len(loaded) == 3 and len(unique_reviews(loaded)) == 2           # same verdict text, different review: kept
+
+
+def test_verdict_request_sends_only_the_question_the_results_rely_on():
+    (req,) = ex.build_requests("verdict", [parse_review(REVIEW, "rid")])
+    assert list(req.questions) == ["verdict"]
