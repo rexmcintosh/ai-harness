@@ -164,3 +164,18 @@ def test_run_pr_review_forwards_task_type_review(member_json):
     run_pr_review(CODE + DOC, _panels(), client, chair_model="c")
     assert client.calls  # sanity: calls actually happened
     assert all(c["task_type"] == "review" for c in client.calls)
+
+
+def test_junk_but_valid_json_from_every_seat_fails_closed(member_json):
+    client = FakeClient(by_model={"code1": '{": ": ", "}', "c": _chair("approve")})
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert blocking == 0 and unavailable is True
+
+
+def test_junk_but_valid_json_from_the_chair_fails_closed(member_json):
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug", findings=[("nil deref", "high", 9)]),
+        "c": '{": ": ", "}'})
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert unavailable is True
+

@@ -14,6 +14,20 @@ def _as_int(value, default: int = 5) -> int:
         return default
 
 
+class UnusableReply(ValueError):
+    """The model answered, the answer parsed, and it says nothing a seat can use."""
+
+
+def _usable(data) -> bool:
+    """A seat reply counts only if it carries a stance, a headline or a finding. Valid JSON
+    alone proves nothing: `{": ": ", "}` parses, and used to pass as a quiet stance "na"."""
+    if not isinstance(data, dict):
+        return False
+    return bool(str(data.get("stance") or "").strip() or str(data.get("headline") or "").strip()
+                or any(isinstance(f, dict) and str(f.get("point") or "").strip()
+                       for f in data.get("findings") or []))
+
+
 def _ask_member(member: Member, context: str, client, *, task_type: str = "chat",
                 max_completion_tokens=None) -> MemberResult:
     try:
@@ -25,6 +39,9 @@ def _ask_member(member: Member, context: str, client, *, task_type: str = "chat"
             max_completion_tokens=max_completion_tokens,
         )
         data = loads_lenient(raw)
+        if not _usable(data):
+            raise UnusableReply(f"no usable answer in the reply ({len(raw or '')} chars): "
+                                f"{' '.join(str(raw or '').split())[:80]!r}")
         findings = [
             Finding(point=str(f.get("point", "")),
                     severity=str(f.get("severity", "info")),
@@ -33,7 +50,7 @@ def _ask_member(member: Member, context: str, client, *, task_type: str = "chat"
         ]
         return MemberResult(
             member=member.name, model=member.model,
-            stance=str(data.get("stance", "na")),
+            stance=str(data.get("stance") or "na"),
             headline=str(data.get("headline", "")),
             findings=findings,
             suggestions=[str(s) for s in data.get("suggestions", [])],

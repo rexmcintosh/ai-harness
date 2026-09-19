@@ -67,3 +67,14 @@ def test_synthesize_falls_back_on_error():
     s = synthesize("x", _results(), client, chair_model="c")
     assert s.error is not None
     assert "unavailable" in s.recommendation.lower()
+
+
+def test_a_chair_reply_with_no_recommendation_is_an_error_not_a_clean_pass():
+    # Same defect class as the empty seat, with a worse outcome: a junk-but-valid chair
+    # reply used to become an empty Synthesis with no error, so the merge gate saw zero
+    # blocks and passed. It must surface as a chair failure (callers fail closed on it).
+    for junk in ('{": ": ", "}', "{}", "[]", '{"recommendation": "   ", "blocking_findings": []}'):
+        syn = synthesize("ctx", [], FakeClient(default=junk), chair_model="c")
+        assert syn.error is not None and "no usable answer" in syn.error
+        assert syn.blocking_findings == [] and syn.raw_response == junk
+

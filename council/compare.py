@@ -32,6 +32,8 @@ def _ask_voter(member: Member, context: str, client,
         raw = client.complete(member.model, member.system + "\n\n" + COMPARE_OUTPUT, context,
                               max_completion_tokens=max_completion_tokens)
         d = loads_lenient(raw)
+        if not isinstance(d, dict) or not str(d.get("pick") or "").strip():
+            raise ValueError(f"no usable answer in the reply ({len(raw or '')} chars)")
         return CandidateVote(
             member=member.name, model=member.model,
             pick=str(d.get("pick", "")),

@@ -165,3 +165,56 @@ def test_requires_key_and_names_the_council_var_first():
         VeniceClient(api_key="")
     msg = str(exc.value)
     assert msg.index("VENICE_COUNCIL_KEY") < msg.index("VENICE_API_KEY")
+
+
+# ── forced JSON is a per-model transport fact, decided in ONE place ───────────────────────
+# Venice's `response_format: json_object` garbles deepseek-v4-pro's first key and the model
+# often stops there (0 of 4 usable with it on, 4 of 4 clean with it off, 2026-09-19). The
+# rule lives in the client, keyed by model, so every caller is covered with no new argument:
+# panel seats, the chair, the router, compare, the sweep, and the per-repo CI shims.
+def _payloads():
+    sent = []
+
+    def fake_post(url, **kw):
+        sent.append(kw["json"])
+        return _resp('{"ok": true}')
+    return sent, fake_post
+
+
+def test_forced_json_is_not_sent_to_a_model_it_corrupts():
+    sent, post = _payloads()
+    c = VeniceClient(api_key="k", post=post)
+    c.complete("deepseek-v4-pro", "sys", "usr")
+    c.complete("grok-4-3", "sys", "usr")
+    c.complete("deepseek-v4-flash", "sys", "usr")            # a different model: unaffected
+    assert "response_format" not in sent[0]
+    assert sent[1]["response_format"] == {"type": "json_object"}
+    assert sent[2]["response_format"] == {"type": "json_object"}
+
+
+def test_json_mode_false_still_sends_no_response_format_for_any_model():
+    sent, post = _payloads()
+    VeniceClient(api_key="k", post=post).complete("grok-4-3", "sys", "usr", json_mode=False)
+    assert "response_format" not in sent[0]
+
+
+def test_the_no_forced_json_list_can_be_replaced_per_client():
+    sent, post = _payloads()
+    c = VeniceClient(api_key="k", post=post, no_forced_json=("model-y",))
+    c.complete("deepseek-v4-pro", "sys", "usr")
+    c.complete("model-y-large", "sys", "usr")
+    assert "response_format" in sent[0] and "response_format" not in sent[1]
+
+
+def test_the_no_forced_json_list_must_be_model_names_not_a_bare_string():
+    # A bare string would be iterated as characters and match nearly every model.
+    with pytest.raises(TypeError, match="model names"):
+        VeniceClient(api_key="k", no_forced_json="deepseek-v4-pro")
+
+
+@pytest.mark.parametrize("bad", [(None,), ("",), ("deepseek-v4-pro", "  "), (42,)])
+def test_the_no_forced_json_list_rejects_empty_or_non_string_names(bad):
+    # "" is a prefix of every model name: it would switch forced JSON off everywhere.
+    with pytest.raises(TypeError, match="model names"):
+        VeniceClient(api_key="k", no_forced_json=bad)
+
