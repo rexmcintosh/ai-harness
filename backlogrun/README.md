@@ -145,6 +145,19 @@ a readiness gate. `approve` still uses the existing human authority, including `
 but now refuses when the branch head differs from its exact recorded review SHA. There is
 no automatic merge.
 
+`report` and `show` may print one more line under the readiness lines, for example
+`Jev reads the chair's verdict as: approve_with_conditions (0.91) [shadow, display only]`.
+It is a second reading of the chair's written recommendation by a small model (Jev, see
+`docs/council-jev-shadow-2026-09-19.md`), saved as `jev_shadow` in the review's
+`inputs.json`. It is display only: it never changes the readiness state, the reasons,
+`report.json`, which rows suggest `approve`, or `approve` itself. The council step runs in
+the parent runner process, so the key (`TYPESAFE_API_KEY`, else `~/.env` read as text) never
+enters the worker session's environment. Only items in repositories on the council's allow
+list (`IN_SCOPE_REPOS` in `council/jev.py`) get a Jev call. The repository is identified by
+git (the main checkout's name, not a folder name), and that identity must also equal the
+item's `repo` field; any mismatch means no call. `COUNCIL_JEV=0` turns the step and the line
+off.
+
 For new items, an optional `required_validations` list declares check names before
 the session starts, for example `required_validations: [pytest, lint]`. Names are
 labels, not commands that the parent runner executes. The session follows the

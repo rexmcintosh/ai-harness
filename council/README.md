@@ -86,6 +86,23 @@ by `council.gate`, not by any single panelist:
 
 See `docs/council-audit-2026-06-25.md` for the failure modes this replaced.
 
+## Jev shadow signals (display only)
+
+After the chair has answered, `council review` asks Jev (TypeSafe's small typed judge, model
+`jev-1.13.0`) three label-and-score questions and prints the answers as one last section:
+how it reads the chair's verdict, which findings two seats both raised ("raised by 2 of 3
+seats"), and which panel finding each chair block confirms. `council sweep` adds one note
+with the findings Jev would also group. This is **shadow mode**: the answers are shown and
+logged (`~/.local/state/council/jev-shadow.jsonl`, ids and numbers only) and nothing reads
+them. The panel, the chair, the gate, `run_pr_review` and every exit code are unchanged.
+Every call goes through the shared client (`jev/`, `docs/contracts/jev.md`). `COUNCIL_JEV=0`
+turns it off, and so does the shared `JEV_DISABLED=1`. Scope is an allow list of repositories
+(`IN_SCOPE_REPOS` in `council/jev.py`, the five the signals were measured on; adding one is
+an owner decision). No `TYPESAFE_API_KEY`, or a repository that is not on the list, means no
+call and byte-identical output. Text on stdin, or a diff saved outside any repository, is
+judged by the working directory's repository alone. Details, the data rule and what
+is deliberately not built: `docs/council-jev-shadow-2026-09-19.md`.
+
 ## Secret
 
 `VENICE_API_KEY` from the environment / `.env`. Never commit it.

@@ -1255,3 +1255,388 @@ def test_approval_preserves_an_in_progress_git_sequence(world):
     sequence.mkdir()
     assert not br.approve_one(cfg, '2026-01-01-a', log=lambda *a:None)
     assert sequence.is_dir() and load_items(cfg)[0]['status'] == 'in_review'
+
+
+# ----------------------------------------------------------------------------- Jev shadow line
+# A display-only second reading of the chair's verdict. It may never move readiness, the
+# approve suggestion or the recorded review status. conftest keeps JEV_DISABLED=1 and
+# COUNCIL_JEV=0 for every test; these tests switch both on and fake the shared transport.
+
+JEV_LINE = "Jev reads the chair's verdict as: approve_with_conditions (0.91) [shadow, display only]"
+
+
+def _jev_switches_on(monkeypatch):
+    monkeypatch.delenv("JEV_DISABLED", raising=False)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+
+
+def jev_reviewer(label="approve_with_conditions", confidence=0.91, **extra):
+    def reviewer(cfg, diff, *, item_id):
+        return {"ok": True, "summary": "Approve with follow-up fixes", "markdown": "Full council output",
+                "jev_shadow": {"verdict": {"label": label, "confidence": confidence}}, **extra}
+    return reviewer
+
+
+def _fake_council(monkeypatch, *, findings=True):
+    """The real adapter over a scripted panel and chair; returns the Jev requests seen."""
+    from types import SimpleNamespace
+    import council.config as config
+    import council.engine as engine
+    import council.venice as venice
+    import jev.client as shared_client
+    from council.jev import MODEL
+    from council.models import Finding, Member, MemberResult, Panel
+    from tests.conftest import FakeClient
+    payload = {"recommendation": "Approve with follow-up fixes. Two gaps should be closed before merge.",
+               "confidence": 8, "blocking_findings": [], "required_changes": []}           # no review_status: unknown
+    panel = Panel("code-review", "fixture", [Member("a", "m1", "x"), Member("b", "m2", "x")])
+    results = [MemberResult("a", "m1", "concerns", "ok", findings=[Finding("parser over-captures", "high", 9)] if findings else []),
+               MemberResult("b", "m2", "concerns", "ok", findings=[Finding("parser splits notes", "med", 8)] if findings else [])]
+    monkeypatch.setattr(config, "load_panels", lambda _: (SimpleNamespace(timeout=1, byte_cap=100000, chair_model="chair"), {"code-review": panel}))
+    monkeypatch.setattr(engine, "run_panel", lambda *args, **kw: results)
+    monkeypatch.setattr(venice, "VeniceClient", lambda *args, **kw: FakeClient(default=payload))
+    monkeypatch.setattr(br, "load_venice_key", lambda role, env_path=None: "venice-test")
+    sent = []
+
+    def transport(req, key, timeout):
+        sent.append(req)
+        if "verdict" in req["questions"]:
+            answers = {"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91, "probabilities": {}}}
+        else:
+            answers = {"same": {"type": "noul", "noul": 0.9}}
+        return {"model": MODEL, "answers": answers}
+    monkeypatch.setattr(shared_client, "http_post", transport)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")
+    monkeypatch.delenv("JEV_DISABLED", raising=False)            # the council's own switch is still off (conftest)
+    return sent
+
+
+def test_real_council_adapter_carries_the_jev_verdict_and_changes_nothing_else(world, monkeypatch):
+    cfg = world.build([])
+    sent = _fake_council(monkeypatch)
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
+    assert sent == [] and "jev_shadow" not in off and "Jev" not in off["markdown"]        # kill switch (conftest)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
+    assert on["jev_shadow"] == {"verdict": {"label": "approve_with_conditions", "confidence": 0.91}}
+    assert on["review_status"] == off["review_status"] == "unknown"
+    assert {k: v for k, v in on.items() if k not in ("jev_shadow", "markdown")} == \
+           {k: v for k, v in off.items() if k != "markdown"}
+    assert on["markdown"].startswith(off["markdown"])
+    assert "### Jev shadow signals (display only; not used by the chair or the gate)" in on["markdown"][len(off["markdown"]):]
+    assert "raised by 2 of 2 seats" in on["markdown"] and len(sent) == 2
+    assert "diff" not in json.dumps([r["state"] for r in sent])                          # the diff is never sent
+
+
+@pytest.mark.parametrize("repo,item_id", [("sat-prep", "2026-01-01-a"), ("romance-empire", "2026-01-01-a"),
+                                          (None, "2026-01-01-a"), ("ai-harness", "2026-01-01-bebop-mail-fix"),
+                                          ("alpha", "2026-01-01-a"), ("vps-tools", "2026-01-01-a"),
+                                          ("brand-new-repo", "2026-01-01-a")])        # not on the allow list
+def test_out_of_scope_or_unknown_repo_gets_no_jev_call_at_all(world, monkeypatch, repo, item_id):
+    cfg = world.build([])
+    sent = _fake_council(monkeypatch)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rev = REAL_COUNCIL_REVIEW(cfg, "diff", item_id=item_id, repo=repo)
+    assert sent == [] and "jev_shadow" not in rev and "Jev" not in rev["markdown"] and rev["ok"] is True
+
+
+def test_a_jev_outage_leaves_the_review_exactly_as_it_was(world, monkeypatch):
+    import jev.client as shared_client
+    cfg = world.build([])
+    _fake_council(monkeypatch)
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+
+    def down(req, key, timeout):
+        raise OSError("TypeSafe is down")
+    monkeypatch.setattr(shared_client, "http_post", down)
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness")
+    assert "jev_shadow" not in on and {k: v for k, v in on.items() if k != "markdown"} == {k: v for k, v in off.items() if k != "markdown"}
+    import council.signals as signals
+    monkeypatch.setattr(signals, "collect", lambda *a, **k: 1 / 0)
+    assert REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="ai-harness") == off
+
+
+def test_work_one_names_the_repo_only_to_a_reviewer_that_asks_for_it(world):
+    seen = {}
+
+    def wants_repo(cfg, diff, *, item_id, repo=None):
+        seen.update(repo=repo)
+        return {"ok": True, "summary": "ok", "markdown": "x"}
+    wants_repo.accepts_repo = True
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=wants_repo, log=lambda *a: None)
+    assert seen == {"repo": "alpha"} and REAL_COUNCIL_REVIEW.accepts_repo is True
+
+
+def test_jev_line_shows_in_report_and_show_and_readiness_stays_unknown(world, monkeypatch, capsys):
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
+    assert result["review_readiness"]["status"] == "unknown"
+    info = br._review_readiness(cfg, load_items(cfg)[0])
+    standard = {"schema_version", "record_id", "branch_sha", "status", "reasons", "evidence_path", "review_path"}
+    assert info["status"] == "unknown" and set(info) == standard          # readiness carries no Jev field
+    report = br.write_report(cfg)
+    assert report.count(JEV_LINE) == 1 and "- " + JEV_LINE in report.splitlines()
+    assert "Review readiness unknown" in report and "`backlog-run approve 1`" not in report
+    assert "resolve or inspect the evidence above before deciding" in report
+    saved = json.loads(Path(cfg.report_json).read_text())["review_readiness"]["2026-01-01-a"]
+    assert saved["status"] == "unknown" and set(saved) == standard
+    assert br.cmd_show(br.build_parser().parse_args(["show", "1"]), cfg) == 0
+    assert capsys.readouterr().out.count(JEV_LINE) == 1
+    monkeypatch.setenv("COUNCIL_JEV", "0")                                       # the kill switch hides it again
+    assert "Jev" not in br.write_report(cfg)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    assert JEV_LINE in br.write_report(cfg)
+    monkeypatch.setenv("JEV_DISABLED", "1")                                      # and so does the shared off switch
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_report_with_and_without_a_jev_label_differs_by_that_one_line(world, monkeypatch):
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, reviewer=jev_reviewer("approve", 0.99), log=lambda *a: None)
+    assert result["review_readiness"]["status"] == "unknown"
+    with_label = br.write_report(cfg).splitlines()[1:]
+    record_path = next(Path(cfg.reviews_dir).glob("*.inputs.json"))
+    record = json.loads(record_path.read_text())
+    assert record.pop("jev_shadow") == {"verdict": {"label": "approve", "confidence": 0.99}}
+    record_path.write_text(json.dumps(record))
+    without = br.write_report(cfg).splitlines()[1:]
+    extra = [ln for ln in with_label if ln not in without]
+    assert extra == ["- Jev reads the chair's verdict as: approve (0.99) [shadow, display only]"]
+    assert [ln for ln in with_label if ln not in extra] == without
+    assert not any("approve 1" in ln for ln in with_label)                       # still no approve suggestion
+
+
+@pytest.mark.parametrize("shadow", [{"verdict": {"label": "ship_it", "confidence": 0.9}},
+                                    {"verdict": {"label": "approve", "confidence": "high"}},
+                                    {"verdict": {"label": "approve", "confidence": 1.7}},
+                                    {"verdict": "approve"}, "approve", None])
+def test_a_malformed_jev_record_is_neither_saved_nor_shown(world, monkeypatch, shadow):
+    _jev_switches_on(monkeypatch)
+
+    def reviewer(cfg, diff, *, item_id):
+        return {"ok": True, "summary": "ok", "markdown": "x", "jev_shadow": shadow}
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=reviewer, log=lambda *a: None)
+    assert "jev_shadow" not in json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_a_jev_label_for_an_older_commit_is_not_shown_against_a_newer_head(world, monkeypatch):
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
+    assert JEV_LINE in br.write_report(cfg)
+    git(world.repo, "checkout", "-q", "claude/bl-a")
+    git(world.repo, "commit", "--allow-empty", "-qm", "moved on")
+    git(world.repo, "checkout", "-q", "main")
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_a_clean_ready_item_keeps_its_approve_suggestion_next_to_a_doubting_jev_label(world, monkeypatch):
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, log=lambda *a: None, reviewer=jev_reviewer(
+        "request_changes", 0.95, review_status="clean", blocking_findings=[]))
+    assert result["review_readiness"]["status"] == "ready"                       # shadow: Jev cannot make it stricter yet
+    report = br.write_report(cfg)
+    assert "`backlog-run approve 1`" in report and "request_changes (0.95) [shadow, display only]" in report
+
+
+# Repo identity (council review 2026-09-19). The scope rule is judged on WHICH repository the
+# work ran in, not on what a folder happens to be called: git's own answer (the main
+# checkout's name, right inside a linked worktree and through a symlink) must also equal the
+# backlog item's `repo` field. Anything else means no Jev call.
+
+def test_repo_identity_is_gits_answer_and_must_match_the_items_repo_field(tmp_path):
+    real = make_repo(tmp_path, "ai-harness", remote=False)
+    assert br._jev_repo_identity(str(real), "ai-harness") == "ai-harness"
+    assert br._jev_repo_identity(str(real), " ai-harness ") == "ai-harness"       # as repo_path reads the field
+    for declared in ("swimtrack", str(real), "", None, "AI-HARNESS", 7):
+        assert br._jev_repo_identity(str(real), declared) is None, declared      # any mismatch: no Jev call
+
+
+def test_a_folder_named_like_an_allowed_repo_is_not_that_repo(tmp_path):
+    lookalike = tmp_path / "elsewhere" / "ai-harness"
+    (lookalike / ".git").mkdir(parents=True)                                     # passes a folder check; git says no
+    assert br._jev_repo_identity(str(lookalike), "ai-harness") is None
+    private = make_repo(tmp_path, "sat-prep", remote=False)
+    linked = tmp_path / "worktrees" / "ai-harness"
+    linked.parent.mkdir()
+    git(private, "worktree", "add", "-q", str(linked), "-b", "side")
+    assert br._jev_repo_identity(str(linked), "ai-harness") is None              # a worktree of sat-prep
+    alias = tmp_path / "aliases" / "ai-harness"
+    alias.parent.mkdir()
+    alias.symlink_to(private, target_is_directory=True)
+    assert br._jev_repo_identity(str(alias), "ai-harness") is None               # a symlink to sat-prep
+
+
+def test_an_identity_that_cannot_be_resolved_means_no_jev_call(tmp_path, monkeypatch):
+    import council.jev as council_jev
+    real = make_repo(tmp_path, "ai-harness", remote=False)
+    monkeypatch.setattr(council_jev, "repo_name", lambda path: None)
+    assert br._jev_repo_identity(str(real), "ai-harness") is None
+    monkeypatch.setattr(council_jev, "repo_name", lambda path: 1 / 0)
+    assert br._jev_repo_identity(str(real), "ai-harness") is None
+
+
+def _work_with_the_real_council(world, monkeypatch, *, declared_repo):
+    sent = _fake_council(monkeypatch)
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", repo=declared_repo, required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    assert p.action == "work", p.reason
+    result = br.work_one(cfg, p, reviewer=REAL_COUNCIL_REVIEW, log=lambda *a: None)
+    record = json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    return sent, result, record
+
+
+def test_work_one_in_the_real_allowed_repo_still_calls_jev(world, monkeypatch):
+    make_repo(world.root, "ai-harness")
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo="ai-harness")
+    assert len(sent) == 2 and record["jev_shadow"]["verdict"]["label"] == "approve_with_conditions"
+    assert result["review_readiness"]["status"] == "unknown"
+
+
+def test_work_one_through_a_symlink_named_like_an_allowed_repo_makes_no_jev_call(world, monkeypatch):
+    private = make_repo(world.root, "sat-prep")
+    (world.root / "projects" / "ai-harness").symlink_to(private, target_is_directory=True)
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo="ai-harness")
+    assert sent == [] and "jev_shadow" not in record
+    assert result["council"].startswith(str(br.today().year))                    # the review itself still ran
+
+
+def test_work_one_makes_no_jev_call_when_the_items_repo_field_is_not_the_repo_name(world, monkeypatch):
+    real = make_repo(world.root, "ai-harness")
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo=str(real))
+    assert sent == [] and "jev_shadow" not in record                             # a path is not a name: mismatch
+
+
+def test_the_work_queue_shares_work_one_and_its_one_repo_is_never_in_scope():
+    import inspect
+    import council.jev as council_jev
+    import workqueue.runner as runner
+    assert runner._work_one is br.work_one                                       # so the identity rule applies there too
+    assert '"repo": "sat-prep"' in inspect.getsource(runner.execute)
+    assert not council_jev.in_scope("any-run-id", "sat-prep")
+
+
+# Two Jev uses now live in backlog-run. The pre-session HOLD GATE (backlogrun/gate.py) runs
+# BEFORE a worker session and may add a hold. The council SHADOW signals run AFTER the council
+# review and are display and log only. These tests pin that they do not interfere.
+
+def _both_jev_uses_on(monkeypatch, *, outward: float):
+    """The real gate and the real council adapter over one fake shared transport. Returns the
+    list of question-name lists the transport saw, in order."""
+    import jev.client as shared_client
+    from council.jev import MODEL
+    _fake_council(monkeypatch)
+    _jev_switches_on(monkeypatch)
+    seen = []
+
+    def transport(req, key, timeout):
+        names = sorted(req["questions"])
+        seen.append((names, req["state"]))
+        if names == ["outward"]:
+            answers = {"outward": {"type": "noul", "noul": outward}}
+        elif names == ["verdict"]:
+            answers = {"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91, "probabilities": {}}}
+        else:
+            answers = {"same": {"type": "noul", "noul": 0.9}}
+        return {"model": MODEL, "answers": answers, "usage": {"input_tokens": 7}}
+    monkeypatch.setattr(shared_client, "http_post", transport)
+    monkeypatch.setattr(br, "council_review", REAL_COUNCIL_REVIEW)      # cmd_work uses the module's reviewer
+    return seen
+
+
+def _usage_rows():
+    path = Path(os.environ["JEV_USAGE_LOG"])
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+def test_under_the_suite_guard_neither_jev_use_makes_a_call(world, monkeypatch):
+    import jev.client as shared_client
+    reached = []
+    monkeypatch.setattr(shared_client, "http_post", lambda *a: reached.append(a) or {})
+    monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")             # a key exists; conftest's switches are on
+    assert os.environ["JEV_DISABLED"] == "1" and os.environ["COUNCIL_JEV"] == "0"
+    assert br.gate_mod.check(item("2026-01-01-deploy", prompt="run npm run deploy")) == (False, "")
+    cfg = world.build([])
+    _fake_council(monkeypatch)
+    monkeypatch.setenv("JEV_DISABLED", "1")                             # _fake_council lifts it; put it back
+    monkeypatch.setattr(shared_client, "http_post", lambda *a: reached.append(a) or {})
+    monkeypatch.setenv("COUNCIL_JEV", "1")                              # even with the council's own switch on
+    rev = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
+    assert reached == [] and "jev_shadow" not in rev and _usage_rows() == []
+
+
+def test_a_gate_hold_means_no_review_no_shadow_call_no_display_line_and_no_shadow_log(world, monkeypatch, capsys):
+    make_repo(world.root, "ai-harness")                                 # a repo the shadow WOULD run for
+    seen = _both_jev_uses_on(monkeypatch, outward=0.95)
+    cfg = world.build([item("2026-01-01-deploy", repo="ai-harness", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    (it,) = load_items(cfg)
+    assert it["status"] == "held" and "pre-session gate" in it["note"] and not it.get("branch")
+    assert [names for names, _ in seen] == [["outward"]]                # the gate's one question, nothing after it
+    assert list(Path(cfg.runs_dir).glob("*.json")) == [] and list(Path(cfg.reviews_dir).glob("*")) == []
+    report = br.write_report(cfg)
+    assert "Jev reads" not in report and "pre-session gate" in report
+    assert br.cmd_show(br.build_parser().parse_args(["show", "2026-01-01-deploy"]), cfg) == 0
+    assert "Jev reads" not in capsys.readouterr().out
+    assert not Path(os.environ["COUNCIL_JEV_LOG"]).exists()             # no shadow log line for a held item
+    assert [(r["project"], r["task"]) for r in _usage_rows()] == [("backlog-run", "outward-gate")]
+
+
+def test_an_item_the_gate_lets_through_is_asked_once_by_each_and_nothing_is_logged_twice(world, monkeypatch, capsys):
+    make_repo(world.root, "ai-harness")
+    seen = _both_jev_uses_on(monkeypatch, outward=0.08)
+    cfg = world.build([item("2026-01-01-a", repo="ai-harness", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    (it,) = load_items(cfg)
+    assert it["status"] == "in_review"
+    assert [names for names, _ in seen] == [["outward"], ["verdict"], ["same"]]      # gate first, shadow last
+    gate_state, shadow_states = seen[0][1], [state for _, state in seen[1:]]
+    assert set(gate_state) == {"repository", "title", "task"}
+    assert "Do the thing" not in json.dumps(shadow_states)              # the shadow never sends the item's prompt
+    assert [(r["project"], r["task"]) for r in _usage_rows()] == [
+        ("backlog-run", "outward-gate"), ("ai-harness", "council-verdict"), ("ai-harness", "council-same")]
+    rows = [json.loads(line) for line in Path(os.environ["COUNCIL_JEV_LOG"]).read_text().splitlines()]
+    assert len(rows) == 1 and rows[0]["kind"] == "review" and rows[0]["item"] == "2026-01-01-a" and rows[0]["calls"] == 2
+    assert "outward" not in json.dumps(rows[0])                         # the gate's answer is not in the shadow log
+    record = json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    assert record["jev_shadow"] == {"verdict": {"label": "approve_with_conditions", "confidence": 0.91}}
+    assert "gate" not in json.dumps(record).lower()
+    assert JEV_LINE in br.write_report(cfg)
+
+
+def test_the_gates_answer_never_reaches_the_shadows_scope_rule(world, monkeypatch):
+    # "alpha" is not on the council's allow list. Whatever the gate does with such an item,
+    # the shadow's own rule still decides for the shadow: a worked item gets no shadow call.
+    seen = _both_jev_uses_on(monkeypatch, outward=0.08)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    assert load_items(cfg)[0]["status"] == "in_review"
+    assert [names for names, _ in seen if names != ["outward"]] == []
+    assert not Path(os.environ["COUNCIL_JEV_LOG"]).exists()
+
+
+def test_the_two_jev_uses_share_no_code_and_no_module_state():
+    import inspect
+    import council.signals as signals
+    from backlogrun import gate
+    gate_source, signals_source = inspect.getsource(gate), inspect.getsource(signals)
+    assert "council" not in gate_source.replace("the council verdict", "")       # the gate knows nothing of the shadow
+    assert "backlogrun" not in signals_source and "outward" not in signals_source
+    mutable = lambda module: {k for k, v in vars(module).items()                  # noqa: E731
+                              if not k.startswith("__") and isinstance(v, (list, set, bytearray))}
+    assert mutable(gate) == set() and mutable(signals) == set()
+    assert gate.MODEL == signals.jev.MODEL                                        # two pins, one measured version today

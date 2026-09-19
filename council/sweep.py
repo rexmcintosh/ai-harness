@@ -90,11 +90,26 @@ def _keep(f: Finding, min_conf: int) -> bool:
     return f.severity == "critical" or f.confidence >= min_conf
 
 
+def _jev_note(findings, jev_repo):
+    """Shadow only: which of the reported findings would Jev also group? Runs AFTER the
+    chair's summary and never touches `findings`. The sweep itself cannot know which
+    repository its chunks came from, so the caller names it (`jev_repo`); without a name,
+    or for a repo that is not on the council's allow list, nothing is sent."""
+    if not jev_repo:
+        return None
+    try:
+        from . import signals
+        return signals.collect_sweep(jev_repo, findings)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def run_sweep(chunks, panel: Panel, client, *, chair_model: str,
-              min_conf: int = 7, max_workers=None, budget=None) -> SweepReport:
+              min_conf: int = 7, max_workers=None, budget=None, jev_repo=None) -> SweepReport:
     """Run `panel` over each chunk, gate + dedup the findings, sort worst-first, and
     have the chair summarize. A chair failure surfaces in ``error`` but never drops
-    the findings."""
+    the findings. `jev_repo` (the swept repository's name) allows the display-only Jev
+    note; it changes no finding, count, order or summary."""
     chunks = list(chunks)
     workers = max_workers or min(8, max(1, len(chunks)))
     tagged = []
@@ -128,4 +143,5 @@ def run_sweep(chunks, panel: Panel, client, *, chair_model: str,
     except Exception as e:  # noqa: BLE001
         report.error = f"{type(e).__name__}: {e}"
         report.summary = "(summary unavailable — see findings below)"
+    report.jev_shadow = _jev_note(findings, jev_repo)
     return report
