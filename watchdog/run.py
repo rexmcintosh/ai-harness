@@ -105,9 +105,22 @@ def _supabase_count(url: str, key: str, table: str) -> int | None:
         return None
 
 
-def _supabase_rows(url: str, key: str, path: str) -> list | None:
+def _note_failure(error: dict | None, exc: Exception) -> None:
+    """Record a failed read as far as it is actually visible: the response
+    status and body when there is one, None/'' when there is not. A caller must
+    be able to tell a schema problem from a timeout — and must not guess when
+    the failure carries nothing to read."""
+    if error is None:
+        return
+    resp = getattr(exc, "response", None)
+    error["status"] = getattr(resp, "status_code", None)
+    error["body"] = (getattr(resp, "text", "") or "")[:300]
+
+
+def _supabase_rows(url: str, key: str, path: str, error: dict | None = None) -> list | None:
     """Read-only PostgREST GET returning rows. None on any failure — a read we
-    can't make must not crash a poll or fake an alert."""
+    can't make must not crash a poll or fake an alert. `error`, when a dict is
+    passed, is FILLED with what the failure looked like (see _note_failure)."""
     try:
         import requests
         r = requests.get(f"{url}/rest/v1/{path}",
@@ -115,8 +128,50 @@ def _supabase_rows(url: str, key: str, path: str) -> list | None:
                          timeout=15)
         r.raise_for_status()
         return r.json()
-    except Exception:  # noqa: BLE001 — network/parse error -> skip this check
+    except Exception as exc:  # noqa: BLE001 — network/parse error -> skip this check
+        _note_failure(error, exc)
         return None
+
+
+# The registry slice the absence alert reads. The per-event coverage columns
+# arrive with an owner-applied MeetTrack migration (splash_poller
+# migrations/2026-09-18_meet_registry_tick_coverage.sql), so production may not
+# have them yet.
+_MEET_COLS = ("sr_meet_id,name,ingest_status,last_ingest_at,updated_at,"
+              "start_date,end_date")
+_MEET_COVERAGE_COLS = ("events_published,events_with_results,last_tick_errors,"
+                       "coverage_at")
+# PostgREST 12 answers a missing column with 400 PGRST204; older builds pass
+# PostgreSQL's 42703 through. Anything else — a timeout, a 5xx, a parse error —
+# is not evidence about the schema and must not be reported as if it were.
+_MISSING_COLUMN_CODES = ("42703", "PGRST204")
+
+
+def _meet_registry_rows(url: str, key: str, since: str) -> list | None:
+    """Rows for check_meet_freshness, with the coverage columns when they exist.
+
+    A 400 on a not-yet-applied migration must cost the coverage RULE, never the
+    whole check — without the retry, a missing column would silently take the
+    absence alert itself off the air."""
+    def fetch(cols, error=None):
+        return _supabase_rows(url, key,
+                              f"meet_registry?select={cols}&updated_at=gt.{since}",
+                              error=error)
+
+    failure: dict = {}
+    rows = fetch(f"{_MEET_COLS},{_MEET_COVERAGE_COLS}", error=failure)
+    if rows is not None:
+        return rows
+    rows = fetch(_MEET_COLS)
+    if rows is not None:
+        body = failure.get("body") or ""
+        if failure.get("status") == 400 and any(c in body for c in _MISSING_COLUMN_CODES):
+            print("meet_registry has no tick-coverage columns yet — freshness "
+                  "check running without the per-event coverage rule")
+        else:
+            print("meet_registry coverage select failed; using the plain "
+                  "freshness rule this run")
+    return rows
 
 
 def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStatus], dict]:
@@ -176,17 +231,17 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
             # 'Z' suffix, never '+00:00' — a '+' in a query string is a space.
             since = (datetime.now(_tz.utc) - timedelta(days=14)).strftime(
                 "%Y-%m-%dT%H:%M:%SZ")
-            rows = _supabase_rows(
-                sb["url"], key,
-                "meet_registry?select=sr_meet_id,name,ingest_status,"
-                "last_ingest_at,updated_at,start_date,end_date"
-                f"&updated_at=gt.{since}")
+            rows = _meet_registry_rows(sb["url"], key, since)
             if rows is not None:
                 out.append(check_meet_freshness(
                     rows, now_epoch,
                     stale_warn_min=mf.get("stale_warn_min", 20),
                     stale_crit_min=mf.get("stale_crit_min", 75),
-                    launch_overdue_min=mf.get("launch_overdue_min", 30)))
+                    launch_overdue_min=mf.get("launch_overdue_min", 30),
+                    coverage_gap_warn=mf.get("coverage_gap_warn", 3),
+                    coverage_gap_pct=mf.get("coverage_gap_pct", 15),
+                    # Unset -> the counters inherit stale_warn_min.
+                    coverage_max_age_min=mf.get("coverage_max_age_min")))
 
     return out, new_metrics
 

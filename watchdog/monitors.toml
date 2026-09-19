@@ -50,10 +50,20 @@ tables        = ["results", "splits", "swimmers"]
 # A live-by-date meet whose writer went quiet during racing hours, a live meet
 # the supervisor never launched, or a meet that hit terminal 'failed'.
 # Escalation already routes to Telegram via the investigator agent.
+#
+# The coverage pair is the half a heartbeat cannot see: a meet still writing 37
+# of its 40 published events looks perfectly healthy. Warn on 3 uncovered
+# events, or on 15% of them (two minimum, so the one event being parsed right
+# now is never an alert). Both are quiet while the counters are NULL — only the
+# PDF writer reports them — and while their coverage_at is older than
+# stale_warn_min, so last weekend's snapshot can never raise this weekend's
+# alarm. Add coverage_max_age_min here to give that bound its own value.
 [meet_freshness]
 stale_warn_min     = 20
 stale_crit_min     = 75
 launch_overdue_min = 30
+coverage_gap_warn  = 3
+coverage_gap_pct   = 15
 
 # --- Jev shadow mode (SHADOW ONLY) ------------------------------------------
 # A second opinion on cron-log tails from Jev (TypeSafe), written to
