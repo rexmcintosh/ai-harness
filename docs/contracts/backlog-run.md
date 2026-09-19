@@ -31,3 +31,7 @@ Before a session is spent on an item, `backlogrun/gate.py` asks Jev one yes/no q
 - Known gap: Jev cannot read dates. "Do not run before <date>" in a prompt is invisible to this gate.
 - This gate reinforces README safety rule 2. It does not replace the session's own duty to stop and report HELD.
 
+## Date rules are read by code (added 2026-09-19)
+
+An item may say when it must not run yet: a `not_before: YYYY-MM-DD` field, or in its title or prompt one of "NOT BEFORE <date>", "do not run/start/work ... before <date>", "if today is before <date>". `backlogrun.cli.not_before()` reads it, and `plan()` defers the item until that UTC date: it stays `open`, takes no slot, is not shown to the Jev gate, and runs by itself on the day. A deadline ("must be stable before <date>") is not a gate and is ignored. Several gates mean the latest. A date rule that cannot be read (a typo, a day that does not exist) holds the item with a note, because the owner meant to gate it. This is code on purpose: Jev cannot compare dates.
+

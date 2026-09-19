@@ -417,6 +417,60 @@ def repo_path(cfg: Config, repo: str | None) -> str | None:
     return path if os.path.isdir(os.path.join(path, ".git")) else None
 
 
+# A date rule in an item is read by code. The Jev hold gate cannot compare dates, and on
+# 2026-09-19 an item that said "NOT BEFORE 2026-11-15" was first in the night's queue.
+# Only phrasings that gate the RUN are read; "must be stable before <date>" is a deadline.
+_DATE = r"(\d{4}-\d{2}-\d{2})"
+_NOT_BEFORE_PATTERNS = [re.compile(p, re.IGNORECASE) for p in (
+    r"\bnot\s+before\s+" + _DATE,                                              # NOT BEFORE 2026-11-15
+    r"\bdo\s+not\s+(?:run|start|work)\b[^.]{0,60}?\bbefore\s+" + _DATE,         # do not run (this item) before ...
+    r"\bif\s+today\s+is\s+before\s+" + _DATE,                                  # DATE GATE: if today is before ...
+)]
+
+
+def _as_date(value) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip())
+    except ValueError:
+        return None
+
+
+def _date_rules(item: dict) -> tuple[list[date], list[str]]:
+    """(readable gate dates, unreadable ones as written). The field counts as one more rule."""
+    good: list[date] = []
+    bad: list[str] = []
+    if item.get("not_before") is not None:
+        d = _as_date(item["not_before"])
+        (good if d else bad).append(d or f"not_before: {item['not_before']!r}")
+    text = f"{item.get('title') or ''}\n{item.get('prompt') or ''}"
+    for pat in _NOT_BEFORE_PATTERNS:
+        for m in pat.finditer(text):
+            d = _as_date(m.group(1))
+            (good if d else bad).append(d or m.group(1))
+    return good, bad
+
+
+def not_before(item: dict) -> date | None:
+    """The first day this item may run, or None. A readable `not_before:` field wins;
+    otherwise the latest run-gating date written in the title or the prompt."""
+    field_date = _as_date(item["not_before"]) if item.get("not_before") is not None else None
+    if field_date:
+        return field_date
+    good, _ = _date_rules(item)
+    return max(good) if good else None
+
+
+def date_rule_problem(item: dict) -> str | None:
+    """The owner wrote a date rule that cannot be read (a typo, a day that does not exist).
+    That must hold the item, not let it run early."""
+    _, bad = _date_rules(item)
+    return f"this item has a date rule I cannot read ({', '.join(bad)}); fix the date, then reopen" if bad else None
+
+
 @dataclass
 class Planned:
     item: dict
@@ -431,7 +485,7 @@ class Planned:
 
 def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
          repo_filter: str | None = None, max_items: int | None = None,
-         gate=None, gate_budget: int | None = None) -> list[Planned]:
+         gate=None, gate_budget: int | None = None, today: date | None = None) -> list[Planned]:
     """Decide what tonight's run would do, without doing it. Oldest `created` first
     (file order breaks ties). Unworkable items (no repo dir, branch/worktree already
     present) become `hold` — cheap, unbounded. Workable ones are `work` up to
@@ -440,7 +494,10 @@ def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
     `gate(item) -> (hold, reason)` is the pre-session hold gate (backlogrun/gate.py). It is
     asked only about an item that would otherwise be worked, it can only turn `work` into
     `hold`, and a held item gives its slot to the next one. After `gate_budget` questions
-    the rest are deferred, so a night of holds cannot turn into a long chain of calls."""
+    the rest are deferred, so a night of holds cannot turn into a long chain of calls.
+
+    An item whose `not_before` date (field or prose, see not_before()) has not come is
+    deferred: it stays open, takes no slot, is not shown to the gate, and runs on the day."""
     max_items = cfg.max_items if max_items is None else max_items
     opens = [it for it in items if it.get("status") == "open"]
     if only:
@@ -452,10 +509,19 @@ def plan(cfg: Config, items: list[dict], *, only: list[str] | None = None,
     worked = 0
     gate_asked = 0
     gate_budget = gate_mod.BUDGET if gate_budget is None else gate_budget
+    today = today or datetime.now(timezone.utc).date()
     for it in opens:
         iid = str(it.get("id"))
         if not safe_slug(iid):
             out.append(Planned(it, "hold", f"id {iid!r} is not a safe slug for a branch/path; rename it"))
+            continue
+        unreadable = date_rule_problem(it)
+        if unreadable:
+            out.append(Planned(it, "hold", unreadable))
+            continue
+        first_day = not_before(it)
+        if first_day and today < first_day:
+            out.append(Planned(it, "defer", f"not before {first_day.isoformat()} (the item says so); it runs by itself on that day"))
             continue
         rp = repo_path(cfg, it.get("repo"))
         if rp is None:
