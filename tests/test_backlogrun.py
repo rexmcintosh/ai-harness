@@ -1450,3 +1450,81 @@ def test_a_clean_ready_item_keeps_its_approve_suggestion_next_to_a_doubting_jev_
     assert result["review_readiness"]["status"] == "ready"                       # shadow: Jev cannot make it stricter yet
     report = br.write_report(cfg)
     assert "`backlog-run approve 1`" in report and "request_changes (0.95) [shadow, display only]" in report
+
+
+# Repo identity (council review 2026-09-19). The scope rule is judged on WHICH repository the
+# work ran in, not on what a folder happens to be called: git's own answer (the main
+# checkout's name, right inside a linked worktree and through a symlink) must also equal the
+# backlog item's `repo` field. Anything else means no Jev call.
+
+def test_repo_identity_is_gits_answer_and_must_match_the_items_repo_field(tmp_path):
+    real = make_repo(tmp_path, "ai-harness", remote=False)
+    assert br._jev_repo_identity(str(real), "ai-harness") == "ai-harness"
+    assert br._jev_repo_identity(str(real), " ai-harness ") == "ai-harness"       # as repo_path reads the field
+    for declared in ("swimtrack", str(real), "", None, "AI-HARNESS", 7):
+        assert br._jev_repo_identity(str(real), declared) is None, declared      # any mismatch: no Jev call
+
+
+def test_a_folder_named_like_an_allowed_repo_is_not_that_repo(tmp_path):
+    lookalike = tmp_path / "elsewhere" / "ai-harness"
+    (lookalike / ".git").mkdir(parents=True)                                     # passes a folder check; git says no
+    assert br._jev_repo_identity(str(lookalike), "ai-harness") is None
+    private = make_repo(tmp_path, "sat-prep", remote=False)
+    linked = tmp_path / "worktrees" / "ai-harness"
+    linked.parent.mkdir()
+    git(private, "worktree", "add", "-q", str(linked), "-b", "side")
+    assert br._jev_repo_identity(str(linked), "ai-harness") is None              # a worktree of sat-prep
+    alias = tmp_path / "aliases" / "ai-harness"
+    alias.parent.mkdir()
+    alias.symlink_to(private, target_is_directory=True)
+    assert br._jev_repo_identity(str(alias), "ai-harness") is None               # a symlink to sat-prep
+
+
+def test_an_identity_that_cannot_be_resolved_means_no_jev_call(tmp_path, monkeypatch):
+    import council.jev as council_jev
+    real = make_repo(tmp_path, "ai-harness", remote=False)
+    monkeypatch.setattr(council_jev, "repo_name", lambda path: None)
+    assert br._jev_repo_identity(str(real), "ai-harness") is None
+    monkeypatch.setattr(council_jev, "repo_name", lambda path: 1 / 0)
+    assert br._jev_repo_identity(str(real), "ai-harness") is None
+
+
+def _work_with_the_real_council(world, monkeypatch, *, declared_repo):
+    sent = _fake_council(monkeypatch)
+    _jev_switches_on(monkeypatch)
+    cfg = world.build([item("2026-01-01-a", repo=declared_repo, required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    assert p.action == "work", p.reason
+    result = br.work_one(cfg, p, reviewer=REAL_COUNCIL_REVIEW, log=lambda *a: None)
+    record = json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    return sent, result, record
+
+
+def test_work_one_in_the_real_allowed_repo_still_calls_jev(world, monkeypatch):
+    make_repo(world.root, "ai-harness")
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo="ai-harness")
+    assert len(sent) == 2 and record["jev_shadow"]["verdict"]["label"] == "approve_with_conditions"
+    assert result["review_readiness"]["status"] == "unknown"
+
+
+def test_work_one_through_a_symlink_named_like_an_allowed_repo_makes_no_jev_call(world, monkeypatch):
+    private = make_repo(world.root, "sat-prep")
+    (world.root / "projects" / "ai-harness").symlink_to(private, target_is_directory=True)
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo="ai-harness")
+    assert sent == [] and "jev_shadow" not in record
+    assert result["council"].startswith(str(br.today().year))                    # the review itself still ran
+
+
+def test_work_one_makes_no_jev_call_when_the_items_repo_field_is_not_the_repo_name(world, monkeypatch):
+    real = make_repo(world.root, "ai-harness")
+    sent, result, record = _work_with_the_real_council(world, monkeypatch, declared_repo=str(real))
+    assert sent == [] and "jev_shadow" not in record                             # a path is not a name: mismatch
+
+
+def test_the_work_queue_shares_work_one_and_its_one_repo_is_never_in_scope():
+    import inspect
+    import council.jev as council_jev
+    import workqueue.runner as runner
+    assert runner._work_one is br.work_one                                       # so the identity rule applies there too
+    assert '"repo": "sat-prep"' in inspect.getsource(runner.execute)
+    assert not council_jev.in_scope("any-run-id", "sat-prep")

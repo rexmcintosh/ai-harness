@@ -20,6 +20,7 @@ checking a finding against a code slice, and a "can it merge exactly as is?" yes
 from __future__ import annotations
 
 import hashlib
+import inspect
 import itertools
 import json
 import os
@@ -34,7 +35,10 @@ from .models import MemberResult, Synthesis
 
 CUT = 0.85                # "same problem" at or above this; read off the offline test, re-check on shadow data
 MAX_PAIRS = 60
-BUDGET_SECONDS = 20       # the whole pass; an outage must not stall a review
+BUDGET_SECONDS = 20       # the whole pass, as a real deadline; an outage must not stall a review
+MIN_CALL_SECONDS = 1.0    # with less than this left, no new call starts
+LOG_LOCK_TRIES = 20       # with the wait below: at most about a second behind another writer
+LOG_LOCK_WAIT_SECONDS = 0.05
 DEFAULT_LOG = "~/.local/state/council/jev-shadow.jsonl"
 LOG_ENV = "COUNCIL_JEV_LOG"
 
@@ -297,13 +301,32 @@ def log_path_for(environ=None) -> Path:
 
 
 def _append_log(record: dict, path) -> None:
-    """One JSON line. A log that cannot be written is ignored: the log serves the review,
-    never the other way round."""
+    """One JSON line, newline-terminated, as ONE write under an exclusive lock on the log
+    file, so two reviews finishing together cannot tear each other's lines. The lock is
+    tried for about a second and never waited on: no lock, no write. Every failure is
+    swallowed (the lock, the write, a path that cannot be written): the log serves the
+    review, never the other way round."""
     try:
+        import fcntl
+        line = (json.dumps(record, sort_keys=True) + "\n").encode("utf-8")
         path = Path(path).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        try:
+            for _ in range(LOG_LOCK_TRIES):
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    time.sleep(LOG_LOCK_WAIT_SECONDS)
+            else:
+                return
+            try:
+                os.write(fd, line)
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
     except Exception:  # noqa: BLE001
         pass
 
@@ -312,13 +335,29 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _takes_timeout(ask) -> bool:
+    try:
+        params = inspect.signature(ask).parameters
+        return "timeout" in params or any(p.kind is p.VAR_KEYWORD for p in params.values())
+    except (TypeError, ValueError):
+        return False
+
+
 def _budgeted(ask, counter: dict, *, deadline: float, clock):
-    """Count every call, and refuse to START one once the time budget is spent."""
+    """Count every call and hold the pass to a real deadline. No call STARTS with less than
+    MIN_CALL_SECONDS left, and a call is handed min(8 s, what is left) as its timeout, so a
+    call that blocks for its whole timeout still ends by the deadline. (An injected `ask`
+    without a `timeout` parameter is a test double and is called as it is.)"""
+    timed = _takes_timeout(ask)
+
     def wrapped(state, questions):
-        if clock() >= deadline:
+        remaining = deadline - clock()
+        if remaining < MIN_CALL_SECONDS:
             counter["budget_exhausted"] = True
             raise BudgetSpent()
         counter["calls"] += 1
+        if timed:
+            return ask(state, questions, timeout=min(jev.TIMEOUT_SECONDS, remaining))
         return ask(state, questions)
     return wrapped
 
@@ -327,8 +366,11 @@ def _default_ask(environ, prefix: str = "council"):
     """The real thing: the council's layer over the shared client. Each call is named in the
     shared usage ledger after its question: council-verdict, council-source, council-same."""
     key = jev.load_key(environ=environ)
-    return lambda state, questions: jev.ask(state, questions, key=key,
-                                            task=f"{prefix}-{'+'.join(sorted(questions))}")
+
+    def ask(state, questions, timeout=None):
+        return jev.ask(state, questions, key=key, timeout=timeout,
+                       task=f"{prefix}-{'+'.join(sorted(questions))}")
+    return ask
 
 
 def collect(context_repo: str | None, results: list[MemberResult], synthesis: Synthesis, *,
@@ -357,7 +399,7 @@ def collect(context_repo: str | None, results: list[MemberResult], synthesis: Sy
                          "eligible": eligible[f.fid]} for f in findings]
         started = clock()
         counter = {"calls": 0, "budget_exhausted": False}
-        budgeted = _budgeted(ask or _default_ask(environ), counter, deadline=started + budget_seconds, clock=clock)
+        budgeted = _budgeted(ask or _default_ask(environ), counter, deadline=started + max(0.0, budget_seconds), clock=clock)
 
         # Cheapest and most useful first: the time budget cuts from the end.
         try:
@@ -433,7 +475,7 @@ def collect_sweep(repo: str | None, findings, *, environ=None, ask=None, cut: fl
         counter = {"calls": 0, "budget_exhausted": False}
         stats: dict = {"scores": [], "errors": 0}
         budgeted = _budgeted(ask or _default_ask(environ, "sweep"), counter,
-                             deadline=started + budget_seconds, clock=clock)
+                             deadline=started + max(0.0, budget_seconds), clock=clock)
         agreeing = _score_pairs(chosen, budgeted, cut=cut, stats=stats)
         position = {f.fid: n for n, f in enumerate(numbered, 1)}
         note = {"groups": [{"findings": [position[fid] for fid in c["findings"]], "p_min": c["p_min"], "p_max": c["p_max"]}

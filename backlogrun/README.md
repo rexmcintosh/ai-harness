@@ -153,8 +153,10 @@ It is a second reading of the chair's written recommendation by a small model (J
 `report.json`, which rows suggest `approve`, or `approve` itself. The council step runs in
 the parent runner process, so the key (`TYPESAFE_API_KEY`, else `~/.env` read as text) never
 enters the worker session's environment. Only items in repositories on the council's allow
-list (`IN_SCOPE_REPOS` in `council/jev.py`) get a Jev call, and `COUNCIL_JEV=0` turns the step
-and the line off.
+list (`IN_SCOPE_REPOS` in `council/jev.py`) get a Jev call. The repository is identified by
+git (the main checkout's name, not a folder name), and that identity must also equal the
+item's `repo` field; any mismatch means no call. `COUNCIL_JEV=0` turns the step and the line
+off.
 
 For new items, an optional `required_validations` list declares check names before
 the session starts, for example `required_validations: [pytest, lint]`. Names are

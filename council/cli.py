@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from .config import load_panels, get_api_key, Settings, truncate, resolve_budget
@@ -70,14 +71,16 @@ def _read_for_review(path_arg: str, cap: int) -> str:
     return "\n\n".join(parts)
 
 
-def _jev_shadow_section(review_text: str, path):
+def _jev_shadow_section(review_text: str, path, clock=time.monotonic):
     """Display-only Jev signals for `council review` (council/signals.py). Returns a
     function for _run to call AFTER the chair has answered and the review is printed, so
     nothing here can reach the panel, the chair or the review text. It never raises and
-    never changes the exit code: any failure means "no section", which is today's output."""
+    never changes the exit code: any failure means "no section", which is today's output.
+    The whole step shares ONE time budget: the git probes that decide the scope count too."""
     def section(results, syn, panel_name) -> str:
         try:
             import os
+            started = clock()
             from . import jev, signals
             from .gate import risk_tier
             from .render import render_jev_shadow
@@ -92,7 +95,8 @@ def _jev_shadow_section(review_text: str, path):
             # labels a linked finding as eligible or not; without a diff there is no label.
             code_paths = changed_paths(split_diff_by_type(review_text)[0])
             sig = signals.collect(repo, results, syn, environ=os.environ, panel=panel_name,
-                                  tier=risk_tier(code_paths) if code_paths else None)
+                                  tier=risk_tier(code_paths) if code_paths else None,
+                                  budget_seconds=signals.BUDGET_SECONDS - (clock() - started))
             return render_jev_shadow(sig) if sig is not None else ""
         except Exception:  # noqa: BLE001 - shadow mode must never break a review
             return ""

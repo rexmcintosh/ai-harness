@@ -8,6 +8,7 @@ an injected `ask` or a fake transport.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -884,3 +885,232 @@ def test_cli_sweep_applies_the_scope_rule_to_the_swept_repo(tmp_path, capsys, mo
                   _client=sweep_client())
     out = capsys.readouterr().out
     assert rc == 0 and ("Jev would also group" in out) is grouped and bool(calls) is grouped
+
+
+# ── council review 2026-09-19: a hard deadline, a tri-state scope, a locked log ───────────
+def test_ask_hands_the_transport_the_time_it_was_given_capped_at_eight_seconds(jev_on):
+    seen = []
+
+    def transport(req, key, timeout):
+        seen.append(timeout)
+        return _reply({"q": {"noul": 0.5}})
+    for given in (None, 3.25, 30):
+        jev.ask("s", {"q": {}}, key="k", transport=transport, timeout=given)
+    assert seen == [8, 3.25, 8]
+
+
+@pytest.mark.parametrize("each_call_takes,expected", [
+    (None, [8, 8, 4]),              # every call blocks for its whole timeout: 8 + 8 + 4 is the budget
+    (6.5, [8, 8, 7]),               # 0 s, 6.5 s, 13 s; at 19.5 s under a second is left: nothing starts
+    (0.5, [8] * 14),                # the normal case: 1 verdict, 2 blocks, 11 pairs, 7 s in all
+])
+def test_the_time_budget_is_a_real_deadline(jev_on, tmp_path, each_call_takes, expected):
+    now, calls = [100.0], []
+
+    def transport(req, key, timeout):
+        calls.append((now[0] - 100.0, timeout))                  # (seconds into the pass, time it may take)
+        now[0] += timeout if each_call_takes is None else each_call_takes
+        return fake_jev_transport([])(req, key, timeout)
+    jev_on(transport)
+    many = panel_results() + [MemberResult("Designer", "m4", "concerns", "h",
+                                           findings=[Finding(f"point {n}", "med", 8) for n in range(3)])]
+    sig = signals.collect("ai-harness", many, synthesis(BLOCKS), environ=ON, budget_seconds=20,
+                          clock=lambda: now[0], log_path=tmp_path / "l.jsonl")
+    assert [timeout for _, timeout in calls] == expected
+    for started_at, timeout in calls:
+        assert 1.0 <= timeout <= 8 and started_at + timeout <= 20    # no call can END after the deadline
+    assert now[0] - 100.0 <= 20 and sig.errors == 0 and sig.calls == len(expected)
+    assert sig.budget_exhausted is (each_call_takes != 0.5)
+    if each_call_takes is None:                                  # the worst case: every call blocks to the end
+        assert sum(timeout for _, timeout in calls) == 20        # time asked for never exceeds the budget
+    if each_call_takes != 0.5:
+        assert calls[-1][1] < 8                                  # the last call got what was left, not 8 s
+
+
+def test_an_injected_ask_that_takes_a_timeout_gets_one_and_a_plain_one_is_left_alone(tmp_path):
+    given = []
+
+    def timed(state, questions, timeout=None):
+        given.append(timeout)
+        return FakeAsk()(state, questions)
+    signals.collect("ai-harness", [], synthesis(), environ=ON, ask=timed, log_path=tmp_path / "l.jsonl")
+    assert given == [8]
+    assert signals.collect("ai-harness", [], synthesis(), environ=ON, ask=FakeAsk(),
+                           log_path=tmp_path / "l.jsonl").verdict["label"] == "approve_with_conditions"
+
+
+def test_scope_probes_of_council_review_count_inside_the_same_budget(monkeypatch, tmp_path):
+    now, seen = [50.0], {}
+
+    def slow_scope(cwd, path=None):
+        now[0] += 5.0                                            # two git probes that took five seconds
+        return "ai-harness"
+
+    def capture(repo, results, syn, **kwargs):
+        seen.update(repo=repo, budget=kwargs["budget_seconds"])
+        return None
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    monkeypatch.delenv("JEV_DISABLED", raising=False)
+    monkeypatch.setattr(jev, "scope_repo", slow_scope)
+    monkeypatch.setattr(signals, "collect", capture)
+    assert cli._jev_shadow_section("text", None, clock=lambda: now[0])(panel_results(), synthesis(), "code-review") == ""
+    assert seen == {"repo": "ai-harness", "budget": 15.0}
+
+
+def test_a_git_probe_is_short_and_a_probe_that_times_out_means_an_unknown_repo(monkeypatch, tmp_path):
+    seen = {}
+
+    def hang(argv, **kwargs):
+        seen.update(timeout=kwargs["timeout"], lang=kwargs["env"].get("LC_ALL"))
+        raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+    monkeypatch.setattr(jev.subprocess, "run", hang)
+    assert jev.resolve_repo(tmp_path) == ("unknown", None) and jev.repo_name(tmp_path) is None
+    assert seen == {"timeout": 3, "lang": "C"}                   # C locale: the "not a git repository" text is matched
+
+
+_REAL_RUN = subprocess.run
+
+
+def _fake_git(monkeypatch, behaviour):
+    """behaviour: {directory name: "missing" | "timeout" | "denied" | "dubious"} for the repo
+    probe of that directory. Every other command, and every other directory, runs for real."""
+    real = _REAL_RUN
+
+    def run(argv, **kwargs):
+        probe = list(argv[:2]) == ["git", "-C"] and "--git-common-dir" in argv
+        kind = behaviour.get(Path(argv[2]).name) if probe else None
+        if kind == "missing":
+            raise FileNotFoundError("git")
+        if kind == "timeout":
+            raise subprocess.TimeoutExpired(argv, kwargs.get("timeout"))
+        if kind == "denied":
+            raise PermissionError("permission denied")
+        if kind == "dubious":
+            return subprocess.CompletedProcess(argv, 128, "", "fatal: detected dubious ownership in repository")
+        return real(argv, **kwargs)
+    monkeypatch.setattr(jev.subprocess, "run", run)
+
+
+@pytest.fixture
+def three_places(tmp_path):
+    """An allowed checkout, a private checkout, and a folder outside any repository."""
+    allowed, private, loose = tmp_path / "swimtrack", tmp_path / "tax-advisor", tmp_path / "loose"
+    for repo in (allowed, private):
+        repo.mkdir()
+        _git(repo, "init", "-q", "-b", "main")
+        (repo / "a.py").write_text("x = 1\n")
+    loose.mkdir()
+    (loose / "saved.diff").write_text(DIFF)
+    return allowed, private, loose
+
+
+def test_resolve_repo_tells_a_repo_from_no_repo_from_cannot_tell(three_places, monkeypatch):
+    allowed, private, loose = three_places
+    assert jev.resolve_repo(allowed / "a.py") == ("repo", "swimtrack")
+    assert jev.resolve_repo(loose / "saved.diff") == ("outside", None)          # git itself said: not a repository
+    assert jev.resolve_repo(loose / "gone" / "x.diff") == ("unknown", None)     # an unreadable path
+    for kind in ("missing", "timeout", "denied", "dubious"):
+        _fake_git(monkeypatch, {"swimtrack": kind})
+        assert jev.resolve_repo(allowed / "a.py") == ("unknown", None), kind
+
+
+def test_scope_repo_judges_a_path_outside_any_repository_by_the_working_directory(three_places):
+    allowed, private, loose = three_places
+    assert jev.scope_repo(allowed, loose / "saved.diff") == "swimtrack"         # as documented
+    assert jev.scope_repo(allowed) == "swimtrack" and jev.scope_repo(allowed, "-") == "swimtrack"
+    assert jev.scope_repo(private, loose / "saved.diff") is None
+    assert jev.scope_repo(loose, loose / "saved.diff") is None                  # no repository at all: refuse
+    assert jev.scope_repo(loose, allowed / "a.py") == "swimtrack"               # the file itself is in an allowed repo
+
+
+def test_scope_repo_refuses_when_either_side_is_out_of_scope(three_places):
+    allowed, private, loose = three_places
+    assert jev.scope_repo(allowed, private / "a.py") is None                    # path out of scope, cwd in scope
+    assert jev.scope_repo(private, allowed / "a.py") is None                    # path in scope, cwd out of scope
+
+
+@pytest.mark.parametrize("kind", ["missing", "timeout", "denied", "dubious"])
+def test_scope_repo_never_falls_back_to_the_working_directory_when_the_path_cannot_be_resolved(
+        three_places, monkeypatch, kind):
+    allowed, private, loose = three_places
+    _fake_git(monkeypatch, {"tax-advisor": kind})
+    assert jev.scope_repo(allowed, private / "a.py") is None                    # not "judge by cwd": refuse
+    _fake_git(monkeypatch, {"loose": kind})
+    assert jev.scope_repo(allowed, loose / "saved.diff") is None                # cannot tell it is outside: refuse
+    _fake_git(monkeypatch, {"swimtrack": kind})
+    assert jev.scope_repo(allowed) is None and jev.scope_repo(allowed, loose / "saved.diff") is None
+
+
+def test_review_of_a_diff_saved_outside_any_repository_is_judged_by_the_working_directory(
+        member_json, capsys, three_places, monkeypatch, jev_on):
+    allowed, private, loose = three_places
+    calls = []
+    jev_on(fake_jev_transport(calls))
+    monkeypatch.chdir(allowed)
+    rc, out, _ = run_review(member_json, capsys, str(loose / "saved.diff"), "--format", "md")
+    assert rc == 0 and len(calls) == 4 and TITLE in out
+    calls.clear()
+    _fake_git(monkeypatch, {"loose": "timeout"})                                # the same command, git cannot answer
+    rc, out, _ = run_review(member_json, capsys, str(loose / "saved.diff"), "--format", "md")
+    assert rc == 0 and calls == [] and "Jev" not in out
+
+
+def test_two_log_appends_are_two_intact_private_lines(tmp_path):
+    log = tmp_path / "deep" / "er" / "jev.jsonl"
+    signals._append_log({"n": 1, "text": "x" * 5000}, log)
+    signals._append_log({"n": 2}, log)
+    raw = log.read_bytes()
+    assert raw.endswith(b"\n") and [json.loads(line)["n"] for line in raw.decode().splitlines()] == [1, 2]
+    assert (log.stat().st_mode & 0o777) == 0o600
+
+
+def test_every_log_line_is_one_write_under_an_exclusive_lock(tmp_path, monkeypatch):
+    import fcntl
+    events, log_fds = [], set()
+    real_flock, real_write = fcntl.flock, os.write
+
+    def flock(fd, op):
+        log_fds.add(fd)
+        events.append(("flock", op & ~fcntl.LOCK_NB))
+        return real_flock(fd, op)
+
+    def write(fd, data):
+        if fd in log_fds:                                        # only writes to the log's own descriptor
+            events.append(("write", data[-1:]))
+        return real_write(fd, data)
+    monkeypatch.setattr(fcntl, "flock", flock)
+    monkeypatch.setattr(signals.os, "write", write)
+    signals._append_log({"n": 1}, tmp_path / "jev.jsonl")
+    assert events == [("flock", fcntl.LOCK_EX), ("write", b"\n"), ("flock", fcntl.LOCK_UN)]
+
+
+def test_concurrent_appends_never_tear_a_line(tmp_path):
+    import threading
+    log = tmp_path / "jev.jsonl"
+    threads = [threading.Thread(target=signals._append_log, args=({"n": n, "pad": "y" * 3000}, log)) for n in range(24)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(json.loads(line)["n"] for line in log.read_text().splitlines()) == list(range(24))
+
+
+def test_a_log_that_is_locked_or_unwritable_never_raises_and_never_stalls(tmp_path, monkeypatch):
+    import fcntl
+    monkeypatch.setattr(signals, "LOG_LOCK_TRIES", 3)
+    monkeypatch.setattr(signals, "LOG_LOCK_WAIT_SECONDS", 0.001)
+    log = tmp_path / "jev.jsonl"
+    log.write_text("")
+    with open(log, "a") as holder:
+        fcntl.flock(holder, fcntl.LOCK_EX)                       # someone else holds the lock and never lets go
+        signals._append_log({"n": 1}, log)
+    assert log.read_text() == ""                                 # no lock, no write: the row is dropped, not torn
+    signals._append_log({"n": 2}, log)
+    assert [json.loads(line)["n"] for line in log.read_text().splitlines()] == [2]
+    blocker = tmp_path / "a-file"
+    blocker.write_text("x")
+    signals._append_log({"n": 3}, blocker / "sub" / "jev.jsonl")  # the parent is a file
+    signals._append_log({"n": 4}, tmp_path)                       # the path is a directory
+    signals._append_log({"n": object()}, log)                    # not JSON: swallowed too
+    assert len(log.read_text().splitlines()) == 1

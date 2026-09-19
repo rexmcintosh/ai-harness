@@ -740,11 +740,27 @@ def _jev_shadow(repo: str | None, item_id: str, results, syn, diff_text: str, st
         return None, ""
 
 
+def _jev_repo_identity(repo_dir: str, declared: object) -> str | None:
+    """WHICH repository the work ran in, for the council's Jev scope rule, or None for "no
+    Jev call". A folder's name proves nothing: a private repo can sit in a folder that is
+    named like an allowed one. So the identity is git's own answer (council.jev.repo_name:
+    the main checkout's name, right inside a linked worktree and through a symlink), and it
+    must ALSO equal the backlog item's `repo` field. Any mismatch, or an identity that
+    cannot be resolved, means None. Never raises."""
+    try:
+        from council import jev as council_jev
+        identity = council_jev.repo_name(repo_dir)
+        wanted = declared.strip() if isinstance(declared, str) else None
+        return identity if identity and wanted and identity == wanted else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def council_review(cfg: Config, diff_text: str, *, item_id: str, repo: str | None = None) -> dict:
     """C3: the same code-review panel `council review --diff` runs, in-process. Returns
     {ok, summary, markdown}. Never raises — a review failure is itself the verdict.
-    `repo` is the reviewed repository's directory name; it only decides whether the
-    display-only Jev signals may run (no name, no Jev)."""
+    `repo` is the reviewed repository's identity (see _jev_repo_identity); it only decides
+    whether the display-only Jev signals may run (no identity, no Jev)."""
     try:
         from council.config import load_panels, truncate
         from council.engine import run_panel
@@ -1138,9 +1154,10 @@ def work_one(cfg: Config, p: Planned, *, reviewer=None, log=print, continuation:
             else:
                 log("  council review ...")
                 try:
-                    # The repo's directory name lets the council decide whether its display-only
-                    # Jev step may run. Injected reviewers keep their (cfg, diff, item_id) contract.
-                    extra = {"repo": os.path.basename(p.repo)} if getattr(reviewer, "accepts_repo", False) else {}
+                    # The repo's identity lets the council decide whether its display-only Jev
+                    # step may run. Injected reviewers keep their (cfg, diff, item_id) contract.
+                    extra = ({"repo": _jev_repo_identity(p.repo, item.get("repo"))}
+                             if getattr(reviewer, "accepts_repo", False) else {})
                     rev = reviewer(cfg, review_input, item_id=iid, **extra)
                     if not isinstance(rev, dict):
                         raise ValueError("reviewer did not return an object")

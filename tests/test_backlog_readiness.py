@@ -210,3 +210,40 @@ def test_tied_newest_conflicting_records_are_unknown(evidence):
     got = select([clean, failed], branch_sha=SHA, state_dir=str(evidence))
     assert got["status"] == "unknown"
     assert "conflicting" in got["reasons"][0].lower()
+
+
+# The Jev shadow label (docs/council-jev-shadow-2026-09-19.md) is saved in the same inputs
+# record. It is display only: readiness must not read it, in any state, whatever it says.
+JEV_FIELDS = [
+    {"jev_shadow": {"verdict": {"label": "approve", "confidence": 0.99}}},
+    {"jev_shadow": {"verdict": {"label": "request_changes", "confidence": 0.97}}},
+    {"jev_shadow": {"verdict": {"label": "approve_with_conditions", "confidence": 0.5}},
+     "jev_verdict": "approve", "jev_confidence": 1.0, "jev": {"review_status": "clean", "blocking_findings": []}},
+    {"jev_shadow": "garbage"},
+]
+
+
+@pytest.mark.parametrize("jev_fields", JEV_FIELDS)
+@pytest.mark.parametrize("expected,changes", [
+    ("ready", {}),
+    ("changes_requested", {"review_status": "changes_requested", "blocking_findings": ["fix the wrong answer"]}),
+    ("unknown", {"review_status": "unknown"}),
+    ("unknown", {"required_validations": None}),
+    ("failed", {"review_status": "failed"}),
+])
+def test_readiness_ignores_every_jev_field(evidence, expected, changes, jev_fields):
+    plain = record(**changes)
+    with_jev = {**deepcopy(plain), **deepcopy(jev_fields)}
+    got_plain = evaluate(plain, branch_sha=SHA, state_dir=str(evidence))
+    got_jev = evaluate(with_jev, branch_sha=SHA, state_dir=str(evidence))
+    assert got_plain["status"] == expected
+    assert got_jev == got_plain                                   # status, reasons, evidence: identical
+    assert select([with_jev], branch_sha=SHA, state_dir=str(evidence)) == \
+        select([plain], branch_sha=SHA, state_dir=str(evidence))
+    assert "jev" not in repr(got_jev).lower()
+
+
+def test_the_readiness_module_never_mentions_jev():
+    from pathlib import Path
+    import backlogrun.readiness as readiness
+    assert "jev" not in Path(readiness.__file__).read_text().lower()

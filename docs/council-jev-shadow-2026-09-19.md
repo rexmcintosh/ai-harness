@@ -124,12 +124,29 @@ those repositories to get the signals too, the change is small: move their names
 
 How the repository is decided:
 
-- `council review`: from the working directory, and from the reviewed path as well when a
-  path is given and lies inside a git repository. Every repository found this way must be
-  in scope. Inside a linked git worktree the name of the main checkout is used, not the
-  name of the worktree folder.
-- `backlog-run`: the directory name of the repository the item was worked in. The item id
-  is checked against the same word list.
+A repository's identity is git's own answer, not a folder name. The code asks git for the
+repository that holds a path and takes the name of its main checkout. That name is right
+inside a linked git worktree, whose own folder is named after a session, and through a
+symbolic link. The question to git has three possible answers, and they are never mixed up:
+
+| Answer | Meaning | Effect |
+|---|---|---|
+| a name | The path is in that repository. | The name is checked against the allow list. |
+| outside | Git itself said: not a git repository. | See `council review` below. Everywhere else: refuse. |
+| unknown | It could not be resolved: git is missing, the question timed out (3 seconds), a permission or ownership error, an unreadable path. | Refuse. There is never a fallback. |
+
+- `council review`: the working directory's repository, and the reviewed path's repository
+  when a path is given. Every repository found this way must be in scope. A path that is
+  *outside* any repository (a diff saved under `/tmp`) is judged by the working directory
+  alone. A path whose repository is *unknown* is refused; the working directory is not used
+  in its place. An *unknown* working directory is refused too.
+- `backlog-run`: the identity of the repository the item was worked in, and that identity
+  must ALSO equal the `repo` field of the backlog item. Any mismatch means no Jev call. So
+  a folder that is merely named like an allowed repository (a plain folder, a symbolic link
+  to another repository, a worktree of another repository) gets no call, and neither does an
+  item whose `repo` field is a path and not a name. The item id is checked against the word
+  list. The work queue runner uses the same code path, and its one repository is not on the
+  allow list.
 - `council sweep`: the repository that holds the swept path. The sweep code cannot know
   where its chunks came from, so the command passes the name in. Without a name there is
   no Jev step.
@@ -144,8 +161,11 @@ Limits of the rule that a reader should know:
   `/tmp` and reviewed, while the working directory is an allowed repository, the signals
   run on it. To avoid this, run the review from inside the repository the text belongs to,
   or set `COUNCIL_JEV=0` for that command.
-- The allow list holds names, not locations. A different repository that is given the same
-  directory name as an allowed one is treated as allowed.
+- The allow list holds names, not locations. A full clone of another repository whose main
+  checkout folder carries an allowed name is treated as allowed: git reports that folder
+  name, and nothing else on disk says which project a clone belongs to. Under the runner
+  this needs the clone to sit in the projects folder under the allowed name, in the place of
+  the real repository.
 - The question wording was tested on `code-review` panels. `council review` also runs the
   signals for other panels (a single document goes to `spec-review`), where the words "code
   review" and "code change" in the questions fit less well. The log records the panel, so
@@ -170,9 +190,17 @@ Limits of the rule that a reader should know:
 - Each call is counted in the shared usage ledger (`~/.local/state/jev/usage.jsonl`, counts
   and cost only) as project `ai-harness`, tasks `council-verdict`, `council-source`,
   `council-same` and `sweep-same`. `jev usage --days 7` shows what it costs.
-- Each call has an 8 second timeout and is not retried. The whole pass has a 20 second budget: once it is
-  spent, no new call starts. The review is printed before the first Jev call, so an outage
-  delays only the extra section.
+- The whole pass has a 20 second budget, and it is a real deadline. A call is not retried.
+  Each call is given a timeout of 8 seconds or the time that is left, whichever is less, so
+  a call that blocks for its whole timeout still ends by the deadline. No call starts with
+  less than 1 second left. In `council review` the questions to git that decide the scope
+  count inside the same 20 seconds; each of them has its own 3 second limit everywhere.
+  Under `backlog-run` that one question to git is asked before the panel runs, so it is
+  outside the 20 seconds and bounded by its 3. The review is printed before the first Jev
+  call, so an outage delays only the extra section. One limit remains: the timeout is
+  applied by the HTTP library to each network step (connect, read), so a server that
+  answers very slowly, a little at a time, could run past it. The replies are a few hundred
+  bytes and arrive in one piece.
 - A failed call or an answer in the wrong shape costs that one answer. The section then
   says how many calls failed. No failure in this step can fail a review, change its exit
   code, or change a recorded review status. Tests cover each of these.
@@ -181,7 +209,11 @@ Limits of the rule that a reader should know:
 
 One JSON line per review or sweep is appended to
 `~/.local/state/council/jev-shadow.jsonl`. `COUNCIL_JEV_LOG` moves it. The folder is created
-when needed, and a log that cannot be written is ignored.
+when needed, and the file is readable by its owner only. Each line is written as one write,
+ending in a newline, under an exclusive lock on the file, so two reviews that finish
+together cannot tear each other's lines. The lock is tried for about one second and never
+waited on: if another writer holds it that long, the line is dropped. A log that cannot be
+locked or written is ignored and never fails a review.
 
 The log holds no review text. It holds ids, labels, numbers and one hash:
 
@@ -269,7 +301,7 @@ call. A typical review makes 10 to 20 calls.
 
 ## Checked on 2026-09-19
 
-- Full test suite: 1611 passed, 1 skipped; 111 of these tests are new. No test reaches the
+- Full test suite: 1658 passed, 1 skipped; 158 of these tests are new. No test reaches the
   network: the suite-wide test configuration sets `JEV_DISABLED=1` and `COUNCIL_JEV=0` and
   sends both logs to temporary files, and the new test file puts a tripwire on the shared
   client's HTTP opener that fails any test that reaches it.
@@ -281,3 +313,8 @@ call. A typical review makes 10 to 20 calls.
   restated a panel finding and was linked to it (0.93), one was about something no seat
   raised and was linked to `none` (1.00). One more live call afterwards confirmed the path
   through the shared client, including its usage ledger row.
+- After the council's own review of this change (repository identity, the hard deadline, the
+  three-answer scope, the locked log), one more live run of 3 calls on the same saved review:
+  0 errors, 1.9 seconds, the same verdict and the same agreeing pair. The linked worktree it
+  ran in was identified as `ai-harness`, each call was handed its 8 second timeout, and the
+  log line was one intact line in a file readable by its owner only.

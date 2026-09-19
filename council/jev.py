@@ -30,7 +30,8 @@ from jev.redact import redact_state as redact, redact_text   # noqa: F401  (re-e
 from jev.scope import OUT_OF_SCOPE                     # noqa: F401  one word list for every caller
 
 MODEL = "jev-1.13.0"            # the council's own pin; passed on every call
-TIMEOUT_SECONDS = 8
+TIMEOUT_SECONDS = 8             # the most one call may wait; a caller with less time left passes less
+GIT_PROBE_SECONDS = 3           # "which repo is this?" must never stall a review; a timeout means "unknown"
 PROJECT = "ai-harness"          # how these calls are named in the shared usage ledger
 TASK = "council-shadow"
 KILL_SWITCH = "COUNCIL_JEV"     # "0", "off" or "false" turns every council use of Jev off
@@ -72,14 +73,17 @@ def in_scope(name: str | None, repo: str | None) -> bool:
     return not any(word in low for word in OUT_OF_SCOPE)
 
 
-def ask(state, questions: dict, *, key: str, transport=None, task: str = TASK) -> dict:
+def ask(state, questions: dict, *, key: str, transport=None, task: str = TASK,
+        timeout: float | None = None) -> dict:
     """One Jev call through the shared client. Returns the `answers` object. Raises JevError
     on ANY failure, and when the answer came from a different model version. The whole
-    request is redacted first. `transport` is for tests; the default is the shared client's,
-    looked up at call time."""
+    request is redacted first. `timeout` is the time this call may take; it is capped at
+    TIMEOUT_SECONDS, so a caller near its deadline hands over what is left. `transport` is
+    for tests; the default is the shared client's, looked up at call time."""
+    seconds = TIMEOUT_SECONDS if timeout is None else max(0.0, min(TIMEOUT_SECONDS, timeout))
     try:
         got = _shared.ask(redact(state), redact(questions), project=PROJECT, task=task, model=MODEL,
-                          key=key, timeout=TIMEOUT_SECONDS, retries=0, transport=transport)
+                          key=key, timeout=seconds, retries=0, transport=transport)
     except JevError:
         raise                                   # the shared client already scrubbed the key
     except Exception as exc:  # noqa: BLE001
@@ -130,40 +134,69 @@ def shadow_enabled(environ=None) -> bool:
 _GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE")
 
 
-def repo_name(path) -> str | None:
-    """The repository's directory name for `path`: the MAIN checkout's name, also when
-    `path` is inside a linked worktree (whose own folder is named after a session, not the
-    repo). None when `path` is not in a git repository or the name cannot be told."""
+def resolve_repo(path) -> tuple[str, str | None]:
+    """Which repository holds `path`? Three answers, because "no repository" and "cannot
+    tell" must never look the same:
+
+      ("repo", name)     the MAIN checkout's directory name, also when `path` is inside a
+                         linked worktree (whose own folder is named after a session) or is
+                         reached through a symlink
+      ("outside", None)  git itself said the path is not in a git repository
+      ("unknown", None)  it could not be resolved: git missing, the probe timed out, a
+                         permission or ownership error, an unreadable path, an odd layout
+
+    Callers refuse on "unknown". Only scope_repo() treats "outside" differently."""
     try:
         target = Path(os.path.realpath(path))
         cwd = target if target.is_dir() else target.parent
         env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARS}
+        env["LC_ALL"] = "C"                         # the refusal below is matched on git's English text
         proc = subprocess.run(["git", "-C", str(cwd), "rev-parse", "--git-common-dir"],
-                              capture_output=True, text=True, timeout=10, env=env)
-        out = proc.stdout.strip()
-        if proc.returncode != 0 or not out:
-            return None
+                              capture_output=True, text=True, timeout=GIT_PROBE_SECONDS, env=env)
+        out = (proc.stdout or "").strip()
+        if proc.returncode != 0:
+            not_a_repo = proc.returncode == 128 and "not a git repository" in (proc.stderr or "").lower()
+            return ("outside", None) if not_a_repo else ("unknown", None)
+        if not out:
+            return "unknown", None
         common = Path(out)
         if not common.is_absolute():
             common = cwd / common
         common = Path(os.path.realpath(common))
-        if common.name == ".git":
-            return common.parent.name or None
-        if common.name.endswith(".git"):            # a bare repository
-            return common.name[:-len(".git")] or None
-        return None
+        if common.name == ".git" and common.parent.name:
+            return "repo", common.parent.name
+        if common.name.endswith(".git") and common.name != ".git":      # a bare repository
+            return "repo", common.name[:-len(".git")]
+        return "unknown", None
     except Exception:  # noqa: BLE001 - not knowing the repo means "refuse", never a crash
-        return None
+        return "unknown", None
+
+
+def repo_name(path) -> str | None:
+    """The repository's name for `path` (see resolve_repo), or None when the path is not in
+    a repository or the name cannot be told. None always means: refuse."""
+    status, name = resolve_repo(path)
+    return name if status == "repo" else None
 
 
 def scope_repo(cwd, path=None) -> str | None:
     """The repository a `council` command's input belongs to, or None to refuse. Every
     repository the input can be tied to must be in scope: the working directory's, and the
-    explicit path's when it lies in one. A path outside any repository (a diff saved under
-    /tmp) is judged by the working directory alone."""
-    cwd_repo = repo_name(cwd)
-    path_repo = repo_name(path) if path not in (None, "", "-") else None
-    known = [r for r in (path_repo, cwd_repo) if r]
-    if not known or not all(in_scope("", r) for r in known):
+    explicit path's when it lies in one.
+
+    Fails closed. A path that git says is OUTSIDE any repository (a diff saved under /tmp) is
+    judged by the working directory alone. A path or working directory whose repository
+    could NOT be resolved is refused: there is no fallback to the other one."""
+    cwd_status, cwd_repo = resolve_repo(cwd)
+    if cwd_status == "unknown":
         return None
-    return known[0]
+    names = [cwd_repo] if cwd_repo else []
+    if path not in (None, "", "-"):
+        path_status, path_repo = resolve_repo(path)
+        if path_status == "unknown":
+            return None
+        if path_repo:
+            names.insert(0, path_repo)
+    if not names or not all(in_scope("", name) for name in names):
+        return None
+    return names[0]
