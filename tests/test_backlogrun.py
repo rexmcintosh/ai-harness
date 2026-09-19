@@ -1255,3 +1255,185 @@ def test_approval_preserves_an_in_progress_git_sequence(world):
     sequence.mkdir()
     assert not br.approve_one(cfg, '2026-01-01-a', log=lambda *a:None)
     assert sequence.is_dir() and load_items(cfg)[0]['status'] == 'in_review'
+
+
+# ----------------------------------------------------------------------------- Jev shadow line
+# A display-only second reading of the chair's verdict. It may never move readiness, the
+# approve suggestion or the recorded review status. conftest keeps COUNCIL_JEV=0 and a
+# tripwire on the real transport for every test; these tests switch it on with a fake.
+
+JEV_LINE = "Jev reads the chair's verdict as: approve_with_conditions (0.91) [shadow, display only]"
+
+
+def jev_reviewer(label="approve_with_conditions", confidence=0.91, **extra):
+    def reviewer(cfg, diff, *, item_id):
+        return {"ok": True, "summary": "Approve with follow-up fixes", "markdown": "Full council output",
+                "jev_shadow": {"verdict": {"label": label, "confidence": confidence}}, **extra}
+    return reviewer
+
+
+def _fake_council(monkeypatch, *, findings=True):
+    """The real adapter over a scripted panel and chair; returns the Jev requests seen."""
+    from types import SimpleNamespace
+    import council.config as config
+    import council.engine as engine
+    import council.jev as jev
+    import council.venice as venice
+    from council.models import Finding, Member, MemberResult, Panel
+    from tests.conftest import FakeClient
+    payload = {"recommendation": "Approve with follow-up fixes. Two gaps should be closed before merge.",
+               "confidence": 8, "blocking_findings": [], "required_changes": []}           # no review_status: unknown
+    panel = Panel("code-review", "fixture", [Member("a", "m1", "x"), Member("b", "m2", "x")])
+    results = [MemberResult("a", "m1", "concerns", "ok", findings=[Finding("parser over-captures", "high", 9)] if findings else []),
+               MemberResult("b", "m2", "concerns", "ok", findings=[Finding("parser splits notes", "med", 8)] if findings else [])]
+    monkeypatch.setattr(config, "load_panels", lambda _: (SimpleNamespace(timeout=1, byte_cap=100000, chair_model="chair"), {"code-review": panel}))
+    monkeypatch.setattr(engine, "run_panel", lambda *args, **kw: results)
+    monkeypatch.setattr(venice, "VeniceClient", lambda *args, **kw: FakeClient(default=payload))
+    monkeypatch.setattr(br, "load_venice_key", lambda role, env_path=None: "venice-test")
+    sent = []
+
+    def transport(req, key, timeout):
+        sent.append(req)
+        if "verdict" in req["questions"]:
+            answers = {"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91, "probabilities": {}}}
+        else:
+            answers = {"same": {"type": "noul", "noul": 0.9}}
+        return {"model": jev.MODEL, "answers": answers}
+    monkeypatch.setattr(jev, "_http_post", transport)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")
+    return sent
+
+
+def test_real_council_adapter_carries_the_jev_verdict_and_changes_nothing_else(world, monkeypatch):
+    cfg = world.build([])
+    sent = _fake_council(monkeypatch)
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="alpha")
+    assert sent == [] and "jev_shadow" not in off and "Jev" not in off["markdown"]        # kill switch (conftest)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="alpha")
+    assert on["jev_shadow"] == {"verdict": {"label": "approve_with_conditions", "confidence": 0.91}}
+    assert on["review_status"] == off["review_status"] == "unknown"
+    assert {k: v for k, v in on.items() if k not in ("jev_shadow", "markdown")} == \
+           {k: v for k, v in off.items() if k != "markdown"}
+    assert on["markdown"].startswith(off["markdown"])
+    assert "### Jev shadow signals (display only; not used by the chair or the gate)" in on["markdown"][len(off["markdown"]):]
+    assert "raised by 2 of 2 seats" in on["markdown"] and len(sent) == 2
+    assert "diff" not in json.dumps([r["state"] for r in sent])                          # the diff is never sent
+
+
+@pytest.mark.parametrize("repo,item_id", [("sat-prep", "2026-01-01-a"), ("romance-empire", "2026-01-01-a"),
+                                          (None, "2026-01-01-a"), ("alpha", "2026-01-01-bebop-mail-fix")])
+def test_out_of_scope_or_unknown_repo_gets_no_jev_call_at_all(world, monkeypatch, repo, item_id):
+    cfg = world.build([])
+    sent = _fake_council(monkeypatch)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rev = REAL_COUNCIL_REVIEW(cfg, "diff", item_id=item_id, repo=repo)
+    assert sent == [] and "jev_shadow" not in rev and "Jev" not in rev["markdown"] and rev["ok"] is True
+
+
+def test_a_jev_outage_leaves_the_review_exactly_as_it_was(world, monkeypatch):
+    import council.jev as jev
+    cfg = world.build([])
+    _fake_council(monkeypatch)
+    off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+
+    def down(req, key, timeout):
+        raise OSError("TypeSafe is down")
+    monkeypatch.setattr(jev, "_http_post", down)
+    on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
+    assert "jev_shadow" not in on and {k: v for k, v in on.items() if k != "markdown"} == {k: v for k, v in off.items() if k != "markdown"}
+    import council.signals as signals
+    monkeypatch.setattr(signals, "collect", lambda *a, **k: 1 / 0)
+    assert REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha") == off
+
+
+def test_work_one_names_the_repo_only_to_a_reviewer_that_asks_for_it(world):
+    seen = {}
+
+    def wants_repo(cfg, diff, *, item_id, repo=None):
+        seen.update(repo=repo)
+        return {"ok": True, "summary": "ok", "markdown": "x"}
+    wants_repo.accepts_repo = True
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=wants_repo, log=lambda *a: None)
+    assert seen == {"repo": "alpha"} and REAL_COUNCIL_REVIEW.accepts_repo is True
+
+
+def test_jev_line_shows_in_report_and_show_and_readiness_stays_unknown(world, monkeypatch, capsys):
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
+    assert result["review_readiness"]["status"] == "unknown"
+    info = br._review_readiness(cfg, load_items(cfg)[0])
+    standard = {"schema_version", "record_id", "branch_sha", "status", "reasons", "evidence_path", "review_path"}
+    assert info["status"] == "unknown" and set(info) == standard          # readiness carries no Jev field
+    report = br.write_report(cfg)
+    assert report.count(JEV_LINE) == 1 and "- " + JEV_LINE in report.splitlines()
+    assert "Review readiness unknown" in report and "`backlog-run approve 1`" not in report
+    assert "resolve or inspect the evidence above before deciding" in report
+    saved = json.loads(Path(cfg.report_json).read_text())["review_readiness"]["2026-01-01-a"]
+    assert saved["status"] == "unknown" and set(saved) == standard
+    assert br.cmd_show(br.build_parser().parse_args(["show", "1"]), cfg) == 0
+    assert capsys.readouterr().out.count(JEV_LINE) == 1
+    monkeypatch.setenv("COUNCIL_JEV", "0")                                       # the kill switch hides it again
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_report_with_and_without_a_jev_label_differs_by_that_one_line(world, monkeypatch):
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, reviewer=jev_reviewer("approve", 0.99), log=lambda *a: None)
+    assert result["review_readiness"]["status"] == "unknown"
+    with_label = br.write_report(cfg).splitlines()[1:]
+    record_path = next(Path(cfg.reviews_dir).glob("*.inputs.json"))
+    record = json.loads(record_path.read_text())
+    assert record.pop("jev_shadow") == {"verdict": {"label": "approve", "confidence": 0.99}}
+    record_path.write_text(json.dumps(record))
+    without = br.write_report(cfg).splitlines()[1:]
+    extra = [ln for ln in with_label if ln not in without]
+    assert extra == ["- Jev reads the chair's verdict as: approve (0.99) [shadow, display only]"]
+    assert [ln for ln in with_label if ln not in extra] == without
+    assert not any("approve 1" in ln for ln in with_label)                       # still no approve suggestion
+
+
+@pytest.mark.parametrize("shadow", [{"verdict": {"label": "ship_it", "confidence": 0.9}},
+                                    {"verdict": {"label": "approve", "confidence": "high"}},
+                                    {"verdict": {"label": "approve", "confidence": 1.7}},
+                                    {"verdict": "approve"}, "approve", None])
+def test_a_malformed_jev_record_is_neither_saved_nor_shown(world, monkeypatch, shadow):
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+
+    def reviewer(cfg, diff, *, item_id):
+        return {"ok": True, "summary": "ok", "markdown": "x", "jev_shadow": shadow}
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=reviewer, log=lambda *a: None)
+    assert "jev_shadow" not in json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_a_jev_label_for_an_older_commit_is_not_shown_against_a_newer_head(world, monkeypatch):
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
+    assert JEV_LINE in br.write_report(cfg)
+    git(world.repo, "checkout", "-q", "claude/bl-a")
+    git(world.repo, "commit", "--allow-empty", "-qm", "moved on")
+    git(world.repo, "checkout", "-q", "main")
+    assert "Jev" not in br.write_report(cfg)
+
+
+def test_a_clean_ready_item_keeps_its_approve_suggestion_next_to_a_doubting_jev_label(world, monkeypatch):
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    (p,) = br.plan(cfg, load_items(cfg))
+    result = br.work_one(cfg, p, log=lambda *a: None, reviewer=jev_reviewer(
+        "request_changes", 0.95, review_status="clean", blocking_findings=[]))
+    assert result["review_readiness"]["status"] == "ready"                       # shadow: Jev cannot make it stricter yet
+    report = br.write_report(cfg)
+    assert "`backlog-run approve 1`" in report and "request_changes (0.95) [shadow, display only]" in report
