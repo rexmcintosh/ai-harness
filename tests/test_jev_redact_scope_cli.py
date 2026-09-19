@@ -65,6 +65,50 @@ def test_the_scope_note_records_the_council_decision_and_its_limit():
         assert still_out in note, still_out
 
 
+# --- scope: which repositories' work may be described to Jev -----------------
+
+FIVE = {"ai-harness", "swimtrack", "swimtrack-website", "ultimate-portugal", "aris-management-website"}
+
+
+def test_the_repo_allow_list_is_exactly_the_five_measured_repositories():
+    # Adding a repository is an owner decision: this test is meant to be in the way.
+    assert scope.IN_SCOPE_REPOS == FIVE and isinstance(scope.IN_SCOPE_REPOS, frozenset)
+
+
+@pytest.mark.parametrize("repo", sorted(FIVE))
+def test_each_listed_repo_is_in_scope(repo):
+    assert scope.repo_in_scope(repo) is True
+    assert scope.repo_in_scope(repo, "2026-09-19-fix-a-typo") is True
+
+
+@pytest.mark.parametrize("repo", [
+    "sat-prep", "monthly-bidding", "romance-empire", "tax-advisor", "brand-new-repo",   # not listed
+    None, "", "none", 0, ["ai-harness"],                                                # not a repo name
+    "AI-Harness", "Swimtrack",                                                          # exact match only
+    "ai-harness-fork", "swimtrack-coach", " ai-harness", "ai-harness ",                 # longer names
+    "/home/dev/projects/ai-harness", "projects/ai-harness", "../ai-harness",            # a path is not a name
+])
+def test_anything_else_is_refused(repo):
+    assert scope.repo_in_scope(repo) is False
+
+
+@pytest.mark.parametrize("name", ["2026-09-19-bebop-briefing-fix", "2026-09-19-Tax-export", "gmail-filter-rules",
+                                  "2026-09-01-sat-prep-feedback-copy"])
+def test_a_listed_repo_is_refused_when_the_name_of_the_work_holds_an_out_of_scope_word(name):
+    assert scope.repo_in_scope("ai-harness", name) is False
+
+
+def test_the_repo_rule_leaves_the_path_rule_and_its_word_list_alone():
+    assert scope.OUT_OF_SCOPE == ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
+                                  "swimtrack-coach", "gmail", "mail", "/wiki/")
+    assert scope.in_scope("/home/dev/.local/state/diem/drain.log")
+
+
+def test_the_scope_note_records_the_repo_allow_list():
+    note = scope.ALLOWED_NOTE
+    assert "allow-list" in note and "IN_SCOPE_REPOS" in note and "backlog" in note and "refused" in note
+
+
 # --- the watchdog keeps working through the shared client --------------------
 
 def test_the_watchdog_shadow_uses_the_shared_client_and_keeps_its_old_names():

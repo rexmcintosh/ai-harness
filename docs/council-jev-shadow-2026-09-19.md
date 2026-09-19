@@ -92,7 +92,9 @@ deny list is not fail-closed: a new private repository would be in scope until s
 remembered to add its name. With an allow list, a repository nobody has decided about gets
 no Jev call.
 
-The allow list is `IN_SCOPE_REPOS` in `council/jev.py`. It holds the five repositories of the
+The allow list is `IN_SCOPE_REPOS` in `jev/scope.py`, the shared scope record. `council/jev.py`
+imports it under the same name, and the backlog hold gate (`backlogrun/gate.py`) follows the
+same list, so there is one list and the two cannot drift. It holds the five repositories of the
 offline test dataset, which are the repositories the signals were measured on:
 
 - `ai-harness`
@@ -118,9 +120,11 @@ Each list exists once. The offline harness in `tools/jev_council/` imports the r
 `council/jev.py`, and it still loads the same 28 reviews and 207 findings as before.
 
 **How to add a repository.** Adding one is an owner decision. After the decision, add the
-name to `IN_SCOPE_REPOS` in `council/jev.py` and to the pinned list in
-`tests/test_council_jev_shadow.py` (`ALLOWED_REPOS`), then refresh the installed command
-(see Rollout). The test pins the list so that it cannot grow by accident.
+name to `IN_SCOPE_REPOS` in `jev/scope.py` and to the pinned lists in
+`tests/test_council_jev_shadow.py` (`ALLOWED_REPOS`) and `tests/test_jev_redact_scope_cli.py`
+(`FIVE`), then refresh the installed command (see Rollout). The tests pin the list so that it
+cannot grow by accident. The decision covers both users of the list: the same name also lets
+the backlog hold gate send that repository's item titles and prompts to Jev.
 
 The shared scope record, `ALLOWED_NOTE` in `jev/scope.py`, now states the council decision in
 one sentence: for council work only, Jev may receive the council's own words (panel
@@ -133,7 +137,8 @@ even though `jev/scope.py` records unpublished manuscript prose as allowed since
 The council decision was given separately from the manuscript decision and did not name
 those repositories, so the stricter reading was kept. If the owner wants council reviews of
 those repositories to get the signals too, the change is small: move their names from
-`OUT_OF_SCOPE_REPOS` to `IN_SCOPE_REPOS` in `council/jev.py`, as described above.
+`OUT_OF_SCOPE_REPOS` (in `council/jev.py`) to `IN_SCOPE_REPOS` (in `jev/scope.py`), as
+described above.
 
 How the repository is decided:
 

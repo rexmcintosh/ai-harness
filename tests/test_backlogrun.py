@@ -1569,7 +1569,8 @@ def test_under_the_suite_guard_neither_jev_use_makes_a_call(world, monkeypatch):
     monkeypatch.setattr(shared_client, "http_post", lambda *a: reached.append(a) or {})
     monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")             # a key exists; conftest's switches are on
     assert os.environ["JEV_DISABLED"] == "1" and os.environ["COUNCIL_JEV"] == "0"
-    assert br.gate_mod.check(item("2026-01-01-deploy", prompt="run npm run deploy")) == (False, "")
+    # an allowed repo, so it is the suite guard that stops the call and not the gate's scope rule
+    assert br.gate_mod.check(item("2026-01-01-deploy", repo="ai-harness", prompt="run npm run deploy")) == (False, "")
     cfg = world.build([])
     _fake_council(monkeypatch)
     monkeypatch.setenv("JEV_DISABLED", "1")                             # _fake_council lifts it; put it back
