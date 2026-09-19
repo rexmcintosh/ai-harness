@@ -30,7 +30,6 @@ def _ask_voter(member: Member, context: str, client,
                max_completion_tokens=None) -> CandidateVote:
     try:
         raw = client.complete(member.model, member.system + "\n\n" + COMPARE_OUTPUT, context,
-                              json_mode=member.json_mode,
                               max_completion_tokens=max_completion_tokens)
         d = loads_lenient(raw)
         if not isinstance(d, dict) or not str(d.get("pick") or "").strip():

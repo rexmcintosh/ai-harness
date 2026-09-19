@@ -17,14 +17,26 @@ class VeniceError(RuntimeError):
     pass
 
 
+# Models (name prefixes) that must NOT be sent `response_format: json_object`. Venice's
+# forced-JSON decoder garbles deepseek-v4-pro's first key ('{": ": ", "}', '{".stance": ...')
+# and the model often stops there: 0 of 4 replies usable with it on, 4 of 4 clean with it
+# off, same seat and payload (2026-09-19). The prompts still demand JSON and loads_lenient
+# reads an unforced reply. Add a model here only with that kind of on/off evidence.
+NO_FORCED_JSON = ("deepseek-v4-pro",)
+
+
 class VeniceClient:
     """Thin Venice chat client. `post` is injectable for tests."""
 
     def __init__(self, api_key, *, base_url=VENICE_API, timeout=180,
                  retries=2, backoff=1.5, post=None, temperature=0.2,
-                 max_completion_tokens=None, transport_is_real=None):
+                 max_completion_tokens=None, transport_is_real=None,
+                 no_forced_json=None):
         if not api_key:
             raise VeniceError("no Venice key set (tried VENICE_COUNCIL_KEY, VENICE_API_KEY)")
+        if isinstance(no_forced_json, str):
+            raise TypeError("no_forced_json takes a tuple of model names, not one string")
+        self.no_forced_json = tuple(NO_FORCED_JSON if no_forced_json is None else no_forced_json)
         self.api_key = api_key
         # Default output ceiling for every call this client makes, so no call
         # site can be left unbounded by omission. Individual calls (the chair,
@@ -80,7 +92,7 @@ class VeniceClient:
             ],
             "temperature": self.temperature,
         }
-        if json_mode:
+        if json_mode and not str(model).startswith(self.no_forced_json):
             payload["response_format"] = {"type": "json_object"}
         # `max_completion_tokens`, not `max_tokens`: Venice's OpenAPI spec
         # (20260911.122036) marks max_tokens deprecated in favour of it, and

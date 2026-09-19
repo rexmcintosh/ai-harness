@@ -132,8 +132,7 @@ def load_panels(path=None):
     panels = {}
     for name, p in data.get("panels", {}).items():
         members = [Member(name=m["name"], model=m["model"], system=m["system"],
-                          max_completion_tokens=m.get("max_completion_tokens"),
-                          json_mode=bool(m.get("json_mode", True)))
+                          max_completion_tokens=m.get("max_completion_tokens"))
                    for m in p.get("members", [])]
         panels[name] = Panel(name=name, description=p.get("description", ""),
                              members=members, default_rigor=p.get("default_rigor", "daily"),

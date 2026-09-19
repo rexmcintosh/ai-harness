@@ -35,7 +35,6 @@ def _ask_member(member: Member, context: str, client, *, task_type: str = "chat"
             member.model,
             member.system + "\n\n" + MEMBER_OUTPUT,
             f"Here is the input to weigh in on:\n\n{context}",
-            json_mode=member.json_mode,
             task_type=task_type,
             max_completion_tokens=max_completion_tokens,
         )

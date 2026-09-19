@@ -102,14 +102,3 @@ def test_a_reply_with_a_garbled_stance_key_keeps_its_real_content():
     for r in run_panel(_panel(), "x", FakeClient(default=garbled)):
         assert r.error is None and r.stance == "na"
         assert r.headline == "No security risk" and len(r.findings) == 1
-
-
-def test_a_seat_is_asked_in_the_json_mode_its_member_declares(member_json):
-    panel = Panel(name="p", description="d", members=[
-        Member("Default", "m1", "sys"),
-        Member("NoForcedJson", "m2", "sys", json_mode=False),
-    ])
-    client = FakeClient(default=member_json())
-    run_panel(panel, "x", client)
-    assert {c["model"]: c["json_mode"] for c in client.calls} == {"m1": True, "m2": False}
-

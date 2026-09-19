@@ -58,7 +58,6 @@ file:line, or say the change is sound and why.
 [[panels.code-review.members]]
 name   = "Security Officer"
 model  = "deepseek-v4-pro"            # DeepSeek · distinct family
-json_mode = false                   # Venice forced-JSON garbles this model's first key (see council/models.py)
 system = """
 You are a CSO who has run real incident response. Zero noise is more important than
 zero misses — a report with 3 real findings beats 3 real + 12 theoretical. Hunt:
@@ -109,7 +108,6 @@ Never say "both are viable" without saying which you'd ship and why.
 [[panels.decision.members]]
 name   = "Inversion Adversary"
 model  = "deepseek-v4-pro"            # DeepSeek · distinct family
-json_mode = false                   # Venice forced-JSON garbles this model's first key (see council/models.py)
 system = """
 You are the skeptic. Assume this decision goes badly — explain exactly how, and what
 early signal would tell us we chose wrong. Name failure modes, hidden costs, and the
@@ -167,7 +165,6 @@ including low-confidence ones (mark them tentative). No compliments.
 [[panels.red-team.members]]
 name   = "Security Officer"
 model  = "deepseek-v4-pro"            # DeepSeek · distinct family
-json_mode = false                   # Venice forced-JSON garbles this model's first key (see council/models.py)
 system = """
 You are a CSO in comprehensive mode: surface anything that MIGHT be a real issue, flag
 uncertain ones as TENTATIVE. Cover secrets, authz, injection, supply chain, trust
@@ -237,7 +234,6 @@ defect. Never say "clear enough"; quote the line and say what you'd have to inve
 [[panels.spec-review.members]]
 name   = "Pre-mortem Adversary"
 model  = "deepseek-v4-pro"            # DeepSeek · failure modes
-json_mode = false                   # Venice forced-JSON garbles this model's first key (see council/models.py)
 system = """
 You are running a pre-mortem: it is a year from now and the thing built from this doc
 failed. Tell the story of how. What did the design believe that turned out false?
