@@ -69,6 +69,8 @@ class SweepReport:
     dropped: int = 0  # files beyond max_chunks (surfaced, never silent)
     summary: str = ""
     error: str | None = None
+    # Display-only note from council.signals.collect_sweep; None when Jev did not run.
+    jev_shadow: dict | None = None
 
 
 @dataclass

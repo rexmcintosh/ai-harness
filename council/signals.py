@@ -401,3 +401,46 @@ def _log_review(sig: JevSignals, synthesis, path) -> None:
     except Exception:  # noqa: BLE001
         record = {"ts": _utc_now(), "kind": "review", **sig.to_dict()}
     _append_log(record, path)
+
+
+# ── the weekly sweep: what would Jev also group? ─────────────────────────────────────────
+SWEEP_MAX_PAIRS = 40
+
+
+def collect_sweep(repo: str | None, findings, *, environ=None, ask=None, cut: float = CUT,
+                  max_pairs: int = SWEEP_MAX_PAIRS, budget_seconds: float = BUDGET_SECONDS,
+                  log_path=None, clock=time.monotonic) -> dict | None:
+    """`council sweep` merges findings whose first 80 characters match. This asks Jev which
+    of the REMAINING findings (`SweepFinding`s, in report order) describe the same problem,
+    for a display-only note. Findings are named by their position in the report, from 1.
+    Same rules as collect(): None and no call when off, without a key or out of scope;
+    never raises; one log line of ids and numbers; the report's findings are not touched."""
+    try:
+        environ = os.environ if environ is None else environ
+        if not jev.shadow_enabled(environ) or not jev.in_scope("", repo):
+            return None
+        numbered = [NumberedFinding(f"S{n}", f"S{n}", _severity_label(f.severity), _whole_number(f.confidence), str(f.point))
+                    for n, f in enumerate(findings, 1)]
+        pairs = list(itertools.combinations([f for f in numbered if f.text.strip()], 2))
+        chosen = _most_severe_first(pairs, max_pairs) if len(pairs) > max_pairs else pairs
+        started = clock()
+        counter = {"calls": 0, "budget_exhausted": False}
+        stats: dict = {"scores": [], "errors": 0}
+        budgeted = _budgeted(ask or _default_ask(environ), counter, deadline=started + budget_seconds, clock=clock)
+        agreeing = _score_pairs(chosen, budgeted, cut=cut, stats=stats)
+        position = {f.fid: n for n, f in enumerate(numbered, 1)}
+        note = {"groups": [{"findings": [position[fid] for fid in c["findings"]], "p_min": c["p_min"], "p_max": c["p_max"]}
+                           for c in clusters(agreeing, numbered)],
+                "pairs_total": len(pairs), "pairs_asked": len(stats["scores"]) + stats["errors"],
+                "truncated": len(pairs) > max_pairs, "cut": cut, "calls": counter["calls"],
+                "errors": stats["errors"], "budget_exhausted": counter["budget_exhausted"],
+                "seconds": round(clock() - started, 3)}
+        _append_log({"ts": _utc_now(), "kind": "sweep", "repo": str(repo), "model": jev.MODEL, **note,
+                     "pair_scores": stats["scores"],
+                     "findings": [{"id": n.fid, "severity": n.severity, "confidence": n.confidence,
+                                   "files": len(f.locations), "seats": len(f.sources)}
+                                  for n, f in zip(numbered, findings)]},
+                    log_path or log_path_for(environ))
+        return note
+    except Exception:  # noqa: BLE001 - shadow mode must never break a sweep
+        return None

@@ -681,3 +681,115 @@ def test_the_ci_gate_path_never_calls_jev_even_with_a_key(member_json, monkeypat
     import council.review as review_module
     source = Path(review_module.__file__).read_text()
     assert "jev" not in source.lower() and "signals" not in source
+
+
+# ── the weekly sweep: a shadow note, nothing else ────────────────────────────────────────
+from council.models import SweepFinding                                           # noqa: E402
+from council.render import render_sweep                                           # noqa: E402
+from council.sweep import run_sweep                                               # noqa: E402
+
+SWEEP_PANEL = Panel("red-team", "break it", [Member("Adversary", "m1", "attacker"), Member("Sec", "m2", "cso")])
+SQLI_A = "SQL injection: the query in a.py is built by string concatenation from user input"
+SQLI_B = "User input reaches the database query in a.py unescaped, so an attacker can inject SQL"
+SECRET = "A hardcoded API secret is committed in b.py"
+
+
+def sweep_client():
+    def member(findings):
+        return json.dumps({"stance": "oppose", "headline": "issues", "suggestions": [],
+                           "findings": [{"point": p, "severity": s, "confidence": c} for p, s, c in findings]})
+    return FakeClient(by_model={"m1": member([(SQLI_A, "high", 9), (SECRET, "critical", 9)]),
+                                "m2": member([(SQLI_B, "high", 8)]), "c": json.dumps({"summary": "2 real risks"})})
+
+
+def sweep_transport(calls, p_same=0.93):
+    def transport(req, key, timeout):
+        calls.append(req)
+        same = {req["state"]["a"], req["state"]["b"]} == {SQLI_A, SQLI_B}
+        return _reply({"same": {"type": "noul", "noul": p_same if same else 0.05}})
+    return transport
+
+
+def test_collect_sweep_groups_findings_the_text_dedup_missed_and_logs_no_text(tmp_path):
+    findings = [SweepFinding(SECRET, "critical", 9, ["b.py"], ["Adversary"]),
+                SweepFinding(SQLI_A, "high", 9, ["a.py"], ["Adversary"]),
+                SweepFinding(SQLI_B, "high", 8, ["a.py"], ["Sec"])]
+    ask = FakeAsk(same=lambda s: 0.93 if {s["a"], s["b"]} == {SQLI_A, SQLI_B} else 0.05)
+    note = signals.collect_sweep("ai-harness", findings, environ=ON, ask=ask, log_path=tmp_path / "l.jsonl")
+    assert note["groups"] == [{"findings": [2, 3], "p_min": 0.93, "p_max": 0.93}]
+    assert (note["pairs_total"], note["pairs_asked"], note["truncated"], note["errors"]) == (3, 3, False, 0)
+    raw = (tmp_path / "l.jsonl").read_text()
+    (row,) = read_log(tmp_path / "l.jsonl")
+    assert row["kind"] == "sweep" and row["repo"] == "ai-harness" and row["model"] == "jev-1.13.0"
+    assert row["findings"] == [{"id": "S1", "severity": "critical", "confidence": 9, "files": 1, "seats": 1},
+                               {"id": "S2", "severity": "high", "confidence": 9, "files": 1, "seats": 1},
+                               {"id": "S3", "severity": "high", "confidence": 8, "files": 1, "seats": 1}]
+    assert "SQL" not in raw and "secret" not in raw.lower() and "a.py" not in raw
+
+
+def test_collect_sweep_caps_the_pairs_and_refuses_out_of_scope_repos(tmp_path):
+    many = [SweepFinding(f"finding number {n}", "high", 9, ["a.py"], ["Sec"]) for n in range(12)]    # 66 pairs
+    ask = FakeAsk(same=0.1)
+    note = signals.collect_sweep("ai-harness", many, environ=ON, ask=ask, log_path=tmp_path / "l.jsonl")
+    assert (note["pairs_total"], note["pairs_asked"], note["truncated"], len(ask.calls)) == (66, 40, True, 40)
+    for repo in ("sat-prep", "romance-empire", None):
+        quiet = FakeAsk()
+        assert signals.collect_sweep(repo, many, environ=ON, ask=quiet, log_path=tmp_path / "l.jsonl") is None
+        assert quiet.calls == []
+    assert signals.collect_sweep("ai-harness", many, environ={**ON, "COUNCIL_JEV": "off"}, ask=FakeAsk()) is None
+
+
+def test_sweep_reports_the_same_findings_in_the_same_order_with_only_a_note_added(monkeypatch):
+    chunks = [("a.py", "code a"), ("b.py", "code b")]
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", sweep_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    plain = run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c")
+    assert plain.jev_shadow is None and calls == []             # no repo named: no Jev step
+    private = run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="finance-tracker")
+    assert private.jev_shadow is None and calls == []
+    shadowed = run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")
+    assert [(f.point, f.severity, f.confidence, f.locations, f.sources) for f in shadowed.findings] == \
+           [(f.point, f.severity, f.confidence, f.locations, f.sources) for f in plain.findings]
+    assert (shadowed.summary, shadowed.error, shadowed.chunks_scanned) == (plain.summary, plain.error, plain.chunks_scanned)
+    before, after = render_sweep("/repo", plain), render_sweep("/repo", shadowed)
+    assert after.startswith(before)
+    note = after[len(before):]
+    assert "display only" in note and "Jev would also group: finding 2 + finding 3 (0.93)" in note
+    count = lambda text: sum(1 for ln in text.splitlines() if ln.startswith("- "))      # noqa: E731
+    assert count(after) == count(before) == 3                   # security-sweep.sh counts "- " lines as findings
+    assert "### Findings" not in note and "### Summary" not in note                       # and cuts its summary there
+    assert len(calls) == 3 and SQLI_A not in note and "a.py" not in note
+
+
+def test_sweep_with_nothing_to_group_or_a_jev_outage_renders_exactly_as_before(monkeypatch):
+    chunks = [("a.py", "code a"), ("b.py", "code b")]
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    plain = render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c"))
+    monkeypatch.setattr(jev, "_http_post", sweep_transport([], p_same=0.4))
+    assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
+
+    def down(req, key, timeout):
+        raise OSError("down")
+    monkeypatch.setattr(jev, "_http_post", down)
+    assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
+    monkeypatch.setattr(signals, "collect_sweep", lambda *a, **k: 1 / 0)
+    assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
+
+
+@pytest.mark.parametrize("folder,grouped", [("some-tool", True), ("swimtrack-coach", False)])
+def test_cli_sweep_applies_the_scope_rule_to_the_swept_repo(tmp_path, capsys, monkeypatch, folder, grouped):
+    repo = tmp_path / folder
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "a.py").write_text("query = 'SELECT ' + user_input\n")
+    calls = []
+    monkeypatch.setattr(jev, "_http_post", sweep_transport(calls))
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    rc = cli.main(["sweep", str(repo)], _settings=Settings(chair_model="c"), _panels={"red-team": SWEEP_PANEL},
+                  _client=sweep_client())
+    out = capsys.readouterr().out
+    assert rc == 0 and ("Jev would also group" in out) is grouped and bool(calls) is grouped

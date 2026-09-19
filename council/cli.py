@@ -99,6 +99,18 @@ def _jev_shadow_section(review_text: str, path):
     return section
 
 
+def _sweep_jev_repo(path):
+    """The swept repository's name, for the scope rule of the display-only Jev note. One
+    `council sweep` call walks one path, so the path names the repo. None (no Jev) when the
+    shadow is off, or the path is not inside a git repository."""
+    try:
+        import os
+        from . import jev
+        return jev.repo_name(path) if jev.shadow_enabled(os.environ) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type="chat", shadow=None):
     if panel_name is None:
         panel_name = pick_panel(context, panels, client,
@@ -275,7 +287,8 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
         report = run_sweep(chunks, sweep_panel, client,
                            chair_model=settings.chair_model, min_conf=args.min_conf,
                            budget=resolve_budget(settings, sweep_panel,
-                                                 sweep_panel.default_rigor))
+                                                 sweep_panel.default_rigor),
+                           jev_repo=_sweep_jev_repo(args.path))
         report.dropped = dropped
         print(f"[sweep · panel: {args.panel} · {report.chunks_scanned} files]\n")
         print(render_sweep(args.path, report))

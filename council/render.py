@@ -113,7 +113,26 @@ def render_sweep(path: str, rep: SweepReport) -> str:
         out += ["_No findings above the confidence gate._", ""]
     out += [f"---", f"Coverage: scanned {rep.chunks_scanned} file(s); "
             f"{rep.dropped} eligible file(s) dropped by the chunk cap."]
+    out += _sweep_jev_note(rep)
     return "\n".join(out)
+
+
+def _sweep_jev_note(rep: SweepReport) -> list[str]:
+    """Shadow note, only when Jev grouped something. It goes after the coverage line and no
+    line starts with "- ": security-sweep.sh counts those lines as findings and cuts its
+    phone summary at the "### Findings" header."""
+    try:
+        groups = (rep.jev_shadow or {}).get("groups") or []
+        parts = []
+        for g in groups:
+            score = f"{g['p_min']:.2f}" if g["p_min"] == g["p_max"] else f"{g['p_min']:.2f} to {g['p_max']:.2f}"
+            parts.append(" + ".join(f"finding {n}" for n in g["findings"]) + f" ({score})")
+        if not parts:
+            return []
+        return ["", "### Jev shadow note (display only; the findings above are unchanged)",
+                "Jev would also group: " + "; ".join(parts) + ". Numbers count the findings above, from 1."]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def render_combined(sections, *, rigor: str = "daily") -> str:
