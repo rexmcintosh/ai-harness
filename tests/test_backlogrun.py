@@ -1528,3 +1528,115 @@ def test_the_work_queue_shares_work_one_and_its_one_repo_is_never_in_scope():
     assert runner._work_one is br.work_one                                       # so the identity rule applies there too
     assert '"repo": "sat-prep"' in inspect.getsource(runner.execute)
     assert not council_jev.in_scope("any-run-id", "sat-prep")
+
+
+# Two Jev uses now live in backlog-run. The pre-session HOLD GATE (backlogrun/gate.py) runs
+# BEFORE a worker session and may add a hold. The council SHADOW signals run AFTER the council
+# review and are display and log only. These tests pin that they do not interfere.
+
+def _both_jev_uses_on(monkeypatch, *, outward: float):
+    """The real gate and the real council adapter over one fake shared transport. Returns the
+    list of question-name lists the transport saw, in order."""
+    import jev.client as shared_client
+    from council.jev import MODEL
+    _fake_council(monkeypatch)
+    _jev_switches_on(monkeypatch)
+    seen = []
+
+    def transport(req, key, timeout):
+        names = sorted(req["questions"])
+        seen.append((names, req["state"]))
+        if names == ["outward"]:
+            answers = {"outward": {"type": "noul", "noul": outward}}
+        elif names == ["verdict"]:
+            answers = {"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91, "probabilities": {}}}
+        else:
+            answers = {"same": {"type": "noul", "noul": 0.9}}
+        return {"model": MODEL, "answers": answers, "usage": {"input_tokens": 7}}
+    monkeypatch.setattr(shared_client, "http_post", transport)
+    monkeypatch.setattr(br, "council_review", REAL_COUNCIL_REVIEW)      # cmd_work uses the module's reviewer
+    return seen
+
+
+def _usage_rows():
+    path = Path(os.environ["JEV_USAGE_LOG"])
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+def test_under_the_suite_guard_neither_jev_use_makes_a_call(world, monkeypatch):
+    import jev.client as shared_client
+    reached = []
+    monkeypatch.setattr(shared_client, "http_post", lambda *a: reached.append(a) or {})
+    monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")             # a key exists; conftest's switches are on
+    assert os.environ["JEV_DISABLED"] == "1" and os.environ["COUNCIL_JEV"] == "0"
+    assert br.gate_mod.check(item("2026-01-01-deploy", prompt="run npm run deploy")) == (False, "")
+    cfg = world.build([])
+    _fake_council(monkeypatch)
+    monkeypatch.setenv("JEV_DISABLED", "1")                             # _fake_council lifts it; put it back
+    monkeypatch.setattr(shared_client, "http_post", lambda *a: reached.append(a) or {})
+    monkeypatch.setenv("COUNCIL_JEV", "1")                              # even with the council's own switch on
+    rev = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="2026-01-01-a", repo="ai-harness")
+    assert reached == [] and "jev_shadow" not in rev and _usage_rows() == []
+
+
+def test_a_gate_hold_means_no_review_no_shadow_call_no_display_line_and_no_shadow_log(world, monkeypatch, capsys):
+    make_repo(world.root, "ai-harness")                                 # a repo the shadow WOULD run for
+    seen = _both_jev_uses_on(monkeypatch, outward=0.95)
+    cfg = world.build([item("2026-01-01-deploy", repo="ai-harness", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    (it,) = load_items(cfg)
+    assert it["status"] == "held" and "pre-session gate" in it["note"] and not it.get("branch")
+    assert [names for names, _ in seen] == [["outward"]]                # the gate's one question, nothing after it
+    assert list(Path(cfg.runs_dir).glob("*.json")) == [] and list(Path(cfg.reviews_dir).glob("*")) == []
+    report = br.write_report(cfg)
+    assert "Jev reads" not in report and "pre-session gate" in report
+    assert br.cmd_show(br.build_parser().parse_args(["show", "2026-01-01-deploy"]), cfg) == 0
+    assert "Jev reads" not in capsys.readouterr().out
+    assert not Path(os.environ["COUNCIL_JEV_LOG"]).exists()             # no shadow log line for a held item
+    assert [(r["project"], r["task"]) for r in _usage_rows()] == [("backlog-run", "outward-gate")]
+
+
+def test_an_item_the_gate_lets_through_is_asked_once_by_each_and_nothing_is_logged_twice(world, monkeypatch, capsys):
+    make_repo(world.root, "ai-harness")
+    seen = _both_jev_uses_on(monkeypatch, outward=0.08)
+    cfg = world.build([item("2026-01-01-a", repo="ai-harness", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    (it,) = load_items(cfg)
+    assert it["status"] == "in_review"
+    assert [names for names, _ in seen] == [["outward"], ["verdict"], ["same"]]      # gate first, shadow last
+    gate_state, shadow_states = seen[0][1], [state for _, state in seen[1:]]
+    assert set(gate_state) == {"repository", "title", "task"}
+    assert "Do the thing" not in json.dumps(shadow_states)              # the shadow never sends the item's prompt
+    assert [(r["project"], r["task"]) for r in _usage_rows()] == [
+        ("backlog-run", "outward-gate"), ("ai-harness", "council-verdict"), ("ai-harness", "council-same")]
+    rows = [json.loads(line) for line in Path(os.environ["COUNCIL_JEV_LOG"]).read_text().splitlines()]
+    assert len(rows) == 1 and rows[0]["kind"] == "review" and rows[0]["item"] == "2026-01-01-a" and rows[0]["calls"] == 2
+    assert "outward" not in json.dumps(rows[0])                         # the gate's answer is not in the shadow log
+    record = json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
+    assert record["jev_shadow"] == {"verdict": {"label": "approve_with_conditions", "confidence": 0.91}}
+    assert "gate" not in json.dumps(record).lower()
+    assert JEV_LINE in br.write_report(cfg)
+
+
+def test_the_gates_answer_never_reaches_the_shadows_scope_rule(world, monkeypatch):
+    # "alpha" is not on the council's allow list. Whatever the gate does with such an item,
+    # the shadow's own rule still decides for the shadow: a worked item gets no shadow call.
+    seen = _both_jev_uses_on(monkeypatch, outward=0.08)
+    cfg = world.build([item("2026-01-01-a", required_validations=[])])
+    assert br.cmd_work(work_args(), cfg) == 0
+    assert load_items(cfg)[0]["status"] == "in_review"
+    assert [names for names, _ in seen if names != ["outward"]] == []
+    assert not Path(os.environ["COUNCIL_JEV_LOG"]).exists()
+
+
+def test_the_two_jev_uses_share_no_code_and_no_module_state():
+    import inspect
+    import council.signals as signals
+    from backlogrun import gate
+    gate_source, signals_source = inspect.getsource(gate), inspect.getsource(signals)
+    assert "council" not in gate_source.replace("the council verdict", "")       # the gate knows nothing of the shadow
+    assert "backlogrun" not in signals_source and "outward" not in signals_source
+    mutable = lambda module: {k for k, v in vars(module).items()                  # noqa: E731
+                              if not k.startswith("__") and isinstance(v, (list, set, bytearray))}
+    assert mutable(gate) == set() and mutable(signals) == set()
+    assert gate.MODEL == signals.jev.MODEL                                        # two pins, one measured version today

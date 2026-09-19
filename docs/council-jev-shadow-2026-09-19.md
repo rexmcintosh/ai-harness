@@ -60,6 +60,19 @@ left out.
 | `backlog-run` (nightly runner) | Its council step adds the same section to the saved review. It saves Jev's label and confidence in the review's `inputs.json` record under `jev_shadow`. `report` and `show` print one extra line for a worked item: `Jev reads the chair's verdict as: approve_with_conditions (0.91) [shadow, display only]`. | `review_status`, the readiness state, the reasons, `report.json`, the rule for suggesting `approve`, `approve` itself. A review whose readiness is "unknown" stays "unknown". |
 | `council sweep` (weekly) | After the sweep has merged findings with matching text and the chair has written its summary, Jev is asked which of the remaining findings describe the same problem. Groups are printed as one note after the coverage line: `Jev would also group: finding 2 + finding 3 (0.93)`. | Which findings are reported, their order, the counts, the summary, the exit code. With nothing to group, the report is byte-identical. |
 
+`backlog-run` has a second, separate use of Jev: the pre-session hold gate in
+`backlogrun/gate.py`. It asks one question BEFORE a worker session and may add a hold. The
+shadow signals run AFTER the council review and decide nothing. The two share the shared
+client and nothing else: no code, no state, no log. An item the gate holds is never worked,
+so it gets no review, no shadow call, no display line and no shadow log line. An item the
+gate lets through is asked once by each; every call is one row in the shared usage ledger
+(project `backlog-run` for the gate, `ai-harness` for the signals), and the review is one
+line in the shadow log. Both are off under `JEV_DISABLED=1`. Tests pin each of these points.
+The gate does not use the allow list described below. It sends the title and the prompt of
+any backlog item it screens, for every repository. That is a different kind of text (the
+owner's task wording, not review text about a repository's code), and its scope is that
+gate's own matter.
+
 The signals do not run in `council/review.py::run_pr_review`, which is the pull request
 merge gate used by CI. That file was not edited, and a test checks that it makes no Jev
 call even when a key is present. `council ask` and `council compare` do not run them
@@ -301,7 +314,7 @@ call. A typical review makes 10 to 20 calls.
 
 ## Checked on 2026-09-19
 
-- Full test suite: 1658 passed, 1 skipped; 158 of these tests are new. No test reaches the
+- Full test suite: 1689 passed, 1 skipped; 163 of these tests are new. No test reaches the
   network: the suite-wide test configuration sets `JEV_DISABLED=1` and `COUNCIL_JEV=0` and
   sends both logs to temporary files, and the new test file puts a tripwire on the shared
   client's HTTP opener that fails any test that reaches it.
