@@ -188,6 +188,16 @@ def test_the_allow_list_and_the_explicit_refusal_list_never_overlap(monkeypatch)
     assert not jev.in_scope("", "romance-empire")
 
 
+def test_there_is_one_repo_allow_list_and_the_council_borrows_it_from_the_shared_scope_record():
+    # The backlog hold gate (backlogrun/gate.py) and the council signals follow "the same"
+    # allow-list (owner, 2026-09-19). The same object, so the two can never drift apart.
+    import jev.scope as shared_scope
+    assert jev.IN_SCOPE_REPOS is shared_scope.IN_SCOPE_REPOS
+    for name, repo in (("", "ai-harness"), ("2026-07-27-time-standards", "swimtrack-website"), ("x", "sat-prep"),
+                       ("bebop-briefing-fix", "ai-harness"), ("x", "brand-new-repo"), ("x", None), ("x", "")):
+        assert jev.in_scope(name, repo) == shared_scope.repo_in_scope(repo, name), (name, repo)
+
+
 def test_the_offline_harness_shares_the_one_scope_list_and_key_loader():
     import jev.scope as shared_scope
     from tools.jev_council import jev as offline, reviews

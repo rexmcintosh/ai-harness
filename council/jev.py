@@ -27,7 +27,7 @@ from pathlib import Path
 import jev as _shared                                  # the top-level shared package, not this module
 from jev import client as _client
 from jev.redact import redact_state as redact, redact_text   # noqa: F401  (re-exported)
-from jev.scope import OUT_OF_SCOPE                     # noqa: F401  one word list for every caller
+from jev.scope import IN_SCOPE_REPOS, OUT_OF_SCOPE     # noqa: F401  one allow list and one word list for every caller
 
 MODEL = "jev-1.13.0"            # the council's own pin; passed on every call
 TIMEOUT_SECONDS = 8             # the most one call may wait; a caller with less time left passes less
@@ -45,11 +45,11 @@ _http_post = _client.http_post  # kept for tools/jev_council, which passes it as
 # list is not fail-closed: a new private repo would be in scope until someone remembered to
 # add its name.
 #
-# These are the five repos in the 2026-09-19 offline test dataset
+# The list itself is IN_SCOPE_REPOS in jev/scope.py, imported above and re-exported under the
+# same name: ONE list for every caller that describes a repository's work to Jev (the backlog
+# hold gate follows it too). These are the five repos in the 2026-09-19 offline test dataset
 # (docs/jev-council-offline-test-2026-09-19.md): the repos the signals were measured on.
-# Adding a repo is an OWNER decision. Extend deliberately; a test pins this list.
-IN_SCOPE_REPOS = frozenset({
-    "ai-harness", "swimtrack", "swimtrack-website", "ultimate-portugal", "aris-management-website"})
+# Adding a repo is an OWNER decision. Extend it there, deliberately; tests pin the list.
 
 # A second, explicit refusal (belt and braces): a name here is refused even if it also lands
 # on the allow list by mistake, and the list documents two decisions. (1) Repos that hold
