@@ -26,6 +26,27 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "jev-usage.jsonl"))
 
 
+@pytest.fixture(autouse=True)
+def _no_live_council_jev(tmp_path, monkeypatch):
+    """No test may reach the real TypeSafe API or write the live council shadow log.
+    `council review`, `council sweep` and backlog-run's council step run the Jev shadow
+    signals whenever a key exists, and this machine has one. So for every test: the kill
+    switch is on, the log is a temp file, and the real transport is a tripwire. A test of
+    the wiring sets COUNCIL_JEV=1 and patches council.jev._http_post with a fake.
+    The tripwire fails the test at teardown, because the shadow code swallows exceptions."""
+    from council import jev
+    reached = []
+
+    def tripwire(req, key, timeout):
+        reached.append(sorted(req.get("questions") or {}))
+        raise AssertionError("a test reached the real Jev transport")
+    monkeypatch.setenv("COUNCIL_JEV", "0")
+    monkeypatch.setenv("COUNCIL_JEV_LOG", str(tmp_path / "council-jev-shadow.jsonl"))
+    monkeypatch.setattr(jev, "_http_post", tripwire)
+    yield
+    assert not reached, f"a test reached the real Jev transport: {reached}"
+
+
 class FakeClient:
     """Stand-in for VeniceClient. Scripted responses keyed by model name,
     or a single default. Records calls for assertions."""
