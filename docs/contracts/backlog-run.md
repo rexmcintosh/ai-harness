@@ -17,3 +17,16 @@ Success is a per-item run record, a council review file, and an item transition 
 ## Failure, escalation, and gaps
 
 Lock contention exits 75 and is visible in the cron log. Failed or ambiguous work is held or recorded rather than merged. The owner must use the morning report to judge work. The contract is reinforced by the backlog README safety contract but is not a replacement for it.
+
+## Pre-session hold gate (added 2026-09-19)
+
+Before a session is spent on an item, `backlogrun/gate.py` asks Jev one yes/no question through the shared client (`docs/contracts/jev.md`): does finishing this item need an outward-facing or irreversible action? A score of 0.7 or more turns `work` into `held` with a note that says why and how to release it. The freed slot goes to the next item. The gate may only add a hold. No answer (no key, an outage, `JEV_DISABLED`) means no hold, so the run is what it was before the gate existed.
+
+- The owner's decision wins: `backlog-run reopen <id> --gate-ok` records `gate_ok: true` on the item and the gate never asks about it again.
+- Off switches: `backlog-run work --no-gate`, or `BACKLOG_GATE=off`.
+- What is sent: the repo name, the title, and the prompt with addresses and token-shaped strings removed. Never the runner note, the council verdict, or the outcome.
+- At most 10 items are screened per run; after that the rest are deferred to the next night.
+- Evidence: `docs/jev-replays-2026-09-19.md` and `docs/evidence/jev-replays-2026-09-19/backlog/`. The wording and the 0.7 line were measured together; `tests/test_backlogrun_gate.py` fails if the wording changes without a new hash.
+- Known gap: Jev cannot read dates. "Do not run before <date>" in a prompt is invisible to this gate.
+- This gate reinforces README safety rule 2. It does not replace the session's own duty to stop and report HELD.
+
