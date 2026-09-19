@@ -1,0 +1,145 @@
+"""Read saved council reviews (the markdown `council review --format md` prints) back into data.
+
+Read-only. The reviews live outside this repo: the backlog runner's state directory and the
+backlog repo's evidence folders. Nothing here is copied into the repo.
+"""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# Owner data rule (2026-09-19): council text, code snippets and diffs may go to TypeSafe for
+# council work. Two things stay out. (1) Repos that hold student, customer, mail, tax or
+# finance data: the same words the watchdog shadow refuses (watchdog/jev_shadow.OUT_OF_SCOPE).
+# (2) Unpublished manuscripts, so every romance repo: the Jev assessment lists them as a
+# category that needs its own decision, and a council review of a chapter quotes the plot.
+# A saved review's id does not name its repo, so scope is decided from the backlog's
+# id -> repo map, and an id the map does not know is refused.
+OUT_OF_SCOPE = ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
+                "swimtrack-coach", "gmail", "mail")
+OUT_OF_SCOPE_REPOS = frozenset({
+    "sat-prep", "tax-advisor", "finance-tracker", "swimtrack-coach", "monthly-bidding", "nato-support",
+    "romance-empire", "romance-tessacross.com", "romance-elliecalloway.com", "flight-7-publishing",
+    "rmpeacockwriter.com"})
+
+_REC = re.compile(r"^### Recommendation \(confidence (\d+)/10\)\s*$", re.M)
+_SEAT = re.compile(r"^#### (?P<name>.+?) · (?P<model>\S+) — (?P<stance>\S+)\s*$", re.M)
+_FINDING = re.compile(r"^- `(?P<sev>[^`]+)` \(c(?P<conf>\d+)\) (?P<text>.+)$")
+_PANEL = re.compile(r"^\[panel: (?P<panel>[\w-]+)", re.M)
+
+
+@dataclass
+class Seat:
+    name: str
+    model: str
+    stance: str
+    headline: str = ""
+
+
+@dataclass
+class SeatFinding:
+    fid: str            # F<seat number>.<finding number>, stable for a saved review
+    seat: str
+    severity: str
+    confidence: int
+    text: str
+    tentative: bool = False
+
+
+@dataclass
+class Review:
+    rid: str
+    repo: str = ""
+    panel: str = ""
+    recommendation: str = ""
+    rec_confidence: int = 0
+    consensus: list[str] = field(default_factory=list)
+    seats: list[Seat] = field(default_factory=list)
+    findings: list[SeatFinding] = field(default_factory=list)
+    chair_blocks: list[dict] = field(default_factory=list)
+
+
+def in_scope(rid: str, repo: str | None) -> bool:
+    if not repo or repo in OUT_OF_SCOPE_REPOS:
+        return False
+    low = f"{rid} {repo}".lower()
+    return not any(word in low for word in OUT_OF_SCOPE)
+
+
+def _bullets(block: str) -> list[str]:
+    return [ln[2:].strip() for ln in block.splitlines() if ln.startswith("- ")]
+
+
+def parse_review(text: str, rid: str) -> Review:
+    r = Review(rid=rid)
+    if (m := _PANEL.search(text)):
+        r.panel = m.group("panel")
+    if (m := _REC.search(text)):
+        r.rec_confidence = int(m.group(1))
+        rest = text[m.end():]
+        r.recommendation = rest.split("\n**", 1)[0].split("\n---", 1)[0].strip()
+        if "**Consensus:**" in rest:
+            r.consensus = _bullets(rest.split("**Consensus:**", 1)[1].split("\n**", 1)[0].split("\n---", 1)[0])
+    seats = list(_SEAT.finditer(text))
+    for n, m in enumerate(seats, 1):
+        body = text[m.end():seats[n].start() if n < len(seats) else len(text)]
+        body = body.split("### Raw chair response", 1)[0]
+        head = re.search(r"^_(.*)_\s*$", body, re.M)
+        r.seats.append(Seat(m.group("name"), m.group("model"), m.group("stance"),
+                            (head.group(1) if head else "").strip()))
+        k = 0
+        for line in body.splitlines():
+            if (f := _FINDING.match(line)):
+                k += 1
+                body_text = f.group("text")
+                tentative = body_text.rstrip().endswith("_(tentative)_")
+                r.findings.append(SeatFinding(
+                    f"F{n}.{k}", m.group("name"), f.group("sev").lower(), int(f.group("conf")),
+                    body_text.replace("_(tentative)_", "").strip(), tentative))
+    raw = re.search(r"### Raw chair response.*?```json\s*(\{.*?\})\s*```", text, re.S)
+    if raw:
+        try:
+            blocks = json.loads(raw.group(1)).get("blocking_findings") or []
+            r.chair_blocks = [b for b in blocks if isinstance(b, dict)]
+        except ValueError:
+            pass
+    return r
+
+
+def backlog_repo_map(*yaml_paths: Path) -> dict[str, str]:
+    """{item id: repo} from the backlog's active and archive files."""
+    import yaml
+    out = {}
+    for path in yaml_paths:
+        doc = yaml.safe_load(Path(path).expanduser().read_text()) or {}
+        for item in doc.get("items") or []:
+            if item.get("id") and item.get("repo"):
+                out[str(item["id"])] = str(item["repo"])
+    return out
+
+
+def _repo_for(rid: str, repo_of: dict[str, str]) -> str | None:
+    # runner records are "<timestamp>-<item id>" or the legacy "<item id>"
+    for item_id, repo in repo_of.items():
+        if rid == item_id or rid.endswith("-" + item_id):
+            return repo
+    return None
+
+
+def load_reviews(directory: Path, *, repo_of: dict[str, str] | None = None,
+                 default_repo: str | None = None) -> list[Review]:
+    """Reviews under `directory` that are in scope. Pass `repo_of` for runner records, or
+    `default_repo` for a folder whose reviews all belong to one known repo."""
+    out = []
+    for p in sorted(Path(directory).expanduser().glob("*.md")):
+        rid = p.stem.replace(".council", "")
+        repo = default_repo or _repo_for(rid, repo_of or {})
+        if not in_scope(rid, repo):
+            continue
+        r = parse_review(p.read_text(encoding="utf-8", errors="replace"), rid)
+        if r.recommendation:
+            r.repo = repo
+            out.append(r)
+    return out

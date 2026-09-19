@@ -1,0 +1,117 @@
+{
+ "_about": "Hand labels for the chair's verdict, written on 2026-09-19 BEFORE any Jev answer was seen. Rule: approve = merge now, anything listed is optional or follow-up; approve_with_conditions = approves but names fixes to make before the merge or before relying on it; request_changes = does not approve as it stands (rework, hold, do not merge). borderline = the wording supports two labels.",
+ "labels": {
+  "2026-07-21-venice-keys-polish-followups": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "2026-07-23-cron-loop-contracts": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "2026-07-23-loom-phantom-wiki-tree-reconcile": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "2026-07-27-time-standards-season-refresh": {
+   "verdict": "request_changes",
+   "borderline": true
+  },
+  "2026-07-29-aris-turnstile-contact-form": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "2026-08-03-harden-backlog-cli-contract": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "2026-08-03-portugal-property-guide": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "2026-08-05-fpn-worldaquatics-scrapers": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "2026-08-25-loom-triage-two-malformed-bm2-artifacts": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "2026-09-02-seo-loop-parked-minors": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "bm2": {
+   "verdict": "request_changes",
+   "borderline": false
+  },
+  "bm2b": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "contracts": {
+   "verdict": "request_changes",
+   "borderline": false
+  },
+  "contracts2": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "contracts3": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "fixture": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "fixture2": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "gate": {
+   "verdict": "approve_with_conditions",
+   "borderline": true
+  },
+  "gate2": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "rework": {
+   "verdict": "approve_with_conditions",
+   "borderline": true
+  },
+  "rework2": {
+   "verdict": "approve",
+   "borderline": true
+  },
+  "rework3": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "spine": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "spine2": {
+   "verdict": "approve",
+   "borderline": false
+  },
+  "swimtrack": {
+   "verdict": "approve_with_conditions",
+   "borderline": false
+  },
+  "swimweb": {
+   "verdict": "approve_with_conditions",
+   "borderline": true
+  },
+  "seatfix": {
+   "verdict": "approve_with_conditions",
+   "borderline": true
+  },
+  "seatfix2": {
+   "verdict": "approve",
+   "borderline": true
+  }
+ }
+}
