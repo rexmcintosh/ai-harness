@@ -95,8 +95,9 @@ seats"), and which panel finding each chair block confirms. `council sweep` adds
 with the findings Jev would also group. This is **shadow mode**: the answers are shown and
 logged (`~/.local/state/council/jev-shadow.jsonl`, ids and numbers only) and nothing reads
 them. The panel, the chair, the gate, `run_pr_review` and every exit code are unchanged.
-`COUNCIL_JEV=0` turns it off; no `TYPESAFE_API_KEY`, or a repository outside the data rule in
-`council/jev.py`, means no call and byte-identical output. Details, the data rule and what
+Every call goes through the shared client (`jev/`, `docs/contracts/jev.md`). `COUNCIL_JEV=0`
+turns it off, and so does the shared `JEV_DISABLED=1`; no `TYPESAFE_API_KEY`, or a repository
+outside the data rule in `council/jev.py`, means no call and byte-identical output. Details, the data rule and what
 is deliberately not built: `docs/council-jev-shadow-2026-09-19.md`.
 
 ## Secret

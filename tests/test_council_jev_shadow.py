@@ -13,21 +13,38 @@ from pathlib import Path
 
 import pytest
 
-from council import jev
+import jev.client as shared_client              # the shared client: the one door to TypeSafe
+from council import jev                        # the council's thin layer over it
+
+
+class _RefusingOpener:
+    def __init__(self, opened):
+        self.opened = opened
+
+    def open(self, request, *args, **kwargs):
+        self.opened.append(getattr(request, "full_url", str(request)))
+        raise AssertionError("a test opened a real connection to TypeSafe")
 
 
 @pytest.fixture(autouse=True)
 def real_connections(monkeypatch):
-    """The last line of defence, below the conftest tripwire: the HTTP opener itself. The
-    shadow code swallows exceptions by design, so the guard records and fails at teardown."""
+    """No test here may reach TypeSafe. conftest already sets JEV_DISABLED=1 and COUNCIL_JEV=0;
+    this is the last line of defence, the HTTP opener of the one shared client. The shadow
+    code swallows exceptions by design, so the guard records and fails at teardown."""
     opened = []
-
-    def refuse(request, *args, **kwargs):
-        opened.append(getattr(request, "full_url", str(request)))
-        raise AssertionError("a test opened a real connection to TypeSafe")
-    monkeypatch.setattr(jev._OPENER, "open", refuse)
+    monkeypatch.setattr(shared_client, "_OPENER", _RefusingOpener(opened))
     yield opened
     assert not opened, f"a test opened a real connection: {opened}"
+
+
+@pytest.fixture
+def jev_on(monkeypatch):
+    """Both switches on and a test key, as a wiring test needs them. Returns a function that
+    installs a fake in place of the shared client's real transport."""
+    monkeypatch.delenv("JEV_DISABLED", raising=False)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    return lambda transport: monkeypatch.setattr(shared_client, "http_post", transport)
 
 
 def _reply(answers, model=jev.MODEL):
@@ -35,11 +52,31 @@ def _reply(answers, model=jev.MODEL):
 
 
 # ── the client ───────────────────────────────────────────────────────────────────────────
-def test_the_guard_itself_catches_a_call_that_reaches_the_opener(real_connections):
-    with pytest.raises(AssertionError, match="real connection"):
-        jev._OPENER.open("https://api.typesafe.ai/v1/systemone")
+def test_the_guard_itself_catches_a_call_that_reaches_the_opener(real_connections, jev_on):
+    with pytest.raises(jev.JevError):                          # the real transport, all the way down
+        jev.ask("s", {"q": {"type": "noul", "instructions": "?"}}, key="k")
     assert real_connections == ["https://api.typesafe.ai/v1/systemone"]
     real_connections.clear()                                   # this one reach was the test
+
+
+def test_every_call_goes_through_the_shared_client_and_lands_in_its_usage_ledger(jev_on, tmp_path, monkeypatch):
+    # docs/contracts/jev.md rule 1: one door, no second HTTP client anywhere.
+    monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "usage.jsonl"))
+    jev_on(lambda req, key, timeout: _reply({"q": {"type": "noul", "noul": 0.5}}))
+    jev.ask("s", {"q": {"type": "noul", "instructions": "?"}}, key="k", task="council-verdict")
+    (row,) = [json.loads(line) for line in (tmp_path / "usage.jsonl").read_text().splitlines()]
+    assert (row["project"], row["task"], row["model"], row["ok"]) == ("ai-harness", "council-verdict", "jev-1.13.0", True)
+    source = Path(jev.__file__).read_text()
+    assert "urllib" not in source and "build_opener" not in source
+
+
+def test_the_shared_off_switch_turns_the_council_off_too(monkeypatch):
+    assert jev.shadow_enabled({"TYPESAFE_API_KEY": "k"}) is True
+    assert jev.shadow_enabled({"TYPESAFE_API_KEY": "k", "JEV_DISABLED": "1"}) is False
+    assert jev.shadow_enabled({"TYPESAFE_API_KEY": "k", "JEV_DISABLED": "0"}) is True
+    monkeypatch.setenv("JEV_DISABLED", "1")                    # and the shared client refuses by itself
+    with pytest.raises(jev.JevError, match="JEV_DISABLED"):
+        jev.ask("s", {"q": {}}, key="k", transport=lambda *a: _reply({"q": {}}))
 
 
 @pytest.mark.parametrize("value", ["0", "off", "false", "OFF", " False "])
@@ -56,7 +93,7 @@ def test_no_key_means_off_and_a_key_means_on_by_default(tmp_path):
     assert jev.shadow_enabled({"HOME": str(tmp_path), "COUNCIL_JEV": "1"}) is True
 
 
-def test_ask_pins_the_model_and_redacts_the_state_and_the_questions():
+def test_ask_pins_the_model_and_redacts_the_state_and_the_questions(jev_on):
     sent = {}
 
     def transport(req, key, timeout):
@@ -81,12 +118,12 @@ def test_council_text_is_redacted_whole_without_clipping_lines():
     assert out.splitlines()[0].endswith("END") and "@pytest.fixture" in out
 
 
-def test_ask_refuses_an_answer_from_another_model_version():
-    with pytest.raises(jev.JevError, match="model"):
+def test_ask_refuses_an_answer_from_another_model_version(jev_on):
+    with pytest.raises(jev.JevError, match="not the pinned jev-1.13.0"):
         jev.ask("s", {"q": {}}, key="k", transport=lambda *a: _reply({}, model="jev-2.0.0"))
 
 
-def test_ask_turns_every_failure_into_a_jev_error_that_never_names_the_key():
+def test_ask_turns_every_failure_into_a_jev_error_that_never_names_the_key(jev_on):
     def down(req, key, timeout):
         raise OSError(f"connection refused for bearer {key}")
     with pytest.raises(jev.JevError) as err:
@@ -96,14 +133,20 @@ def test_ask_turns_every_failure_into_a_jev_error_that_never_names_the_key():
         jev.ask("s", {"q": {}}, key="k", transport=lambda *a: {"model": jev.MODEL, "answers": "nope"})
 
 
-def test_ask_without_a_transport_uses_the_module_transport_looked_up_at_call_time(monkeypatch):
-    monkeypatch.setattr(jev, "_http_post", lambda req, key, timeout: _reply({"q": {"noul": 0.1}}))
+def test_ask_without_a_transport_uses_the_shared_transport_looked_up_at_call_time(jev_on):
+    jev_on(lambda req, key, timeout: _reply({"q": {"noul": 0.1}}))
     assert jev.ask("s", {"q": {}}, key="k") == {"q": {"noul": 0.1}}
 
 
-def test_redirects_are_never_followed():
-    # urllib re-sends the Authorization header on a redirect
-    assert jev._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://elsewhere.test/") is None
+def test_a_failed_call_is_not_retried_inside_a_review(jev_on):
+    tries = []
+
+    def busy(req, key, timeout):
+        tries.append(1)
+        raise shared_client.TransientError("HTTP 529")
+    with pytest.raises(jev.JevError):
+        jev.ask("s", {"q": {}}, key="k", transport=busy)
+    assert len(tries) == 1                                      # the time budget is for other questions
 
 
 def test_scope_rule_refuses_private_repos_manuscripts_and_unknown_repos():
@@ -115,10 +158,12 @@ def test_scope_rule_refuses_private_repos_manuscripts_and_unknown_repos():
 
 
 def test_the_offline_harness_shares_the_one_scope_list_and_key_loader():
+    import jev.scope as shared_scope
     from tools.jev_council import jev as offline, reviews
-    assert reviews.OUT_OF_SCOPE is jev.OUT_OF_SCOPE and reviews.OUT_OF_SCOPE_REPOS is jev.OUT_OF_SCOPE_REPOS
+    assert reviews.OUT_OF_SCOPE is jev.OUT_OF_SCOPE is shared_scope.OUT_OF_SCOPE      # one word list for every caller
+    assert reviews.OUT_OF_SCOPE_REPOS is jev.OUT_OF_SCOPE_REPOS
     assert reviews.in_scope is jev.in_scope and offline.load_key is jev.load_key
-    assert offline.MODEL == jev.MODEL
+    assert offline.MODEL == jev.MODEL and offline.redact_text is jev.redact_text
 
 
 def _git(cwd, *args):
@@ -398,15 +443,17 @@ def test_collect_returns_none_and_makes_no_call_when_off_out_of_scope_or_unknown
     assert ask.calls == [] and not log.exists()
 
 
-def test_collect_without_an_injected_ask_uses_the_key_and_the_module_transport(tmp_path, monkeypatch):
+def test_collect_without_an_injected_ask_uses_the_key_and_the_module_transport(tmp_path, monkeypatch, jev_on):
     seen = []
 
     def transport(req, key, timeout):
         seen.append((key, sorted(req["questions"])))
         return _reply({"verdict": {"choice": "approve", "confidence": 0.8, "probabilities": {}}})
-    monkeypatch.setattr(jev, "_http_post", transport)
+    jev_on(transport)
+    monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "usage.jsonl"))
     sig = signals.collect("ai-harness", [], synthesis(), environ=ON, log_path=tmp_path / "l.jsonl")
     assert seen == [("test-key", ["verdict"])] and sig.verdict["label"] == "approve"
+    assert json.loads((tmp_path / "usage.jsonl").read_text())["task"] == "council-verdict"
 
 
 def test_collect_never_raises_and_keeps_what_it_already_has(tmp_path):
@@ -583,10 +630,12 @@ def run_review(member_json, capsys, *args):
     return rc, capsys.readouterr().out, client
 
 
-def test_review_output_is_byte_identical_to_today_when_the_shadow_is_off(member_json, capsys, in_scope_checkout, monkeypatch):
+@pytest.mark.parametrize("switch", ["COUNCIL_JEV", "JEV_DISABLED"])
+def test_review_output_is_byte_identical_to_today_when_the_shadow_is_off(member_json, capsys, in_scope_checkout,
+                                                                         monkeypatch, jev_on, switch):
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")                # a key exists; the switch is off (conftest)
+    jev_on(fake_jev_transport(calls))                                 # a key and a transport exist...
+    monkeypatch.setenv(switch, "0" if switch == "COUNCIL_JEV" else "1")   # ...and one of the two switches is off
     rc, out, client = run_review(member_json, capsys, "change.diff", "--format", "md")
     settings, panels, replay = review_world(member_json)
     from council.engine import run_panel
@@ -598,10 +647,10 @@ def test_review_output_is_byte_identical_to_today_when_the_shadow_is_off(member_
     assert rc == 0 and calls == [] and "Jev" not in out
 
 
-def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys, in_scope_checkout, monkeypatch):
+def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys, in_scope_checkout, monkeypatch, jev_on):
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    jev_on(fake_jev_transport(calls))
+    monkeypatch.setenv("COUNCIL_JEV", "0")
     rc_off, off, client_off = run_review(member_json, capsys, "change.diff", "--format", "md")
     monkeypatch.setenv("COUNCIL_JEV", "1")
     rc_on, on, client_on = run_review(member_json, capsys, "change.diff", "--format", "md")
@@ -618,16 +667,15 @@ def test_review_shows_the_shadow_section_at_the_end_when_on(member_json, capsys,
     assert row["panel"] == "code-review"
 
 
-def test_review_in_the_terminal_format_gets_the_section_too(member_json, capsys, in_scope_checkout, monkeypatch):
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport([]))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+def test_review_in_the_terminal_format_gets_the_section_too(member_json, capsys, in_scope_checkout, monkeypatch, jev_on):
+    jev_on(fake_jev_transport([]))
     rc, out, _ = run_review(member_json, capsys, "change.diff")
     assert rc == 0 and out.rstrip().count(TITLE) == 1 and out.index(TITLE) > out.index("── Raw panel ──")
 
 
-def test_a_broken_jev_step_never_changes_the_review_or_its_exit_code(member_json, capsys, in_scope_checkout, monkeypatch):
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+def test_a_broken_jev_step_never_changes_the_review_or_its_exit_code(member_json, capsys, in_scope_checkout, monkeypatch, jev_on):
+    jev_on(fake_jev_transport([]))
+    monkeypatch.setenv("COUNCIL_JEV", "0")
     rc_off, off, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
     monkeypatch.setenv("COUNCIL_JEV", "1")
 
@@ -639,26 +687,22 @@ def test_a_broken_jev_step_never_changes_the_review_or_its_exit_code(member_json
 
 
 @pytest.mark.parametrize("folder", ["sat-prep", "romance-empire"])
-def test_review_in_an_out_of_scope_checkout_makes_no_jev_call(member_json, capsys, tmp_path, monkeypatch, folder):
+def test_review_in_an_out_of_scope_checkout_makes_no_jev_call(member_json, capsys, tmp_path, monkeypatch, folder, jev_on):
     repo = tmp_path / folder
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
     (repo / "change.diff").write_text(DIFF)
     monkeypatch.chdir(repo)
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(fake_jev_transport(calls))
     rc, out, _ = run_review(member_json, capsys, "change.diff", "--format", "md")
     assert rc == 0 and calls == [] and "Jev" not in out
 
 
 def test_review_outside_any_repository_or_of_a_path_in_a_private_repo_makes_no_jev_call(
-        member_json, capsys, tmp_path, in_scope_checkout, monkeypatch):
+        member_json, capsys, tmp_path, in_scope_checkout, monkeypatch, jev_on):
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(fake_jev_transport(calls))
     private = tmp_path / "tax-advisor"
     private.mkdir()
     _git(private, "init", "-q", "-b", "main")
@@ -673,22 +717,29 @@ def test_review_outside_any_repository_or_of_a_path_in_a_private_repo_makes_no_j
     assert rc == 0 and calls == [] and "Jev" not in out          # unknown repo: fail closed
 
 
-def test_ask_never_runs_the_shadow(member_json, capsys, in_scope_checkout, monkeypatch):
+def test_the_gate_and_the_commands_load_no_jev_code_until_a_review_asks_for_it():
+    # The CI gate imports council.review from an installed copy. Jev code is imported lazily,
+    # inside guarded blocks, so a missing or broken Jev layer cannot break an import.
+    import sys
+    code = ("import sys, council.review, council.cli, council.sweep, council.render, backlogrun.cli; "
+            "print([m for m in ('jev', 'council.jev', 'council.signals') if m in sys.modules])")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True,
+                         cwd=Path(__file__).resolve().parents[1])
+    assert out.stdout.strip() == "[]"
+
+
+def test_ask_never_runs_the_shadow(member_json, capsys, in_scope_checkout, monkeypatch, jev_on):
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(fake_jev_transport(calls))
     settings, panels, client = review_world(member_json)
     assert cli.main(["ask", "ship it?", "--panel", "code-review"], _settings=settings, _panels=panels, _client=client) == 0
     assert calls == [] and "Jev" not in capsys.readouterr().out
 
 
-def test_the_ci_gate_path_never_calls_jev_even_with_a_key(member_json, monkeypatch, in_scope_checkout):
+def test_the_ci_gate_path_never_calls_jev_even_with_a_key(member_json, monkeypatch, in_scope_checkout, jev_on):
     from council.review import run_pr_review
     calls = []
-    monkeypatch.setattr(jev, "_http_post", fake_jev_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(fake_jev_transport(calls))
     settings, panels, client = review_world(member_json)
     body, blocking, unavailable = run_pr_review(DIFF, panels, client, chair_model="c")
     assert (blocking, unavailable) == (1, False) and calls == [] and "Jev" not in body
@@ -753,12 +804,10 @@ def test_collect_sweep_caps_the_pairs_and_refuses_out_of_scope_repos(tmp_path):
     assert signals.collect_sweep("ai-harness", many, environ={**ON, "COUNCIL_JEV": "off"}, ask=FakeAsk()) is None
 
 
-def test_sweep_reports_the_same_findings_in_the_same_order_with_only_a_note_added(monkeypatch):
+def test_sweep_reports_the_same_findings_in_the_same_order_with_only_a_note_added(monkeypatch, jev_on):
     chunks = [("a.py", "code a"), ("b.py", "code b")]
     calls = []
-    monkeypatch.setattr(jev, "_http_post", sweep_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(sweep_transport(calls))
     plain = run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c")
     assert plain.jev_shadow is None and calls == []             # no repo named: no Jev step
     private = run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="finance-tracker")
@@ -777,32 +826,28 @@ def test_sweep_reports_the_same_findings_in_the_same_order_with_only_a_note_adde
     assert len(calls) == 3 and SQLI_A not in note and "a.py" not in note
 
 
-def test_sweep_with_nothing_to_group_or_a_jev_outage_renders_exactly_as_before(monkeypatch):
+def test_sweep_with_nothing_to_group_or_a_jev_outage_renders_exactly_as_before(monkeypatch, jev_on):
     chunks = [("a.py", "code a"), ("b.py", "code b")]
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(sweep_transport([], p_same=0.4))
     plain = render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c"))
-    monkeypatch.setattr(jev, "_http_post", sweep_transport([], p_same=0.4))
     assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
 
     def down(req, key, timeout):
         raise OSError("down")
-    monkeypatch.setattr(jev, "_http_post", down)
+    jev_on(down)
     assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
     monkeypatch.setattr(signals, "collect_sweep", lambda *a, **k: 1 / 0)
     assert render_sweep("/repo", run_sweep(chunks, SWEEP_PANEL, sweep_client(), chair_model="c", jev_repo="ai-harness")) == plain
 
 
 @pytest.mark.parametrize("folder,grouped", [("some-tool", True), ("swimtrack-coach", False)])
-def test_cli_sweep_applies_the_scope_rule_to_the_swept_repo(tmp_path, capsys, monkeypatch, folder, grouped):
+def test_cli_sweep_applies_the_scope_rule_to_the_swept_repo(tmp_path, capsys, monkeypatch, folder, grouped, jev_on):
     repo = tmp_path / folder
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
     (repo / "a.py").write_text("query = 'SELECT ' + user_input\n")
     calls = []
-    monkeypatch.setattr(jev, "_http_post", sweep_transport(calls))
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    jev_on(sweep_transport(calls))
     rc = cli.main(["sweep", str(repo)], _settings=Settings(chair_model="c"), _panels={"red-team": SWEEP_PANEL},
                   _client=sweep_client())
     out = capsys.readouterr().out

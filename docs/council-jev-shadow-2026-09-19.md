@@ -5,7 +5,8 @@ are shown and logged. They decide nothing.
 **Code:** `council/jev.py`, `council/signals.py`. **Tests:** `tests/test_council_jev_shadow.py`
 and the Jev section at the end of `tests/test_backlogrun.py`.
 **Background:** `docs/jev-council-offline-test-2026-09-19.md` (the offline test that chose
-these three jobs) and `docs/council-gate-policy-2026-09-18.md` (the provenance gap).
+these three jobs), `docs/council-gate-policy-2026-09-18.md` (the provenance gap) and
+`docs/contracts/jev.md` (the rules of the shared Jev client, which every call here uses).
 
 ## Summary
 
@@ -16,9 +17,12 @@ these three jobs) and `docs/council-gate-policy-2026-09-18.md` (the provenance g
    log, and nothing else reads them.
 3. Nothing Jev returns can change what the panel or the chair sees, the gate count,
    `review_status`, review readiness, `backlog-run approve` or any exit code.
-4. One switch turns all of it off: `COUNCIL_JEV=0`. With the switch off, without a key, or
-   for a repository outside the data rule, the output is byte-identical to the output
+4. One switch turns all of it off: `COUNCIL_JEV=0`. The shared switch `JEV_DISABLED=1`, which
+   turns every Jev caller on the machine off, works too. With a switch off, without a key,
+   or for a repository outside the data rule, the output is byte-identical to the output
    before this change.
+5. Every call goes through the shared client in the `jev` package. The council has no HTTP
+   client of its own.
 
 ## The three signals
 
@@ -72,8 +76,15 @@ request, the answer options included.
 The owner's data rule of 2026-09-19 allows council text, code snippets and diffs to go to
 TypeSafe for council work. Two groups of repositories are never sent: those that hold
 student, customer, mail, tax or finance data, and the romance repositories (unpublished
-manuscripts). The exact lists are `OUT_OF_SCOPE` and `OUT_OF_SCOPE_REPOS` in
-`council/jev.py`. This is now the only copy, and the offline harness imports it.
+manuscripts). The word list is the shared one, `OUT_OF_SCOPE` in `jev/scope.py`. The list of
+repository names, `OUT_OF_SCOPE_REPOS`, is in `council/jev.py`. Each exists once, and the
+offline harness imports both from `council/jev.py`.
+
+One point needs the owner's eye. The note in `jev/scope.py` records a decision of the same
+day that unpublished manuscript prose may be sent. The rule given for council work keeps the
+romance repositories out. The council follows the stricter rule. If the owner wants council
+reviews of those repositories to get the signals too, remove their names from
+`OUT_OF_SCOPE_REPOS`; nothing else needs to change.
 
 How the repository is decided:
 
@@ -105,14 +116,20 @@ Limits of the rule that a reader should know:
 
 - `COUNCIL_JEV=0` (also `off` or `false`) turns every council use of Jev off, including the
   extra line in `backlog-run report` and `show`. Set it in the shell, in the crontab line,
-  or in the environment of the process that runs the command.
+  or in the environment of the process that runs the command. `JEV_DISABLED=1`, the shared
+  client's switch for every Jev caller, has the same effect here.
 - No key means off. The key is `TYPESAFE_API_KEY`, read from the environment, or else from
   `~/.env` read as plain text. It is never logged and never passed to the runner's worker
   session, whose environment stays an allow list.
-- The model version is pinned. An answer from any other version is refused.
-- HTTP redirects are never followed, because a redirect would carry the key to another
-  host.
-- Each call has an 8 second timeout. The whole pass has a 20 second budget: once it is
+- The model version is pinned in `council/jev.py` and passed on every call, so a change of
+  the shared client's default cannot move the 0.85 cut. An answer from any other version is
+  refused.
+- The shared client never follows an HTTP redirect, because a redirect would carry the key
+  to another host, and it removes the key from every error message.
+- Each call is counted in the shared usage ledger (`~/.local/state/jev/usage.jsonl`, counts
+  and cost only) as project `ai-harness`, tasks `council-verdict`, `council-source`,
+  `council-same` and `sweep-same`. `jev usage --days 7` shows what it costs.
+- Each call has an 8 second timeout and is not retried. The whole pass has a 20 second budget: once it is
   spent, no new call starts. The review is printed before the first Jev call, so an outage
   delays only the extra section.
 - A failed call or an answer in the wrong shape costs that one answer. The section then
@@ -211,14 +228,15 @@ call. A typical review makes 10 to 20 calls.
 
 ## Checked on 2026-09-19
 
-- Full test suite: 1538 passed, 1 skipped (1456 passed, 1 skipped before this change). No
-  test reaches the network: the suite-wide test configuration turns the switch off and puts
-  a tripwire on the real transport, and the new test file adds a second tripwire on the HTTP
-  opener.
+- Full test suite: 1586 passed, 1 skipped; 86 of these tests are new. No test reaches the
+  network: the suite-wide test configuration sets `JEV_DISABLED=1` and `COUNCIL_JEV=0` and
+  sends both logs to temporary files, and the new test file puts a tripwire on the shared
+  client's HTTP opener that fails any test that reaches it.
 - The three questions built by the new code are byte-identical to the requests the offline
   test sent.
 - One live run on a saved ai-harness review: 9 calls, 0 errors, 5.4 seconds. The verdict
   label and the agreeing pair matched the offline test's answers for that review. No saved
   in-scope review carries chair blocks, so the two blocks in that run were constructed: one
   restated a panel finding and was linked to it (0.93), one was about something no seat
-  raised and was linked to `none` (1.00).
+  raised and was linked to `none` (1.00). One more live call afterwards confirmed the path
+  through the shared client, including its usage ledger row.

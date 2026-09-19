@@ -1,53 +1,52 @@
-"""Jev (TypeSafe System One) client for the council's shadow signals.
+"""The council's thin layer over the shared Jev client (the `jev` package, jev/client.py).
 
-Jev is a small typed judge: it answers a yes/no, a choice or a score about the text it is
-given. The council uses it for label-and-score jobs AROUND the review, never to review.
+Jev is TypeSafe's small typed judge: it answers a yes/no, a choice or a score about the text
+it is given. The council uses it for label-and-score jobs AROUND a review, never to review.
 Background: docs/jev-council-offline-test-2026-09-19.md. What is wired in and what is not:
-docs/council-jev-shadow-2026-09-19.md.
+docs/council-jev-shadow-2026-09-19.md. The shared client's rules: docs/contracts/jev.md.
 
-This module is the single place the packaged code talks to TypeSafe, and the single home of
-the data-scope rule. `tools/jev_council` imports from here; nothing here imports from
-`tools/` or `watchdog/`, because those are not installed packages.
+One door: every call here goes through `jev.ask` in the shared client, so there is no second
+HTTP client, the shared off switch (JEV_DISABLED=1) works, and each call lands in the shared
+usage ledger as project "ai-harness". This module adds what is the council's own:
 
-Contract:
-  * The model version is pinned. An answer from any other version is refused.
-  * The WHOLE request is redacted before it leaves: state and questions.
-  * Redirects are never followed (urllib would re-send the Authorization header).
-  * Scope fails closed: an unknown repository is refused.
+  * its own model pin (contract rule 6: the 0.85 cut was measured on this version),
+  * redaction of the WHOLE request, state and questions, before it is handed over,
+  * a short timeout and no retries, because a review's time budget is small,
+  * the council's data-scope rule by REPOSITORY, failing closed on an unknown one,
+  * the council's own kill switch, COUNCIL_JEV=0.
+
+`tools/jev_council` imports from here; nothing here imports from `tools/` or `watchdog/`,
+because those are not installed packages. (`jev` is one.)
 """
 from __future__ import annotations
 
-import json
 import os
-import re
 import subprocess
-import urllib.request
 from pathlib import Path
 
-URL = "https://api.typesafe.ai/v1/systemone"
-MODEL = "jev-1.13.0"            # exact version; a moving alias would shift the numbers under us
+import jev as _shared                                  # the top-level shared package, not this module
+from jev import client as _client
+from jev.redact import redact_state as redact, redact_text   # noqa: F401  (re-exported)
+from jev.scope import OUT_OF_SCOPE                     # noqa: F401  one word list for every caller
+
+MODEL = "jev-1.13.0"            # the council's own pin; passed on every call
 TIMEOUT_SECONDS = 8
+PROJECT = "ai-harness"          # how these calls are named in the shared usage ledger
+TASK = "council-shadow"
 KILL_SWITCH = "COUNCIL_JEV"     # "0", "off" or "false" turns every council use of Jev off
 _OFF = ("0", "off", "false")
 
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_URL_QUERY = re.compile(r"(https?://[^\s?\"']+)\?[^\s\"']+")
-_TOKENISH = re.compile(r"\b[A-Za-z0-9_\-]{40,}\b")
+JevError = _shared.JevError
+_http_post = _client.http_post  # kept for tools/jev_council, which passes it as a transport
 
-# Owner data rule (2026-09-19): council text, code snippets and diffs may go to TypeSafe for
-# council work. Two things stay out. (1) Repos that hold student, customer, mail, tax or
-# finance data. (2) Unpublished manuscripts, so every romance repo: that category needs its
-# own decision, and a review of a chapter quotes the plot. Extend these; never trim them.
-OUT_OF_SCOPE = ("sat-prep", "attainprep", "bento", "bebop", "tax", "finance", "rent",
-                "swimtrack-coach", "gmail", "mail")
+# Owner data rule for COUNCIL work (2026-09-19): council text, code snippets and diffs may go
+# to TypeSafe. Two things stay out. (1) Repos that hold student, customer, mail, tax or
+# finance data: the shared word list above. (2) Unpublished manuscripts, so every romance
+# repo: a review of a chapter quotes the plot. Extend these; never trim them.
 OUT_OF_SCOPE_REPOS = frozenset({
     "sat-prep", "tax-advisor", "finance-tracker", "swimtrack-coach", "monthly-bidding", "nato-support",
     "romance-empire", "romance-tessacross.com", "romance-elliecalloway.com", "flight-7-publishing",
     "rmpeacockwriter.com"})
-
-
-class JevError(RuntimeError):
-    pass
 
 
 def in_scope(name: str | None, repo: str | None) -> bool:
@@ -59,59 +58,19 @@ def in_scope(name: str | None, repo: str | None) -> bool:
     return not any(word in low for word in OUT_OF_SCOPE)
 
 
-def redact_text(text: str) -> str:
-    """Council prose and code, whole: no line clipping (a recommendation is one long line)
-    and no @handle stripping (code has decorators). Only addresses, URL query strings and
-    long token-shaped strings go."""
-    text = _EMAIL.sub("<email>", text)
-    text = _URL_QUERY.sub(r"\1?<query removed>", text)
-    return _TOKENISH.sub("<token>", text)
-
-
-def redact(value):
-    """Every string VALUE inside a request part. Dict keys are option ids and question
-    names, so they are left alone."""
-    if isinstance(value, str):
-        return redact_text(value)
-    if isinstance(value, dict):
-        return {k: redact(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [redact(v) for v in value]
-    return value
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """urllib re-sends the Authorization header on a redirect. Refuse them all."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
-_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
-def _http_post(req: dict, key: str, timeout: float) -> dict:
-    request = urllib.request.Request(
-        URL, data=json.dumps(req).encode(), method="POST",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                 "User-Agent": "ai-harness-council-shadow/1"})
-    with _OPENER.open(request, timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
-def ask(state, questions: dict, *, key: str, transport=None) -> dict:
-    """One Jev call. Returns the `answers` object. Raises JevError on ANY failure, and when
-    the answer came from a different model version. `transport` is injectable; the default
-    is looked up at call time so a test can replace it for a whole code path."""
-    req = {"state": redact(state), "model": MODEL, "questions": redact(questions)}
+def ask(state, questions: dict, *, key: str, transport=None, task: str = TASK) -> dict:
+    """One Jev call through the shared client. Returns the `answers` object. Raises JevError
+    on ANY failure, and when the answer came from a different model version. The whole
+    request is redacted first. `transport` is for tests; the default is the shared client's,
+    looked up at call time."""
     try:
-        reply = (transport or _http_post)(req, key, TIMEOUT_SECONDS)
+        got = _shared.ask(redact(state), redact(questions), project=PROJECT, task=task, model=MODEL,
+                          key=key, timeout=TIMEOUT_SECONDS, retries=0, transport=transport)
+    except JevError:
+        raise                                   # the shared client already scrubbed the key
     except Exception as exc:  # noqa: BLE001
-        detail = str(exc)[:200].replace(key, "<key>") if key else str(exc)[:200]
-        raise JevError(f"Jev call failed: {type(exc).__name__}: {detail}") from None
-    if not isinstance(reply, dict) or reply.get("model") != MODEL:
-        got = reply.get("model") if isinstance(reply, dict) else type(reply).__name__
-        raise JevError(f"answer came from model {got!r}, expected {MODEL}")
-    answers = reply.get("answers")
+        raise JevError(f"Jev call failed: {type(exc).__name__}") from None
+    answers = got.get("answers")
     if not isinstance(answers, dict):
         raise JevError("the reply carries no answers object")
     return answers
@@ -123,8 +82,12 @@ def _home(environ) -> Path:
 
 
 def load_key(env_file=None, environ=None) -> str | None:
-    """TYPESAFE_API_KEY from the environment, else from ~/.env read as text (no shell)."""
-    environ = os.environ if environ is None else environ
+    """TYPESAFE_API_KEY from the environment, else from ~/.env read as text (no shell): the
+    shared client's loader. Given an explicit `environ`, that mapping alone decides (its
+    TYPESAFE_API_KEY, else the .env file under its HOME), so a caller or a test can say
+    exactly which environment counts."""
+    if environ is None or environ is os.environ:
+        return _client.load_key(env_file)
     value = environ.get("TYPESAFE_API_KEY")
     if value:
         return value
@@ -138,12 +101,14 @@ def load_key(env_file=None, environ=None) -> str | None:
 
 
 def switched_off(environ=None) -> bool:
+    """COUNCIL_JEV=0 (or off/false): the council's switch. JEV_DISABLED=1: the shared one."""
     environ = os.environ if environ is None else environ
-    return str(environ.get(KILL_SWITCH, "")).strip().lower() in _OFF
+    return (str(environ.get(KILL_SWITCH, "")).strip().lower() in _OFF
+            or str(environ.get("JEV_DISABLED", "")) not in ("", "0"))
 
 
 def shadow_enabled(environ=None) -> bool:
-    """Default on when a key exists. COUNCIL_JEV=0 (or off/false) turns it off."""
+    """Default on when a key exists. Either switch turns it off."""
     environ = os.environ if environ is None else environ
     return not switched_off(environ) and bool(load_key(environ=environ))
 

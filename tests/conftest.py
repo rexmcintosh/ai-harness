@@ -28,23 +28,14 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_live_council_jev(tmp_path, monkeypatch):
-    """No test may reach the real TypeSafe API or write the live council shadow log.
-    `council review`, `council sweep` and backlog-run's council step run the Jev shadow
-    signals whenever a key exists, and this machine has one. So for every test: the kill
-    switch is on, the log is a temp file, and the real transport is a tripwire. A test of
-    the wiring sets COUNCIL_JEV=1 and patches council.jev._http_post with a fake.
-    The tripwire fails the test at teardown, because the shadow code swallows exceptions."""
-    from council import jev
-    reached = []
-
-    def tripwire(req, key, timeout):
-        reached.append(sorted(req.get("questions") or {}))
-        raise AssertionError("a test reached the real Jev transport")
+    """The council's Jev shadow signals run in `council review`, `council sweep` and
+    backlog-run's council step whenever a key exists, and this machine has one. They go
+    through the shared client, so JEV_DISABLED above already stops every call. On top of
+    that the council's own switch is off and its shadow log is a temp file, so no test writes
+    ~/.local/state/council/. A test of the wiring deletes JEV_DISABLED, sets COUNCIL_JEV=1
+    and replaces jev.client.http_post with a fake (tests/test_council_jev_shadow.py)."""
     monkeypatch.setenv("COUNCIL_JEV", "0")
     monkeypatch.setenv("COUNCIL_JEV_LOG", str(tmp_path / "council-jev-shadow.jsonl"))
-    monkeypatch.setattr(jev, "_http_post", tripwire)
-    yield
-    assert not reached, f"a test reached the real Jev transport: {reached}"
 
 
 class FakeClient:

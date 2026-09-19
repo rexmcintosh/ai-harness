@@ -323,9 +323,12 @@ def _budgeted(ask, counter: dict, *, deadline: float, clock):
     return wrapped
 
 
-def _default_ask(environ):
+def _default_ask(environ, prefix: str = "council"):
+    """The real thing: the council's layer over the shared client. Each call is named in the
+    shared usage ledger after its question: council-verdict, council-source, council-same."""
     key = jev.load_key(environ=environ)
-    return lambda state, questions: jev.ask(state, questions, key=key)
+    return lambda state, questions: jev.ask(state, questions, key=key,
+                                            task=f"{prefix}-{'+'.join(sorted(questions))}")
 
 
 def collect(context_repo: str | None, results: list[MemberResult], synthesis: Synthesis, *,
@@ -429,7 +432,8 @@ def collect_sweep(repo: str | None, findings, *, environ=None, ask=None, cut: fl
         started = clock()
         counter = {"calls": 0, "budget_exhausted": False}
         stats: dict = {"scores": [], "errors": 0}
-        budgeted = _budgeted(ask or _default_ask(environ), counter, deadline=started + budget_seconds, clock=clock)
+        budgeted = _budgeted(ask or _default_ask(environ, "sweep"), counter,
+                             deadline=started + budget_seconds, clock=clock)
         agreeing = _score_pairs(chosen, budgeted, cut=cut, stats=stats)
         position = {f.fid: n for n, f in enumerate(numbered, 1)}
         note = {"groups": [{"findings": [position[fid] for fid in c["findings"]], "p_min": c["p_min"], "p_max": c["p_max"]}

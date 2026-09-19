@@ -1259,10 +1259,15 @@ def test_approval_preserves_an_in_progress_git_sequence(world):
 
 # ----------------------------------------------------------------------------- Jev shadow line
 # A display-only second reading of the chair's verdict. It may never move readiness, the
-# approve suggestion or the recorded review status. conftest keeps COUNCIL_JEV=0 and a
-# tripwire on the real transport for every test; these tests switch it on with a fake.
+# approve suggestion or the recorded review status. conftest keeps JEV_DISABLED=1 and
+# COUNCIL_JEV=0 for every test; these tests switch both on and fake the shared transport.
 
 JEV_LINE = "Jev reads the chair's verdict as: approve_with_conditions (0.91) [shadow, display only]"
+
+
+def _jev_switches_on(monkeypatch):
+    monkeypatch.delenv("JEV_DISABLED", raising=False)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
 
 
 def jev_reviewer(label="approve_with_conditions", confidence=0.91, **extra):
@@ -1277,8 +1282,9 @@ def _fake_council(monkeypatch, *, findings=True):
     from types import SimpleNamespace
     import council.config as config
     import council.engine as engine
-    import council.jev as jev
     import council.venice as venice
+    import jev.client as shared_client
+    from council.jev import MODEL
     from council.models import Finding, Member, MemberResult, Panel
     from tests.conftest import FakeClient
     payload = {"recommendation": "Approve with follow-up fixes. Two gaps should be closed before merge.",
@@ -1298,9 +1304,10 @@ def _fake_council(monkeypatch, *, findings=True):
             answers = {"verdict": {"type": "choice", "choice": "approve_with_conditions", "confidence": 0.91, "probabilities": {}}}
         else:
             answers = {"same": {"type": "noul", "noul": 0.9}}
-        return {"model": jev.MODEL, "answers": answers}
-    monkeypatch.setattr(jev, "_http_post", transport)
+        return {"model": MODEL, "answers": answers}
+    monkeypatch.setattr(shared_client, "http_post", transport)
     monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-test")
+    monkeypatch.delenv("JEV_DISABLED", raising=False)            # the council's own switch is still off (conftest)
     return sent
 
 
@@ -1332,7 +1339,7 @@ def test_out_of_scope_or_unknown_repo_gets_no_jev_call_at_all(world, monkeypatch
 
 
 def test_a_jev_outage_leaves_the_review_exactly_as_it_was(world, monkeypatch):
-    import council.jev as jev
+    import jev.client as shared_client
     cfg = world.build([])
     _fake_council(monkeypatch)
     off = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
@@ -1340,7 +1347,7 @@ def test_a_jev_outage_leaves_the_review_exactly_as_it_was(world, monkeypatch):
 
     def down(req, key, timeout):
         raise OSError("TypeSafe is down")
-    monkeypatch.setattr(jev, "_http_post", down)
+    monkeypatch.setattr(shared_client, "http_post", down)
     on = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x", repo="alpha")
     assert "jev_shadow" not in on and {k: v for k, v in on.items() if k != "markdown"} == {k: v for k, v in off.items() if k != "markdown"}
     import council.signals as signals
@@ -1362,7 +1369,7 @@ def test_work_one_names_the_repo_only_to_a_reviewer_that_asks_for_it(world):
 
 
 def test_jev_line_shows_in_report_and_show_and_readiness_stays_unknown(world, monkeypatch, capsys):
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    _jev_switches_on(monkeypatch)
     cfg = world.build([item("2026-01-01-a", required_validations=[])])
     (p,) = br.plan(cfg, load_items(cfg))
     result = br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
@@ -1380,10 +1387,14 @@ def test_jev_line_shows_in_report_and_show_and_readiness_stays_unknown(world, mo
     assert capsys.readouterr().out.count(JEV_LINE) == 1
     monkeypatch.setenv("COUNCIL_JEV", "0")                                       # the kill switch hides it again
     assert "Jev" not in br.write_report(cfg)
+    monkeypatch.setenv("COUNCIL_JEV", "1")
+    assert JEV_LINE in br.write_report(cfg)
+    monkeypatch.setenv("JEV_DISABLED", "1")                                      # and so does the shared off switch
+    assert "Jev" not in br.write_report(cfg)
 
 
 def test_report_with_and_without_a_jev_label_differs_by_that_one_line(world, monkeypatch):
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    _jev_switches_on(monkeypatch)
     cfg = world.build([item("2026-01-01-a", required_validations=[])])
     (p,) = br.plan(cfg, load_items(cfg))
     result = br.work_one(cfg, p, reviewer=jev_reviewer("approve", 0.99), log=lambda *a: None)
@@ -1405,7 +1416,7 @@ def test_report_with_and_without_a_jev_label_differs_by_that_one_line(world, mon
                                     {"verdict": {"label": "approve", "confidence": 1.7}},
                                     {"verdict": "approve"}, "approve", None])
 def test_a_malformed_jev_record_is_neither_saved_nor_shown(world, monkeypatch, shadow):
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    _jev_switches_on(monkeypatch)
 
     def reviewer(cfg, diff, *, item_id):
         return {"ok": True, "summary": "ok", "markdown": "x", "jev_shadow": shadow}
@@ -1417,7 +1428,7 @@ def test_a_malformed_jev_record_is_neither_saved_nor_shown(world, monkeypatch, s
 
 
 def test_a_jev_label_for_an_older_commit_is_not_shown_against_a_newer_head(world, monkeypatch):
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    _jev_switches_on(monkeypatch)
     cfg = world.build([item("2026-01-01-a", required_validations=[])])
     (p,) = br.plan(cfg, load_items(cfg))
     br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
@@ -1429,7 +1440,7 @@ def test_a_jev_label_for_an_older_commit_is_not_shown_against_a_newer_head(world
 
 
 def test_a_clean_ready_item_keeps_its_approve_suggestion_next_to_a_doubting_jev_label(world, monkeypatch):
-    monkeypatch.setenv("COUNCIL_JEV", "1")
+    _jev_switches_on(monkeypatch)
     cfg = world.build([item("2026-01-01-a", required_validations=[])])
     (p,) = br.plan(cfg, load_items(cfg))
     result = br.work_one(cfg, p, log=lambda *a: None, reviewer=jev_reviewer(

@@ -87,4 +87,5 @@ One JSON line out per request, in order. A failure is `{"error": "..."}` (exit 1
 |---|---|---|
 | `watchdog/jev_shadow.py` | second opinion beside the cron-log regex, log only | live since 2026-09-19, shadow |
 | `ultimate-portugal/scripts/prefilter-stories.mjs` | gate before the Opus judge, line 0.1 | live since 2026-09-19; still has its own fetch, moves to `jev batch` next |
-| `tools/jev_council/` (branch `claude/jev-council-offline-test`) | offline council experiments | imports the names `watchdog/jev_shadow.py` keeps for it; should move to `import jev` |
+| `council/signals.py` through `council/jev.py` (`council review`, the council step of `backlog-run`, `council sweep`) | three label-and-score signals after the chair has answered: verdict label, same problem from two seats, source of a chair block. Display and log only | shadow (branch `claude/council-jev-shadow`); own pin `jev-1.13.0`, own switch `COUNCIL_JEV=0`, scope by repository. `docs/council-jev-shadow-2026-09-19.md` |
+| `tools/jev_council/` | offline council experiments | imports the pin, the key loader, redaction and the scope rule from `council/jev.py`. Its own `ask` still hands the shared `http_post` to a retry loop and skips the usage ledger; it should move to `jev.ask` |
