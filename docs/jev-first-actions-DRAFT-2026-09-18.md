@@ -96,3 +96,29 @@ Bebop (H2) and loom (H1) wait for Option 2 or 3.
 - Whether to keep Jev at all. A fair test: after a month of shadow logs, did it
   catch events the rules missed, and did it cause any bad call? If the answer is
   not clearly yes and no, remove it.
+
+## Added 2026-09-19, after the five replays (still DRAFT)
+
+Facts are in `jev-replays-2026-09-19.md`. Opinions only here.
+
+- **Build next: the backlog hold-only gate, question A alone, line 0.7.** It is the one
+  new result that is both measured and useful, and its value is safety, not money: it
+  would have held three sessions that were told to write to a live database, spend on a
+  paid model, and push to master. It may only add a hold. Before building, re-test two
+  wording changes on the same 157 items: ask about the item's done-criteria instead of
+  what the prompt permits, and say that a merge recommendation is not a merge. Date gates
+  stay in code; Jev cannot read dates.
+- **Do not build a clarity gate.** Inside a book Jev is at chance. Spend nothing more here.
+- **SAT: do not swap Jev into the blind-solve gate.** A narrower idea is open: skip the
+  strong solver when Jev agrees with the key at 0.95 or more. It needs one more test
+  first, a batch with planted wrong keys, to show Jev would not wave a bad key through.
+- **SwimTrack editorial: wait for history.** The pipeline has run once. If it starts
+  running, log Jev's answers beside Opus's from day one; the ranker result is the part
+  to watch.
+- **A rule that came out of all five:** never act on a Jev disagreement; only skip work
+  on a confident Jev agreement. And look at the spread of its answers first: if they all
+  sit between 0.3 and 0.7 on real data, stop, the question is not one Jev can answer.
+- **Move `ultimate-portugal/scripts/prefilter-stories.mjs` onto `jev batch`** once the
+  `jev` command is installed, keeping its own `--model jev-1.13.0` pin.
+- **Tell the council session** to switch `tools/jev_council/jev.py` to `import jev`. Its
+  tests already pass on top of the shared client.

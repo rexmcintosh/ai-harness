@@ -1,0 +1,317 @@
+[
+  {
+    "id": "cd47ddbd90cc",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Single-athlete college verbal-commitment announcement: ephemeral recruiting news, no standalone lesson."
+  },
+  {
+    "id": "d5812c8cfab2",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement, same as above."
+  },
+  {
+    "id": "15dc33878011",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Human-interest gossip (ex-swimmer's music tour); no parent takeaway."
+  },
+  {
+    "id": "18c6b6b23d5b",
+    "in_scope": false,
+    "pillar": "competition",
+    "marginal": false,
+    "reason": "Meet-field/roster announcement (who is registered to race); ephemeral logistics news, no standalone lesson."
+  },
+  {
+    "id": "bf039ef40241",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement."
+  },
+  {
+    "id": "756975b0acd0",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement."
+  },
+  {
+    "id": "270ca6ff47dd",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement."
+  },
+  {
+    "id": "20f2055e752e",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Roster/contract news about the pro 'Enhanced Games' league; elite gossip, no parent takeaway."
+  },
+  {
+    "id": "218817c96d59",
+    "in_scope": false,
+    "pillar": "competition",
+    "marginal": false,
+    "reason": "Elite athlete's race-schedule news (which meet he'll swim next); athlete-performance news."
+  },
+  {
+    "id": "83ee80e7fc45",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement."
+  },
+  {
+    "id": "4ba297080177",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Coaching-hire announcement; ephemeral career news, no standalone parent lesson. Could be argued as 'pathways' if reframed, but as written it's just a hire notice."
+  },
+  {
+    "id": "6f487f56b796",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Hall of Fame induction notice; gossip/honor news, no parent takeaway."
+  },
+  {
+    "id": "4dd4a6984ac6",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Sponsored product-launch press release (partner content), not developmental content."
+  },
+  {
+    "id": "3f334592ae78",
+    "in_scope": false,
+    "pillar": "competition",
+    "marginal": false,
+    "reason": "Preseason poll/rankings update -- explicitly the kind of ephemeral news EDITORIAL_SYS excludes."
+  },
+  {
+    "id": "a2a7faaadcbf",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Water polo rankings: out-of-scope sport, and a rankings update on top of that."
+  },
+  {
+    "id": "2b9414b38e55",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Obituary/tribute; elite gossip with no standalone parent-development takeaway."
+  },
+  {
+    "id": "04ee3bc01b91",
+    "in_scope": false,
+    "pillar": "pathways",
+    "marginal": false,
+    "reason": "Verbal-commitment announcement."
+  },
+  {
+    "id": "0e5beda8abce",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Charity awards-auction announcement/event listing, not developmental content."
+  },
+  {
+    "id": "9e0472592eca",
+    "in_scope": true,
+    "pillar": "mindset",
+    "marginal": true,
+    "reason": "Genuine evergreen 'how to start a season well' explainer with no news hook; reads like true developmental content, though the exact pillar (mindset vs. training) is a judgment call."
+  },
+  {
+    "id": "7ac3a0e1d49d",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Water polo Champions League qualifiers; out-of-scope sport, also a results recap."
+  },
+  {
+    "id": "5db491245507",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial gear buying-guide listicle (pull buoys); consumer shopping content, not a developmental explainer, despite touching 'training' keywords."
+  },
+  {
+    "id": "1453bdbd820f",
+    "in_scope": true,
+    "pillar": "mindset",
+    "marginal": true,
+    "reason": "Motivational-quotes roundup; evergreen, shareable mindset content for a swim parent, though it's a listicle rather than a full explainer."
+  },
+  {
+    "id": "ff100b8dfbea",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Federation-president interview/press piece about organizational strategy; not parent-development content."
+  },
+  {
+    "id": "5472bc062940",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Adult open-water marathon-swim feature (900-mile channel swim); not competitive pool swimming, and it's an ongoing-news update."
+  },
+  {
+    "id": "a7c3416cdfaf",
+    "in_scope": false,
+    "pillar": "competition",
+    "marginal": false,
+    "reason": "Elite relay-record meet preview; athlete-performance/meet news."
+  },
+  {
+    "id": "0b3611a80cfe",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Podcast-episode guest-list promo; no standalone lesson in the item itself."
+  },
+  {
+    "id": "8eddf5327dd9",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Conference registration-open notice; organizational/admin news."
+  },
+  {
+    "id": "fead1c1d3d06",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Photo-gallery announcement (new camera angles at a championship); not developmental content."
+  },
+  {
+    "id": "157e482c9ce6",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Water polo Champions League qualifiers preview; out-of-scope sport."
+  },
+  {
+    "id": "f73297a7ae8e",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Internal staff-training/carbon-footprint news; organizational, not parent-facing at all."
+  },
+  {
+    "id": "76a6fb9a9ea2",
+    "in_scope": false,
+    "pillar": "training",
+    "marginal": true,
+    "reason": "Report that a coach held a clinic and described his training philosophy; interesting but written as an event report, not an explainer a parent could act on -- no extracted, standalone lesson given in the excerpt."
+  },
+  {
+    "id": "f1a5ec73308b",
+    "in_scope": true,
+    "pillar": "training",
+    "marginal": false,
+    "reason": "Genuine evergreen instructional guide (151 dryland exercises) that a swim parent could use directly with their swimmer."
+  },
+  {
+    "id": "bc644af56dd4",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Water polo Champions League Final Four venue announcement; out-of-scope sport."
+  },
+  {
+    "id": "046f03ccd3d1",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Artistic-swimming coaches' course notice; out-of-scope discipline (artistic swimming explicitly excluded)."
+  },
+  {
+    "id": "fd511144d52f",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Water polo officials' certification course notice; out-of-scope sport."
+  },
+  {
+    "id": "b7c9ae90eaff",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Podcast-episode guest promo; no standalone lesson given."
+  },
+  {
+    "id": "c4d7e033cccb",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": false,
+    "reason": "Press release about the publication itself (Swimming World's relaunch); not developmental content for a parent."
+  },
+  {
+    "id": "c4373e4b4d95",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial gear buying-guide listicle (swim caps for long hair); consumer shopping content."
+  },
+  {
+    "id": "b58b7221f123",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial buying-guide listicle (shampoo/conditioner); consumer shopping content."
+  },
+  {
+    "id": "f28e1bccaef8",
+    "in_scope": false,
+    "pillar": "body",
+    "marginal": true,
+    "reason": "Adult general-fitness weight-loss workout listicle; audience mismatch -- not about a competitive youth swimmer or their parent, despite touching 'body' keywords."
+  },
+  {
+    "id": "335f7f4ce74d",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial gear buying-guide listicle (full equipment list); consumer shopping content."
+  },
+  {
+    "id": "6ae3cdc4d699",
+    "in_scope": false,
+    "pillar": "body",
+    "marginal": true,
+    "reason": "General adult exercise-science content ('how swimming changes your body'); audience mismatch, not competitive-swimmer/parent specific."
+  },
+  {
+    "id": "1037f1a57607",
+    "in_scope": true,
+    "pillar": "training",
+    "marginal": false,
+    "reason": "Genuine evergreen instructional guide (warm-up/cool-down routine) directly usable by a swim parent supporting practice habits."
+  },
+  {
+    "id": "81cde972c095",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial buying-guide (tech-suit fit); consumer shopping content."
+  },
+  {
+    "id": "9a45ee613396",
+    "in_scope": false,
+    "pillar": "none_of_these",
+    "marginal": true,
+    "reason": "Commercial/pricing-explainer content (why tech suits cost so much); consumer/shopping angle, not developmental."
+  }
+]
