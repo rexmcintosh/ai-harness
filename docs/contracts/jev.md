@@ -33,7 +33,13 @@ Use it as a **plug-in inside a process**, not as a replacement for a reasoning m
    error. A caller with a measured threshold passes its own `model=` (or `--model`) so a
    bump of the shared pin cannot move its line.
 7. **Data scope is the owner's.** `jev/scope.py` records it and refuses out-of-scope file
-   paths. Redaction (`jev/redact.py`) lowers risk; it never widens the scope.
+   paths. Redaction (`jev/redact.py`) lowers risk; it never widens the scope. A caller that
+   describes a repository's work to Jev (an item's title and prompt, a diff) first asks
+   `jev.scope.repo_in_scope(repo, name)`: only the repositories in `IN_SCOPE_REPOS` pass
+   (`ai-harness`, `swimtrack`, `swimtrack-website`, `ultimate-portugal`,
+   `aris-management-website`; owner decision 2026-09-19). Any other or unknown repository is
+   refused, and the caller then makes no call and does what it did before Jev existed.
+   Adding a repository is an owner decision.
 8. **Name yourself.** `project=` and `task=` are required. They land in the usage ledger.
 9. **Tests never reach TypeSafe.** `tests/conftest.py` sets `JEV_DISABLED=1` and a temp
    `JEV_USAGE_LOG` for every test. A test of an enabled path deletes `JEV_DISABLED` and
@@ -87,5 +93,5 @@ One JSON line out per request, in order. A failure is `{"error": "..."}` (exit 1
 |---|---|---|
 | `watchdog/jev_shadow.py` | second opinion beside the cron-log regex, log only | live since 2026-09-19, shadow |
 | `ultimate-portugal/scripts/prefilter-stories.mjs` | gate before the Opus judge, line 0.1 | live since 2026-09-19; still has its own fetch, moves to `jev batch` next |
-| `backlogrun/gate.py` | hold-only gate before a night-runner session, line 0.7, own model pin | live once merged and reinstalled (2026-09-19) |
+| `backlogrun/gate.py` | hold-only gate before a night-runner session, line 0.7, own model pin; asks only about items whose `repo` passes `repo_in_scope` (rule 7), every other item skips the gate | live once merged and reinstalled (2026-09-19) |
 | `tools/jev_council/` | offline council experiments | on main; imports the names `watchdog/jev_shadow.py` keeps for it; should move to `import jev` |

@@ -9,6 +9,10 @@ The gate may only ADD a hold. No answer (no key, an outage, JEV_DISABLED, a malf
 means no hold: the run is then exactly what it was before the gate existed. The owner's
 `gate_ok: true` on an item wins over the gate; `backlog-run reopen <id> --gate-ok` sets it.
 
+Scope (owner, 2026-09-19): the gate sends an item's title and prompt to an outside vendor, so it
+asks only about items whose `repo` is on the allow-list in jev/scope.py (IN_SCOPE_REPOS). An item
+from any other repository, or with no repository, skips the gate: no call, no ledger row, no hold.
+
 Measured on 157 past items (docs/jev-replays-2026-09-19.md): AUC 0.95. At 0.7 it holds 47 of
 53 outward items with 8 false holds; on the 33 items that really cost a session it holds 8 of
 the 11 that ended held, and 5 that finished, 3 of which carried an instruction rule 2 forbids
@@ -73,6 +77,12 @@ def _jev():
     return jev, redact_text
 
 
+def _repo_in_scope():
+    """The owner's repo allow-list (jev/scope.py, contract rule 7). Imported on use, like _jev()."""
+    from jev.scope import repo_in_scope
+    return repo_in_scope
+
+
 def item_state(item: dict) -> dict:
     """Only what the judgement needs. Never the runner note, the council verdict or the outcome."""
     try:
@@ -89,6 +99,10 @@ def check(item: dict, *, ask=None) -> tuple[bool, str]:
     if item.get("gate_ok") is True:
         return False, ""
     try:
+        # An item from a repository that is not on the allow-list is never described to Jev: no
+        # call, no ledger row, no hold. If the rule cannot be read, nothing is sent either.
+        if not _repo_in_scope()(item.get("repo"), item.get("id") or ""):
+            return False, ""
         ask = ask or _jev()[0].try_ask
         got = ask(item_state(item), {"outward": QUESTION}, project="backlog-run", task="outward-gate",
                   model=MODEL, timeout=TIMEOUT_SECONDS, retries=RETRIES)

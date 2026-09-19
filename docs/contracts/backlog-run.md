@@ -25,6 +25,7 @@ Before a session is spent on an item, `backlogrun/gate.py` asks Jev one yes/no q
 - The owner's decision wins: `backlog-run reopen <id> --gate-ok` records `gate_ok: true` on the item and the gate never asks about it again.
 - Off switches: `backlog-run work --no-gate`, or `BACKLOG_GATE=off`.
 - What is sent: the repo name, the title, and the prompt with addresses and token-shaped strings removed. Never the runner note, the council verdict, or the outcome.
+- Which items are sent (owner decision 2026-09-19): only items whose `repo` is on the allow-list in `jev/scope.py` (`IN_SCOPE_REPOS`: `ai-harness`, `swimtrack`, `swimtrack-website`, `ultimate-portugal`, `aris-management-website`) and whose id holds no out-of-scope word. An item from any other repository (for example `sat-prep` or `monthly-bidding`), an unknown one, or one with no repository skips the gate: no call, no usage-ledger row, no gate hold, and it runs as it did before the gate existed. Student, customer, financial and tax work never goes to TypeSafe, and redaction does not change that. Adding a repository is an owner decision.
 - At most 10 items are screened per run; after that the rest are deferred to the next night.
 - Evidence: `docs/jev-replays-2026-09-19.md` and `docs/evidence/jev-replays-2026-09-19/backlog/`. The wording and the 0.7 line were measured together; `tests/test_backlogrun_gate.py` fails if the wording changes without a new hash.
 - Known gap: Jev cannot read dates. "Do not run before <date>" in a prompt is invisible to this gate.
