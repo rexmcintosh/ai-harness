@@ -37,6 +37,9 @@ class VeniceClient:
         if isinstance(no_forced_json, str):
             raise TypeError("no_forced_json takes a tuple of model names, not one string")
         self.no_forced_json = tuple(NO_FORCED_JSON if no_forced_json is None else no_forced_json)
+        if not all(isinstance(n, str) and n.strip() for n in self.no_forced_json):
+            # "" is a prefix of every model: it would switch forced JSON off everywhere.
+            raise TypeError("no_forced_json takes non-empty model names")
         self.api_key = api_key
         # Default output ceiling for every call this client makes, so no call
         # site can be left unbounded by omission. Individual calls (the chair,

@@ -211,3 +211,10 @@ def test_the_no_forced_json_list_must_be_model_names_not_a_bare_string():
     with pytest.raises(TypeError, match="model names"):
         VeniceClient(api_key="k", no_forced_json="deepseek-v4-pro")
 
+
+@pytest.mark.parametrize("bad", [(None,), ("",), ("deepseek-v4-pro", "  "), (42,)])
+def test_the_no_forced_json_list_rejects_empty_or_non_string_names(bad):
+    # "" is a prefix of every model name: it would switch forced JSON off everywhere.
+    with pytest.raises(TypeError, match="model names"):
+        VeniceClient(api_key="k", no_forced_json=bad)
+
