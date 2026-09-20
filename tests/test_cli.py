@@ -182,6 +182,41 @@ def test_review_code_file_autopicks_code_review(tmp_path, member_json):
     assert "code1" in models and "doc1" not in models
 
 
+# ── per-panel chair: a panel that names a chair gets it, every other panel the global one ──
+def _env_with_panel_chair(member_json):
+    settings, panels, client = _env_with_spec(member_json)
+    panels["code-review"].chair_model = "pc"           # only code-review names its own chair
+    client.by_model["pc"] = client.by_model["c"]
+    return settings, panels, client
+
+
+def _models(client):
+    return [c["model"] for c in client.calls]
+
+
+def test_review_on_code_review_calls_that_panels_chair(tmp_path, member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    f = tmp_path / "app.py"
+    f.write_text("print('hi')\n")
+    cli.main(["review", str(f)], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["code1", "pc"]           # the panel's chair, never the global one
+
+
+def test_review_on_another_panel_calls_the_global_chair(tmp_path, member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    f = tmp_path / "design.md"
+    f.write_text("# Design\nsome spec prose\n")
+    cli.main(["review", str(f)], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["doc1", "c"]             # spec-review names no chair
+
+
+def test_ask_uses_the_chair_of_the_panel_it_runs(member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    cli.main(["ask", "x", "--panel", "code-review"], _settings=settings, _panels=panels, _client=client)
+    cli.main(["ask", "x", "--panel", "spec-review"], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["code1", "pc", "doc1", "c"]
+
+
 def test_review_explicit_panel_overrides_autopick(tmp_path, member_json):
     settings, panels, client = _env_with_spec(member_json)
     f = tmp_path / "design.md"

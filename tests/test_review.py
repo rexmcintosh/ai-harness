@@ -166,6 +166,51 @@ def test_run_pr_review_forwards_task_type_review(member_json):
     assert all(c["task_type"] == "review" for c in client.calls)
 
 
+# ── per-panel chair: the caller still passes ONE chair_model (the per-repo CI shims do) ────
+def _mixed_client(member_json, **chairs):
+    return FakeClient(by_model={
+        "code1": member_json(stance="approve", headline="ok"),
+        "doc1": member_json(stance="approve", headline="ok"),
+        **{name: _chair(f"verdict from {name}") for name in chairs.values()}})
+
+
+def _chair_of(client, seat):
+    """The model called right after `seat`: a one-seat panel's chair call follows its seat."""
+    models = [c["model"] for c in client.calls]
+    return models[models.index(seat) + 1]
+
+
+def test_mixed_diff_uses_the_code_panels_chair_for_code_and_the_global_chair_for_docs(member_json):
+    panels = _panels()
+    panels["code-review"].chair_model = "pc"
+    client = _mixed_client(member_json, code="pc", docs="c")
+    body, _, unavailable = run_pr_review(CODE + DOC, panels, client, chair_model="c")
+    assert [c["model"] for c in client.calls] == ["code1", "pc", "doc1", "c"]
+    assert unavailable is False
+    # each section shows the answer of the chair that was asked for it
+    assert (body.index("verdict from pc") < body.index("Docs review (advisory)")
+            < body.index("verdict from c"))
+
+
+def test_the_doc_slice_uses_spec_reviews_own_chair_when_it_names_one(member_json):
+    panels = _panels()
+    panels["spec-review"].chair_model = "pd"
+    client = _mixed_client(member_json, code="c", docs="pd")
+    run_pr_review(CODE + DOC, panels, client, chair_model="c")
+    assert _chair_of(client, "code1") == "c" and _chair_of(client, "doc1") == "pd"
+
+
+def test_the_code_panels_chair_is_the_gate_arbiter_and_its_outage_fails_closed(member_json):
+    # The gate's safety property follows the chair that is actually asked: the panel's own.
+    panels = _panels()
+    panels["code-review"].chair_model = "pc"
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug", findings=[("nil deref", "high", 9)]),
+        "c": _chair()}, raises_for={"pc"})
+    _, blocking, unavailable = run_pr_review(CODE, panels, client, chair_model="c")
+    assert unavailable is True and "c" not in [c["model"] for c in client.calls]
+
+
 def test_junk_but_valid_json_from_every_seat_fails_closed(member_json):
     client = FakeClient(by_model={"code1": '{": ": ", "}', "c": _chair("approve")})
     _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")

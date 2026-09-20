@@ -103,3 +103,64 @@ def test_get_api_key_exits_when_neither_is_set(monkeypatch, capsys):
     # generic fallback, and must never echo a key value.
     err = capsys.readouterr().err
     assert "VENICE_COUNCIL_KEY" in err
+
+
+# ── per-panel chair (docs/council-chair-decision-2026-09-20.md) ────────────────────────────
+# A panel may name its own chair. A panel that names none uses [settings] chair_model.
+PANEL_CHAIR_TOML = TOML + textwrap.dedent("""
+[panels.code-review]
+description = "review code"
+{chair_line}
+[[panels.code-review.members]]
+name = "Eng"
+model = "m2"
+system = "be an eng"
+""")
+
+
+def _load(tmp_path, chair_line):
+    f = tmp_path / "panels.toml"
+    f.write_text(PANEL_CHAIR_TOML.format(chair_line=chair_line))
+    return load_panels(f)
+
+
+def test_a_panel_can_name_its_own_chair(tmp_path):
+    from council.config import chair_for
+    settings, panels = _load(tmp_path, 'chair_model = "pchair"')
+    assert panels["code-review"].chair_model == "pchair"
+    assert chair_for(settings, panels["code-review"]) == "pchair"
+    assert settings.chair_model == "cmodel"                  # the global chair is untouched
+
+
+def test_a_panel_without_its_own_chair_uses_the_global_chair(tmp_path):
+    from council.config import chair_for
+    settings, panels = _load(tmp_path, "")
+    assert panels["code-review"].chair_model is None
+    assert panels["decision"].chair_model is None
+    assert chair_for(settings, panels["code-review"]) == "cmodel"
+    assert chair_for(settings, panels["decision"]) == "cmodel"
+
+
+@pytest.mark.parametrize("chair_line", ['chair_model = ""', 'chair_model = "   "', "chair_model = 42",
+                                        "chair_model = true", 'chair_model = ["pchair"]'])
+def test_an_empty_or_non_string_panel_chair_is_no_override(tmp_path, chair_line):
+    # An empty model name would reach Venice as model "": treat it as "not set" instead.
+    from council.config import chair_for
+    settings, panels = _load(tmp_path, chair_line)
+    assert panels["code-review"].chair_model is None
+    assert chair_for(settings, panels["code-review"]) == "cmodel"
+
+
+def test_shipped_panels_swap_the_chair_on_code_review_only():
+    # Owner decision 2026-09-20: the bake-off tested the code-review panel only, so only
+    # that panel gets the new chair. The path is explicit so a user override file in
+    # ~/.config/council/ cannot change what this test reads.
+    from importlib.resources import files
+    from council.config import chair_for
+    settings, panels = load_panels(str(files("council") / "panels.toml"))
+    assert settings.chair_model == "claude-opus-4-8"
+    assert chair_for(settings, panels["code-review"]) == "openai-gpt-56-sol"
+    others = {name: chair_for(settings, p) for name, p in panels.items() if name != "code-review"}
+    assert set(others) == {"decision", "brainstorm", "red-team", "spec-review"}
+    assert set(others.values()) == {"claude-opus-4-8"}
+    assert all(p.chair_model is None for name, p in panels.items() if name != "code-review")

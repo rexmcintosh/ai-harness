@@ -1,5 +1,7 @@
 # Chair bake-off — the run
 
+> The decision that followed this run (2026-09-20) is recorded in `docs/council-chair-decision-2026-09-20.md`.
+
 Executed 2026-09-12 against `docs/chair-bakeoff-design-2026-09-11.md`. 36 paid
 chair calls, no panel calls. **Nothing here changes `chair_model`.** `panels.toml`
 is byte-identical to `main`; the seat is still `claude-opus-4-8` and the decision

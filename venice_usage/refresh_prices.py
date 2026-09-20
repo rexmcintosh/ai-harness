@@ -294,6 +294,9 @@ def panel_models(panels_path):
         if key.endswith("_model") and isinstance(value, str):
             found.add(value)
     for panel in (data.get("panels") or {}).values():
+        chair = (panel or {}).get("chair_model")       # a panel may name its own chair
+        if isinstance(chair, str) and chair.strip():
+            found.add(chair.strip())
         for member in (panel or {}).get("members") or []:
             if isinstance(member.get("model"), str):
                 found.add(member["model"])

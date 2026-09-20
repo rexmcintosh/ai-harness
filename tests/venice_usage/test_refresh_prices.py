@@ -205,6 +205,17 @@ def test_wanted_is_the_union_of_the_table_the_ledger_and_the_panels(tmp_path):
                              "claude-opus-4-8", "gemini-3-5-flash", "kimi-k3"})
 
 
+def test_a_panels_own_chair_is_a_configured_model_too(tmp_path):
+    # council lets a panel name its own chair ([panels.<name>] chair_model). It is called
+    # and billed like any seat, so it must be priced from its first call as well.
+    panels = tmp_path / "panels.toml"
+    panels.write_text('[settings]\nchair_model = "claude-opus-4-8"\n'
+                      '[panels.p]\nchair_model = "openai-gpt-56-sol"\n'
+                      '[[panels.p.members]]\nmodel = "gemini-3-5-flash"\n'
+                      '[panels.q]\nchair_model = 42\n')
+    assert rp.panel_models(panels) == ["claude-opus-4-8", "gemini-3-5-flash", "openai-gpt-56-sol"]
+
+
 def test_a_table_never_silently_shrinks(tmp_path):
     # An id already in the committed table stays wanted even with an empty ledger.
     wanted = rp.wanted_models(existing=["claude-opus-4-6"], db_path=tmp_path / "gone.db",

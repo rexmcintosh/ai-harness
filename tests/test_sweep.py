@@ -144,6 +144,20 @@ def test_cli_sweep_runs_and_prints(tmp_path, capsys):
     assert "SQLi" in out and "1 risk" in out
 
 
+def test_cli_sweep_uses_the_panels_own_chair(tmp_path, capsys):
+    from council import cli
+    from council.config import Settings
+    (tmp_path / "app.py").write_text("query = 'SELECT ' + user_input\n")
+    panel = Panel("red-team", "break it", [Member("Adversary", "m1", "attacker")], chair_model="pc")
+    client = FakeClient(by_model={"m1": _member([("SQLi via string concat", "high", 9)]),
+                                  "c": _summary("global chair"), "pc": _summary("panel chair")})
+    rc = cli.main(["sweep", str(tmp_path)], _settings=Settings(chair_model="c"),
+                  _panels={"red-team": panel}, _client=client)
+    assert rc == 0
+    assert [c["model"] for c in client.calls] == ["m1", "pc"]    # never the global chair "c"
+    assert "panel chair" in capsys.readouterr().out
+
+
 def test_cli_sweep_empty_target_is_clean_noop(tmp_path, capsys):
     from council import cli
     from council.config import Settings

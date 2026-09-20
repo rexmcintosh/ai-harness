@@ -23,6 +23,8 @@ class Panel:
     chair_max_completion_tokens: int | None = None
     # {"daily": {...}, "deep": {...}} — per-rigor overrides of the two above.
     rigor: dict = field(default_factory=dict)
+    # This panel's own chair. None = use [settings] chair_model (config.chair_for).
+    chair_model: str | None = None
 
 
 @dataclass

@@ -137,6 +137,20 @@ def test_cli_compare_picks_winner(tmp_path, capsys):
     assert "Winner" in out and "graft from A" in out
 
 
+def test_cli_compare_uses_the_panels_own_chair(tmp_path, capsys):
+    from council import cli
+    settings, panels, client = _cli_env()
+    panels["code-review"] = Panel("code-review", "review", [Member("Eng", "m1", "eng")],
+                                  chair_model="pc")
+    client.by_model["pc"] = _synth("A", ["A", "B"])
+    a = tmp_path / "a.py"; a.write_text("def f(): return 1\n")
+    b = tmp_path / "b.py"; b.write_text("def f(): return 2\n")
+    rc = cli.main(["compare", "--task", "t", str(a), str(b)],
+                  _settings=settings, _panels=panels, _client=client)
+    assert rc == 0
+    assert [c["model"] for c in client.calls] == ["m1", "pc"]    # never the global chair "c"
+
+
 def test_cli_compare_requires_two_files(tmp_path, capsys):
     from council import cli
     settings, panels, client = _cli_env()

@@ -4,7 +4,7 @@ import sys
 import time
 from pathlib import Path
 
-from .config import load_panels, get_api_key, Settings, truncate, resolve_budget
+from .config import load_panels, get_api_key, Settings, truncate, resolve_budget, chair_for
 from .venice import VeniceClient
 from .engine import run_panel
 from .router import pick_panel
@@ -131,7 +131,7 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
     # ceiling for both the seats and the chair (see [settings.rigor.deep]).
     budget = resolve_budget(settings, panel, rigor)
     results = run_panel(panel, context, client, task_type=task_type, budget=budget)
-    syn = synthesize(context, results, client, chair_model=settings.chair_model,
+    syn = synthesize(context, results, client, chair_model=chair_for(settings, panel),
                      task_type=task_type, max_completion_tokens=budget.chair)
     render = render_markdown if fmt == "md" else render_terminal
     print(f"[panel: {panel_name} · rigor: {rigor}]\n")
@@ -270,7 +270,7 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
             candidates.append((label, truncate(text, settings.byte_cap // len(args.files))))
         cmp_panel = panels[args.panel]
         res = run_compare(args.task, candidates, cmp_panel, client,
-                          chair_model=settings.chair_model,
+                          chair_model=chair_for(settings, cmp_panel),
                           budget=resolve_budget(settings, cmp_panel,
                                                 cmp_panel.default_rigor))
         from .render import render_comparison
@@ -292,7 +292,7 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
             return 0
         sweep_panel = panels[args.panel]
         report = run_sweep(chunks, sweep_panel, client,
-                           chair_model=settings.chair_model, min_conf=args.min_conf,
+                           chair_model=chair_for(settings, sweep_panel), min_conf=args.min_conf,
                            budget=resolve_budget(settings, sweep_panel,
                                                  sweep_panel.default_rigor),
                            jev_repo=_sweep_jev_repo(args.path))
