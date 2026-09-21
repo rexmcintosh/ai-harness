@@ -130,15 +130,45 @@ except: print('usage=?')" 2>/dev/null)
 done
 [ "$ATTEMPT" -gt 1 ] && USAGE="$USAGE attempts=$ATTEMPT"
 
+# --- backlog line, morning only ---------------------------------------------------
+# backlog-run leaves finished work `in_review` and parks the rest `held`; nothing pinged
+# Rex, so items sat for weeks. This is that reminder. Unlike the loom line above it is
+# NOT handed to the model through the prompt — it is appended to the finished text below,
+# after the agent has answered, so the briefing model can neither drop it nor reword it.
+# Empty output means nothing is waiting, and then no line is added at all.
+# Fail open: a missing helper, a missing backlog, a crash or a hang all cost the line and
+# nothing else (the helper itself always exits 0; `timeout` and `|| true` cover the rest).
+BACKLOG_LINE=""
+BACKLOG_FLAG=0
+BACKLOG_HELPER="$DIR/backlog_line.py"
+BACKLOG_PY="$DIR/../.venv/bin/python"
+[ -x "$BACKLOG_PY" ] || BACKLOG_PY="$(command -v python3 || true)"
+if [ "$MODE" = "morning" ] && [ -r "$BACKLOG_HELPER" ] && [ -n "$BACKLOG_PY" ]; then
+  BACKLOG_LINE=$(timeout "${BEBOP_BACKLOG_TIMEOUT:-10}" \
+    "$BACKLOG_PY" "$BACKLOG_HELPER" 2>/dev/null || true)
+fi
+
 # --- send: agent output IS the briefing text (or FAILED:<reason>) ---
 # Success contract for the log stays `rc=0 ... result="SENT..."` — the watchdog's
 # check_bebop_runs parses `[ts] ... rc=N` from these lines; keep that shape.
 SEND_OK=0
 if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAILED'; then
-  if printf '%s' "$RESULT" | "$TG_SEND" "$CHAT_ID" -; then
+  # The backlog line rides on a briefing that actually composed. It is deliberately NOT
+  # stapled to the failure ping below: that ping is an alarm, and an ordinary-looking
+  # backlog nag under it would make a broken morning read like a normal one. The items
+  # are still there tomorrow; the alarm has to stay loud today.
+  MESSAGE="$RESULT"
+  if [ -n "$BACKLOG_LINE" ]; then
+    MESSAGE="$RESULT
+
+$BACKLOG_LINE"
+    BACKLOG_FLAG=1
+  fi
+  if printf '%s' "$MESSAGE" | "$TG_SEND" "$CHAT_ID" -; then
     SEND_OK=1
   else
     RC=1
+    BACKLOG_FLAG=0                      # nothing reached Rex, so nothing was added
     RESULT="FAILED:tg-send (Bot API) send failed"
   fi
 else
@@ -150,12 +180,12 @@ fi
 RESULT_1LINE="$(printf '%s' "$RESULT" | tr '\n' ' ')"
 
 if [ $SEND_OK -eq 1 ]; then
-  echo "[$TS] mode=$MODE rc=0 result=\"SENT ${RESULT_1LINE:0:80}\" $USAGE" >> "$LOG"
+  echo "[$TS] mode=$MODE rc=0 result=\"SENT ${RESULT_1LINE:0:80}\" $USAGE backlog_line=$BACKLOG_FLAG" >> "$LOG"
   python3 -c "import json;open('$STATE_FILE','w').write(json.dumps({'last_run_epoch':$NOW_EPOCH,'last_run_iso':'$TS','last_mode':'$MODE'},indent=2)+'\n')"
   echo "ok: sent"
   exit 0
 else
-  echo "[$TS] mode=$MODE rc=$RC result=\"${RESULT_1LINE:0:90}\" $USAGE" >> "$LOG"
+  echo "[$TS] mode=$MODE rc=$RC result=\"${RESULT_1LINE:0:90}\" $USAGE backlog_line=$BACKLOG_FLAG" >> "$LOG"
   "$TG_SEND" "$CHAT_ID" "⚠️ Bebop $MODE briefing failed (rc=$RC). Check ~/projects/ai-harness/bebop/logs/." || true
   echo "FAILED rc=$RC result=$RESULT" >&2
   exit 1

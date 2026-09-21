@@ -25,11 +25,23 @@ def executable(path: Path, text: str) -> Path:
     return path
 
 
-def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=None):
-    """replies[n] is what the fake claude answers on its n-th call (last one repeats)."""
+def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=None,
+        mode: str = "morning", backlog: str | None = None, helper: str | None = None):
+    """replies[n] is what the fake claude answers on its n-th call (last one repeats).
+
+    `backlog` is the YAML the backlog helper reads; `helper` replaces the helper script
+    itself (to stand in for a crash or a hang). With neither, BEBOP_BACKLOG_FILE points
+    at a file that does not exist, so no test can read Rex's real backlog.
+    """
     bebop = tmp_path / "tree" / "bebop"
     shutil.copytree(ROOT / "bebop" / "prompts", bebop / "prompts")
     shutil.copy(ROOT / "bebop" / "run-briefing.sh", bebop / "run-briefing.sh")
+    shutil.copy(ROOT / "bebop" / "backlog_line.py", bebop / "backlog_line.py")
+    if helper is not None:
+        executable(bebop / "backlog_line.py", helper)
+    backlog_file = tmp_path / "backlog.yaml"
+    if backlog is not None:
+        backlog_file.write_text(backlog)
     (tmp_path / "replies.json").write_text(json.dumps(replies))
     executable(tmp_path / "fakebin" / "claude", f"""#!/usr/bin/env python3
 import json, pathlib, sys
@@ -46,8 +58,9 @@ if [ "$2" = "-" ]; then cat > "{tmp_path}/sent-$(date +%s%N).txt"; else printf '
 """)
     home = tmp_path / "home"; home.mkdir()
     env = {"HOME": str(home), "PATH": f"{tmp_path / 'fakebin'}:/usr/bin:/bin",
-           "BEBOP_RETRY_DELAY": "0", **(extra_env or {})}
-    proc = subprocess.run(["bash", str(bebop / "run-briefing.sh"), "morning"],
+           "BEBOP_RETRY_DELAY": "0", "BEBOP_BACKLOG_FILE": str(backlog_file),
+           "BEBOP_BACKLOG_NOW": "2026-09-21", **(extra_env or {})}
+    proc = subprocess.run(["bash", str(bebop / "run-briefing.sh"), mode],
                           env=env, capture_output=True, text=True, timeout=60)
     calls = int((tmp_path / "claude-calls").read_text())
     sent = [p.read_text() for p in sorted(tmp_path.glob("sent-*.txt"))]
@@ -117,3 +130,94 @@ def test_a_non_numeric_delay_falls_back_to_the_default_with_a_warning(tmp_path):
     proc, calls, sent, log, state = run(tmp_path, [BRIEFING], extra_env={"BEBOP_RETRY_DELAY": "soon"})
     assert proc.returncode == 0 and calls == 1
     assert "BEBOP_RETRY_DELAY" in proc.stderr
+
+
+# --- the backlog line ---------------------------------------------------------------
+# Appended here, in the shell, AFTER the agent has composed the briefing: the model never
+# sees it, so it can neither drop it nor reword it. Morning only, and only on a briefing
+# that actually composed.
+
+BACKLOG = """\
+items:
+- id: 2026-09-03-review-complaint-sweep
+  status: in_review
+  created: 2026-09-03
+  worked: 2026-09-03
+- id: 2026-07-20-shots-dir-retention-prune
+  status: held
+  created: 2026-07-20
+  worked: 2026-09-21
+"""
+BACKLOG_LINE = ("Backlog: 1 waits for your review (oldest 18 days: review-complaint-sweep). "
+                "1 new on hold since yesterday. Look: backlog-run report")
+
+
+def test_the_morning_briefing_gets_the_backlog_line_appended(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG)
+    assert proc.returncode == 0
+    assert sent == [f"{BRIEFING}\n\n{BACKLOG_LINE}"]
+    assert "backlog_line=1" in log[0]
+
+
+def test_the_evening_briefing_is_left_alone(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG, mode="evening")
+    assert proc.returncode == 0
+    assert sent == [BRIEFING]
+    assert "backlog_line=0" in log[0]
+
+
+def test_an_empty_backlog_adds_nothing_at_all(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog="items: []\n")
+    assert proc.returncode == 0
+    assert sent == [BRIEFING]
+    assert "backlog_line=0" in log[0]
+
+
+def test_a_missing_backlog_file_still_sends_the_briefing(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING])
+    assert proc.returncode == 0 and sent == [BRIEFING] and "backlog_line=0" in log[0]
+
+
+def test_a_crashing_helper_costs_the_line_not_the_briefing(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], backlog=BACKLOG,
+        helper="#!/usr/bin/env python3\nraise SystemExit('boom')\n")
+    assert proc.returncode == 0
+    assert sent == [BRIEFING]                       # no traceback, no partial line
+    assert "backlog_line=0" in log[0]
+
+
+def test_a_hanging_helper_is_cut_off_and_the_briefing_still_goes(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], backlog=BACKLOG,
+        helper="#!/usr/bin/env python3\nimport time\ntime.sleep(30)\n",
+        extra_env={"BEBOP_BACKLOG_TIMEOUT": "1"})
+    assert proc.returncode == 0
+    assert sent == [BRIEFING]
+    assert "backlog_line=0" in log[0]
+
+
+def test_a_failed_briefing_gets_the_failure_ping_alone(tmp_path):
+    """The failure ping is an alarm. A backlog nag stapled to it would read like a normal
+    morning, which is the one thing the ping exists to prevent."""
+    proc, calls, sent, log, state = run(tmp_path, ["FAILED: tools unavailable"], backlog=BACKLOG)
+    assert proc.returncode == 1
+    assert len(sent) == 1 and "briefing failed" in sent[0]
+    assert "Backlog:" not in sent[0]
+    assert " rc=1 " in log[0] and "backlog_line=0" in log[0]
+
+
+def test_the_line_survives_a_retry(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path, ["FAILED: tools unavailable", BRIEFING], backlog=BACKLOG)
+    assert proc.returncode == 0 and calls == 2
+    assert sent == [f"{BRIEFING}\n\n{BACKLOG_LINE}"]
+    assert "backlog_line=1" in log[0]
+
+
+def test_the_log_line_still_parses_with_the_backlog_flag_on_it(tmp_path):
+    from watchdog.triage import check_bebop_runs
+    import time
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG)
+    assert check_bebop_runs("\n".join(log) + "\n", int(time.time())).level == "ok"
+    assert len(log) == 1

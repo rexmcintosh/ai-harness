@@ -38,6 +38,7 @@ cron (07:00 + 18:00 Lisbon)
 | `prompts/briefing-morning.md` | Morning briefing instructions (today's schedule + important new email). The thing to tune. |
 | `prompts/briefing-evening.md` | Evening wrap + tomorrow preview. |
 | `run-briefing.sh` | Runner. Computes the delta window, invokes headless Claude, logs cost, manages state, pings on failure. |
+| `backlog_line.py` | Builds the one backlog line the morning briefing carries. Stdlib + PyYAML, reads the backlog file and nothing else. |
 | `state.json` | Last successful run (epoch + iso). Gitignored. The delta mechanism. |
 | `logs/runs.log` | One line per run: mode, rc, result, cost, tokens. Gitignored. Watch this to track cost. |
 
@@ -93,3 +94,51 @@ on its 11th lookup). Nothing was wrong with the accounts or the connection.
 failure sends the usual failure ping. `BEBOP_MAX_ATTEMPTS=1` turns the retry off; any
 other value means 2, so the runner can never loop.
 Tests: `tests/test_bebop_runner.py` (fake `claude` and `tg-send`, temp state and logs).
+
+## The backlog line (morning only)
+
+`backlog-run` works the queue at 03:00 UTC. It leaves finished work `in_review` for Rex to
+approve and parks anything needing a human decision as `held`. Neither state pinged him, so
+items sat for weeks. The **morning** briefing now carries one line about it:
+
+```
+Backlog: 3 wait for your review (oldest 18 days: review-complaint-sweep). 1 new on hold since yesterday. Look: backlog-run report
+```
+
+- **Built in code, not by the model.** `backlog_line.py` prints the finished string;
+  `run-briefing.sh` appends it to the composed briefing *after* the agent has answered and
+  before the send. The model never sees it, so it cannot drop it, shorten it or reword it.
+  (The loom line is different: it goes in through the prompt and is asked to pass it
+  through verbatim.)
+- **Silent when nothing is waiting.** No `in_review` items and no new hold means an empty
+  string and no line at all. A line that appears every morning stops being read.
+- **Evening is untouched.**
+- **Not stapled to a failure ping.** If the briefing failed to compose, the failure ping
+  goes out alone. That ping is an alarm; an ordinary-looking backlog nag under it would
+  make a broken morning read like a normal one. The items keep until tomorrow.
+- **Fail open, always.** Missing file, broken YAML, an unexpected shape, a crash or a hang
+  cost the line and nothing else. The helper always exits 0 and prints nothing it is unsure
+  of; the shell wraps it in `timeout` (`BEBOP_BACKLOG_TIMEOUT`, default 10s) and `|| true`.
+- `runs.log` gains `backlog_line=1|0` — whether the line was in the message that was sent.
+
+### How the two numbers are worked out
+
+| Clause | Rule |
+|--------|------|
+| *N wait for your review* | items with `status: in_review`. |
+| *oldest N days: `<name>`* | age from `worked` if present, else `created`; name is the id without its leading `YYYY-MM-DD-`. Dropped when no waiting item has a usable date. |
+| *N new on hold since yesterday* | items with `status: held` whose `worked` date is today (UTC). |
+
+`worked` is a **date**, not a timestamp, and it is the only field that records when a hold
+happened (`backlogrun.cli` stamps `item["worked"] = today()` in UTC in the same write that
+sets `status: held`). The 03:00 UTC runner and the ~06:00 UTC morning briefing fall on the
+same UTC date, so "`worked` is today" means "held by last night's run", and the item drops
+out of the count tomorrow instead of being reported twice. A hold placed by hand
+(`backlog-run hold`) writes no date at all, so it is never counted as new — the clause
+under-reports rather than guesses. **If the 03:00 cron ever moves to before midnight UTC,
+this clause goes quiet and the rule needs revisiting.**
+
+Environment: `BEBOP_BACKLOG_FILE` (default `~/projects/backlog/backlog.yaml`),
+`BEBOP_BACKLOG_NOW` (ISO date, injectable "today" for tests), `BEBOP_BACKLOG_TIMEOUT`.
+Tests: `tests/test_bebop_backlog_line.py` (the builder) and `tests/test_bebop_runner.py`
+(the append, the modes, the fail-open paths).
