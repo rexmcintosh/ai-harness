@@ -138,6 +138,11 @@ after midnight UTC and before the briefing. A hold placed by hand (`backlog-run 
 writes neither field and is never counted: the clause under-reports rather than guesses.
 
 Environment: `BEBOP_BACKLOG_FILE` (default `~/projects/backlog/backlog.yaml`),
-`BEBOP_BACKLOG_NOW` (ISO date, injectable "today" for tests), `BEBOP_BACKLOG_TIMEOUT`.
+`BEBOP_BACKLOG_NOW` (ISO date, injectable "today" for tests), `BEBOP_BACKLOG_TIMEOUT`
+(seconds, default 10, never more than 30).
+
+The helper runs only after the briefing composed, so it can never delay the failure ping.
+The line is left out when it would push the message past 4000 characters (Telegram's limit
+is 4096), and the item name in it is cleaned to one printable line of at most 60 characters.
 Tests: `tests/test_bebop_backlog_line.py` (the builder) and `tests/test_bebop_runner.py`
 (the append, the modes, the fail-open paths).

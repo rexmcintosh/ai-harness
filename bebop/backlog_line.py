@@ -120,8 +120,16 @@ def _age_text(days: int) -> str:
     return "1 day" if days == 1 else f"{days} days"
 
 
+NAME_MAX = 60                           # an id is a filename-ish slug; anything longer is noise
+
+
 def _short_name(iid: str) -> str:
-    return _ID_DATE.sub("", iid)
+    # This string ends up in a Telegram message. Whatever the backlog holds, the briefing
+    # gets one short line of printable text: control characters and line breaks become
+    # spaces, runs of space collapse, and a runaway id is cut.
+    name = "".join(ch if ch.isprintable() else " " for ch in _ID_DATE.sub("", iid))
+    name = " ".join(name.split())
+    return name if len(name) <= NAME_MAX else name[:NAME_MAX - 3].rstrip() + "..."
 
 
 def briefing_line(items, *, today: date, now: datetime | None = None) -> str:

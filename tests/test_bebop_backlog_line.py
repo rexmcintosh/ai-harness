@@ -200,6 +200,21 @@ def test_both_clauses_appear_in_order():
         "1 new on hold since yesterday. " + TAIL)
 
 
+# --- what reaches Telegram is one clean line --------------------------------------
+
+def test_an_id_with_a_newline_or_control_characters_still_gives_one_line():
+    items = [item("2026-09-01-bad\nname\x07 with\ttabs", "in_review", worked=date(2026, 9, 20))]
+    line = briefing_line(items, today=TODAY)
+    assert "\n" not in line and "\x07" not in line and "\t" not in line
+    assert "bad name with tabs" in line
+
+
+def test_a_very_long_id_is_cut_short():
+    items = [item("2026-09-01-" + "a" * 500, "in_review", worked=date(2026, 9, 20))]
+    line = briefing_line(items, today=TODAY)
+    assert len(line) < 200 and "a" * 61 not in line
+
+
 # --- shapes nobody expected ------------------------------------------------------
 
 @pytest.mark.parametrize("items", [None, "items", 7, {"id": "a"}, [None, 3, "x"]])

@@ -221,3 +221,45 @@ def test_the_log_line_still_parses_with_the_backlog_flag_on_it(tmp_path):
     proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG)
     assert check_bebop_runs("\n".join(log) + "\n", int(time.time())).level == "ok"
     assert len(log) == 1
+
+
+MARKING_HELPER = """#!/usr/bin/env python3
+import pathlib, sys
+pathlib.Path({marker!r}).write_text("ran")
+sys.stdout.write("Backlog: 1 waits for your review. Look: backlog-run report")
+"""
+
+
+def test_a_failed_briefing_never_runs_the_helper_so_the_alarm_is_not_delayed(tmp_path):
+    marker = tmp_path / "helper-ran"
+    proc, calls, sent, log, state = run(
+        tmp_path, ["FAILED: tools unavailable"], backlog=BACKLOG,
+        helper=MARKING_HELPER.format(marker=str(marker)))
+    assert proc.returncode == 1
+    assert not marker.exists()
+
+
+def test_a_line_that_would_push_the_message_past_telegrams_limit_is_left_out(tmp_path):
+    long_briefing = "x" * 4050                      # Telegram refuses a message over 4096 characters
+    proc, calls, sent, log, state = run(tmp_path, [long_briefing], backlog=BACKLOG)
+    assert proc.returncode == 0
+    assert sent == [long_briefing]                  # the briefing goes; the optional line does not
+    assert "backlog_line=0" in log[0]
+
+
+def test_a_garbled_timeout_falls_back_to_the_default_and_the_line_still_goes(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG,
+                                        extra_env={"BEBOP_BACKLOG_TIMEOUT": "forever"})
+    assert proc.returncode == 0
+    assert sent == [f"{BRIEFING}\n\n{BACKLOG_LINE}"]
+
+
+def test_a_huge_timeout_is_capped_so_a_hang_cannot_hold_the_briefing_for_long(tmp_path):
+    import time
+    started = time.monotonic()
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], backlog=BACKLOG,
+        helper="#!/usr/bin/env python3\nimport time\ntime.sleep(120)\n",
+        extra_env={"BEBOP_BACKLOG_TIMEOUT": "9999", "BEBOP_BACKLOG_TIMEOUT_CAP": "2"})
+    assert proc.returncode == 0 and sent == [BRIEFING]
+    assert time.monotonic() - started < 30

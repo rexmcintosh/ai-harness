@@ -143,10 +143,16 @@ BACKLOG_FLAG=0
 BACKLOG_HELPER="$DIR/backlog_line.py"
 BACKLOG_PY="$DIR/../.venv/bin/python"
 [ -x "$BACKLOG_PY" ] || BACKLOG_PY="$(command -v python3 || true)"
-if [ "$MODE" = "morning" ] && [ -r "$BACKLOG_HELPER" ] && [ -n "$BACKLOG_PY" ]; then
-  BACKLOG_LINE=$(timeout "${BEBOP_BACKLOG_TIMEOUT:-10}" \
-    "$BACKLOG_PY" "$BACKLOG_HELPER" 2>/dev/null || true)
-fi
+# The helper sits on the send path, so its wait is bounded twice: a garbled value falls
+# back to 10 seconds and nothing above the cap (30) is honoured. `-k 2` is for a helper
+# that ignores TERM.
+BACKLOG_TIMEOUT_CAP="${BEBOP_BACKLOG_TIMEOUT_CAP:-30}"
+case "$BACKLOG_TIMEOUT_CAP" in ''|*[!0-9]*) BACKLOG_TIMEOUT_CAP=30 ;; esac
+BACKLOG_TIMEOUT="${BEBOP_BACKLOG_TIMEOUT:-10}"
+case "$BACKLOG_TIMEOUT" in ''|*[!0-9]*) BACKLOG_TIMEOUT=10 ;; esac
+[ "$BACKLOG_TIMEOUT" -ge 1 ] || BACKLOG_TIMEOUT=10
+[ "$BACKLOG_TIMEOUT" -le "$BACKLOG_TIMEOUT_CAP" ] || BACKLOG_TIMEOUT="$BACKLOG_TIMEOUT_CAP"
+TG_MAX_CHARS=4000                     # Telegram refuses a message over 4096 characters
 
 # --- send: agent output IS the briefing text (or FAILED:<reason>) ---
 # Success contract for the log stays `rc=0 ... result="SENT..."` — the watchdog's
@@ -157,8 +163,15 @@ if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAIL
   # stapled to the failure ping below: that ping is an alarm, and an ordinary-looking
   # backlog nag under it would make a broken morning read like a normal one. The items
   # are still there tomorrow; the alarm has to stay loud today.
+  # The helper runs here and not earlier, so a slow backlog read can never delay the
+  # failure ping. And the line is optional: if it would push the message past Telegram's
+  # limit, the briefing goes without it rather than not at all.
+  if [ "$MODE" = "morning" ] && [ -r "$BACKLOG_HELPER" ] && [ -n "$BACKLOG_PY" ]; then
+    BACKLOG_LINE=$(timeout -k 2 "$BACKLOG_TIMEOUT" \
+      "$BACKLOG_PY" "$BACKLOG_HELPER" 2>/dev/null || true)
+  fi
   MESSAGE="$RESULT"
-  if [ -n "$BACKLOG_LINE" ]; then
+  if [ -n "$BACKLOG_LINE" ] && [ $(( ${#RESULT} + ${#BACKLOG_LINE} + 2 )) -le "$TG_MAX_CHARS" ]; then
     MESSAGE="$RESULT
 
 $BACKLOG_LINE"
