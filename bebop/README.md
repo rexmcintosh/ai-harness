@@ -127,16 +127,15 @@ Backlog: 3 wait for your review (oldest 18 days: review-complaint-sweep). 1 new 
 |--------|------|
 | *N wait for your review* | items with `status: in_review`. |
 | *oldest N days: `<name>`* | age from `worked` if present, else `created`; name is the id without its leading `YYYY-MM-DD-`. Dropped when no waiting item has a usable date. |
-| *N new on hold since yesterday* | items with `status: held` whose `worked` date is today (UTC). |
+| *N new on hold since yesterday* | items with `status: held` whose `worked_at` stamp is less than 24 hours old. Older records with no stamp: `worked` date is today (UTC). |
 
-`worked` is a **date**, not a timestamp, and it is the only field that records when a hold
-happened (`backlogrun.cli` stamps `item["worked"] = today()` in UTC in the same write that
-sets `status: held`). The 03:00 UTC runner and the ~06:00 UTC morning briefing fall on the
-same UTC date, so "`worked` is today" means "held by last night's run", and the item drops
-out of the count tomorrow instead of being reported twice. A hold placed by hand
-(`backlog-run hold`) writes no date at all, so it is never counted as new — the clause
-under-reports rather than guesses. **If the 03:00 cron ever moves to before midnight UTC,
-this clause goes quiet and the rule needs revisiting.**
+`backlogrun.cli` writes two fields in the same write that sets the status: `worked` (a UTC
+**date**) and `worked_at` (a UTC **timestamp**, added 2026-09-21). The line uses the stamp,
+so it does not depend on when the runner fires: a hold from a 03:00 UTC run, a 22:00 UTC run
+or a run that crosses midnight is reported on the next morning and only that one. A record
+with no stamp falls back to "`worked` is today", which is exact only while the runner fires
+after midnight UTC and before the briefing. A hold placed by hand (`backlog-run hold`)
+writes neither field and is never counted: the clause under-reports rather than guesses.
 
 Environment: `BEBOP_BACKLOG_FILE` (default `~/projects/backlog/backlog.yaml`),
 `BEBOP_BACKLOG_NOW` (ISO date, injectable "today" for tests), `BEBOP_BACKLOG_TIMEOUT`.

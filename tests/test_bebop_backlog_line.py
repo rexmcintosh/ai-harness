@@ -14,7 +14,7 @@ import ast
 import os
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -142,6 +142,46 @@ def test_an_older_hold_is_not_new():
 def test_a_hold_with_no_worked_date_is_never_counted_as_new():
     items = [item("2026-07-20-a", "held")]
     assert briefing_line(items, today=TODAY) == ""
+
+
+# `worked_at` is a UTC timestamp the runner writes next to `worked`. With it the clause no
+# longer depends on WHEN the runner fires: a hold is new for the 24 hours after it happened.
+MORNING = datetime(2026, 9, 21, 7, 0, tzinfo=timezone.utc)
+
+
+def test_a_hold_stamped_before_midnight_is_new_the_next_morning():
+    # The runner moved to 22:00 UTC: `worked` is YESTERDAY's date, which the date rule misses.
+    items = [item("2026-09-20-a", "held", worked=date(2026, 9, 20), worked_at="2026-09-20T22:41:07Z")]
+    assert briefing_line(items, today=TODAY, now=MORNING) == (
+        "Backlog: 1 new on hold since yesterday. " + TAIL)
+
+
+def test_a_stamped_hold_is_reported_once_not_on_two_mornings():
+    items = [item("2026-09-20-a", "held", worked=date(2026, 9, 20), worked_at="2026-09-20T03:00:06Z")]
+    assert briefing_line(items, today=TODAY, now=MORNING) == ""     # that was yesterday's news
+
+
+def test_the_timestamp_wins_over_the_date_when_both_are_present():
+    # worked == today would count it; the stamp says it is 28 hours old.
+    items = [item("2026-09-20-a", "held", worked=date(2026, 9, 21), worked_at="2026-09-20T03:00:06Z")]
+    assert briefing_line(items, today=TODAY, now=MORNING) == ""
+
+
+def test_a_stamp_from_the_future_is_not_new():
+    items = [item("2026-09-20-a", "held", worked_at="2026-09-22T03:00:06Z")]
+    assert briefing_line(items, today=TODAY, now=MORNING) == ""
+
+
+def test_an_unreadable_stamp_falls_back_to_the_date_rule():
+    items = [item("2026-09-20-a", "held", worked=date(2026, 9, 21), worked_at="last night")]
+    assert briefing_line(items, today=TODAY, now=MORNING) == (
+        "Backlog: 1 new on hold since yesterday. " + TAIL)
+
+
+def test_a_stamp_parsed_by_yaml_into_a_datetime_works_too():
+    items = [item("2026-09-20-a", "held", worked_at=datetime(2026, 9, 20, 22, 41, 7))]
+    assert briefing_line(items, today=TODAY, now=MORNING) == (
+        "Backlog: 1 new on hold since yesterday. " + TAIL)
 
 
 def test_an_item_worked_today_but_left_in_review_is_not_counted_as_held():

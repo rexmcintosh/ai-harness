@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -70,6 +70,45 @@ def _as_date(value) -> date | None:
     return None
 
 
+def _as_utc(value) -> datetime | None:
+    """The runner's `worked_at` stamp (`2026-09-20T22:41:07Z`), or None when it is not one.
+    PyYAML may hand it over as a string or as a datetime; a naive one is UTC by contract."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def utc_now(today: date | None = None) -> datetime:
+    """Now in UTC. When "today" was injected (tests, replays), the hour the briefing goes out
+    on that day, so an injected date and the clock can never disagree."""
+    if today is not None and today != datetime.now(timezone.utc).date():
+        return datetime(today.year, today.month, today.day, 7, 0, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
+
+
+NEW_FOR = timedelta(hours=24)           # one briefing a day: a hold is news exactly once
+
+
+def _newly_held(it: dict, *, today: date, now: datetime) -> bool:
+    # `worked_at` is the runner's UTC timestamp for the hold. With it the answer does not
+    # depend on WHEN the runner fires: 03:00 UTC, 22:00 UTC, or a run across midnight are all
+    # reported on the next morning and only that one. A stamp that cannot be read falls back
+    # to the date rule rather than dropping the item.
+    stamp = _as_utc(it.get("worked_at"))
+    if stamp is not None:
+        return timedelta(0) <= now - stamp < NEW_FOR
+    # Records written before `worked_at` existed carry only `worked`, a DATE. That rule is
+    # exact only while the runner fires after midnight UTC and before the briefing: then
+    # "worked is today" means "held by last night's run". A hold placed by hand
+    # (`backlog-run hold`) writes neither field, so it is never counted.
+    return _as_date(it.get("worked")) == today
+
+
 def _age_days(when: date, today: date) -> int:
     # A date in the future is a typo, not a negative age. Clamp rather than print "-3 days".
     return max(0, (today - when).days)
@@ -85,10 +124,11 @@ def _short_name(iid: str) -> str:
     return _ID_DATE.sub("", iid)
 
 
-def briefing_line(items, *, today: date) -> str:
-    """The line, or "" when nothing is waiting. Pure: no file, no clock, no env."""
+def briefing_line(items, *, today: date, now: datetime | None = None) -> str:
+    """The line, or "" when nothing is waiting. Pure when `now` is given: no file, no env."""
     if not isinstance(items, list):
         return ""
+    now = now or utc_now(today)
 
     review: list[tuple[date | None, str]] = []
     newly_held = 0
@@ -104,12 +144,7 @@ def briefing_line(items, *, today: date) -> str:
             # written down. An item with neither still counts; it just cannot be "oldest".
             review.append((_as_date(it.get("worked")) or _as_date(it.get("created")), iid))
         elif status == "held":
-            # `worked` is the only field carrying when the hold happened, and it is a DATE.
-            # The runner stamps it at 03:00 UTC and this line goes out at ~06:00 UTC the
-            # same day, so "worked is today" means "held by last night's run" exactly once:
-            # tomorrow the date is yesterday's and the item falls out again. A hold placed
-            # by hand (`backlog-run hold`) writes no date at all, so it is never counted.
-            if _as_date(it.get("worked")) == today:
+            if _newly_held(it, today=today, now=now):
                 newly_held += 1
 
     if not review and not newly_held:

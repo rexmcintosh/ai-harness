@@ -1307,6 +1307,7 @@ def _apply(cfg: Config, result: dict, *, expected_statuses: tuple[str, ...] = ("
         if result.get("reviewed_sha"):
             item["reviewed_sha"] = result["reviewed_sha"]
         item["worked"] = today()
+        item["worked_at"] = now_stamp()     # readers that ask "in the last 24 hours?" (the Bebop backlog line)
         item["note"] = result["note"]
         if result.get("session"):
             item["session"] = result["session"]
@@ -1848,6 +1849,7 @@ def cmd_reopen(args, cfg: Config) -> int:
             raise ValueError(f"{iid} is {item.get('status')}, not held")
         item["status"] = "open"
         item.pop("worked", None)
+        item.pop("worked_at", None)
         if str(item.get("note", "")).startswith("runner:"):
             item.pop("note", None)
         if getattr(args, "gate_ok", False):
