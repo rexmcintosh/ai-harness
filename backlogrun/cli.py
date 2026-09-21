@@ -858,6 +858,12 @@ def council_review(cfg: Config, diff_text: str, *, item_id: str, repo: str | Non
             key = load_venice_key("review", env_path=cfg.env_file)
         except VeniceKeyError as exc:
             return {"ok": False, "summary": f"REVIEW FAILED: {exc}", "markdown": ""}
+        # The run fires two hours before the DIEM reset. On a day the allowance is already
+        # spent, wait for the reset rather than record a review that was bound to fail.
+        from backlogrun import review_budget
+        if review_budget.enabled():
+            review_budget.wait_for_review_budget(
+                balance=lambda: review_budget.venice_balance(key), log=print)
         client = VeniceClient(key, timeout=settings.timeout)
         panel = panels["code-review"]
         full_ctx = f"Review this:\n\n{diff_text}"
