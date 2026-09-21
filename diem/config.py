@@ -1,6 +1,7 @@
 """Config + key loading. Cron has no shell env, so the Venice key is read
 straight from ~/.env (accepts VENICE_API_KEY or VENICE_KEY)."""
 from __future__ import annotations
+import math
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -113,9 +114,12 @@ class DiemConfig:
             if "lock" not in reserve or "diem" not in reserve:
                 _config_die("[reserve] needs both lock (a path) and diem (an amount)")
             kw["reserve_lock"] = Path(str(reserve["lock"])).expanduser()
-            kw["reserve_diem"] = float(reserve["diem"])
-            if kw["reserve_diem"] < 0:
-                _config_die("[reserve] diem must be 0 or more")
+            try:
+                kw["reserve_diem"] = float(reserve["diem"])
+            except (TypeError, ValueError):
+                _config_die("[reserve] diem must be a number")
+            if not math.isfinite(kw["reserve_diem"]) or kw["reserve_diem"] < 0:
+                _config_die("[reserve] diem must be a finite number, 0 or more")
         kw["telegram"] = raw.get("telegram")
         kw["cmd_whitelist"] = raw.get("cmd_whitelist", {})
 

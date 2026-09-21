@@ -395,3 +395,48 @@ def test_a_garbled_not_before_is_treated_as_absent(tmp_path):
     run_checkpoint(cfg, now=datetime(2026, 7, 3, 21, 30), balance=FakeBalance([90.0, 89.0]),
                    queue=q, estimates=est, reviewed=rev, runner=r)
     assert len(r.ran) == 1
+
+
+def test_a_probe_that_cannot_be_read_keeps_the_reserve_and_says_so(tmp_path, monkeypatch):
+    # Silence here would turn "could not look" into "nobody is running" and an empty balance.
+    import diem.drain as drain_mod
+    lock = tmp_path / "runner" / "lock"
+    _held(lock).close()
+    monkeypatch.setattr(drain_mod, "PROC_LOCKS", str(tmp_path / "no-such-proc-locks"))
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3)
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([8.0, 6.0, 6.0, 4.9, 4.9]),
+                             queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 2 and summary["reserve"] == 5.0
+    assert summary["reserve_probe"] == "probe_error"
+
+
+def test_the_probe_result_is_recorded(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    fh = _held(lock)
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    s = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    fh.close()
+    assert s["reserve_probe"] == "held"
+    s = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    assert s["reserve_probe"] == "not_held"
+    s = run_checkpoint(_cfg(tmp_path), now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    assert s["reserve_probe"] == "off"
+
+
+def test_an_item_that_expires_while_the_checkpoint_runs_is_not_started(tmp_path):
+    # Expiry used the checkpoint's START time for the whole run, so a long slot could start
+    # work whose deadline had already passed.
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    q.add(new_item("ask", {"question": "first", "panel": "decision"}, created=NOW_ISO))
+    late = new_item("review", {"repo": "/r/late", "diff": True}, created=NOW_ISO,
+                    expires="2026-07-03T23:05:30")      # 30 s into the run; the first job takes 60 s
+    q.add(late)
+    r = FakeRunner()
+    run_checkpoint(cfg, now=NOW, balance=FakeBalance([90.0, 89.0, 89.0, 88.0]), queue=q,
+                   estimates=est, reviewed=rev, runner=r)
+    assert [i.payload.get("question") for i in r.ran] == ["first"]

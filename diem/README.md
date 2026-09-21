@@ -77,7 +77,8 @@ like the checkpoints, so `23:00` is still due at 00:20 under a 01:00 reset). Bef
 the drain does not see the item at all: it cannot take the morning allowance, it is not
 reported as skipped, and it does not stop the loom filler from seeding (the filler needs an
 empty queue). Use it for work that is worth doing only with DIEM that would expire anyway:
-`diem queue add ask "..." --not-before 23:00`. A value that does not parse counts as absent.
+`diem queue add ask "..." --not-before 23:00` (the command refuses a value that is not HH:MM;
+in a hand-written queue file a value that does not parse counts as absent).
 
 ## Reserve while the night runner works
 
@@ -95,8 +96,12 @@ the drain leaves `diem` unspent while some process holds that flock. It asks aga
 every job, so the reserve ends the moment the runner lets go; the higher of floor and
 reserve wins. The check reads `/proc/locks` and never takes the lock itself: a probe that
 took it, even briefly, could make the runner's own non-blocking attempt fail and cost it the
-night. No `[reserve]` section, a missing lock file or an unreadable `/proc/locks` all mean
-no reserve. Each checkpoint record in `drain.log` carries `"reserve"`.
+night. No `[reserve]` section or a lock file that does not exist means no reserve. A probe
+that cannot look (`/proc/locks` unreadable) KEEPS the reserve: wrong that way costs a little
+expired DIEM, wrong the other way costs a failed review. Each checkpoint record in `drain.log`
+carries `"reserve"` (the largest seen in that slot) and `"reserve_probe"`
+(`off`, `held`, `not_held` or `probe_error`, the last answer). The match is the ext4 identity
+(hex major:minor, decimal inode); on overlay or btrfs check it before relying on it.
 
 ## Crontab installation
 

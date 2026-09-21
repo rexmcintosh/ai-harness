@@ -273,6 +273,14 @@ def main(argv=None) -> int:
                     print("error: queue add cmd requires a name", file=sys.stderr)
                     return 2
                 payload = {"name": args.args[0]}
+            if args.not_before is not None:
+                # Refused here because the drain reads a garbled value as "absent", and an
+                # item meant for leftovers would then take the morning allowance.
+                hh, _, mm = args.not_before.partition(":")
+                if not (hh.isdigit() and mm.isdigit() and len(mm) == 2
+                        and int(hh) <= 23 and int(mm) <= 59):
+                    print("error: --not-before must be HH:MM", file=sys.stderr)
+                    return 2
             it = new_item(args.type, payload, banked=True,
                           expires=args.expires, created=now_iso,
                           not_before=args.not_before)

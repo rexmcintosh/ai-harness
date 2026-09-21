@@ -359,3 +359,15 @@ def test_venice_usage_labels_the_estimate_and_says_bills_have_no_project(
     assert "billed" in out.lower()
     assert "no project" in out.lower()
     assert "12.5" in out
+
+
+def test_queue_add_not_before_is_stored_and_a_typo_is_refused(tmp_path, capsys):
+    cfgp = _cfg_file(tmp_path)
+    assert cli.main(["queue", "add", "ask", "leftovers?", "--not-before", "23:00",
+                     "--config", str(cfgp)]) == 0
+    (it,) = QueueDir(tmp_path / "state").pending("2026-07-03T21:00:00")
+    assert it.not_before == "23:00"
+    # a typo would fail open at drain time and let the item take the morning allowance
+    assert cli.main(["queue", "add", "ask", "typo", "--not-before", "11pm",
+                     "--config", str(cfgp)]) == 2
+    assert len(QueueDir(tmp_path / "state").pending("2026-07-03T21:00:00")) == 1

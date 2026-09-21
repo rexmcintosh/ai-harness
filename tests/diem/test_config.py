@@ -177,3 +177,12 @@ def test_a_negative_reserve_is_refused(tmp_path):
     p.write_text('daily_diem = 31.0\n[reserve]\nlock = "/tmp/x"\ndiem = -1\n')
     with pytest.raises(SystemExit):
         DiemConfig.load(p)
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", '"two"'])
+def test_a_reserve_that_is_not_a_finite_number_is_a_config_error(tmp_path, bad):
+    from diem.config import DiemConfig
+    p = tmp_path / "c.toml"
+    p.write_text(f'daily_diem = 31.0\n[reserve]\nlock = "/tmp/x"\ndiem = {bad}\n')
+    with pytest.raises(SystemExit):
+        DiemConfig.load(p)
