@@ -156,3 +156,24 @@ def test_bad_time_string_exits_2(tmp_path, bad_time):
     with pytest.raises(SystemExit) as exc:
         DiemConfig.load(p)
     assert exc.value.code == 2
+
+
+def test_reserve_section_is_read_and_is_off_by_default(tmp_path):
+    from diem.config import DiemConfig
+    p = tmp_path / "c.toml"
+    p.write_text('daily_diem = 31.0\n')
+    cfg = DiemConfig.load(p)
+    assert cfg.reserve_lock is None and cfg.reserve_diem == 0.0
+    p.write_text('daily_diem = 31.0\n[reserve]\nlock = "~/projects/.backlog-run/lock"\ndiem = 2.0\n')
+    cfg = DiemConfig.load(p)
+    assert str(cfg.reserve_lock).endswith("/projects/.backlog-run/lock") and "~" not in str(cfg.reserve_lock)
+    assert cfg.reserve_diem == 2.0
+
+
+def test_a_negative_reserve_is_refused(tmp_path):
+    import pytest
+    from diem.config import DiemConfig
+    p = tmp_path / "c.toml"
+    p.write_text('daily_diem = 31.0\n[reserve]\nlock = "/tmp/x"\ndiem = -1\n')
+    with pytest.raises(SystemExit):
+        DiemConfig.load(p)

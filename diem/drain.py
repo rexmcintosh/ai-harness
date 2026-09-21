@@ -4,6 +4,7 @@ Interactive evening use is honored implicitly: balance re-read between jobs
 means a human burning DIEM pushes the balance to the floor and we stop."""
 from __future__ import annotations
 import json
+import os
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -79,12 +80,54 @@ def floor_for(cfg, now: datetime) -> float:
     return frac * cfg.daily_diem
 
 
+def _flock_held(path) -> bool:
+    """True when some process holds a flock on `path`. Read from /proc/locks instead of
+    trying the lock: a probe that takes the lock, even for a microsecond, could make the
+    runner's own non-blocking attempt fail and cost it the night. Anything unreadable or
+    unexpected answers False."""
+    try:
+        st = os.stat(path)
+        want = f"{os.major(st.st_dev):02x}:{os.minor(st.st_dev):02x}:{st.st_ino}"
+        with open("/proc/locks", encoding="ascii", errors="replace") as fh:
+            return any("FLOCK" in line and want in line.split() for line in fh)
+    except (OSError, ValueError):
+        return False
+
+
+def _reserve(cfg) -> float:
+    """DIEM to leave on the table right now: cfg.reserve_diem while another job holds
+    cfg.reserve_lock (a flock), else 0. Asked again before every job, so the reserve ends
+    the moment that job lets go. A lock file that is missing means nobody is running: no
+    reserve, the drain behaves as it always did."""
+    path, amount = getattr(cfg, "reserve_lock", None), getattr(cfg, "reserve_diem", 0.0)
+    if not path or amount <= 0:
+        return 0.0
+    return float(amount) if _flock_held(path) else 0.0
+
+
+def _due(cfg, item, now: datetime) -> bool:
+    """False while an item's `not_before` (HH:MM of the DIEM day) is still ahead. Anchored to
+    the day start like the checkpoints, so 23:00 stays due at 00:20 under a 01:00 reset.
+    A value that does not parse counts as absent."""
+    nb = getattr(item, "not_before", None)
+    if not nb:
+        return True
+    try:
+        day_start = next_reset(cfg, now) - timedelta(days=1)
+        t = _at(day_start, nb)
+    except (ValueError, TypeError):
+        return True
+    if t < day_start:
+        t += timedelta(days=1)
+    return now >= t
+
+
 def run_checkpoint(cfg, *, now: datetime, balance, queue, estimates, reviewed,
                    runner, run=subprocess.run) -> dict:
     now_iso = now.isoformat(timespec="seconds")
     floor = floor_for(cfg, now)
     deadline = next_deadline(cfg, now)
-    summary = {"aborted": None, "floor": floor, "started_balance": None,
+    summary = {"aborted": None, "floor": floor, "reserve": 0.0, "started_balance": None,
                "ended_balance": None, "ran": [], "skipped": [],
                "deadline": deadline.isoformat(timespec="seconds")}
 
@@ -126,17 +169,20 @@ def run_checkpoint(cfg, *, now: datetime, balance, queue, estimates, reviewed,
             if summary["started_balance"] is None:
                 summary["started_balance"] = bal
             summary["ended_balance"] = bal
-            if bal <= floor:
+            reserve = _reserve(cfg)
+            summary["reserve"] = max(summary["reserve"], reserve)
+            keep = max(floor, reserve)          # what this pass must leave unspent
+            if bal <= keep:
                 return summary
 
             eff_now = now + timedelta(seconds=elapsed)
-            pend = queue.pending(now_iso)
+            pend = [it for it in queue.pending(now_iso) if _due(cfg, it, eff_now)]
             picked, skipped_this_pass = None, []
             for it in pend:
                 if it.id in attempted:
                     continue
                 cost, dur = estimates.estimate(it.type)
-                if bal - cost < floor:
+                if bal - cost < keep:
                     reason = "budget"
                 elif eff_now + timedelta(seconds=dur) > deadline:
                     reason = "deadline"

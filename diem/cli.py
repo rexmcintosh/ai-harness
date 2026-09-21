@@ -219,6 +219,8 @@ def main(argv=None) -> int:
     qa.add_argument("args", nargs="*")
     qa.add_argument("--panel", default="decision"); qa.add_argument("--range")
     qa.add_argument("--expires"); qa.add_argument("--max-targets", type=int, default=2)
+    qa.add_argument("--not-before", default=None, metavar="HH:MM",
+                    help="leftovers only: invisible to the drain before this time of the DIEM day")
     ql = qsub.add_parser("list"); ql.add_argument("--config", default=None)
     qr = qsub.add_parser("rm"); qr.add_argument("id"); qr.add_argument("--config", default=None)
 
@@ -272,7 +274,8 @@ def main(argv=None) -> int:
                     return 2
                 payload = {"name": args.args[0]}
             it = new_item(args.type, payload, banked=True,
-                          expires=args.expires, created=now_iso)
+                          expires=args.expires, created=now_iso,
+                          not_before=args.not_before)
             added = q.add(it)
             print(it.id if added else "duplicate — not added")
             return 0 if added else 1
