@@ -35,3 +35,23 @@ Before a session is spent on an item, `backlogrun/gate.py` asks Jev one yes/no q
 
 An item may say when it must not run yet: a `not_before: YYYY-MM-DD` field, or in its title or prompt one of "NOT BEFORE <date>", "do not run/start/work ... before <date>", "if today is before <date>". `backlogrun.cli.not_before()` reads it, and `plan()` defers the item until that UTC date: it stays `open`, takes no slot, is not shown to the Jev gate, and runs by itself on the day. A deadline ("must be stable before <date>") is not a gate and is ignored. Several gates mean the latest. A date rule that cannot be read (a typo, a day that does not exist) holds the item with a note, because the owner meant to gate it. This is code on purpose: Jev cannot compare dates.
 
+
+## A review waits for the DIEM reset (added 2026-09-21)
+
+The nightly run fires at 22:00 UTC, two hours before Venice's 00:00 UTC DIEM reset, so its
+council reviews spend allowance that would expire. On a day the allowance is already gone a
+review started before the reset can only fail, and a failed review is work the owner redoes
+by hand. So the real reviewer (`council_review`) first reads the balance with the review key
+(`backlogrun/review_budget.py`):
+
+- balance at least 1.5 DIEM: review now.
+- lower, and the reset is at most 2 h 10 min away: sleep until 90 seconds after the reset,
+  then review on the new day's allowance. One wait, never a loop.
+- lower, and the reset is further away (a hand run in the afternoon): review now and let it
+  report what it finds.
+- the balance cannot be read: review now. The guard never blocks a review it cannot help.
+
+The runner holds its lock while it waits, so the `diem` drain keeps its `[reserve]`. A wait
+eats into the run's 3-hour deadline: on an empty-balance night the second item is usually
+deferred to the next night. `BACKLOG_REVIEW_WAIT=off` turns the guard off; the test suite
+runs with it off (`tests/conftest.py`), so no test reads the balance or sleeps.

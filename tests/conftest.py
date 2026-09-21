@@ -23,6 +23,8 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     # before any transport, and the usage ledger goes to a temp file. A test of the enabled
     # path deletes JEV_DISABLED itself and passes a fake `transport=`.
     monkeypatch.setenv("JEV_DISABLED", "1")
+    # the runner's "wait for the DIEM reset" guard reads Venice's balance and may sleep for an hour
+    monkeypatch.setenv("BACKLOG_REVIEW_WAIT", "off")
     monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "jev-usage.jsonl"))
 
 
