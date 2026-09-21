@@ -40,8 +40,9 @@ An item may say when it must not run yet: a `not_before: YYYY-MM-DD` field, or i
 
 The nightly run fires at 22:00 UTC, two hours before Venice's 00:00 UTC DIEM reset, so its
 council reviews spend allowance that would expire. On a day the allowance is already gone a
-review started before the reset can only fail, and a failed review is work the owner redoes
-by hand. So the real reviewer (`council_review`) first reads the balance with the review key
+review started before the reset is billed in USD (the account is on Venice's paid tier; on
+2026-09-21 DIEM was 0 by mid-afternoon and reviews kept running on the USD balance), or fails
+on a key with USD off. So the real reviewer (`council_review`) first reads the balance with the review key
 (`backlogrun/review_budget.py`):
 
 - balance at least 1.5 DIEM: review now.
@@ -51,7 +52,9 @@ by hand. So the real reviewer (`council_review`) first reads the balance with th
   report what it finds.
 - the balance cannot be read: review now. The guard never blocks a review it cannot help.
 
-The runner holds its lock while it waits, so the `diem` drain keeps its `[reserve]`. A wait
+The runner holds its lock while it waits, so the `diem` drain keeps its `[reserve]`, and any
+other `backlog-run` command that needs the lock (`approve`, `hold`, `reopen`) exits 75 until the
+wait ends: at most from 21:50 UTC to 00:02 UTC. An unreadable balance is logged by type. A wait
 eats into the run's 3-hour deadline: on an empty-balance night the second item is usually
 deferred to the next night. `BACKLOG_REVIEW_WAIT=off` turns the guard off; the test suite
 runs with it off (`tests/conftest.py`), so no test reads the balance or sleeps.

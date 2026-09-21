@@ -130,3 +130,30 @@ def test_with_the_switch_off_the_reviewer_never_asks(tmp_path, monkeypatch):
     monkeypatch.setattr(council.engine, "run_panel", no_panel)
     rev = br.council_review(cfg, "diff --git a/x b/x", item_id="2026-09-21-x")
     assert calls == [] and "panel reached" in rev["summary"]
+
+
+def test_the_limit_is_on_the_time_to_the_reset_not_on_the_sleep():
+    # 2 h 09 min to the reset is inside the 2 h 10 min rule; the 90 s grace is only slept.
+    clock = Clock(at(21, 51))
+    out, logs = run(lambda: 0.0, clock)
+    assert out == "waited" and sum(clock.slept) == 129 * 60 + rb.AFTER_RESET_S
+
+
+def test_an_unreadable_balance_is_logged_so_a_dead_guard_is_visible():
+    def boom():
+        raise RuntimeError("HTTP 403 for key sk-SECRET")
+    clock = Clock(at(22, 30))
+    out, logs = run(boom, clock)
+    assert out == "unknown"
+    assert any("balance" in line and "RuntimeError" in line for line in logs)
+    assert not any("sk-SECRET" in line for line in logs)      # the type, never the message
+
+
+def test_the_balance_read_goes_through_the_shared_diem_client(monkeypatch):
+    import diem.balance
+    seen = {}
+    class Fake:
+        def __init__(self, key, **kw): seen["key"] = key
+        def diem_balance(self): return 7.5
+    monkeypatch.setattr(diem.balance, "BalanceClient", Fake)
+    assert rb.venice_balance("k") == 7.5 and seen == {"key": "k"}
