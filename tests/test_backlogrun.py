@@ -2,6 +2,7 @@
 `claude` binary. No network, no real sessions."""
 from __future__ import annotations
 
+import re
 import json
 import os
 import stat
@@ -370,6 +371,8 @@ def test_work_done_flow_end_to_end(world):
     assert it["branch"] == "claude/bl-a"
     assert it["council"].startswith("stub: approve")
     assert it["worked"] == br.today()
+    # the timestamp twin of `worked`: what lets a reader ask "in the last 24 hours?" whatever hour the runner fires
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", it["worked_at"])
     assert it["session"] == "sess-1234-abcd" and it["cost_usd"] == 1.23
     assert "summary for done" in it["note"]
     # branch has the session's commit; worktree is gone
