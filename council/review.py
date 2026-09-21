@@ -34,6 +34,9 @@ def run_pr_review(diff: str, panels: dict, client, *, chair_model: str,
       - unavailable: fail-closed flag keyed on the CODE review only (chair errored, or
         >= half the code panel errored). Doc-side failures never set it.
 
+    chair_model: the GLOBAL chair, as the per-repo CI shims pass it. A panel that names its
+      own `chair_model` in panels.toml uses that for its slice instead, so the shims need
+      no change (docs/council-chair-decision-2026-09-20.md).
     file_context: optional full contents of the changed files, supplied by the CI shim
       from the checkout, so the panel and chair can verify findings (audit S1).
     settings: optional council Settings, for the output ceilings. Omitting it is
@@ -52,7 +55,7 @@ def run_pr_review(diff: str, panels: dict, client, *, chair_model: str,
         panel = panels["code-review"]
         budget = resolve_budget(settings, panel, panel.default_rigor)
         results = run_panel(panel, ctx, client, task_type="review", budget=budget)
-        syn = synthesize(ctx, results, client, chair_model=chair_model,
+        syn = synthesize(ctx, results, client, chair_model=panel.chair_model or chair_model,
                          system=REVIEW_SYNTH_OUTPUT, task_type="review",
                          max_completion_tokens=budget.chair)
         sections.append(("Code review (gate)", "", "Code changes", syn, results))
@@ -68,7 +71,8 @@ def run_pr_review(diff: str, panels: dict, client, *, chair_model: str,
             panel,
             f"Review this design doc / spec / plan diff:\n\n```diff\n{doc_diff}\n```", client,
             task_type="review", budget=budget)
-        syn = synthesize("Doc review", results, client, chair_model=chair_model,
+        syn = synthesize("Doc review", results, client,
+                         chair_model=panel.chair_model or chair_model,
                          task_type="review", max_completion_tokens=budget.chair)
         sections.append(("Docs review (advisory)",
                          "Advisory only — does not affect the merge check.",

@@ -1099,6 +1099,29 @@ def test_real_council_adapter_uses_structured_evidence_only(world, monkeypatch, 
     assert "required_changes" in fake.calls[0]["system"]
 
 
+@pytest.mark.parametrize("panel_chair,asked", [("panel-chair", "panel-chair"), (None, "chair")])
+def test_real_council_adapter_asks_the_code_review_panels_own_chair(world, monkeypatch, panel_chair, asked):
+    """The runner reviews on the code-review panel, so it follows that panel's chair, and the
+    global chair when the panel names none (docs/council-chair-decision-2026-09-20.md)."""
+    from types import SimpleNamespace
+    import council.config as config
+    import council.engine as engine
+    import council.venice as venice
+    from council.models import Member, MemberResult, Panel
+    from tests.conftest import FakeClient
+    cfg = world.build([])
+    fake = FakeClient(default={"recommendation": "ok", "confidence": 9, "review_status": "clean",
+                               "required_changes": [], "blocking_findings": []})
+    panel = Panel("code-review", "fixture", [Member("a", "m1", "x")], chair_model=panel_chair)
+    monkeypatch.setattr(config, "load_panels", lambda _: (SimpleNamespace(timeout=1, byte_cap=100000, chair_model="chair"), {"code-review": panel}))
+    monkeypatch.setattr(engine, "run_panel", lambda *args, **kw: [MemberResult("a", "m1", "approve", "ok")])
+    monkeypatch.setattr(venice, "VeniceClient", lambda *args, **kw: fake)
+    monkeypatch.setattr(br, "load_venice_key", lambda role, env_path=None: "venice-test")
+    rev = REAL_COUNCIL_REVIEW(cfg, "diff", item_id="x")
+    assert rev["review_status"] == "clean"
+    assert [c["model"] for c in fake.calls] == [asked]          # the seats are scripted: one chair call
+
+
 @pytest.mark.parametrize("bad", ["doneish", "failedness", "heldover"])
 def test_outcome_marker_requires_a_complete_word(bad):
     assert br.parse_outcome("RUNNER-OUTCOME: " + bad)["outcome"] == ""

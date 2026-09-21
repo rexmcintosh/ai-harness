@@ -192,6 +192,24 @@ def test_forced_json_is_not_sent_to_a_model_it_corrupts():
     assert sent[2]["response_format"] == {"type": "json_object"}
 
 
+def test_every_shipped_chair_still_gets_forced_json():
+    # The 2026-09-12 bake-off ran every chair with response_format json_object, and the
+    # code-review chair was chosen on those runs. A chair on the no-forced-JSON list would
+    # be running in a mode nobody measured.
+    from importlib.resources import files
+    from council.config import chair_for, load_panels
+    from council.venice import NO_FORCED_JSON
+    settings, panels = load_panels(str(files("council") / "panels.toml"))
+    chairs = {chair_for(settings, p) for p in panels.values()}
+    assert chairs == {"openai-gpt-56-sol", "claude-opus-4-8"}
+    sent, post = _payloads()
+    c = VeniceClient(api_key="k", post=post)
+    for chair in sorted(chairs):
+        assert not chair.startswith(NO_FORCED_JSON), chair
+        c.complete(chair, "sys", "usr")
+    assert [p["response_format"] for p in sent] == [{"type": "json_object"}] * 2
+
+
 def test_json_mode_false_still_sends_no_response_format_for_any_model():
     sent, post = _payloads()
     VeniceClient(api_key="k", post=post).complete("grok-4-3", "sys", "usr", json_mode=False)

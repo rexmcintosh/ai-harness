@@ -57,6 +57,13 @@ disagree differently, and the Adversary is always a non-Claude model for genuine
 independence. Edit `council/panels.toml` (or drop a `~/.config/council/panels.toml`
 override) to change personas/models or add seats.
 
+**The chair, per panel.** `[settings] chair_model` is the chair for every panel. A panel
+can name its own with `chair_model = "..."` under `[panels.<name>]`, and that model then
+synthesizes every run of that panel: `ask`, `review`, `compare`, `sweep`, the backlog
+runner's review, and that panel's slice of `run_pr_review`. A panel that names none uses
+the global chair. Today only `code-review` names one (`openai-gpt-56-sol`). The evidence,
+the scope and the rollback are in `docs/council-chair-decision-2026-09-20.md`.
+
 ## Rigor (the noise gate)
 
 - `daily` (default): show findings with confidence ≥ 8; demote 5–7 to a

@@ -138,8 +138,21 @@ def load_panels(path=None):
                              members=members, default_rigor=p.get("default_rigor", "daily"),
                              max_completion_tokens=p.get("max_completion_tokens"),
                              chair_max_completion_tokens=p.get("chair_max_completion_tokens"),
-                             rigor=p.get("rigor", {}) or {})
+                             rigor=p.get("rigor", {}) or {},
+                             chair_model=_panel_chair(p.get("chair_model")))
     return settings, panels
+
+
+def _panel_chair(value):
+    """A panel's own `chair_model`, or None. Only a non-empty string is an override: an
+    empty name would reach Venice as model "", so it means "not set", as does a non-string."""
+    return (value.strip() or None) if isinstance(value, str) else None
+
+
+def chair_for(settings, panel) -> str:
+    """The model that synthesizes `panel`: the panel's own chair when it names one, else
+    the global `[settings] chair_model`. See docs/council-chair-decision-2026-09-20.md."""
+    return getattr(panel, "chair_model", None) or settings.chair_model
 
 
 def truncate(text: str, cap: int) -> str:

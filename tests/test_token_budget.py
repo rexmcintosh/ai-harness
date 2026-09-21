@@ -328,10 +328,12 @@ def test_run_pr_review_caps_both_the_panel_and_the_chair(tmp_path, monkeypatch):
     client = RecordingClient()
     diff = ("diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n"
             "+++ b/src/app.py\n@@ -1 +1 @@\n-a\n+b\n")
+    # The shipped code-review panel names its own chair, and that one is asked (2026-09-20).
+    chair = panels["code-review"].chair_model or "chair"
     run_pr_review(diff, panels, client, chair_model="chair", settings=settings)
-    caps = {c["cap"] for c in client.calls if c["model"] != "chair"}
+    caps = {c["cap"] for c in client.calls if c["model"] != chair}
     assert caps == {24000}
-    assert client.cap_for("chair") == 8000
+    assert client.cap_for(chair) == 8000
 
 
 def test_run_pr_review_without_settings_still_caps_from_the_class_defaults(tmp_path):
@@ -342,9 +344,10 @@ def test_run_pr_review_without_settings_still_caps_from_the_class_defaults(tmp_p
     client = RecordingClient()
     diff = ("diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n"
             "+++ b/src/app.py\n@@ -1 +1 @@\n-a\n+b\n")
+    chair = panels["code-review"].chair_model or "chair"
     run_pr_review(diff, panels, client, chair_model="chair")
-    assert client.cap_for("chair") == Settings.chair_max_completion_tokens
-    assert {c["cap"] for c in client.calls if c["model"] != "chair"} == {
+    assert client.cap_for(chair) == Settings.chair_max_completion_tokens
+    assert {c["cap"] for c in client.calls if c["model"] != chair} == {
         Settings.max_completion_tokens}
 
 
@@ -378,19 +381,25 @@ CATALOGUE_MAX_COMPLETION = {
     "claude-opus-4-8": 128000, "claude-opus-4-7": 128000,
     "gemini-3-5-flash": 65536, "gemini-3-1-pro-preview": 32768,
     "openai-gpt-53-codex": 128000, "deepseek-v4-pro": 32768, "grok-4-3": 32000,
+    # The code-review chair. Same 2026-09-11 fetch, as recorded in
+    # docs/chair-bakeoff-design-2026-09-11.md section 3 (not re-fetched on 2026-09-20).
+    "openai-gpt-56-sol": 128000,
 }
 
 
 def test_no_shipped_cap_exceeds_its_model_catalogue_ceiling():
+    from council.config import chair_for
     settings, panels = load_panels()
     assert settings.chair_model in CATALOGUE_MAX_COMPLETION
     assert settings.router_model in CATALOGUE_MAX_COMPLETION
     for name, panel in panels.items():
+        chair = chair_for(settings, panel)          # a panel may name its own chair
+        assert chair in CATALOGUE_MAX_COMPLETION, (name, chair)
         for rigor in ("daily", "deep"):
             b = resolve_budget(settings, panel, rigor)
             for m in panel.members:
                 assert m.model in CATALOGUE_MAX_COMPLETION, m.model
                 assert b.member(m.name) <= CATALOGUE_MAX_COMPLETION[m.model], \
                     (name, rigor, m.name, m.model)
-            assert b.chair <= CATALOGUE_MAX_COMPLETION[settings.chair_model]
+            assert b.chair <= CATALOGUE_MAX_COMPLETION[chair], (name, rigor, chair)
             assert b.router <= CATALOGUE_MAX_COMPLETION[settings.router_model]

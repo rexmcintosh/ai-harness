@@ -40,6 +40,9 @@ chair_max_completion_tokens = 12000
 [panels.code-review]
 description   = "Review a code change for correctness, security, and design."
 default_rigor = "daily"
+# This panel's own chair (owner decision 2026-09-20). Every other panel keeps the global
+# [settings] chair_model. Record: docs/council-chair-decision-2026-09-20.md
+chair_model   = "openai-gpt-56-sol"
 
 [[panels.code-review.members]]
 name   = "Eng Manager"

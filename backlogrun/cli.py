@@ -847,7 +847,7 @@ def council_review(cfg: Config, diff_text: str, *, item_id: str, repo: str | Non
     `repo` is the reviewed repository's identity (see _jev_repo_identity); it only decides
     whether the display-only Jev signals may run (no identity, no Jev)."""
     try:
-        from council.config import load_panels, truncate
+        from council.config import chair_for, load_panels, truncate
         from council.engine import run_panel
         from council.render import render_markdown
         from council.synthesize import synthesize
@@ -863,7 +863,7 @@ def council_review(cfg: Config, diff_text: str, *, item_id: str, repo: str | Non
         full_ctx = f"Review this:\n\n{diff_text}"
         ctx = truncate(full_ctx, settings.byte_cap)
         results = run_panel(panel, ctx, client, task_type="chat")
-        syn = synthesize(ctx, results, client, chair_model=settings.chair_model, task_type="chat",
+        syn = synthesize(ctx, results, client, chair_model=chair_for(settings, panel), task_type="chat",
                          system=REVIEW_SYNTH_OUTPUT + "\nAlso return review_status: clean or changes_requested, "
                          "and required_changes: a JSON list of ALL fixes or conditions required before merge, "
                          "without truncation. Use changes_requested for conditional approval, even when the "
