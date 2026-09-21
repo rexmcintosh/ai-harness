@@ -2,7 +2,7 @@
 # bebop/backlog_line.py
 """One line for the morning briefing: what the backlog is waiting on.
 
-`backlog-run` works the queue at 03:00 UTC. Finished work is left `in_review` for Rex to
+`backlog-run` works the queue at 22:00 UTC (03:00 UTC until 2026-09-21). Finished work is left `in_review` for Rex to
 approve; anything needing a human decision or an outward action is parked `held`. Neither
 state pings him, so items sat for weeks. This builds the reminder.
 

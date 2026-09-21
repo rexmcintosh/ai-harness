@@ -4,7 +4,7 @@
 
 ## Purpose and authority
 
-**Default mode:** bounded change-producing preparation. At 03:00 UTC, work at most two eligible open backlog items in isolated `claude/bl-*` worktrees, council-review the result, and leave it `in_review` or `held`. Local cron documentation and host configuration confirm UTC scheduling. Canonical item state is `/home/dev/projects/backlog/backlog.yaml`; completed and dropped records are stored in `archive.yaml`.
+**Default mode:** bounded change-producing preparation. At 22:00 UTC (03:00 UTC until 2026-09-21), work at most two eligible open backlog items in isolated `claude/bl-*` worktrees, council-review the result, and leave it `in_review` or `held`. Local cron documentation and host configuration confirm UTC scheduling. Canonical item state is `/home/dev/projects/backlog/backlog.yaml`; completed and dropped records are stored in `archive.yaml`.
 
 It may create local worktrees and branches, run the scoped agent, write runner records, and transition only still-open items to `in_review` or `held`. It must not push, merge, deploy, send externally except its configured summary, or approve its own work. Human approval under the canonical merge protocol remains the merge authority; `backlog-run approve` is an explicit operator command, not a clock action.
 

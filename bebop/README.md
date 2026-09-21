@@ -97,7 +97,7 @@ Tests: `tests/test_bebop_runner.py` (fake `claude` and `tg-send`, temp state and
 
 ## The backlog line (morning only)
 
-`backlog-run` works the queue at 03:00 UTC. It leaves finished work `in_review` for Rex to
+`backlog-run` works the queue at 22:00 UTC (03:00 UTC until 2026-09-21). It leaves finished work `in_review` for Rex to
 approve and parks anything needing a human decision as `held`. Neither state pinged him, so
 items sat for weeks. The **morning** briefing now carries one line about it:
 
