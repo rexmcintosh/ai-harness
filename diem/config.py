@@ -1,6 +1,7 @@
 """Config + key loading. Cron has no shell env, so the Venice key is read
 straight from ~/.env (accepts VENICE_API_KEY or VENICE_KEY)."""
 from __future__ import annotations
+import math
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -70,6 +71,10 @@ class DiemConfig:
     cmd_whitelist: dict = field(default_factory=dict)
     backfill_max_per_night: int = 4
     backfill_chunk: int = 2
+    # While another job holds this flock, the drain leaves reserve_diem unspent (the night
+    # runner's council reviews land after the floor-0 slot). None / 0 = off.
+    reserve_lock: Path | None = None
+    reserve_diem: float = 0.0
 
     @classmethod
     def load(cls, path: Path | None = None) -> "DiemConfig":
@@ -104,6 +109,17 @@ class DiemConfig:
         for k, v in raw.get("seeds", {}).items():
             seeds[k] = {**seeds.get(k, {}), **v}
         kw["seeds"] = seeds
+        reserve = raw.get("reserve") or {}
+        if reserve:
+            if "lock" not in reserve or "diem" not in reserve:
+                _config_die("[reserve] needs both lock (a path) and diem (an amount)")
+            kw["reserve_lock"] = Path(str(reserve["lock"])).expanduser()
+            try:
+                kw["reserve_diem"] = float(reserve["diem"])
+            except (TypeError, ValueError):
+                _config_die("[reserve] diem must be a number")
+            if not math.isfinite(kw["reserve_diem"]) or kw["reserve_diem"] < 0:
+                _config_die("[reserve] diem must be a finite number, 0 or more")
         kw["telegram"] = raw.get("telegram")
         kw["cmd_whitelist"] = raw.get("cmd_whitelist", {})
 

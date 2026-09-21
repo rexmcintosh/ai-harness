@@ -252,3 +252,191 @@ def test_filler_keeps_seeding_while_backfill_is_productive(tmp_path):
                    queue=q, estimates=est, reviewed=rev, runner=r)
     assert len(r.ran) == 2                       # productive → runs to the cap
     assert all(i.type == "backfill" for i in r.ran)
+
+
+# --- reserve while another job still needs DIEM tonight -------------------------------
+# backlog-run fires at 22:00 UTC and its council reviews land until midnight. The floor-0
+# slot would empty the balance under it, and a review on an empty balance is a failed
+# review. While the runner holds its lock, the drain leaves `reserve_diem` on the table.
+import fcntl
+
+ENDGAME = datetime(2026, 7, 4, 0, 20)          # floor 0.0 in _cfg
+ENDGAME_ISO = "2026-07-04T00:20:00"
+
+
+def _held(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(path, "w")
+    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    return fh
+
+
+def _asks(q, n, created=ENDGAME_ISO, **kw):
+    for i in range(n):
+        q.add(new_item("ask", {"question": f"q{i}", "panel": "decision"}, created=created, **kw))
+
+
+def test_the_drain_leaves_the_reserve_while_the_runner_holds_its_lock(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    fh = _held(lock)
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3)
+    bal = FakeBalance([8.0, 6.0, 6.0, 4.9, 4.9])
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=ENDGAME, balance=bal, queue=q, estimates=est, reviewed=rev, runner=r)
+    fh.close()
+    assert len(r.ran) == 2                      # 8 -> 6 -> 4.9, and 4.9 is under the 5.0 reserve
+    assert summary["reserve"] == 5.0 and summary["floor"] == 0.0
+
+
+def test_with_the_lock_free_the_drain_goes_to_the_floor_as_before(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    _held(lock).close()                         # the file exists, nobody holds it
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3)
+    bal = FakeBalance([8.0, 6.0, 6.0, 4.0, 4.0, 2.0, 2.0])
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=ENDGAME, balance=bal, queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 3 and summary["reserve"] == 0.0
+
+
+def test_the_reserve_ends_the_moment_the_runner_lets_go(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    fh = _held(lock)
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3)
+
+    class ReleasingRunner(FakeRunner):
+        def __call__(self, item, **kw):
+            fh.close()                          # the runner finishes while the drain works
+            return super().__call__(item, **kw)
+
+    bal = FakeBalance([8.0, 4.9, 4.9, 3.0, 3.0, 1.0, 1.0])
+    r = ReleasingRunner()
+    run_checkpoint(cfg, now=ENDGAME, balance=bal, queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 3                      # 4.9 is under the reserve, but the reserve is gone
+
+
+def test_a_missing_lock_file_means_no_reserve(tmp_path):
+    cfg = _cfg(tmp_path, reserve_lock=tmp_path / "nowhere" / "lock", reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 2)
+    bal = FakeBalance([8.0, 4.0, 4.0, 2.0, 2.0])
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=ENDGAME, balance=bal, queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 2 and summary["reserve"] == 0.0
+
+
+def test_the_reserve_never_lowers_a_higher_floor(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    fh = _held(lock)
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3, created=NOW_ISO)
+    bal = FakeBalance([40.0, 25.0, 25.0, 14.0, 14.0])      # floor at 23:05 is 15.0
+    r = FakeRunner()
+    run_checkpoint(cfg, now=NOW, balance=bal, queue=q, estimates=est, reviewed=rev, runner=r)
+    fh.close()
+    assert len(r.ran) == 2                      # stopped by the 15.0 floor, not by the 5.0 reserve
+
+
+# --- leftovers-only work: `not_before` ---------------------------------------------------
+# Work that should only ever soak up DIEM nobody else wanted carries a time of the DIEM day.
+# Before that time the drain does not see it at all, so it cannot take the morning allowance
+# and it cannot stop the loom filler from seeding (filler needs an empty queue).
+
+def test_an_item_is_invisible_before_its_not_before_time(tmp_path):
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 1, created="2026-07-03T21:30:00", not_before="23:00")
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=datetime(2026, 7, 3, 21, 30), balance=FakeBalance([90.0]),
+                             queue=q, estimates=est, reviewed=rev, runner=r)
+    assert r.ran == [] and summary["skipped"] == []
+    assert len(q.pending("2026-07-03T21:30:00")) == 1       # still there for tonight
+
+
+def test_the_same_item_runs_once_its_time_has_come(tmp_path):
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 1, created="2026-07-03T21:30:00", not_before="23:00")
+    r = FakeRunner()
+    run_checkpoint(cfg, now=NOW, balance=FakeBalance([90.0, 89.0]), queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 1
+
+
+def test_not_before_follows_the_diem_day_across_midnight(tmp_path):
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)          # reset 01:00: 00:20 is still "tonight"
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 1, created="2026-07-03T21:30:00", not_before="23:00")
+    r = FakeRunner()
+    run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([9.0, 8.0]), queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 1
+
+
+def test_a_waiting_item_does_not_stop_the_loom_filler_from_seeding(tmp_path):
+    cfg = _cfg(tmp_path, backfill_max_per_night=1)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 1, created="2026-07-03T21:30:00", not_before="23:00")
+    r = FakeRunner()
+    run_checkpoint(cfg, now=datetime(2026, 7, 3, 21, 30), balance=FakeBalance([90.0, 89.0]),
+                   queue=q, estimates=est, reviewed=rev, runner=r)
+    assert [i.type for i in r.ran] == ["backfill"]
+
+
+def test_a_garbled_not_before_is_treated_as_absent(tmp_path):
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 1, created="2026-07-03T21:30:00", not_before="late")
+    r = FakeRunner()
+    run_checkpoint(cfg, now=datetime(2026, 7, 3, 21, 30), balance=FakeBalance([90.0, 89.0]),
+                   queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 1
+
+
+def test_a_probe_that_cannot_be_read_keeps_the_reserve_and_says_so(tmp_path, monkeypatch):
+    # Silence here would turn "could not look" into "nobody is running" and an empty balance.
+    import diem.drain as drain_mod
+    lock = tmp_path / "runner" / "lock"
+    _held(lock).close()
+    monkeypatch.setattr(drain_mod, "PROC_LOCKS", str(tmp_path / "no-such-proc-locks"))
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    _asks(q, 3)
+    r = FakeRunner()
+    summary = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([8.0, 6.0, 6.0, 4.9, 4.9]),
+                             queue=q, estimates=est, reviewed=rev, runner=r)
+    assert len(r.ran) == 2 and summary["reserve"] == 5.0
+    assert summary["reserve_probe"] == "probe_error"
+
+
+def test_the_probe_result_is_recorded(tmp_path):
+    lock = tmp_path / "runner" / "lock"
+    fh = _held(lock)
+    cfg = _cfg(tmp_path, reserve_lock=lock, reserve_diem=5.0, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    s = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    fh.close()
+    assert s["reserve_probe"] == "held"
+    s = run_checkpoint(cfg, now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    assert s["reserve_probe"] == "not_held"
+    s = run_checkpoint(_cfg(tmp_path), now=ENDGAME, balance=FakeBalance([9.0]), queue=q, estimates=est, reviewed=rev, runner=FakeRunner())
+    assert s["reserve_probe"] == "off"
+
+
+def test_an_item_that_expires_while_the_checkpoint_runs_is_not_started(tmp_path):
+    # Expiry used the checkpoint's START time for the whole run, so a long slot could start
+    # work whose deadline had already passed.
+    cfg = _cfg(tmp_path, backfill_max_per_night=0)
+    q, est, rev = _bits(tmp_path, cfg)
+    q.add(new_item("ask", {"question": "first", "panel": "decision"}, created=NOW_ISO))
+    late = new_item("review", {"repo": "/r/late", "diff": True}, created=NOW_ISO,
+                    expires="2026-07-03T23:05:30")      # 30 s into the run; the first job takes 60 s
+    q.add(late)
+    r = FakeRunner()
+    run_checkpoint(cfg, now=NOW, balance=FakeBalance([90.0, 89.0, 89.0, 88.0]), queue=q,
+                   estimates=est, reviewed=rev, runner=r)
+    assert [i.payload.get("question") for i in r.ran] == ["first"]

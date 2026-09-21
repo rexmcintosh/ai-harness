@@ -70,6 +70,39 @@ One JSON file per item in `~/.local/state/diem/queue/`. Claude sessions (or huma
 
 Banked items always outrank discovered items. Deduped by type-specific key: one `review` per repo per night, one `images` per standing order per night. Stale items with an `expires` timestamp die quietly instead of burning DIEM. Type payloads: `ask` = {question, panel}; `review` = {repo, range? | diff?}; `images` = {repo, count}; `backfill` = {max_targets}; `cmd` = {name}.
 
+## Leftovers-only work: `not_before`
+
+An item may carry `"not_before": "HH:MM"`, a time of the DIEM day (anchored to the day start
+like the checkpoints, so `23:00` is still due at 00:20 under a 01:00 reset). Before that time
+the drain does not see the item at all: it cannot take the morning allowance, it is not
+reported as skipped, and it does not stop the loom filler from seeding (the filler needs an
+empty queue). Use it for work that is worth doing only with DIEM that would expire anyway:
+`diem queue add ask "..." --not-before 23:00` (the command refuses a value that is not HH:MM;
+in a hand-written queue file a value that does not parse counts as absent).
+
+## Reserve while the night runner works
+
+`backlog-run work` fires at 22:00 UTC and its council reviews land until about midnight. The
+floor-0 slot would empty the balance under it, and a review on an empty balance is a failed
+review. With
+
+```toml
+[reserve]
+lock = "~/projects/.backlog-run/lock"   # the runner's flock
+diem = 2.0                              # two reviews
+```
+
+the drain leaves `diem` unspent while some process holds that flock. It asks again before
+every job, so the reserve ends the moment the runner lets go; the higher of floor and
+reserve wins. The check reads `/proc/locks` and never takes the lock itself: a probe that
+took it, even briefly, could make the runner's own non-blocking attempt fail and cost it the
+night. No `[reserve]` section or a lock file that does not exist means no reserve. A probe
+that cannot look (`/proc/locks` unreadable) KEEPS the reserve: wrong that way costs a little
+expired DIEM, wrong the other way costs a failed review. Each checkpoint record in `drain.log`
+carries `"reserve"` (the largest seen in that slot) and `"reserve_probe"`
+(`off`, `held`, `not_held` or `probe_error`, the last answer). The match is the ext4 identity
+(hex major:minor, decimal inode); on overlay or btrfs check it before relying on it.
+
 ## Crontab installation
 
 Three checkpoints run `diem drain --checkpoint` and log to `~/.local/state/diem/drain.log`. Append to your crontab:

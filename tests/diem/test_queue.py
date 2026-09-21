@@ -65,3 +65,11 @@ def test_night_helpers_tolerate_non_dict_json(tmp_path):
     (q.adir / "junk2.json").write_text('"just a string"')
     assert q.night_count("ask", "2026-07-01T00:00:00") == 0
     assert q.archived_keys_since("2026-07-01T00:00:00") == set()
+
+
+def test_not_before_roundtrips_and_old_files_without_it_still_load():
+    it = new_item("ask", {"question": "q?", "panel": "decision"}, created=NOW, not_before="23:00")
+    assert Item.from_json(it.to_json()).not_before == "23:00"
+    import json
+    old = json.loads(it.to_json()); old.pop("not_before")
+    assert Item.from_json(json.dumps(old)).not_before is None

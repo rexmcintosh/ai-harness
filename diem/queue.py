@@ -20,6 +20,9 @@ class Item:
     expires: str | None = None
     attempts: int = 0
     max_attempts: int = 2
+    # "HH:MM" of the DIEM day. Before it the drain does not see the item at all: work that
+    # should only soak up leftovers (see drain._due). None = eligible at every checkpoint.
+    not_before: str | None = None
 
     def dedupe_key(self) -> str:
         p = self.payload
@@ -43,10 +46,11 @@ class Item:
 
 def new_item(type: str, payload: dict, *, banked: bool = False,
              expires: str | None = None, created: str,
-             max_attempts: int = 2) -> Item:
+             max_attempts: int = 2, not_before: str | None = None) -> Item:
     return Item(id=uuid.uuid4().hex, type=type, banked=banked,
                 priority=_TYPE_PRIORITY.get(type, 5), payload=payload,
-                created=created, expires=expires, max_attempts=max_attempts)
+                created=created, expires=expires, max_attempts=max_attempts,
+                not_before=not_before)
 
 
 class QueueDir:
