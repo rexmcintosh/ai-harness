@@ -1,6 +1,7 @@
 # backlog-run
 
-The 3am backlog runner and the morning-review tool for `~/projects/backlog`.
+The 3am backlog runner and the morning-review tool for `~/projects/backlog`. (The name is from its
+first schedule. Since 2026-09-21 cron fires it at 22:00 UTC, two hours before the DIEM reset.)
 Spec: `../docs/superpowers/specs/2026-09-03-backlog-runner-design.md`.
 Contract it obeys: `~/projects/backlog/README.md` § "Safety contract for the 3am runner".
 
