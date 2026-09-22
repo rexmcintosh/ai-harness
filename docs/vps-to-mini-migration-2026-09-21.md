@@ -163,6 +163,16 @@ not copied.
   `549300be-8015-48f0-ab86-d0c9c51be717` (original swimtrack app history, in `~/projects`),
   `a162af71-9db4-4363-89cc-f16bc896ddf4` (website flow, in `~/projects/swimtrack-website`).
 
+## 4c. Client setup that worked (2026-09-22)
+
+- MacBook `~/.ssh/config`: `Host bebop-vm` / `HostName bebop-vm` / `User dev`. Keyless Tailscale SSH,
+  same as the old `Host vps` entry.
+- VS Code: Remote-SSH, host `bebop-vm`, folder `/home/dev/projects`.
+- Claude desktop app, "Add SSH connection": Name `bebop-vm`, SSH host `dev@bebop-vm`, port `22`,
+  SSH key empty, Worktree folder `/home/dev/projects`. Connected with no key.
+- The MacBook and iPhone public keys from the VPS `authorized_keys` are also on the VM, so a
+  key-based client (Termius, Codex app if it needs one) can use `~/.ssh/id_ed25519`.
+
 ## 5. Remaining phases
 
 ### Phase A: make the VM reachable and durable
