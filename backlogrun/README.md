@@ -34,6 +34,13 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
 existing branch. Both `work` and `rework` sessions run `--model claude-opus-5-5 --effort high`
 unless `--model`/`--effort` say otherwise.
 
+The loop flags are checked before any work starts, and a bad value exits with status 2:
+`--max-items` and `--item-estimate` must be whole numbers above 0, and `--diem-floor` must be
+a finite number of at least 0 (`nan`, `inf` and negatives are refused). Without this, a
+negative estimate or a NaN floor would silently switch off the stop-time or balance check.
+`cmd_work` runs the same check (`validate_budget_config`) on its `Config`, so a caller that
+skips argparse gets the same refusal.
+
 ## The budget-driven loop
 
 The goal of the night is to spend the day's Venice DIEM allowance (31 DIEM, reset at

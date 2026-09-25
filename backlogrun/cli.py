@@ -1381,6 +1381,29 @@ def stop_moment(cfg: Config, started: datetime) -> datetime | None:
     return started.astimezone(timezone.utc).replace(hour=hh, minute=mm, second=0, microsecond=0)
 
 
+def validate_budget_config(cfg: Config) -> None:
+    """Refuse loop settings that would silently switch off a safety check: a zero or negative
+    --item-estimate passes the stop-time check at any hour, a NaN --diem-floor passes the
+    balance check at any balance, and --max-items must allow at least one session.
+    Raises ValueError naming the flag."""
+    def is_int(v) -> bool:
+        return isinstance(v, int) and not isinstance(v, bool)
+    if not (is_int(cfg.item_estimate) and cfg.item_estimate > 0):
+        raise ValueError(f"--item-estimate (item_estimate) must be a positive integer of seconds, not {cfg.item_estimate!r}")
+    if not (is_int(cfg.max_items) and cfg.max_items > 0):
+        raise ValueError(f"--max-items (max_items) must be a positive integer, not {cfg.max_items!r}")
+    f = cfg.diem_floor
+    if not ((is_int(f) or isinstance(f, float)) and math.isfinite(f) and f >= 0):
+        raise ValueError(f"--diem-floor (diem_floor) must be a finite number of at least 0, not {f!r}")
+    if cfg.stop_utc is not None:
+        try:
+            ok = _stop_utc(cfg.stop_utc) == cfg.stop_utc and cfg.stop_utc != ""
+        except (argparse.ArgumentTypeError, AttributeError):
+            ok = False
+        if not ok:
+            raise ValueError(f"--stop-utc (stop_utc) must be HH:MM in UTC or off, not {cfg.stop_utc!r}")
+
+
 def budget_stop(cfg: Config, *, worked: int, now: datetime, stop: datetime | None, balance) -> str | None:
     """Why the loop takes no more items, or None to take the next one. `balance()` returns the
     DIEM balance or None (unreadable); it is only called when the cap and the clock allow."""
@@ -1417,6 +1440,11 @@ def _dry_run_budget(cfg: Config, planned: list[Planned]) -> None:
 
 
 def cmd_work(args, cfg: Config) -> int:
+    try:
+        validate_budget_config(cfg)
+    except ValueError as e:
+        print(f"work: {e}", file=sys.stderr)
+        return 2
     items = load_yaml(cfg.backlog_path)["items"]
     use_gate = gate_mod.enabled() and not getattr(args, "no_gate", False)
     planned = plan(cfg, items, only=args.only, repo_filter=args.repo, max_items=args.max_items,
@@ -1971,19 +1999,41 @@ def _stop_utc(value: str) -> str:
     return f"{int(m.group(1)):02d}:{m.group(2)}"
 
 
+def _positive_int(value: str) -> int:
+    """argparse type for --max-items and --item-estimate: a whole number above 0."""
+    try:
+        n = int(value.strip())
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"must be a positive whole number, not {value!r}") from None
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive whole number, not {value!r}")
+    return n
+
+
+def _diem_floor(value: str) -> float:
+    """argparse type for --diem-floor: a finite number of at least 0 (no nan, no inf)."""
+    try:
+        f = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"must be a number of at least 0, not {value!r}") from None
+    if not math.isfinite(f) or f < 0:
+        raise argparse.ArgumentTypeError(f"must be a finite number of at least 0, not {value!r}")
+    return f
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="backlog-run", description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
 
     w = sub.add_parser("work", help="work open items unattended (nightly)")
     w.add_argument("--dry-run", action="store_true", help="show the plan; change nothing")
-    w.add_argument("--max-items", type=int, default=None,
+    w.add_argument("--max-items", type=_positive_int, default=None,
                    help="nightly Claude-session cap; protects the Claude plan limits, not DIEM (default 10)")
-    w.add_argument("--diem-floor", type=float, default=None,
+    w.add_argument("--diem-floor", type=_diem_floor, default=None,
                    help="take another item only while the Venice DIEM balance is at least this (default 1.5)")
     w.add_argument("--stop-utc", type=_stop_utc, default=None,
                    help="HH:MM UTC: start no item that cannot finish by then, or 'off' (default 23:30)")
-    w.add_argument("--item-estimate", type=int, default=None,
+    w.add_argument("--item-estimate", type=_positive_int, default=None,
                    help="seconds one item usually takes, for the stop-time check (default 1200)")
     w.add_argument("--only", action="append", help="work only this item id (repeatable)")
     w.add_argument("--repo", help="limit to items targeting this repo (dir name)")
@@ -2062,6 +2112,12 @@ def main(argv=None) -> int:
         if args.no_notify:
             cfg.tg_enabled = False
         cfg.keep_worktree = args.keep_worktree
+    if args.cmd == "work":
+        try:
+            validate_budget_config(cfg)
+        except ValueError as e:     # e.g. a bad value from a caller that bypassed argparse
+            print(f"backlog-run work: error: {e}", file=sys.stderr)
+            raise SystemExit(2)
     return args.func(args, cfg)
 
 

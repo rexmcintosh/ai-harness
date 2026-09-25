@@ -200,6 +200,63 @@ def test_budget_flags_reach_the_config(monkeypatch):
         br.build_parser().parse_args(["work", "--stop-utc", "25:00"])
 
 
+@pytest.mark.parametrize("flag,value", [
+    ("--item-estimate", "0"), ("--item-estimate", "-60"), ("--item-estimate", "1.5"), ("--item-estimate", "nan"),
+    ("--max-items", "0"), ("--max-items", "-1"), ("--max-items", "inf"),
+    ("--diem-floor", "-0.5"), ("--diem-floor", "nan"), ("--diem-floor", "NaN"),
+    ("--diem-floor", "inf"), ("--diem-floor", "-inf"), ("--diem-floor", "Infinity"),
+])
+def test_invalid_budget_flags_are_rejected_before_work_starts(monkeypatch, capsys, flag, value):
+    called = []
+    monkeypatch.setattr(br, "cmd_work", lambda args, cfg: called.append(cfg) or 0)
+    with pytest.raises(SystemExit) as exc:
+        br.main(["work", flag, value])
+    assert exc.value.code == 2 and not called
+    assert flag in capsys.readouterr().err
+
+
+def test_valid_edge_values_are_accepted(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(br, "cmd_work", lambda args, cfg: seen.update(cfg=cfg) or 0)
+    br.main(["work", "--diem-floor", "0", "--max-items", "1", "--item-estimate", "1"])
+    assert (seen["cfg"].diem_floor, seen["cfg"].max_items, seen["cfg"].item_estimate) == (0.0, 1, 1)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("item_estimate", 0), ("item_estimate", -1200), ("item_estimate", 1.5), ("item_estimate", True),
+    ("item_estimate", float("nan")),
+    ("max_items", 0), ("max_items", -3), ("max_items", float("inf")), ("max_items", "10"),
+    ("diem_floor", -1.0), ("diem_floor", float("nan")), ("diem_floor", float("inf")),
+    ("diem_floor", float("-inf")), ("diem_floor", "1.5"), ("diem_floor", True),
+    ("stop_utc", "25:00"), ("stop_utc", "late"),
+])
+def test_validate_budget_config_rejects_bad_values(field, value):
+    cfg = br.Config()
+    setattr(cfg, field, value)
+    with pytest.raises(ValueError):
+        br.validate_budget_config(cfg)
+
+
+def test_validate_budget_config_accepts_the_defaults_and_no_stop_time():
+    br.validate_budget_config(br.Config())
+    br.validate_budget_config(br.Config(stop_utc=None, diem_floor=0, max_items=1, item_estimate=1))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("item_estimate", -1200), ("max_items", 0), ("diem_floor", float("nan")), ("diem_floor", float("inf")),
+])
+def test_cmd_work_refuses_an_invalid_config_before_touching_anything(tmp_path, monkeypatch, capsys, field, value):
+    # The backlog does not exist: cmd_work must refuse before it reads, plans or works anything.
+    cfg = br.Config(backlog_path=str(tmp_path / "missing" / "backlog.yaml"), state_dir=str(tmp_path / "state"))
+    setattr(cfg, field, value)
+    monkeypatch.setattr(br, "load_yaml", lambda path: pytest.fail("backlog read with a bad config"))
+    monkeypatch.setattr(br, "work_one", lambda *a, **k: pytest.fail("item worked with a bad config"))
+    monkeypatch.setattr(br, "read_diem_balance", lambda cfg: pytest.fail("balance read with a bad config"))
+    assert br.cmd_work(work_args(), cfg) == 2
+    assert field in capsys.readouterr().err
+    assert not (tmp_path / "state").exists()
+
+
 # ----------------------------------------------------------------------------- (2) model and effort
 
 
