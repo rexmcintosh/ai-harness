@@ -259,7 +259,17 @@ def test_direct_config_stop_utc_means_what_the_flag_means(value, canonical):
         assert f"{stop:%H:%M}" == canonical
 
 
-@pytest.mark.parametrize("value", ["25:00", "late", 2330])
+@pytest.mark.parametrize("value", [b"23:30", bytearray(b"23:30"), 2330, 23.5, ["23:30"], object()])
+def test_normalize_stop_utc_turns_any_non_string_into_the_flag_error(value):
+    # A bytes value used to escape as a TypeError from the regex; every non-string value
+    # must give the documented ValueError that names --stop-utc.
+    with pytest.raises(ValueError, match="--stop-utc"):
+        br.normalize_stop_utc(value)
+    with pytest.raises(ValueError, match="--stop-utc"):
+        br.validate_budget_config(br.Config(stop_utc=value))
+
+
+@pytest.mark.parametrize("value", ["25:00", "late", 2330, b"23:30"])
 def test_stop_moment_refuses_a_bad_direct_stop_utc(value):
     with pytest.raises(ValueError):
         br.stop_moment(br.Config(stop_utc=value), at(18))

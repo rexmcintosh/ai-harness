@@ -1401,13 +1401,15 @@ def validate_budget_config(cfg: Config) -> None:
 
 def normalize_stop_utc(value) -> str | None:
     """A stop_utc as --stop-utc reads it: None, "" or off (any case) is no stop time, and
-    H:MM becomes HH:MM. Raises ValueError naming the flag for anything else."""
+    H:MM becomes HH:MM. Raises ValueError naming the flag for anything else, non-strings included."""
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
     try:
-        return _stop_utc(value) or None     # off comes back as ""
-    except (argparse.ArgumentTypeError, AttributeError):
-        raise ValueError(f"--stop-utc (stop_utc) must be HH:MM in UTC or off, not {value!r}") from None
+        if isinstance(value, str):
+            return _stop_utc(value) or None     # off comes back as ""
+    except argparse.ArgumentTypeError:
+        pass
+    raise ValueError(f"--stop-utc (stop_utc) must be HH:MM in UTC or off, not {value!r}") from None
 
 
 def budget_stop(cfg: Config, *, worked: int, now: datetime, stop: datetime | None, balance) -> str | None:
