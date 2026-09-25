@@ -1,7 +1,8 @@
 # backlog-run
 
 The 3am backlog runner and the morning-review tool for `~/projects/backlog`. (The name is from its
-first schedule. Since 2026-09-21 cron fires it at 22:00 UTC, two hours before the DIEM reset.)
+first schedule. Since 2026-09-21 cron fires it at 22:00 UTC, two hours before the DIEM reset. The
+budget-driven loop below is built to start at 18:00 UTC instead; see [Cron](#cron).)
 Spec: `../docs/superpowers/specs/2026-09-03-backlog-runner-design.md`.
 Contract it obeys: `~/projects/backlog/README.md` § "Safety contract for the 3am runner".
 
@@ -13,7 +14,7 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
 
     backlog-run work --dry-run           # what tonight would do; changes nothing
     backlog-run work                     # the nightly run (cron); open -> in_review | held
-    backlog-run work --only <id>         # one specific item (also --repo NAME, --max-items N)
+    backlog-run work --only <id>         # one specific item (also --repo NAME, --max-items N, --stop-utc off)
     backlog-run rework <id> --dry-run     # show the rework target; changes nothing
     backlog-run rework <id> --no-notify   # continue its existing held/in_review branch
     backlog-run report                   # morning report, numbered
@@ -24,11 +25,47 @@ as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the cloc
     backlog-run hold <id> "why"          # park an item;  backlog-run reopen <id> returns it
     backlog-run list
 
-`work` flags: `--max-items` (2) · `--item-timeout` seconds (3600) · `--deadline` seconds
-(10800) · `--budget-usd` per session (20; 0 = none) · `--model` (sonnet) · `--effort`
-(medium) · `--no-council` ·
-`--no-notify` · `--keep-worktree`. `rework` accepts the same session flags except
-`--max-items` and `--deadline`; it always targets one existing branch.
+`work` flags: `--max-items` session cap (10) · `--diem-floor` (1.5) · `--stop-utc` HH:MM or
+`off` (23:30) · `--item-estimate` seconds (1200) · `--item-timeout` seconds (3600) ·
+`--deadline` seconds (25200) · `--budget-usd` per session (20; 0 = none) · `--model`
+(claude-opus-5-5) · `--effort` (high) · `--no-council` · `--no-notify` · `--keep-worktree`.
+`rework` accepts the same session flags except the loop flags (`--max-items`,
+`--diem-floor`, `--stop-utc`, `--item-estimate`, `--deadline`); it always targets one
+existing branch. Both `work` and `rework` sessions run `--model claude-opus-5-5 --effort high`
+unless `--model`/`--effort` say otherwise.
+
+## The budget-driven loop
+
+The goal of the night is to spend the day's Venice DIEM allowance (31 DIEM, reset at
+00:00 UTC; unused DIEM expires). The runner spends DIEM only through its council reviews,
+about 0.5 to 1 DIEM each, so it keeps taking planned items, oldest first, while **all three**
+hold:
+
+1. **Balance.** The DIEM balance is at least `--diem-floor` (1.5, one review with margin). It is
+   read before each item the same way the review guard reads it: the review key
+   (`VENICE_SECOND_OPINION_KEY`) through the drain's `BalanceClient`.
+2. **Time.** The item can finish before `--stop-utc` (23:30 UTC), using `--item-estimate`
+   (20 min) as its length. `--item-timeout` (3600 s) stays the kill limit for one session. The
+   stop time is fixed on the day the run started, so a review that waits past the reset ends
+   the night rather than starting a new one.
+3. **Cap.** Fewer than `--max-items` (10) Claude sessions have run tonight. This protects the
+   Claude Max plan limits, not DIEM.
+
+The first rule to fail stops the loop: the log shows `- STOP  <reason>`, and every remaining
+item stays `open` for the next night, with that reason in the summary. A balance that cannot
+be read (no key, an outage) does not stop the night: the log says so and the time and cap
+rules still bound it. `BACKLOG_RUN_BALANCE=off` skips the read on purpose (the test suite
+does). `--deadline` (7 h) stays as a backstop for the whole run.
+
+`--dry-run` reads the balance once and prints a `budget:` line and where the loop would stop,
+for example `loop would stop after 2 item(s): stop time: ...`. It treats the balance as
+fixed, so it cannot foresee the DIEM the reviews will spend.
+
+Unchanged: not-before dates, holds, the Jev gate, `--only`, `--repo`, the usage-limit stop,
+and the review guard below (`review_budget.py`: a review started on a spent allowance near
+the reset waits for it). The DIEM drain keeps its 2 DIEM reserve while the runner holds
+`~/projects/.backlog-run/lock` (`[reserve]` in `~/.config/diem/config.toml`), so the drain and
+the runner do not compete for the last review.
 
 ## Rework
 
@@ -109,7 +146,19 @@ Council or generic Venice keys. The worker receives none of these credentials.
 
 ## Cron
 
-    0 3 * * *  /home/dev/.local/bin/backlog-run work >> /home/dev/projects/.backlog-run/cron.log 2>&1
+The current line (since 2026-09-21) fires at 22:00 UTC. For the budget-driven loop, replace it
+with this one, which starts at 18:00 UTC and leaves five and a half hours to spend the DIEM
+before the 23:30 stop:
+
+    0 18,19 * * *  [ "$(date -u +\%H)" = "18" ] && /home/dev/.local/bin/backlog-run work >> /home/dev/projects/.backlog-run/cron.log 2>&1
+
+Why two hours and a test: the system clock is Europe/Lisbon and Debian cron ignores `CRON_TZ`,
+so a fixed local hour is 18:00 UTC in one half of the year and 17:00 or 19:00 UTC in the other.
+Firing at local 18 and 19 and letting only the one whose UTC hour is 18 run keeps the start at
+18:00 UTC across daylight-saving changes. In winter (UTC+0) the 18:00 local firing runs; in summer
+(UTC+1) the 19:00 local one does. The `%` is escaped because cron treats a bare `%` as a
+newline. Edit the crontab by hand after merging and `pipx install --force`; the runner never
+edits it.
 
 ## Install / update
 
@@ -117,7 +166,7 @@ Council or generic Venice keys. The worker receives none of these credentials.
 
 ## Tests
 
-    python3 -m pytest tests/test_backlogrun.py -q
+    python3 -m pytest tests/test_backlogrun.py tests/test_backlogrun_budget_loop.py -q
 
 They run the whole `work`/`approve`/`drop` flow against temp git repos with a fake `claude`
 binary (no network, no real sessions) and assert the scrubbed environment, the pushurl
@@ -172,6 +221,9 @@ array with `name`, `branch_sha`, `status` (`passed`, `failed`, or `unknown`), an
 includes it in the council's input. Results are explicitly **session-reported**;
 the parent does not independently rerun the commands. All reported checks must
 refer to the reviewed commit. Missing or malformed results cannot imply success.
+A session that reports a short SHA (a hex prefix of at least 7 characters) is taken to mean
+the reviewed head only when it really is a prefix of that head's full SHA; the runner then
+stores the full SHA. Any other value stays invalid, as before.
 
 An absent required list means validation coverage is unknown, even if the review
 is clean. An explicit empty list is appropriate only for work with no required

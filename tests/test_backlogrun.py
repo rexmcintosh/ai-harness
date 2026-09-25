@@ -122,8 +122,11 @@ def item(iid, repo="alpha", status="open", created="2026-01-01", **kw):
 
 
 @pytest.fixture
-def world(tmp_path):
-    """A projects dir with repo `alpha` (+ bare origin), a backlog repo, a fake claude."""
+def world(tmp_path, monkeypatch):
+    """A projects dir with repo `alpha` (+ bare origin), a backlog repo, a fake claude.
+    The budget loop sees a full DIEM balance and no stop time, so a test's outcome never
+    depends on Venice or on the hour it runs; tests of the loop set both themselves."""
+    monkeypatch.setattr(br, "read_diem_balance", lambda cfg, **k: 31.0)
     fake_dir = tmp_path / "fake"
     fake_dir.mkdir()
     fake = fake_dir / "claude"
@@ -137,7 +140,7 @@ def world(tmp_path):
         cfg = br.Config(backlog_path=str(path), state_dir=str(tmp_path / "state"),
                         projects=str(tmp_path / "projects"), claude_bin=str(fake),
                         git_enabled=True, tg_enabled=False, env_file=str(tmp_path / "no.env"),
-                        item_timeout=30, deadline=300, max_items=2)
+                        item_timeout=30, deadline=300, max_items=2, stop_utc=None)
         return cfg
 
     class W:
@@ -272,7 +275,7 @@ def test_scrubbed_env_has_no_secrets_and_disables_push(world):
 
 def test_bounded_worker_defaults_and_explicit_cli_route():
     cfg = br.Config()
-    assert (cfg.model, cfg.effort, cfg.budget_usd, cfg.item_timeout) == ("sonnet", "medium", 20.0, 3600)
+    assert (cfg.model, cfg.effort, cfg.budget_usd, cfg.item_timeout) == ("claude-opus-5-5", "high", 20.0, 3600)
     args = br.build_parser().parse_args(["work", "--model", "opus", "--effort", "high"])
     assert args.model == "opus" and args.effort == "high"
 

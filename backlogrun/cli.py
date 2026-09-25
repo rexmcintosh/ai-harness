@@ -7,7 +7,8 @@ runs as a COLD headless Claude Code session inside its own git worktree on a fre
 and the item is left `in_review` (or `held`) for the human's morning review.
 
 Subcommands:
-  work      nightly: pick open items (oldest first, bounded), work each, review, mark.
+  work      nightly: pick open items (oldest first), work each, review, mark; keeps going
+            while the DIEM balance, the UTC stop time and the session cap allow.
   rework    continue one held/in_review item on its existing reviewed branch.
   report    write + print the morning report (numbered, for approve/drop by number).
   list      one line per active item.
@@ -35,8 +36,8 @@ Safety contract (~/projects/backlog/README.md), enforced here and tagged C1..C4:
      the item.
   C4 `work` moves open -> in_review | held. `rework` moves the same held/in_review item
      back to reviewed or held state without changing merge authority.
-Also: fail closed per item (one failure never aborts the batch); bounded (max items,
-per-item timeout + budget, global deadline); one run at a time (flock); backlog.yaml is
+Also: fail closed per item (one failure never aborts the batch); bounded (session cap,
+DIEM floor, UTC stop time, per-item timeout + budget, global deadline); one run at a time (flock); backlog.yaml is
 re-read under feedback-sync's lock directory immediately before every write, so a
 session-long stale copy can never clobber items appended meanwhile.
 """
@@ -45,6 +46,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 import os
 import re
 import shutil
@@ -54,7 +56,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -62,6 +64,7 @@ import yaml
 from sessiongc.cli import GitError, default_branch_ref, git, git_ok, parse_worktrees
 from backlogrun import gate as gate_mod
 from backlogrun import readiness
+from backlogrun import review_budget
 from backlogrun.venice_keys import VeniceKeyError, load_key as load_venice_key
 
 HOME = os.path.expanduser("~")
@@ -119,12 +122,15 @@ class Config:
     tg_send: str = field(default_factory=lambda: _env(
         "BACKLOG_RUN_TG_SEND", os.path.join(PROJECTS, "ai-harness", "bin", "tg-send")))
     env_file: str = field(default_factory=lambda: _env("BACKLOG_RUN_ENV_FILE", os.path.join(HOME, ".env")))
-    model: str = "sonnet"
-    effort: str = "medium"
+    model: str = "claude-opus-5-5"
+    effort: str = "high"
     budget_usd: float = 20.0
-    item_timeout: int = 3600
-    deadline: int = 3 * 3600
-    max_items: int = 2
+    item_timeout: int = 3600          # the kill limit for one session
+    deadline: int = 7 * 3600          # backstop for the whole run; the stop time normally ends it
+    max_items: int = 10               # nightly Claude-session cap (Claude Max plan limits, not DIEM)
+    diem_floor: float = 1.5           # take another item only while the DIEM balance is at least this
+    stop_utc: str | None = "23:30"    # start no item that cannot finish by then (DIEM resets 00:00 UTC)
+    item_estimate: int = 20 * 60      # what one item usually takes, for the stop-time check
     keep_worktree: bool = False
     extra: dict = field(default_factory=dict)
 
@@ -942,7 +948,7 @@ def _run_started_at(run: Path, suffix: str) -> datetime:
     return datetime.strptime(stamp, fmt).replace(tzinfo=timezone.utc)
 
 
-def _capture_validations(cfg: Config, stem: str, text: str) -> list:
+def _capture_validations(cfg: Config, stem: str, text: str, *, head_sha: str = "") -> list:
     matches = re.findall(r"^[ \t]*\**RUNNER-VALIDATIONS\**:\**[ \t]*(.*)$", text, re.MULTILINE)
     if not matches:
         return []
@@ -963,7 +969,8 @@ def _capture_validations(cfg: Config, stem: str, text: str) -> list:
         path = Path(cfg.reviews_dir) / f"{stem}.validation-{n}.txt"
         if isinstance(evidence, str) and evidence.strip():
             _write_text(path, evidence)
-        captured.append({"name": entry.get("name"), "branch_sha": entry.get("branch_sha"),
+        # A 7+ character prefix of the reviewed head is that head; anything else stays as reported.
+        captured.append({"name": entry.get("name"), "branch_sha": readiness.expand_sha(entry.get("branch_sha"), head_sha),
                          "status": entry.get("status"),
                          "evidence_path": os.path.relpath(path, cfg.state_dir)})
     return captured
@@ -1235,7 +1242,7 @@ def work_one(cfg: Config, p: Planned, *, reviewer=None, log=print, continuation:
         # branch you later decide to take has a verdict on record.
         if result.get("branch"):
             sha = git(p.repo, "rev-parse", p.branch).strip()
-            validations = _capture_validations(cfg, stem, final_text)
+            validations = _capture_validations(cfg, stem, final_text, head_sha=sha)
             diff_text = git(p.repo, "diff", f"{p.base}...{p.branch}")
             review_input = diff_text + "\n\nRunner outcome: " + kind
             review_input += "\nRequired validations: " + json.dumps(required)
@@ -1341,6 +1348,74 @@ def notify(cfg: Config, text: str) -> str:
         return f"telegram failed: {e}"
 
 
+# ----------------------------------------------------------------------------- budget loop
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def read_diem_balance(cfg: Config, *, log=print) -> float | None:
+    """The Venice DIEM balance, read like the review guard reads it (review key, the drain's
+    client). None when it cannot be read: the night then runs on the session cap alone."""
+    if os.environ.get("BACKLOG_RUN_BALANCE", "on").strip().lower() in ("off", "0", "false", "no"):
+        log("  DIEM balance check is off (BACKLOG_RUN_BALANCE); the session cap bounds the night")
+        return None
+    try:
+        have = float(review_budget.venice_balance(load_venice_key("review", env_path=cfg.env_file)))
+        if not math.isfinite(have):
+            raise ValueError("balance is not a finite number")
+        return have
+    except Exception as exc:    # noqa: BLE001 - an unreadable balance must not stop the night
+        # The type only: an HTTP error message can carry the key.
+        log(f"  DIEM balance not readable ({type(exc).__name__}); falling back to the session cap ({cfg.max_items})")
+        return None
+
+
+def stop_moment(cfg: Config, started: datetime) -> datetime | None:
+    """The run's stop time, fixed on the day the run started. A review that waits past the
+    00:00 reset therefore ends the night instead of starting another one."""
+    if not cfg.stop_utc:
+        return None
+    hh, mm = (int(x) for x in cfg.stop_utc.split(":"))
+    return started.astimezone(timezone.utc).replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+
+def budget_stop(cfg: Config, *, worked: int, now: datetime, stop: datetime | None, balance) -> str | None:
+    """Why the loop takes no more items, or None to take the next one. `balance()` returns the
+    DIEM balance or None (unreadable); it is only called when the cap and the clock allow."""
+    if worked >= cfg.max_items:
+        return f"session cap: {cfg.max_items} Claude session(s) tonight (--max-items)"
+    if stop is not None and now + timedelta(seconds=cfg.item_estimate) > stop:
+        return (f"stop time: an item takes about {cfg.item_estimate // 60} min "
+                f"and the run stops at {stop:%H:%M} UTC")
+    have = balance()
+    if have is not None and have < cfg.diem_floor:
+        return f"DIEM balance {have:.2f} is below the floor {cfg.diem_floor:g} (one council review with margin)"
+    return None
+
+
+def _dry_run_budget(cfg: Config, planned: list[Planned]) -> None:
+    now = _utc_now()
+    stop = stop_moment(cfg, now)
+    have = read_diem_balance(cfg)
+    shown = "unreadable (the cap bounds the night)" if have is None else f"{have:.2f}"
+    print(f"  budget: DIEM balance {shown}, floor {cfg.diem_floor:g}; "
+          f"stop {stop:%H:%M} UTC" if stop else f"  budget: DIEM balance {shown}, floor {cfg.diem_floor:g}; no stop time", end="")
+    print(f"; about {cfg.item_estimate // 60} min per item; cap {cfg.max_items} session(s)")
+    n = sum(1 for p in planned if p.action == "work")
+    # The balance is taken as it is now; each council review spends about 0.5 to 1 DIEM of it.
+    for i in range(n + 1):
+        why = budget_stop(cfg, worked=i, now=now + timedelta(seconds=i * cfg.item_estimate),
+                          stop=stop, balance=lambda: have)
+        if why and i < n:
+            print(f"  loop would stop after {i} item(s): {why}")
+            return
+        if i == n:
+            print(f"  loop would work all {n} planned item(s), then "
+                  + (f"stop: {why}" if why else "run out of open items"))
+
+
 def cmd_work(args, cfg: Config) -> int:
     items = load_yaml(cfg.backlog_path)["items"]
     use_gate = gate_mod.enabled() and not getattr(args, "no_gate", False)
@@ -1350,6 +1425,8 @@ def cmd_work(args, cfg: Config) -> int:
         print(f"backlog-run dry-run — {now_stamp()} — max {cfg.max_items} item(s), {cfg.item_timeout}s each, deadline {cfg.deadline}s")
         if not planned:
             print("nothing open.")
+        else:
+            _dry_run_budget(cfg, planned)
         for p in planned:
             iid = p.item["id"]
             if p.action == "work":
@@ -1365,6 +1442,9 @@ def cmd_work(args, cfg: Config) -> int:
         ensure_state(cfg)
         write_session_settings(cfg)
         start = time.monotonic()
+        stop = stop_moment(cfg, _utc_now())
+        worked = 0
+        stopped = ""
         print(f"backlog-run work — {now_stamp()} — {sum(1 for p in planned if p.action == 'work')} to work, "
               f"{sum(1 for p in planned if p.action == 'hold')} to hold, {sum(1 for p in planned if p.action == 'defer')} deferred")
         results: list[dict] = []
@@ -1383,12 +1463,21 @@ def cmd_work(args, cfg: Config) -> int:
             if limit_hit:
                 results.append({"id": iid, "status": "open", "note": "usage limit hit earlier tonight", "deferred": True})
                 continue
+            if not stopped:
+                stopped = budget_stop(cfg, worked=worked, now=_utc_now(), stop=stop,
+                                      balance=lambda: read_diem_balance(cfg)) or ""
+                if stopped:
+                    print(f"- STOP  {stopped}")
+            if stopped:
+                results.append({"id": iid, "status": "open", "note": f"budget loop stopped: {stopped}", "deferred": True})
+                continue
             elapsed = time.monotonic() - start
             if elapsed + cfg.item_timeout > cfg.deadline:
                 results.append({"id": iid, "status": "open", "note": "deadline: not enough time left tonight", "deferred": True})
                 print(f"- DEFER {iid}: deadline")
                 continue
             print(f"- WORK  {iid}")
+            worked += 1
             res = work_one(cfg, p, reviewer=(False if args.no_council else None))
             results.append(res)
             if res.get("limit"):
@@ -1872,22 +1961,39 @@ def cmd_reopen(args, cfg: Config) -> int:
 # ----------------------------------------------------------------------------- entry
 
 
+def _stop_utc(value: str) -> str:
+    """argparse type for --stop-utc: HH:MM (UTC), or off (returned as "")."""
+    if value.strip().lower() == "off":
+        return ""
+    m = re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)", value.strip())
+    if not m:
+        raise argparse.ArgumentTypeError("use HH:MM in UTC, e.g. 23:30, or off")
+    return f"{int(m.group(1)):02d}:{m.group(2)}"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="backlog-run", description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
 
     w = sub.add_parser("work", help="work open items unattended (nightly)")
     w.add_argument("--dry-run", action="store_true", help="show the plan; change nothing")
-    w.add_argument("--max-items", type=int, default=None, help="items to work tonight (default 2)")
+    w.add_argument("--max-items", type=int, default=None,
+                   help="nightly Claude-session cap; protects the Claude plan limits, not DIEM (default 10)")
+    w.add_argument("--diem-floor", type=float, default=None,
+                   help="take another item only while the Venice DIEM balance is at least this (default 1.5)")
+    w.add_argument("--stop-utc", type=_stop_utc, default=None,
+                   help="HH:MM UTC: start no item that cannot finish by then, or 'off' (default 23:30)")
+    w.add_argument("--item-estimate", type=int, default=None,
+                   help="seconds one item usually takes, for the stop-time check (default 1200)")
     w.add_argument("--only", action="append", help="work only this item id (repeatable)")
     w.add_argument("--repo", help="limit to items targeting this repo (dir name)")
     w.add_argument("--item-timeout", type=int, default=None, help="seconds per item (default 3600)")
     w.add_argument("--no-gate", action="store_true",
                    help="skip the pre-session hold gate (Jev: does this item need an outward action?)")
-    w.add_argument("--deadline", type=int, default=None, help="seconds for the whole run (default 10800)")
+    w.add_argument("--deadline", type=int, default=None, help="seconds for the whole run (default 25200)")
     w.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd per session (default 20; 0 = none)")
-    w.add_argument("--model", help="model for the sessions (default: sonnet)")
-    w.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: medium)")
+    w.add_argument("--model", help="model for the sessions (default: claude-opus-5-5)")
+    w.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: high)")
     w.add_argument("--no-council", action="store_true", help="skip the council review (tests/debugging)")
     w.add_argument("--no-notify", action="store_true", help="no Telegram summary")
     w.add_argument("--keep-worktree", action="store_true", help="leave the session worktree in place")
@@ -1898,8 +2004,8 @@ def build_parser() -> argparse.ArgumentParser:
     rw.add_argument("--dry-run", action="store_true", help="show the plan; change nothing")
     rw.add_argument("--item-timeout", type=int, default=None, help="seconds for the session (default 3600)")
     rw.add_argument("--budget-usd", type=float, default=None, help="--max-budget-usd for the session (default 20; 0 = none)")
-    rw.add_argument("--model", help="model for the session (default: sonnet)")
-    rw.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: medium)")
+    rw.add_argument("--model", help="model for the session (default: claude-opus-5-5)")
+    rw.add_argument("--effort", choices=("medium", "high"), default=None, help="reasoning effort (default: high)")
     rw.add_argument("--no-council", action="store_true", help="skip the council review (tests/debugging)")
     rw.add_argument("--no-notify", action="store_true", help="no Telegram summary")
     rw.add_argument("--keep-worktree", action="store_true", help="leave the session worktree in place")
@@ -1941,6 +2047,12 @@ def main(argv=None) -> int:
             cfg.item_timeout = args.item_timeout
         if getattr(args, "deadline", None) is not None:
             cfg.deadline = args.deadline
+        if getattr(args, "diem_floor", None) is not None:
+            cfg.diem_floor = args.diem_floor
+        if getattr(args, "stop_utc", None) is not None:
+            cfg.stop_utc = args.stop_utc or None
+        if getattr(args, "item_estimate", None) is not None:
+            cfg.item_estimate = args.item_estimate
         if args.budget_usd is not None:
             cfg.budget_usd = args.budget_usd
         if args.model:
