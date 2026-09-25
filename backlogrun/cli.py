@@ -1375,9 +1375,10 @@ def read_diem_balance(cfg: Config, *, log=print) -> float | None:
 def stop_moment(cfg: Config, started: datetime) -> datetime | None:
     """The run's stop time, fixed on the day the run started. A review that waits past the
     00:00 reset therefore ends the night instead of starting another one."""
-    if not cfg.stop_utc:
+    stop_utc = normalize_stop_utc(cfg.stop_utc)
+    if stop_utc is None:
         return None
-    hh, mm = (int(x) for x in cfg.stop_utc.split(":"))
+    hh, mm = (int(x) for x in stop_utc.split(":"))
     return started.astimezone(timezone.utc).replace(hour=hh, minute=mm, second=0, microsecond=0)
 
 
@@ -1385,7 +1386,7 @@ def validate_budget_config(cfg: Config) -> None:
     """Refuse loop settings that would silently switch off a safety check: a zero or negative
     --item-estimate passes the stop-time check at any hour, a NaN --diem-floor passes the
     balance check at any balance, and --max-items must allow at least one session.
-    Raises ValueError naming the flag."""
+    Stores stop_utc in the form --stop-utc gives (None or HH:MM). Raises ValueError naming the flag."""
     def is_int(v) -> bool:
         return isinstance(v, int) and not isinstance(v, bool)
     if not (is_int(cfg.item_estimate) and cfg.item_estimate > 0):
@@ -1395,13 +1396,18 @@ def validate_budget_config(cfg: Config) -> None:
     f = cfg.diem_floor
     if not ((is_int(f) or isinstance(f, float)) and math.isfinite(f) and f >= 0):
         raise ValueError(f"--diem-floor (diem_floor) must be a finite number of at least 0, not {f!r}")
-    if cfg.stop_utc is not None:
-        try:
-            ok = _stop_utc(cfg.stop_utc) == cfg.stop_utc and cfg.stop_utc != ""
-        except (argparse.ArgumentTypeError, AttributeError):
-            ok = False
-        if not ok:
-            raise ValueError(f"--stop-utc (stop_utc) must be HH:MM in UTC or off, not {cfg.stop_utc!r}")
+    cfg.stop_utc = normalize_stop_utc(cfg.stop_utc)
+
+
+def normalize_stop_utc(value) -> str | None:
+    """A stop_utc as --stop-utc reads it: None, "" or off (any case) is no stop time, and
+    H:MM becomes HH:MM. Raises ValueError naming the flag for anything else."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        return _stop_utc(value) or None     # off comes back as ""
+    except (argparse.ArgumentTypeError, AttributeError):
+        raise ValueError(f"--stop-utc (stop_utc) must be HH:MM in UTC or off, not {value!r}") from None
 
 
 def budget_stop(cfg: Config, *, worked: int, now: datetime, stop: datetime | None, balance) -> str | None:

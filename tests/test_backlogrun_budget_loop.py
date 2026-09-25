@@ -228,7 +228,7 @@ def test_valid_edge_values_are_accepted(monkeypatch):
     ("max_items", 0), ("max_items", -3), ("max_items", float("inf")), ("max_items", "10"),
     ("diem_floor", -1.0), ("diem_floor", float("nan")), ("diem_floor", float("inf")),
     ("diem_floor", float("-inf")), ("diem_floor", "1.5"), ("diem_floor", True),
-    ("stop_utc", "25:00"), ("stop_utc", "late"),
+    ("stop_utc", "25:00"), ("stop_utc", "late"), ("stop_utc", "23:30:00"), ("stop_utc", 2330),
 ])
 def test_validate_budget_config_rejects_bad_values(field, value):
     cfg = br.Config()
@@ -240,6 +240,37 @@ def test_validate_budget_config_rejects_bad_values(field, value):
 def test_validate_budget_config_accepts_the_defaults_and_no_stop_time():
     br.validate_budget_config(br.Config())
     br.validate_budget_config(br.Config(stop_utc=None, diem_floor=0, max_items=1, item_estimate=1))
+
+
+@pytest.mark.parametrize("value,canonical", [
+    ("off", None), ("OFF", None), (" off ", None), ("", None), (None, None),
+    ("9:05", "09:05"), (" 23:30 ", "23:30"), ("0:00", "00:00"), ("23:30", "23:30"),
+])
+def test_direct_config_stop_utc_means_what_the_flag_means(value, canonical):
+    # A Config built directly takes the same forms as --stop-utc: off is no stop time and
+    # H:MM is HH:MM, so validation and stop_moment agree with the command line.
+    cfg = br.Config(stop_utc=value)
+    br.validate_budget_config(cfg)
+    assert cfg.stop_utc == canonical
+    stop = br.stop_moment(br.Config(stop_utc=value), at(18))
+    if canonical is None:
+        assert stop is None
+    else:
+        assert f"{stop:%H:%M}" == canonical
+
+
+@pytest.mark.parametrize("value", ["25:00", "late", 2330])
+def test_stop_moment_refuses_a_bad_direct_stop_utc(value):
+    with pytest.raises(ValueError):
+        br.stop_moment(br.Config(stop_utc=value), at(18))
+
+
+@pytest.mark.parametrize("value,shown", [("off", "no stop time"), ("7:00", "stop 07:00 UTC")])
+def test_cmd_work_dry_run_with_a_direct_config_stop_utc(world, monkeypatch, capsys, value, shown):
+    cfg = three(world)
+    cfg.stop_utc = value
+    assert br.cmd_work(work_args("--dry-run"), cfg) == 0
+    assert shown in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("field,value", [
