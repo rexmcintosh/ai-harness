@@ -42,6 +42,19 @@ def _full_sha(value: object) -> bool:
     return isinstance(value, str) and _SHA_RE.fullmatch(value) is not None
 
 
+_SHORT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+
+
+def expand_sha(reported: object, head_sha: str) -> object:
+    """A session may report a validation's commit as a short SHA (``0123abc``). When that is a
+    hex prefix of at least 7 characters of the full head SHA it was run against, return the
+    full head SHA. Anything else comes back unchanged, so evaluate() still rejects it."""
+    if (isinstance(reported, str) and _SHORT_SHA_RE.fullmatch(reported) and len(reported) < 40
+            and _full_sha(head_sha) and head_sha.lower().startswith(reported.lower())):
+        return head_sha
+    return reported
+
+
 def _utc_rfc3339(value: object) -> datetime | None:
     if not isinstance(value, str) or _UTC_RFC3339_RE.fullmatch(value) is None:
         return None

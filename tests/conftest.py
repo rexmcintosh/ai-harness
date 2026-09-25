@@ -25,6 +25,8 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     monkeypatch.setenv("JEV_DISABLED", "1")
     # the runner's "wait for the DIEM reset" guard reads Venice's balance and may sleep for an hour
     monkeypatch.setenv("BACKLOG_REVIEW_WAIT", "off")
+    # ... and its budget loop reads the same balance before every item: never from a test
+    monkeypatch.setenv("BACKLOG_RUN_BALANCE", "off")
     monkeypatch.setenv("JEV_USAGE_LOG", str(tmp_path / "jev-usage.jsonl"))
 
 
