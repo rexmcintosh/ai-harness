@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import copy
 import fcntl
+import filecmp
 import hashlib
 import json
 import os
 import shutil
+import stat
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -74,6 +78,34 @@ def ensure_within(root: Path, path: Path) -> Path:
     if resolved != root_real and root_real not in resolved.parents:
         raise MirrorSafetyError(f"{path} escapes required root {root}")
     return resolved
+
+
+def same_tree(left: Path, right: Path) -> bool:
+    """True when two skill folders hold the same files, links and bytes, so one is a plain duplicate."""
+    def entries(root: Path) -> dict[str, tuple[str, ...]]:
+        found: dict[str, tuple[str, ...]] = {}
+        for dirpath, dirnames, filenames in os.walk(root):
+            for name in dirnames + filenames:
+                path = Path(dirpath) / name
+                relative = str(path.relative_to(root))
+                if path.is_symlink():
+                    found[relative] = ("link", os.readlink(path))
+                elif path.is_dir():
+                    found[relative] = ("dir",)
+                elif path.is_file():
+                    found[relative] = ("file", str(stat.S_IMODE(path.stat().st_mode) & 0o111))
+                else:
+                    found[relative] = ("other",)
+        return found
+
+    try:
+        left_entries, right_entries = entries(left), entries(right)
+        if left_entries != right_entries or any(kind == ("other",) for kind in left_entries.values()):
+            return False
+        return all(filecmp.cmp(left / relative, right / relative, shallow=False)
+                   for relative, kind in left_entries.items() if kind[0] == "file")
+    except OSError:
+        return False
 
 
 def fingerprint(target: Path) -> tuple[str, ...]:
@@ -183,6 +215,8 @@ def classify(target: Path, kind: str, source: Path, content: str | None, owned: 
         return "create"
     prior = owned.get(str(target))
     if prior is None:
+        if kind == "symlink" and not target.is_symlink() and target.is_dir() and same_tree(target, source):
+            return "replace-identical-copy"
         return "preserve-unmanaged"
     if kind == "symlink":
         if target.is_symlink() and Path(os.readlink(target)) == source:
@@ -327,10 +361,15 @@ def build_plan(inventory: dict[str, Any], codex_home: Path, projects_root: Path,
     return ops
 
 
-def backup_target(target: Path, backup_root: Path) -> None:
+def backup_destination(target: Path, backup_root: Path) -> Path:
     relative = Path(*target.parts[1:]) if target.is_absolute() else target
     destination = backup_root / relative
     destination.parent.mkdir(parents=True, exist_ok=True)
+    return destination
+
+
+def backup_target(target: Path, backup_root: Path) -> None:
+    destination = backup_destination(target, backup_root)
     if target.is_symlink():
         destination.symlink_to(os.readlink(target))
     elif target.is_dir():
@@ -396,24 +435,38 @@ def replace_atomically(target: Path, kind: str, source: Path, content: str | Non
     fsync_dir(target.parent)
 
 
-def apply_plan(ops: list[Operation], ownership: Path, backup_dir: Path) -> dict[str, int]:
-    counts = {"created": 0, "replaced": 0, "unchanged": 0, "preserved": 0, "missing": 0, "rejected": 0}
-    lock_path = ownership.with_suffix(ownership.suffix + ".lock")
+def mirror_lock(ownership: Path) -> MirrorLock:
+    return MirrorLock(ownership.with_suffix(ownership.suffix + ".lock"))
+
+
+def apply_plan(ops: list[Operation], ownership: Path, backup_dir: Path,
+               outcomes: list[dict[str, str]] | None = None, *, take_lock: bool = True) -> dict[str, int]:
+    """Apply `ops` under the lock. `outcomes`, when given, receives each changed target's final status.
+
+    Pass `take_lock=False` only when the caller already holds `mirror_lock(ownership)`.
+    """
+    counts = {"created": 0, "replaced": 0, "deduplicated": 0, "unchanged": 0, "preserved": 0, "missing": 0,
+              "rejected": 0}
     journal_path = ownership.with_suffix(ownership.suffix + ".journal")
     backup_root = backup_dir / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
-    with MirrorLock(lock_path):
+    with mirror_lock(ownership) if take_lock else contextlib.nullcontext():
         recover_journal(journal_path, ownership)
         owned = owned_entries(ownership)
 
         for op in ops:
             if op.kind == "rejected":
                 counts["rejected"] += 1
+                if outcomes is not None:
+                    # A rejected name never gets a target path; report what was rejected.
+                    outcomes.append({"status": op.status, "target": op.target or op.source})
                 continue
 
             status, content = recompute_status(op, owned)
             if status == "source-missing":
                 counts["missing"] += 1
+                if outcomes is not None:
+                    outcomes.append({"status": status, "target": op.target})
                 continue
             if status in {"preserve-unmanaged", "preserve-owned-modified"}:
                 counts["preserved"] += 1
@@ -444,14 +497,45 @@ def apply_plan(ops: list[Operation], ownership: Path, backup_dir: Path) -> dict[
                 owned_record = {"kind": "wrapper", "source": str(source), "target": str(target),
                                  "content_sha256": digest(content or "")}
 
-            atomic_write_json(journal_path, {
+            journal: dict[str, Any] = {
                 "target": str(target),
                 "prior_fingerprint": list(prior_fp),
                 "new_fingerprint": list(new_fp),
                 "owned_record": owned_record,
-            })
+            }
+            if status == "replace-identical-copy":
+                # Recheck right before the move: a directory cannot be renamed over, so it moves aside first.
+                if target.is_symlink() or not same_tree(target, source):
+                    counts["preserved"] += 1
+                    continue
+                backup_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+                moved_to = backup_destination(target, backup_root)
+                journal["moved_to"] = str(moved_to)
+            atomic_write_json(journal_path, journal)
 
-            replace_atomically(target, op.kind, source, content)
+            if status == "replace-identical-copy":
+                # Rename is atomic. It fails cleanly (for example across filesystems), and then the copy stays.
+                # A crash after it leaves the target missing; the next run sees "create" and links it.
+                try:
+                    os.rename(target, moved_to)
+                except OSError as error:
+                    journal_path.unlink(missing_ok=True)
+                    counts["preserved"] += 1
+                    if outcomes is not None:
+                        outcomes.append({"status": f"preserve-rename-failed: {error.strerror}", "target": str(target)})
+                    continue
+                try:
+                    fsync_dir(target.parent)
+                    fsync_dir(moved_to.parent)
+                    replace_atomically(target, op.kind, source, content)
+                except OSError:
+                    if not target.exists() and not target.is_symlink():
+                        os.rename(moved_to, target)
+                        journal_path.unlink(missing_ok=True)
+                    # Otherwise the link is in place: keep the journal so the next run records ownership.
+                    raise
+            else:
+                replace_atomically(target, op.kind, source, content)
 
             owned[str(target)] = owned_record
             atomic_write_json(ownership, {
@@ -460,9 +544,66 @@ def apply_plan(ops: list[Operation], ownership: Path, backup_dir: Path) -> dict[
             })
             journal_path.unlink(missing_ok=True)
 
-            counts["created" if status == "create" else "replaced"] += 1
+            counts[{"create": "created", "replace-identical-copy": "deduplicated"}.get(status, "replaced")] += 1
+            if outcomes is not None:
+                outcomes.append({"status": status, "target": str(target)})
 
     return counts
+
+
+def install_time(entry: dict[str, Any], key: str) -> datetime:
+    """Parse an install timestamp; a missing or malformed one sorts as oldest."""
+    try:
+        parsed = datetime.fromisoformat(str(entry[key]).replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError):
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def live_inventory(inventory: dict[str, Any], claude_home: Path) -> dict[str, Any]:
+    """Replace the snapshot's global skills, commands and plugins with what Claude has installed now.
+
+    Plugin paths are versioned, so a frozen snapshot goes stale on every plugin update.
+    Project-scoped sections still come from the snapshot.
+    """
+    skills_dir = claude_home / "skills"
+    if not skills_dir.is_dir():
+        raise ValueError(f"Claude skills folder not found: {skills_dir}")
+    data = copy.deepcopy(inventory)
+    global_part = data.setdefault("claude_global", {})
+    global_part["skills"] = [
+        {"name": path.parent.name, "path": str(path.parent), "classification": "live"}
+        for path in sorted(skills_dir.glob("*/SKILL.md")) if not path.parent.name.startswith(".")
+    ]
+    global_part["commands"] = sorted(path.stem for path in (claude_home / "commands").glob("*.md"))
+
+    def optional_json(path: Path) -> dict[str, Any]:
+        # A fresh Claude install has no plugin file yet; a malformed file still stops the run.
+        return load_json(path) if path.exists() else {}
+
+    installed = optional_json(claude_home / "plugins" / "installed_plugins.json").get("plugins", {})
+    enabled = optional_json(claude_home / "settings.json").get("enabledPlugins", {})
+    base_names = [plugin_ref.split("@", 1)[0] for plugin_ref, is_enabled in enabled.items() if is_enabled is True]
+    clashes = sorted({name for name in base_names if base_names.count(name) > 1})
+    if clashes:
+        raise ValueError(f"Enabled plugins from different marketplaces share a name: {', '.join(clashes)}")
+    active_paths: dict[str, str] = {}
+    for plugin_ref, is_enabled in sorted(enabled.items()):
+        if is_enabled is not True:
+            continue
+        candidates = [entry for entry in installed.get(plugin_ref, [])
+                      if entry.get("scope") == "user" and entry.get("installPath")
+                      and Path(entry["installPath"]).is_dir()]
+        if candidates:
+            newest = max(candidates, key=lambda entry: (install_time(entry, "lastUpdated"),
+                                                         install_time(entry, "installedAt"), entry["installPath"]))
+            active_paths[plugin_ref.split("@", 1)[0]] = newest["installPath"]
+    data["plugins"] = {
+        "enabled": {plugin_ref: is_enabled is True for plugin_ref, is_enabled in enabled.items()},
+        "active_paths": active_paths,
+        "plugin_skill_names": {},
+    }
+    return data
 
 
 def persist_inventory(inventory: dict[str, Any], path: Path) -> None:
@@ -481,10 +622,14 @@ def run_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inventory", type=Path, help="Fresh inventory JSON; defaults to the saved installed inventory.")
     parser.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
+    parser.add_argument("--claude-home", type=Path, default=Path.home() / ".claude")
+    parser.add_argument("--frozen", action="store_true",
+                        help="Plan from the inventory alone; skip reading Claude's current skills and plugins.")
     parser.add_argument("--projects-root", type=Path, default=Path.home() / "projects")
     parser.add_argument("--ownership", type=Path)
     parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--quiet", action="store_true", help="Print one summary line (for scheduled runs).")
     args = parser.parse_args(argv)
     ownership = args.ownership or args.codex_home / "claude-mirror-owned.json"
     backup_dir = args.backup_dir or args.codex_home / "backups" / "claude-mirror"
@@ -495,13 +640,31 @@ def run_main(argv: list[str] | None = None) -> int:
         if data.get("schema_version") != SCHEMA_VERSION:
             raise ValueError(f"Unsupported inventory schema: {inventory_path}")
         data = data["inventory"]
-    ops = build_plan(data, args.codex_home, args.projects_root, ownership)
-    result: dict[str, Any] = {"mode": "plan", "operations": [asdict(item) for item in ops]}
-    if args.apply:
-        result["mode"] = "apply"
-        result["applied"] = apply_plan(ops, ownership, backup_dir)
-        persist_inventory(data, saved_inventory)
-    json.dump(result, sys.stdout, indent=2, sort_keys=True)
+    quiet_statuses = {"unchanged", "preserve-unmanaged", "preserve-owned-modified"}
+    # Apply reads Claude's state, plans and applies under one lock, so a run that waited
+    # behind another cannot apply an older plan over newer links.
+    with mirror_lock(ownership) if args.apply else contextlib.nullcontext():
+        if not args.frozen:
+            data = live_inventory(data, args.claude_home)
+        ops = build_plan(data, args.codex_home, args.projects_root, ownership)
+        result: dict[str, Any] = {"mode": "plan", "operations": [asdict(item) for item in ops]}
+        changes = [{"status": item.status, "target": item.target} for item in ops
+                   if item.status not in quiet_statuses]
+        if args.apply:
+            result["mode"] = "apply"
+            changes = []
+            result["applied"] = apply_plan(ops, ownership, backup_dir, changes, take_lock=False)
+            persist_inventory(data, saved_inventory)
+    if args.quiet:
+        summary = {
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "mode": result["mode"],
+            "applied": result.get("applied"),
+            "changes": changes,
+        }
+        json.dump(summary, sys.stdout, sort_keys=True)
+    else:
+        json.dump(result, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0
 

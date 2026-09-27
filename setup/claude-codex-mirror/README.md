@@ -4,11 +4,17 @@ This directory contains three bounded tools. Neither changes live configuration 
 
 `mirror.py` calls Codex's native `externalAgentConfig/detect` method. It uses `maxSessions: 0`, so it does not inspect or import conversations. The native importer supports `AGENTS_MD`, `CONFIG`, `SKILLS`, `PLUGINS`, `MCP_SERVER_CONFIG`, `SUBAGENTS`, `HOOKS`, `COMMANDS`, `MEMORY`, and `SESSIONS` in Codex 0.153.4. Detection only reports work that remains. Skill import does not replace an existing target directory.
 
-`mirror_files.py` makes an install plan from the saved metadata-only inventory at `~/.codex/mirrors/claude/inventory.json` (or `/tmp/claude-skill-inventory.json` on first install). It plans symlinks for missing portable or runtime skills and creates small Codex skill wrappers for Claude commands under each repository `.agents/skills` directory. Project wrappers contain an explicit repository check. Existing Codex skills, the adapted `delegate` and `site-flow` ports, and unmanaged target paths are preserved.
+`mirror_files.py` keeps Claude as the one source of truth for shared skills. `~/.claude/skills` and the enabled Claude plugins own the skill files; `~/.codex/skills` holds only symlinks to them, small wrappers for Claude commands, and the Codex-specific ports (`delegate`, `site-flow`, `codex`, `claude-connectors`) plus Codex system skills. Each run reads Claude's current skills, commands, `plugins/installed_plugins.json` and `settings.json` `enabledPlugins`, so plugin links follow the installed version instead of a frozen snapshot. Project-scoped commands and skills still come from the saved metadata-only inventory at `~/.codex/mirrors/claude/inventory.json` (or `/tmp/claude-skill-inventory.json` on first install) and become small Codex skill wrappers under each repository `.agents/skills` directory. Project wrappers contain an explicit repository check. `--frozen` plans from the saved inventory alone. The adapted `delegate` and `site-flow` ports and unmanaged target paths are preserved. An unmanaged Codex skill folder with the same files, file contents, executable bits and internal links as its Claude source is a duplicate: apply renames it into the backup folder (same filesystem only) and replaces it with a symlink. A copy that differs in any of those is preserved and reported as `preserve-unmanaged`. Apply reads Claude's state, plans and applies under the single-writer lock, so a run that waited behind another cannot restore older links. This live reading is the default since 2026-09-27; `--frozen` gives the earlier snapshot-only behavior.
 
 ```bash
 python3 setup/claude-codex-mirror/mirror_files.py
 python3 setup/claude-codex-mirror/mirror_files.py --apply
+```
+
+A scheduled apply keeps the links current after Claude plugin updates. `--quiet` prints one JSON line with the counts and changed targets:
+
+```cron
+47 * * * *  /usr/bin/python3 /home/dev/projects/ai-harness/setup/claude-codex-mirror/mirror_files.py --apply --quiet >> /home/dev/.codex/mirrors/claude/sync.log 2>&1
 ```
 
 The apply mode writes `~/.codex/claude-mirror-owned.json`. It also saves the exact input metadata at `~/.codex/mirrors/claude/inventory.json`. For a source refresh, create a new read-only Claude/Codex inventory and pass its path with `--inventory`. Normal verification uses the durable saved inventory and does not depend on temporary files. Later runs may replace only unchanged paths in the ownership file. Manually edited owned paths and all unmanaged paths are preserved. It backs up an unchanged owned path before replacement under `~/.codex/backups/claude-mirror/`. Apply uses a single-writer lock, rechecks current targets, and records a pending operation before atomically replacing a file or symlink. A later run can recover ownership when the installed target still matches that recorded operation. Invalid path segments and target-parent escapes are rejected. These checks do not coordinate unrelated editors or promise a transaction across the whole machine. Symlink sources remain canonical, and the tool does not copy `.env`, credential, transcript, or session files.
@@ -28,8 +34,10 @@ the maintained instructions; the pointer tells Codex to read them in the relevan
 repository. Settings applies also use a single-writer lock with a 30-second wait limit and recheck the current configuration before committing changes. Missing or unreadable Claude source settings stop with a clear error so refresh cannot silently erase the source preferences. Claude shell allowlists and UI/model settings do not silently become
 global Codex permissions. There were no source project deny rules to migrate.
 
-The source's 14 disabled skills remain disabled. Existing Codex `delegate`,
-`site-flow`, system skills and identical Cloudflare skill copies are retained.
+The source's 14 disabled skills remain disabled; Codex matches its disabled-skill
+paths through the symlinks. Existing Codex `delegate`, `site-flow` and system skills
+are retained. The former identical Cloudflare skill copies are now symlinks to
+`~/.claude/skills`.
 Enabled plugin skills link to the currently installed Claude version, including
 the local slim Superpowers preamble. Disabled code-review, GitHub and Telegram
 plugins remain excluded. No custom source subagent definitions were present.
