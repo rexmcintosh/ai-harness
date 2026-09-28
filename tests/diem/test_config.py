@@ -186,3 +186,14 @@ def test_a_reserve_that_is_not_a_finite_number_is_a_config_error(tmp_path, bad):
     p.write_text(f'daily_diem = 31.0\n[reserve]\nlock = "/tmp/x"\ndiem = {bad}\n')
     with pytest.raises(SystemExit):
         DiemConfig.load(p)
+
+
+def test_review_and_ask_seeds_are_the_billed_council_run_cost():
+    """2026-09-20..27 billing reconciliation: one 4-seat code-review panel run bills
+    ~0.43 DIEM (ledger estimate ~0.32; the openai-gpt-56-sol seat bills 2.2x its
+    estimate). The old 1.0 review seed was ~2x too high; durations are unchanged."""
+    from diem.config import _DEFAULT_SEEDS
+    assert _DEFAULT_SEEDS["review"] == {"cost": 0.45, "duration_s": 180}
+    assert _DEFAULT_SEEDS["ask"] == {"cost": 0.45, "duration_s": 120}
+    cfg = DiemConfig(daily_diem=31.0, repos=[])
+    assert cfg.seeds["review"]["cost"] == cfg.seeds["ask"]["cost"] == 0.45

@@ -186,7 +186,8 @@ def test_estimates_recorded_from_balance_delta(tmp_path):
     run_checkpoint(cfg, now=NOW, balance=FakeBalance([50.0, 47.0, 14.0]), queue=q,
                    estimates=est, reviewed=rev, runner=FakeRunner())
     cost, _dur = est.estimate("ask")
-    assert cost == pytest.approx(0.5 + 0.3 * (3.0 - 0.5))  # EMA toward observed 3.0
+    seed = cfg.seeds["ask"]["cost"]
+    assert cost == pytest.approx(seed + 0.3 * (3.0 - seed))  # EMA toward observed 3.0
 
 
 # --- UTC / midnight-reset (00:00 UTC epoch) config ---
@@ -465,3 +466,22 @@ def test_a_blocking_review_lands_in_the_findings_file(tmp_path):
         [(block.id, "swim", "a..b", "new")]
     ran = [e for e in summary["ran"] if e["type"] == "review"]
     assert [e.get("finding", False) for e in ran] == [e["id"] == block.id for e in ran]
+
+
+def test_default_seeds_still_run_leftover_asks_after_reviews(tmp_path):
+    """The banked audit asks sit at priority 900 behind reviews with not_before 23:00.
+    With the billed-cost seeds a thin floor-0 balance still reaches them."""
+    cfg = _cfg(tmp_path)
+    q, est, rev = _bits(tmp_path, cfg)
+    q.add(new_item("review", {"repo": "/r/a", "range": "a..b", "head": "b"},
+                   created=NOW_ISO))
+    ask = new_item("ask", {"question": "audit", "panel": "code-review"},
+                   created=NOW_ISO, not_before="23:00")
+    ask.priority = 900
+    q.add(ask)
+    at = datetime(2026, 7, 4, 0, 20)          # floor 0 slot
+    bal = FakeBalance([0.95, 0.47, 0.47, 0.0, 0.0, 0.0])  # old 1.0/0.5 seeds: nothing ran
+    r = FakeRunner()
+    run_checkpoint(cfg, now=at, balance=bal, queue=q, estimates=est,
+                   reviewed=rev, runner=r)
+    assert [i.type for i in r.ran][:2] == ["review", "ask"]

@@ -44,9 +44,17 @@ class Checkpoint:
 
 _DEFAULT_CHECKPOINTS = [Checkpoint("21:00", 0.40), Checkpoint("23:00", 0.15),
                         Checkpoint("00:15", 0.0)]
+# review/ask cost = one 4-seat council panel run as BILLED, not as the ledger
+# estimates it. Measured 2026-09-20..27 (`venice-usage reconcile --project
+# council`, 521 matched calls): mean billed per run 0.43 DIEM vs 0.32 estimated,
+# because openai-gpt-56-sol bills 2.2x its estimate (the other seats are within
+# 4%). The drain's own balance deltas over 106 reviews since 09-13 agree (mean
+# 0.42). 0.45 keeps a small margin; the audit asks use the same code-review
+# panel on similar-size prompts. The live floor re-check between jobs stays the
+# guard, and these are only priors until estimates.json has an EWMA.
 _DEFAULT_SEEDS = {
-    "ask": {"cost": 0.5, "duration_s": 120},
-    "review": {"cost": 1.0, "duration_s": 180},
+    "ask": {"cost": 0.45, "duration_s": 120},
+    "review": {"cost": 0.45, "duration_s": 180},
     "images": {"cost": 2.0, "duration_s": 180},
     "backfill": {"cost": 1.0, "duration_s": 300},
     "cmd": {"cost": 1.0, "duration_s": 300},
