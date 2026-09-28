@@ -3,8 +3,9 @@
 
 Works `status: open` items from ~/projects/backlog/backlog.yaml unattended. Each item
 runs as a COLD headless Claude Code session inside its own git worktree on a fresh
-`claude/bl-<slug>` branch of the item's repo; the resulting diff is council-reviewed
-and the item is left `in_review` (or `held`) for the human's morning review.
+`claude/bl-<slug>` branch of the item's repo; the resulting diff is reviewed (council panel
+for code, light review for docs-only) and the item is left `in_review` (or `held`) for the
+human's morning review.
 
 Subcommands:
   work      nightly: pick open items (oldest first), work each, review, mark; keeps going
@@ -31,9 +32,13 @@ Safety contract (~/projects/backlog/README.md), enforced here and tagged C1..C4:
      (d) no MCP servers (--strict-mcp-config with an empty config); (e) the contract in
      its prompt with a HELD escape hatch. Whatever it cannot finish inside the branch
      becomes `held` with a note — the runner never performs the outward step itself.
-  C3 Every worked diff is council-reviewed (the council package, in-process, same panel
-     as `council review --diff`); the verdict — or the review failure — is recorded on
-     the item.
+  C3 Every worked diff is reviewed, sized to its risk (backlogrun/review_policy.py): code
+     gets the council code-review panel (in-process, same panel as `council review
+     --diff`); a docs-only diff gets a light review, a tool-less Claude session at
+     22:00-07:00 UTC, else the spec-review panel's cheapest seat. Only blocking or serious
+     findings send an item back; minor ones become follow-ups. After 3 review rounds the
+     owner decides. The verdict, the reviewer and why — or the review failure — is
+     recorded on the item.
   C4 `work` moves open -> in_review | held. `rework` moves the same held/in_review item
      back to reviewed or held state without changing merge authority.
 Also: fail closed per item (one failure never aborts the batch); bounded (session cap,

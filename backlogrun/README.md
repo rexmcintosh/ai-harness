@@ -7,7 +7,8 @@ Spec: `../docs/superpowers/specs/2026-09-03-backlog-runner-design.md`.
 Contract it obeys: `~/projects/backlog/README.md` § "Safety contract for the 3am runner".
 
 Each `open` item is worked by a cold, headless Claude Code session inside its own git
-worktree on a fresh `claude/bl-<slug>` branch of the item's repo, council-reviewed, and left
+worktree on a fresh `claude/bl-<slug>` branch of the item's repo, reviewed (council panel for
+code, light review for docs-only; see [Review policy](#review-policy)), and left
 as `in_review` (or `held`) for you. Nothing is ever pushed or merged by the clock.
 
 ## Commands
@@ -89,8 +90,12 @@ It refuses, with one sentence on stderr and exit 1, when:
 - the branch is gone (`branch claude/bl-<slug> does not exist`);
 - the repo or its local default branch cannot be resolved.
 
+- the item has had 3 review rounds (`3 review rounds are done, so the owner decides; approve,
+  drop, or pass --force to run another round`). `--force` is your call to run one more.
+
 A refusal changes nothing. `--dry-run` runs the same checks, then prints the status, repo,
-branch, head, commits ahead, worktree path and the number of review notes. It takes no
+branch, head, commits ahead, worktree path, the number of review notes and the next review
+round. It takes no
 lock, starts no session, and leaves `reviewed_sha` alone. A real rework clears
 `reviewed_sha` first, so the branch needs a fresh review before `approve`.
 
@@ -117,7 +122,8 @@ the note starts with `Rex's review`. No review notes, no section.
   `runner: CONFLICT …` note (the branch is kept).
 - An empty leftover `claude/bl-*` branch (no commits, no worktree) is reclaimed on the next
   run, journaled; a leftover branch **with** work holds the item instead.
-- Every branch that carries work is council-reviewed — held ones too. A council failure is
+- Every branch that carries work is reviewed — held ones too (see [Review policy](#review-policy)).
+  A review failure is
   recorded as the verdict (`REVIEW FAILED: …`); the item still goes to `in_review` — the
   morning report shows it, you review by hand.
 - `approve` takes `in_review` items; a held item's branch needs `--held`. Both require the
@@ -132,7 +138,8 @@ the note starts with `Rex's review`. No review notes, no section.
 ## Item fields the runner writes
 
 `status`, `branch`, `worked`, `council`, `note`, `session` (claude session id), `cost_usd`,
-`reviewed_sha` (the exact branch commit submitted to review).
+`reviewed_sha` (the exact branch commit submitted to review), `review_rounds` (how many
+reviews ran on this item), `follow_ups` (the last review's minor points; absent when none).
 `approve` adds `merged`, `merge_commit`; `drop` adds `dropped`. Both move the item to
 `archive.yaml`.
 
@@ -173,21 +180,70 @@ edits it.
 
 ## Tests
 
-    python3 -m pytest tests/test_backlogrun.py tests/test_backlogrun_budget_loop.py -q
+    python3 -m pytest tests/test_backlogrun.py tests/test_backlogrun_budget_loop.py tests/test_backlogrun_review_policy.py -q
 
 They run the whole `work`/`approve`/`drop` flow against temp git repos with a fake `claude`
 binary (no network, no real sessions) and assert the scrubbed environment, the pushurl
 guard, the state transitions, the YAML round trip and the lock.
 
+## Review policy
+
+Venice DIEM is the scarce resource, so the review is sized to the risk and the rework loop is
+bounded (`backlogrun/review_policy.py`). Every item is still reviewed, and every round is a
+full review, never a recheck of the last findings only: a replay of September 2026 showed a
+recheck-only loop would have merged two real bugs that only later full reviews found.
+
+**Review sized to risk.** The runner lists the branch's changed paths (`git diff --name-only
+--no-renames base...branch`) and classifies them:
+
+- **docs-only**: every path is prose or data: `.md`, `.markdown`, `.txt`, `.rst`, `.adoc`,
+  `.csv`, `.tsv`, and `.yaml`/`.yml` inside a `docs/` or `doc/` folder.
+- **code**: anything else. That includes every script and config that can execute (`.py`,
+  `.js`, `.mjs`, `.ts`, `.sh`, `.json`, `package.json`, `.toml`, `.html`, files with no
+  suffix such as `Makefile` or `bin/tg-send`), YAML outside a docs folder, anything under a
+  dot folder (`.github/`, `.claude/`), agent instruction files (`CLAUDE.md`, `AGENTS.md`,
+  `GEMINI.md`, `SKILL.md`), and any path with `cron` in it (crontab text). Unsure is code.
+  One script among many reports makes the whole branch code.
+
+| Diff | When (UTC) | Reviewer (recorded as) |
+|---|---|---|
+| code | any time | the full council `code-review` panel ("council code-review") |
+| docs-only | 22:00-07:00 | a fresh Claude session: `claude -p --model claude-opus-5-5 --effort high --tools ""`, no MCP servers, a scrubbed environment, in an empty temp folder ("Claude review (docs)") |
+| docs-only | 07:00-22:00 | the council `spec-review` panel cut to one seat, its cheapest model by the `venice_usage` price table, which also chairs ("council spec-review (one seat, docs)") |
+
+The night window is when the owner's Claude plan is otherwise idle. The Claude reviewer has
+no tools, so it cannot write anything; it returns the same JSON shape as the council chair.
+Which reviewer ran, and why, is saved as `reviewer` and `reviewer_reason` in the review's
+`inputs.json` and shown by `report` and `show`.
+
+**Severity gate.** The reviewer returns its required changes plus one class per change
+(`required_change_classes`: severity and whether it is a verified correctness or security
+defect). A finding is **blocking/serious** when the chair lists it under `blocking_findings`,
+its severity is high or critical, or it is a verified correctness or security defect.
+Everything else is **minor**. Only serious findings make readiness "Changes requested";
+minor-only reviews are "Ready with follow-ups" and the minor points are saved on the item as
+`follow_ups`. When the classes are missing or do not line up one-to-one with the changes,
+every change counts as serious (fail closed). Raw panelist findings the chair did not confirm
+do not count.
+
+**Round limit.** Each review that runs is one round, saved on the item as `review_rounds` and in
+the review record as `review_round` (a `--no-council` pass is not a round). From round 3 on, a
+review that still finds a serious point reads "Owner decides (3 rounds)", and `rework` refuses
+unless you pass `--force`. A round-3 review with no serious point is ready as usual. The report
+and `show` print the round, e.g. `review: round 2 of 3, by council code-review`. Items worked
+before this policy start counting at their next review.
+
 ## Review readiness
 
 `in_review` means the work awaits your decision. It does not mean checks passed.
-The report now shows one of four evidence states for each worked branch:
+The report now shows one of six evidence states for each worked branch:
 
 | State | Meaning | Suggested next step |
 |---|---|---|
 | Ready for your review | Explicit completed outcome, explicit clean council verdict, and the declared checks passed for the current branch commit. | Read the full evidence, then decide. |
-| Changes requested | The council names unresolved fixes or conditions. | Address the listed conditions. |
+| Ready with follow-ups | As ready, and the review listed only minor points. They are shown as follow-ups and do not send the item back. | Read the evidence, decide; fold the follow-ups in or file them. |
+| Changes requested | The review names a blocking or serious finding. | Address the listed conditions (`rework`). |
+| Owner decides (3 rounds) | Round 3 or later still found a blocking or serious point. `rework` refuses without `--force`. | Approve, drop, or `rework --force`. |
 | Review or checks failed | The runner, reviewer, synthesis, or a required check failed. | Inspect the failure evidence. |
 | Review readiness unknown | Evidence is missing, malformed, incomplete, contradictory, or covers another commit. | Inspect or refresh the evidence. |
 
@@ -197,7 +253,7 @@ The report preserves full conditions and links to the full review. Its JSON adds
 `review_readiness`, keyed by item ID; the existing `numbers` mapping stays intact.
 `show` displays the same readiness and full evidence. Short notifications state
 readiness and point to `show`, instead of clipping a possibly conditional verdict.
-Only ready rows suggest the numbered `approve` command. This is display guidance, not
+Only ready rows (with or without follow-ups) suggest the numbered `approve` command. This is display guidance, not
 a readiness gate. `approve` still uses the existing human authority, including `--held`,
 but now refuses when the branch head differs from its exact recorded review SHA. There is
 no automatic merge.
