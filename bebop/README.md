@@ -158,6 +158,8 @@ for changes is recorded in `~/.local/state/diem/findings.json` as `new` (see
 - Same contract as the backlog line: built in code, appended after the model answers,
   morning only, never under the failure ping, fail open, bounded by `BEBOP_BACKLOG_TIMEOUT`.
 - It sits under the backlog line, and is dropped first if the message would pass 4000 chars.
+- It runs under system `python3` (the venv python only if there is none), not the
+  backlog line's PyYAML interpreter, so a broken venv costs the backlog line alone.
 - `BEBOP_FINDINGS_FILE` overrides the path (tests use it).
 - `runs.log` gains `findings_line=1|0`.
 - `diem findings --ack <id>` is how a finding stops being counted.

@@ -162,6 +162,11 @@ TG_MAX_CHARS=4000                     # Telegram refuses a message over 4096 cha
 FINDINGS_LINE=""
 FINDINGS_FLAG=0
 FINDINGS_HELPER="$DIR/findings_line.py"
+# Its own interpreter, not BACKLOG_PY: that one is picked for PyYAML, and the findings helper
+# is stdlib only, so a broken or missing venv must not cost this line too. System python3
+# first; the venv python is the fallback only when no python3 is on PATH.
+FINDINGS_PY="$(command -v python3 || true)"
+[ -n "$FINDINGS_PY" ] || { [ -x "$DIR/../.venv/bin/python" ] && FINDINGS_PY="$DIR/../.venv/bin/python"; }
 
 # --- send: agent output IS the briefing text (or FAILED:<reason>) ---
 # Success contract for the log stays `rc=0 ... result="SENT..."` — the watchdog's
@@ -179,9 +184,9 @@ if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAIL
     BACKLOG_LINE=$(timeout -k 2 "$BACKLOG_TIMEOUT" \
       "$BACKLOG_PY" "$BACKLOG_HELPER" 2>/dev/null || true)
   fi
-  if [ "$MODE" = "morning" ] && [ -r "$FINDINGS_HELPER" ] && [ -n "$BACKLOG_PY" ]; then
+  if [ "$MODE" = "morning" ] && [ -r "$FINDINGS_HELPER" ] && [ -n "$FINDINGS_PY" ]; then
     FINDINGS_LINE=$(timeout -k 2 "$BACKLOG_TIMEOUT" \
-      "$BACKLOG_PY" "$FINDINGS_HELPER" 2>/dev/null || true)
+      "$FINDINGS_PY" "$FINDINGS_HELPER" 2>/dev/null || true)
   fi
   MESSAGE="$RESULT"
   SEP="

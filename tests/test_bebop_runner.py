@@ -27,13 +27,15 @@ def executable(path: Path, text: str) -> Path:
 
 def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=None,
         mode: str = "morning", backlog: str | None = None, helper: str | None = None,
-        findings: str | None = None, findings_helper: str | None = None):
+        findings: str | None = None, findings_helper: str | None = None,
+        venv_python: str | None = None):
     """replies[n] is what the fake claude answers on its n-th call (last one repeats).
 
     `backlog` is the YAML the backlog helper reads; `helper` replaces the helper script
     itself (to stand in for a crash or a hang). With neither, BEBOP_BACKLOG_FILE points
     at a file that does not exist, so no test can read Rex's real backlog.
     `findings` / `findings_helper` do the same for the code-review findings line.
+    `venv_python` becomes the tree's .venv/bin/python, the backlog helper's first choice.
     """
     bebop = tmp_path / "tree" / "bebop"
     shutil.copytree(ROOT / "bebop" / "prompts", bebop / "prompts")
@@ -44,6 +46,8 @@ def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=Non
     shutil.copy(ROOT / "bebop" / "findings_line.py", bebop / "findings_line.py")
     if findings_helper is not None:
         executable(bebop / "findings_line.py", findings_helper)
+    if venv_python is not None:
+        executable(tmp_path / "tree" / ".venv" / "bin" / "python", venv_python)
     findings_file = tmp_path / "findings.json"
     if findings is not None:
         findings_file.write_text(findings)
@@ -322,3 +326,38 @@ def test_no_findings_line_under_the_failure_ping(tmp_path):
     assert proc.returncode == 1
     assert all("code-review" not in m for m in sent)
     assert "findings_line=0" in log[0]
+
+
+# --- council review: the findings line must not depend on the backlog's interpreter ---
+# findings_line.py is stdlib only. It used to borrow BACKLOG_PY, the venv python picked
+# for PyYAML, so a broken or missing venv cost the findings line along with the backlog one.
+
+def test_a_broken_backlog_venv_python_does_not_cost_the_findings_line(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], backlog=BACKLOG, findings=FINDINGS,
+        venv_python="#!/bin/sh\nexit 1\n")
+    assert proc.returncode == 0
+    assert sent == [f"{BRIEFING}\n\n{FINDINGS_LINE}"]
+    assert "backlog_line=0 findings_line=1" in log[0]
+
+
+def test_findings_line_goes_when_no_python_can_import_yaml(tmp_path):
+    """No venv, and python3 on PATH has no PyYAML: the backlog helper fails at import,
+    the findings helper does not need yaml and still reports."""
+    no_yaml = tmp_path / "no-yaml"
+    no_yaml.mkdir()
+    (no_yaml / "yaml.py").write_text("raise ImportError('no PyYAML here')\n")
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], backlog=BACKLOG, findings=FINDINGS,
+        extra_env={"PYTHONPATH": str(no_yaml)})
+    assert proc.returncode == 0
+    assert sent == [f"{BRIEFING}\n\n{FINDINGS_LINE}"]
+    assert "backlog_line=0 findings_line=1" in log[0]
+
+
+def test_a_hanging_findings_helper_is_still_cut_off_under_its_own_interpreter(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path, [BRIEFING], findings=FINDINGS, venv_python="#!/bin/sh\nexit 1\n",
+        findings_helper="#!/usr/bin/env python3\nimport time\ntime.sleep(30)\n",
+        extra_env={"BEBOP_BACKLOG_TIMEOUT": "1"})
+    assert proc.returncode == 0 and sent == [BRIEFING] and "findings_line=0" in log[0]
