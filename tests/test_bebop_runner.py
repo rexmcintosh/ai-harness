@@ -26,12 +26,14 @@ def executable(path: Path, text: str) -> Path:
 
 
 def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=None,
-        mode: str = "morning", backlog: str | None = None, helper: str | None = None):
+        mode: str = "morning", backlog: str | None = None, helper: str | None = None,
+        findings: str | None = None, findings_helper: str | None = None):
     """replies[n] is what the fake claude answers on its n-th call (last one repeats).
 
     `backlog` is the YAML the backlog helper reads; `helper` replaces the helper script
     itself (to stand in for a crash or a hang). With neither, BEBOP_BACKLOG_FILE points
     at a file that does not exist, so no test can read Rex's real backlog.
+    `findings` / `findings_helper` do the same for the code-review findings line.
     """
     bebop = tmp_path / "tree" / "bebop"
     shutil.copytree(ROOT / "bebop" / "prompts", bebop / "prompts")
@@ -39,6 +41,12 @@ def run(tmp_path: Path, replies: list[str], *, claude_rc: int = 0, extra_env=Non
     shutil.copy(ROOT / "bebop" / "backlog_line.py", bebop / "backlog_line.py")
     if helper is not None:
         executable(bebop / "backlog_line.py", helper)
+    shutil.copy(ROOT / "bebop" / "findings_line.py", bebop / "findings_line.py")
+    if findings_helper is not None:
+        executable(bebop / "findings_line.py", findings_helper)
+    findings_file = tmp_path / "findings.json"
+    if findings is not None:
+        findings_file.write_text(findings)
     backlog_file = tmp_path / "backlog.yaml"
     if backlog is not None:
         backlog_file.write_text(backlog)
@@ -59,6 +67,7 @@ if [ "$2" = "-" ]; then cat > "{tmp_path}/sent-$(date +%s%N).txt"; else printf '
     home = tmp_path / "home"; home.mkdir()
     env = {"HOME": str(home), "PATH": f"{tmp_path / 'fakebin'}:/usr/bin:/bin",
            "BEBOP_RETRY_DELAY": "0", "BEBOP_BACKLOG_FILE": str(backlog_file),
+           "BEBOP_FINDINGS_FILE": str(findings_file),
            "BEBOP_BACKLOG_NOW": "2026-09-21", **(extra_env or {})}
     proc = subprocess.run(["bash", str(bebop / "run-briefing.sh"), mode],
                           env=env, capture_output=True, text=True, timeout=60)
@@ -263,3 +272,53 @@ def test_a_huge_timeout_is_capped_so_a_hang_cannot_hold_the_briefing_for_long(tm
         extra_env={"BEBOP_BACKLOG_TIMEOUT": "9999", "BEBOP_BACKLOG_TIMEOUT_CAP": "2"})
     assert proc.returncode == 0 and sent == [BRIEFING]
     assert time.monotonic() - started < 30
+
+
+# --- the code-review findings line -------------------------------------------------
+
+FINDINGS = json.dumps([{"id": "a" * 32, "status": "new"}, {"id": "b" * 32, "status": "new"},
+                       {"id": "c" * 32, "status": "acked"}])
+FINDINGS_LINE = "2 new code-review findings on main. Look: diem findings"
+
+
+def test_the_morning_briefing_gets_the_findings_line_after_the_backlog_line(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], backlog=BACKLOG,
+                                        findings=FINDINGS)
+    assert proc.returncode == 0
+    assert sent == [f"{BRIEFING}\n\n{BACKLOG_LINE}\n{FINDINGS_LINE}"]
+    assert "backlog_line=1 findings_line=1" in log[0]
+
+
+def test_the_findings_line_alone_when_the_backlog_is_quiet(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, [BRIEFING], findings=FINDINGS)
+    assert sent == [f"{BRIEFING}\n\n{FINDINGS_LINE}"]
+    assert "backlog_line=0 findings_line=1" in log[0]
+
+
+def test_no_findings_line_in_the_evening_or_when_all_are_acked(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path / "e", [BRIEFING], findings=FINDINGS,
+                                        mode="evening")
+    assert sent == [BRIEFING] and "findings_line=0" in log[0]
+    acked = json.dumps([{"id": "a" * 32, "status": "acked"}])
+    proc, calls, sent, log, state = run(tmp_path / "m", [BRIEFING], findings=acked)
+    assert sent == [BRIEFING] and "findings_line=0" in log[0]
+
+
+def test_a_crashing_or_hanging_findings_helper_still_sends_the_briefing(tmp_path):
+    proc, calls, sent, log, state = run(
+        tmp_path / "c", [BRIEFING], findings=FINDINGS,
+        findings_helper="#!/usr/bin/env python3\nraise SystemExit(3)\n")
+    assert proc.returncode == 0 and sent == [BRIEFING] and "findings_line=0" in log[0]
+    proc, calls, sent, log, state = run(
+        tmp_path / "h", [BRIEFING], findings=FINDINGS,
+        findings_helper="#!/usr/bin/env python3\nimport time\ntime.sleep(30)\n",
+        extra_env={"BEBOP_BACKLOG_TIMEOUT": "1"})
+    assert proc.returncode == 0 and sent == [BRIEFING] and "findings_line=0" in log[0]
+
+
+def test_no_findings_line_under_the_failure_ping(tmp_path):
+    proc, calls, sent, log, state = run(tmp_path, ["FAILED: tools unavailable"],
+                                        findings=FINDINGS)
+    assert proc.returncode == 1
+    assert all("code-review" not in m for m in sent)
+    assert "findings_line=0" in log[0]
