@@ -388,7 +388,9 @@ def test_work_done_flow_end_to_end(world):
     # main untouched, remote untouched
     assert git(world.repo, "rev-list", "--count", "origin/main..main").strip() == "0"
     # review file + run log + backlog commit
-    assert (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text().startswith("# council review")
+    review_md = (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text()
+    assert review_md.startswith("# council review — 2026-01-01-a — ")   # same header whichever reviewer ran
+    assert "Reviewer: injected reviewer, because reviewer supplied by the caller." in review_md
     assert list(Path(cfg.runs_dir).glob("*-2026-01-01-a.json"))
     assert "backlog: 2026-01-01-a -> in_review (claude/bl-a)" in git(cfg.backlog_dir, "log", "-1", "--format=%s")
     # what the session saw

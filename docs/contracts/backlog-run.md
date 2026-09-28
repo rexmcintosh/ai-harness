@@ -12,7 +12,7 @@ It may create local worktrees and branches, run the scoped agent, write runner r
 
 ## Success and evidence
 
-Success is a per-item run record, a review file, and an item transition consistent with the recorded outcome. Inspect `/home/dev/projects/.backlog-run/cron.log`, `runs/<timestamp>-<id>.json`, `reviews/<id>.md`, `report.json`, `report.md`, and the backlog item. The runner’s own test suite covers its state transitions with fake workers.
+Success is a per-item run record, a review file, and an item transition consistent with the recorded outcome. Inspect `/home/dev/projects/.backlog-run/cron.log`, `runs/<timestamp>-<id>.json`, `reviews/<id>.md`, `report.json`, `report.md`, and the backlog item. Every review file starts with the same line, `# council review — <id> — <time>`, whichever reviewer ran (council panel or Claude); the next line, `Reviewer: <label>, because <reason>. Review round N of 3.`, names the reviewer that actually ran. A skipped review has no `Reviewer:` line. The runner’s own test suite covers its state transitions with fake workers.
 
 ## Failure, escalation, and gaps
 

@@ -1132,15 +1132,23 @@ def _capture_validations(cfg: Config, stem: str, text: str, *, head_sha: str = "
     return captured
 
 
+# First line of every reviews/<id>.md, whichever reviewer ran (council panel or Claude).
+REVIEW_HEADER = "# council review"
+
+
 def _save_review(cfg: Config, *, iid: str, stem: str, sha: str, kind: str,
                  required: object, validations: list, rev: dict) -> dict:
     path = Path(cfg.reviews_dir) / f"{stem}.md"
-    label = rev.get("reviewer") if isinstance(rev.get("reviewer"), str) else "council review"
-    text = f"# {label} — {iid} — {now_stamp()}\n\n"
-    if rev.get("review_round"):
-        text += f"Review round {rev['review_round']} of {review_policy.ROUND_LIMIT}. "
-    if rev.get("reviewer_reason"):
-        text += f"Reviewer: {label}, because {rev['reviewer_reason']}.\n\n"
+    # The first line is the same for every reviewer; the reviewer is named on the line after it.
+    text = f"{REVIEW_HEADER} — {iid} — {now_stamp()}\n\n"
+    if isinstance(rev.get("reviewer"), str):
+        text += f"Reviewer: {rev['reviewer']}"
+        if rev.get("reviewer_reason"):
+            text += f", because {rev['reviewer_reason']}"
+        text += "."
+        if rev.get("review_round"):
+            text += f" Review round {rev['review_round']} of {review_policy.ROUND_LIMIT}."
+        text += "\n\n"
     text += str(rev.get("markdown") or rev.get("summary") or "Review unavailable.")
     conditions = rev.get("blocking_findings")
     if isinstance(conditions, list) and all(isinstance(x, str) for x in conditions):

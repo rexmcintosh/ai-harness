@@ -312,6 +312,38 @@ def test_claude_docs_review_bad_answers_never_read_as_clean(world, tmp_path, ans
     assert rev.get("review_status") != "clean"
 
 
+# ----------------------------------------------------------------------------- review file header
+
+
+@pytest.mark.parametrize("label", [rp.REVIEWER_CODE, rp.REVIEWER_CLAUDE_DOCS, rp.REVIEWER_COUNCIL_DOCS,
+                                   "injected reviewer"])
+def test_review_file_has_one_header_for_every_reviewer(tmp_path, label):
+    cfg = br.Config(state_dir=str(tmp_path))
+    Path(cfg.reviews_dir).mkdir(parents=True)
+    rev = {"ok": True, "summary": "ok", "markdown": "review body", "review_status": "clean",
+           "blocking_findings": [], "follow_ups": [], "reviewer": label,
+           "reviewer_reason": "the reason", "review_round": 2}
+    br._save_review(cfg, iid="2026-01-01-a", stem="s-2026-01-01-a", sha=SHA, kind="done",
+                    required=[], validations=[], rev=rev)
+    for name in ("s-2026-01-01-a.md", "2026-01-01-a.md"):
+        lines = (Path(cfg.reviews_dir) / name).read_text().splitlines()
+        assert lines[0].startswith(f"{br.REVIEW_HEADER} — 2026-01-01-a — ")
+        assert lines[2] == f"Reviewer: {label}, because the reason. Review round 2 of 3."
+        assert lines[4] == "review body"
+
+
+def test_review_file_without_a_reviewer_keeps_the_header_and_names_no_reviewer(tmp_path):
+    cfg = br.Config(state_dir=str(tmp_path))
+    Path(cfg.reviews_dir).mkdir(parents=True)
+    rev = {"ok": True, "summary": "review skipped (--no-council)", "review_status": "unknown", "blocking_findings": []}
+    br._save_review(cfg, iid="2026-01-01-a", stem="s-2026-01-01-a", sha=SHA, kind="done",
+                    required=[], validations=[], rev=rev)
+    lines = (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text().splitlines()
+    assert lines[0].startswith(f"{br.REVIEW_HEADER} — 2026-01-01-a — ")
+    assert lines[2] == "review skipped (--no-council)"
+    assert not any(line.startswith("Reviewer:") for line in lines)
+
+
 # ----------------------------------------------------------------------------- end to end
 
 
@@ -342,6 +374,11 @@ def test_work_picks_the_reviewer_by_diff_and_hour_and_records_it(world, monkeypa
     rec = json.loads(next(Path(cfg.reviews_dir).glob("*.inputs.json")).read_text())
     assert rec["reviewer"] == "Claude review (docs)" and "22:00-07:00 UTC" in rec["reviewer_reason"]
     assert rec["review_round"] == 1 and rec["follow_ups"] == ["tidy the wording in step 2"]
+    # One header for every reviewer; the reviewer that ran is named on the next line.
+    md = (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text().splitlines()
+    assert md[0].startswith("# council review — 2026-01-01-a — ")
+    assert md[2].startswith("Reviewer: Claude review (docs), because docs-only diff at 23:10 UTC")
+    assert md[2].endswith("Review round 1 of 3.")
     (it,) = load_items(cfg)
     assert it["review_rounds"] == 1 and it["follow_ups"] == ["tidy the wording in step 2"]
     report = br.write_report(cfg)

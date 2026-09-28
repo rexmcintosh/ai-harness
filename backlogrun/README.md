@@ -146,7 +146,9 @@ reviews ran on this item), `follow_ups` (the last review's minor points; absent 
 ## State
 
 `~/projects/.backlog-run/`: `report.md` + `report.json` (number → id), `reviews/<id>.md`
-(full council output), `runs/<ts>-<id>.json` (raw session result), `journal.log`
+(full review output; the first line is always `# council review — <id> — <time>`,
+whichever reviewer ran, and the line after it names the reviewer, the reason and the
+round), `runs/<ts>-<id>.json` (raw session result), `journal.log`
 (branch deletions: ts, repo, branch, sha, action — restore with `git branch <name> <sha>`),
 `lock`, `cron.log`.
 
