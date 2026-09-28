@@ -8,12 +8,24 @@ the count of "new" into one morning briefing line.
 
 Parsing is plain text matching, no model. Only a recommendation that opens
 with a request for changes (or block / reject / do not merge) counts; every
-flavour of "Approve ..." does not, even "approve with fixes". Anything that
-cannot be read is skipped, never raised: a findings hiccup must not cost the
-drain its night."""
+flavour of "Approve ..." does not, even "approve with fixes". Any other
+"Request ..." ("Request a small fix ...") counts only when its first sentence
+plainly asks for the change before merge and says nothing of after-merge or
+follow-up work: "Request a follow-up issue after merge" is not a finding.
+Anything that cannot be read is skipped, never raised: a findings hiccup must
+not cost the drain its night.
+
+The drain, `diem findings --ack` and `--backfill` can run at once. Every write
+takes an exclusive flock on findings.json.lock, re-reads the file under it,
+applies its one change and replaces the file before letting go, so no writer
+works from a stale copy and none can drop another's record or ack. Readers
+(bebop's line, `diem findings`) need no lock: the replace is atomic."""
 from __future__ import annotations
+import contextlib
+import fcntl
 import json
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -21,14 +33,22 @@ from .state import _atomic_write
 
 FILENAME = "findings.json"
 LINE_MAX = 160
+LOCK_TIMEOUT = 10.0  # seconds a writer waits for the lock before giving up
 
 _HEADING = re.compile(r"^### Recommendation\b.*$", re.M)
 _REVIEW_NAME = re.compile(r"^(?P<repo>.+)-(?P<id>[0-9a-f]{32})\.md$")
 # Leading markdown noise before the verdict word: bold, quotes, bullets, spaces.
 _LEAD = re.compile(r"^[\s*_>#`\-]+")
-_BLOCKING = ("request changes", "request a ", "request small", "request minor",
-             "changes requested", "changes required", "needs changes",
-             "block", "reject", "do not merge", "don't merge")
+_BLOCKING = ("request changes", "changes requested", "changes required",
+             "needs changes", "block", "reject", "do not merge", "don't merge")
+# For the rest of the "request ..." family: the first sentence must ask for the
+# change before merge and must not also point after merge or at follow-up work.
+_SENTENCE_END = re.compile(r"[.;:!?](\s|$)")
+_PRE_MERGE = re.compile(r"\b(before (merge|merging|this merges|it merges)|"
+                        r"prior to merg(e|ing)|pre-?merge)\b")
+_NOT_PRE_MERGE = re.compile(r"\b(after (the )?(merge|merging|this merges|it merges)|"
+                            r"post-?merge|follow[- ]?ups?|non-?blocking|"
+                            r"not blocking|later|separate(ly)?|approve)\b")
 
 
 def parse_recommendation(text: str) -> str | None:
@@ -54,7 +74,12 @@ def is_blocking(rec: str | None) -> bool:
     head = _LEAD.sub("", rec).lower()
     if head.startswith("approve"):
         return False
-    return head.startswith(_BLOCKING)
+    if head.startswith(_BLOCKING):
+        return True
+    if not head.startswith("request "):
+        return False
+    first = _SENTENCE_END.split(head, maxsplit=1)[0]
+    return bool(_PRE_MERGE.search(first)) and not _NOT_PRE_MERGE.search(first)
 
 
 def one_line(rec: str) -> str:
@@ -70,10 +95,15 @@ def one_line(rec: str) -> str:
 class Findings:
     """findings.json: a list of records, one per review id. A file that does
     not parse is left alone (writes refuse) rather than overwritten, so an
-    operator's acks are never silently lost."""
+    operator's acks are never silently lost. `data` is a snapshot for reading;
+    add() and ack() re-read the file under the lock and refresh it."""
 
     def __init__(self, state_dir: Path):
         self.path = Path(state_dir) / FILENAME
+        self.lock_path = self.path.with_name(FILENAME + ".lock")
+        self._load()
+
+    def _load(self) -> None:
         self.broken = False
         try:
             data = json.loads(self.path.read_text())
@@ -91,6 +121,27 @@ class Findings:
     def new(self) -> list[dict]:
         return [r for r in self.data if r.get("status") == "new"]
 
+    @contextlib.contextmanager
+    def _locked(self):
+        """Hold the writers' flock, with the file freshly re-read. Raises
+        TimeoutError after LOCK_TIMEOUT seconds rather than hang the drain."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.lock_path, "a") as fh:
+            deadline = time.monotonic() + LOCK_TIMEOUT
+            while True:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(f"{self.lock_path} is held; gave up") from None
+                    time.sleep(0.05)
+            try:
+                self._load()
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
     def _save(self) -> None:
         if self.broken:
             raise ValueError(f"{self.path} does not parse; not overwriting it")
@@ -98,25 +149,29 @@ class Findings:
 
     def add(self, rec: dict) -> bool:
         """Append unless this review id is already recorded (idempotent)."""
-        if self.broken or any(r["id"] == rec["id"] for r in self.data):
-            return False
-        self.data.append(rec)
-        self._save()
-        return True
+        with self._locked():
+            if self.broken or any(r["id"] == rec["id"] for r in self.data):
+                return False
+            self.data.append(rec)
+            self._save()
+            return True
 
     def ack(self, ids) -> list[str]:
         """Mark findings acked by full id or unique prefix. Returns acked ids;
         unknown or ambiguous prefixes ack nothing."""
-        done = []
-        for want in ids:
-            hits = [r for r in self.data if r["id"].startswith(str(want))]
-            if len(hits) != 1:
-                continue
-            hits[0]["status"] = "acked"
-            done.append(hits[0]["id"])
-        if done:
-            self._save()
-        return done
+        with self._locked():
+            if self.broken:
+                return []
+            done = []
+            for want in ids:
+                hits = [r for r in self.data if r["id"].startswith(str(want))]
+                if len(hits) != 1:
+                    continue
+                hits[0]["status"] = "acked"
+                done.append(hits[0]["id"])
+            if done:
+                self._save()
+            return done
 
 
 def _reviewed(payload: dict) -> str:

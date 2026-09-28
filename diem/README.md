@@ -135,8 +135,12 @@ diem queue rm <id>
 **Review findings:** a drain review whose council "### Recommendation" asks for changes
 (request changes / block / reject / do not merge; any "Approve ..." does not count) is
 recorded in `~/.local/state/diem/findings.json` with status `new`, one record per review id
-(repo, reviewed range, date, first sentence of the recommendation, output path). Recording
-never fails the drain job; the summary entry gets `"finding": true`.
+(repo, reviewed range, date, first sentence of the recommendation, output path). Other
+"Request a ..." wording counts only when its first sentence asks for the change before merge
+and mentions no after-merge or follow-up work ("Request a follow-up issue after merge" is not
+a finding). Recording never fails the drain job; the summary entry gets `"finding": true`.
+The drain, `--ack` and `--backfill` may run at once: each write holds an flock on
+`findings.json.lock` and re-reads the file under it, so none drops another's record or ack.
 ```bash
 diem findings                 # new findings (what the morning briefing counts)
 diem findings --all           # include acked ones

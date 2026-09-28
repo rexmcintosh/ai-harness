@@ -204,7 +204,7 @@ def _cmd_findings(cfg, now, args) -> int:
     if args.backfill:
         try:
             n = findings_backfill(cfg.state_dir, cfg.outputs_dir, days=args.days, now=now)
-        except ValueError as e:
+        except (ValueError, TimeoutError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 2
         print(f"{n} finding(s) added from the last {args.days} days of reviews")
@@ -214,7 +214,11 @@ def _cmd_findings(cfg, now, args) -> int:
         print(f"error: {f.path} does not parse", file=sys.stderr)
         return 2
     if args.ack:
-        done = f.ack(args.ack)
+        try:
+            done = f.ack(args.ack)
+        except TimeoutError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
         print(f"acked {len(done)}: {' '.join(i[:8] for i in done)}".rstrip(": "))
         return 0 if len(done) == len(args.ack) else 1
     recs = f.all() if args.all else f.new()
