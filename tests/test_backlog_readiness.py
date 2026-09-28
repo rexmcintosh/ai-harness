@@ -50,6 +50,9 @@ def test_ready_requires_explicit_success_and_returns_source_record(evidence):
         "status": "ready",
         "reasons": [],
         "evidence_path": "reviews/review.md",
+        "follow_ups": [],
+        "review_round": None,
+        "reviewer": None,
     }
     assert evaluate(record(required_validations=[], validations=[]), branch_sha=SHA,
                     state_dir=str(evidence))["status"] == "ready"
