@@ -141,6 +141,49 @@ def test_execute_builds_queue_local_bounded_runner_input(queue_world, monkeypatc
     assert result["branch"] == "claude/bl-run-123"
 
 
+@pytest.mark.parametrize(
+    ("review_readiness", "label", "detail"),
+    [
+        (
+            {"status": "ready_with_follow_ups", "reasons": [],
+             "follow_ups": ["Tidy the log wording.", "Add a docstring."]},
+            "Ready with follow-ups: Tidy the log wording.; Add a docstring.",
+            "Follow-ups (do not block merge):\n- Tidy the log wording.\n- Add a docstring.",
+        ),
+        (
+            {"status": "owner_decides",
+             "reasons": ["Review round 3 still found blocking or serious points; "
+                         "after 3 rounds the owner decides."],
+             "follow_ups": [], "review_round": 3},
+            "Owner decides (3 rounds): Review round 3 still found blocking or serious points; "
+            "after 3 rounds the owner decides.",
+            "Review round: 3",
+        ),
+    ],
+    ids=["ready-with-follow-ups", "owner-decides"],
+)
+def test_new_review_states_have_explicit_labels(queue_world, monkeypatch, review_readiness, label, detail):
+    projects, state = queue_world
+
+    def fake_work_one(cfg, planned, *, reviewer=None, log=print):
+        write_session_record(cfg, "run-labels", "Done.\nRUNNER-OUTCOME: done\nRUNNER-VALIDATIONS: []\n")
+        return {"status": "in_review", "note": "runner: done", "branch": "claude/bl-run-labels",
+                "session": "session-full-id", "cost": 0, "review_readiness": review_readiness}
+
+    monkeypatch.setattr(runner, "_work_one", fake_work_one)
+    result = runner.execute(task(), "run-labels", str(state), str(projects))
+
+    assert result["readiness"] == label
+    assert "Review readiness unknown" not in result["result"]
+    assert detail in result["result"]
+
+
+def test_every_backlog_readiness_state_has_a_workqueue_label():
+    for status in runner.backlogrun.READINESS_LABELS:
+        label, _, _ = runner._readiness({"review_readiness": {"status": status, "reasons": []}})
+        assert status == "unknown" or label != "Review readiness unknown", status
+
+
 def test_execute_rejects_duplicate_run_before_runner_call(queue_world, monkeypatch):
     projects, state = queue_world
     calls = 0

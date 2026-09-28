@@ -81,3 +81,30 @@ every round is a full review. Full rules: `backlogrun/README.md` § "Review poli
   without `--force`.
 - Which reviewer ran and why is recorded in the review's `inputs.json` (`reviewer`,
   `reviewer_reason`, `review_round`) and shown by `report` and `show`.
+
+### Operator: backlog README text
+
+The canonical safety contract lives outside this repository, in
+`/home/dev/projects/backlog/README.md` § "Safety contract for the 3am runner". Before this
+branch's review policy runs at night, the operator replaces that section's item 3 with the text
+below, exactly as written, in the same change as the merge:
+
+```markdown
+3. **Review each worked item, sized to risk, and record the verdict.** Every worked item is
+   reviewed, and every round is a full review. Code (any changed path that is not clearly
+   prose or data; unsure counts as code) gets the full council `code-review` panel
+   (`council review --diff`). Docs-only changes (every changed path is prose or data, such as
+   `.md`, `.txt`, `.csv`, or YAML inside a docs folder; no script, config, agent instruction
+   file, dot folder or cron text) get a light review: from 22:00 to 07:00 UTC a fresh
+   read-only Claude session (`claude -p --model claude-opus-5-5 --effort high`, no tools that
+   write), otherwise the council `spec-review` panel cut to its one cheapest seat. The runner
+   records which reviewer ran and why. Only a blocking or serious finding (council blocking,
+   high or critical severity, or a verified correctness or security defect) makes readiness
+   "Changes requested"; minor points make it "Ready with follow-ups" and are saved on the item
+   as follow-ups. Review rounds are counted per item; from round 3 a review that still finds
+   a serious point reads "Owner decides (3 rounds)", and once an item has 3 rounds
+   `backlog-run rework` refuses without `--force`. A review never approves work: rule 4 still
+   holds.
+```
+
+Items 1, 2 and 4 and the rest of that section stay as they are.
