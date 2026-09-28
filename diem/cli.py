@@ -13,6 +13,7 @@ import venice_usage
 
 from .balance import BalanceClient, BalanceUnavailable
 from .config import DiemConfig, load_venice_key, load_venice_admin_key, _read_env
+from .findings import Findings, backfill as findings_backfill
 from .drain import _last_fired, floor_for, next_deadline, next_reset, run_checkpoint
 from .queue import QueueDir, new_item
 from .report import evening_ping, send_telegram, write_morning_report
@@ -199,6 +200,36 @@ def _cmd_venice_usage(cfg, now, *, days=7, as_json=False) -> int:
     return 0
 
 
+def _cmd_findings(cfg, now, args) -> int:
+    if args.backfill:
+        try:
+            n = findings_backfill(cfg.state_dir, cfg.outputs_dir, days=args.days, now=now)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        print(f"{n} finding(s) added from the last {args.days} days of reviews")
+        return 0
+    f = Findings(cfg.state_dir)
+    if f.broken:
+        print(f"error: {f.path} does not parse", file=sys.stderr)
+        return 2
+    if args.ack:
+        done = f.ack(args.ack)
+        print(f"acked {len(done)}: {' '.join(i[:8] for i in done)}".rstrip(": "))
+        return 0 if len(done) == len(args.ack) else 1
+    recs = f.all() if args.all else f.new()
+    if not recs:
+        print("no new code-review findings" if not args.all else "no findings")
+        return 0
+    for r in recs:
+        print(f"{r['id'][:8]} {r.get('status', '?'):5} {r.get('date', '?')} "
+              f"{r.get('repo', '?')} {r.get('reviewed', '?')}\n"
+              f"         {r.get('recommendation', '')}\n"
+              f"         {r.get('output_path', '')}")
+    print(f"\n{len(recs)} shown. Mark seen: diem findings --ack <id> ...")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="diem")
     p.add_argument("--config", default=None)
@@ -223,6 +254,14 @@ def main(argv=None) -> int:
                     help="leftovers only: invisible to the drain before this time of the DIEM day")
     ql = qsub.add_parser("list"); ql.add_argument("--config", default=None)
     qr = qsub.add_parser("rm"); qr.add_argument("id"); qr.add_argument("--config", default=None)
+
+    fi = sub.add_parser("findings", help="council reviews that asked for changes")
+    fi.add_argument("--config", default=None)
+    fi.add_argument("--all", action="store_true", help="include acked findings")
+    fi.add_argument("--ack", nargs="+", metavar="ID", help="mark seen (id or unique prefix)")
+    fi.add_argument("--backfill", action="store_true",
+                    help="record findings from saved review outputs (idempotent)")
+    fi.add_argument("--days", type=int, default=14, help="--backfill window (default 14)")
 
     pa = sub.add_parser("pause")
     pa.add_argument("hours", nargs="?", type=float); pa.add_argument("--config", default=None)
@@ -294,6 +333,8 @@ def main(argv=None) -> int:
             return 0
         if args.qcmd == "rm":
             return 0 if q.remove(args.id) else 1
+    if args.cmd == "findings":
+        return _cmd_findings(cfg, now, args)
     if args.cmd == "pause":
         until = (now + timedelta(hours=args.hours)) if args.hours is not None \
             else next_reset(cfg, now)

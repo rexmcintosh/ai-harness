@@ -371,3 +371,27 @@ def test_queue_add_not_before_is_stored_and_a_typo_is_refused(tmp_path, capsys):
     assert cli.main(["queue", "add", "ask", "typo", "--not-before", "11pm",
                      "--config", str(cfgp)]) == 2
     assert len(QueueDir(tmp_path / "state").pending("2026-07-03T21:00:00")) == 1
+
+
+def test_findings_list_ack_and_backfill(tmp_path, capsys):
+    cfgp = _cfg_file(tmp_path)
+    rid = "ab" * 16
+    out = tmp_path / "out" / "reviews" / f"swimtrack-{rid}.md"
+    out.parent.mkdir(parents=True)
+    out.write_text("## Council\n\n### Recommendation (confidence 8/10)\n\n"
+                   "Request changes before merge. The lock is late.\n")
+    assert cli.main(["findings", "--config", str(cfgp)]) == 0
+    assert "no new code-review findings" in capsys.readouterr().out
+    assert cli.main(["findings", "--backfill", "--config", str(cfgp)]) == 0
+    assert "1 finding(s) added" in capsys.readouterr().out
+    assert cli.main(["findings", "--config", str(cfgp)]) == 0
+    listed = capsys.readouterr().out
+    assert rid[:8] in listed and "swimtrack" in listed
+    assert "Request changes before merge." in listed and str(out) in listed
+    assert cli.main(["findings", "--ack", rid[:8], "--config", str(cfgp)]) == 0
+    assert "acked 1" in capsys.readouterr().out
+    assert cli.main(["findings", "--config", str(cfgp)]) == 0
+    assert rid[:8] not in capsys.readouterr().out
+    assert cli.main(["findings", "--all", "--config", str(cfgp)]) == 0
+    assert "acked" in capsys.readouterr().out
+    assert cli.main(["findings", "--ack", "zzzz", "--config", str(cfgp)]) == 1
