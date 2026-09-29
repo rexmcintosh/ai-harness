@@ -190,15 +190,23 @@ def _readiness(worked: dict) -> tuple[str, list[str], str]:
         return "Review readiness unknown", [], ""
     reasons = value.get("reasons")
     reasons = reasons if isinstance(reasons, list) and all(isinstance(reason, str) for reason in reasons) else []
-    label = {
-        "ready": "Ready for your review",
-        "changes_requested": "Changes requested",
-        "failed": "Review or checks failed",
-        "unknown": "Review readiness unknown",
-    }.get(value.get("status"), "Review readiness unknown")
-    summary = label + (": " + "; ".join(reasons) if reasons else "")
+    # One label table for the report and the queue, so a new readiness state
+    # (ready_with_follow_ups, owner_decides) never falls through to "unknown".
+    label = backlogrun.READINESS_LABELS.get(value.get("status"), backlogrun.READINESS_LABELS["unknown"])
+    shown = reasons
+    if value.get("status") == "ready_with_follow_ups":
+        shown = _follow_ups(worked)
+    summary = label + (": " + "; ".join(shown) if shown else "")
     review_path = value.get("review_path")
     return summary, reasons, review_path if isinstance(review_path, str) else ""
+
+
+def _follow_ups(worked: dict) -> list[str]:
+    value = worked.get("review_readiness")
+    follow_ups = value.get("follow_ups") if isinstance(value, dict) else None
+    if not isinstance(follow_ups, list):
+        return []
+    return [item for item in follow_ups if isinstance(item, str) and item.strip()]
 
 
 def _changed_paths(planned: backlogrun.Planned, branch: str) -> list[str]:
@@ -248,6 +256,13 @@ def _full_result(
         review_lines.append(f"Review summary: {council.strip()}")
     if reasons:
         review_lines.append("Review conditions:\n" + "\n".join(f"- {reason}" for reason in reasons))
+    follow_ups = _follow_ups(worked)
+    if follow_ups:
+        review_lines.append("Follow-ups (do not block merge):\n" + "\n".join(f"- {item}" for item in follow_ups))
+    value = worked.get("review_readiness")
+    review_round = value.get("review_round") if isinstance(value, dict) else None
+    if isinstance(review_round, int) and not isinstance(review_round, bool):
+        review_lines.append(f"Review round: {review_round}")
     if review_path:
         review_lines.append(f"Full review: {review_path}")
     if review_evidence:

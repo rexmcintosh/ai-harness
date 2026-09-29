@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from backlogrun.review_policy import ROUND_LIMIT
+
 
 _SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 _UTC_RFC3339_RE = re.compile(
@@ -23,7 +25,8 @@ _VALIDATION_STATUSES = {"passed", "failed", "unknown"}
 
 def _result(branch_sha: str, *, record_id: str | None = None,
             status: str = "unknown", reasons: list[str] | None = None,
-            evidence_path: str | None = None) -> dict[str, Any]:
+            evidence_path: str | None = None, follow_ups: list[str] | None = None,
+            review_round: int | None = None, reviewer: str | None = None) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "record_id": record_id,
@@ -31,6 +34,9 @@ def _result(branch_sha: str, *, record_id: str | None = None,
         "status": status,
         "reasons": reasons or [],
         "evidence_path": evidence_path,
+        "follow_ups": follow_ups or [],
+        "review_round": review_round,
+        "reviewer": reviewer,
     }
 
 
@@ -135,6 +141,20 @@ def evaluate(record: object, *, branch_sha: str, state_dir: str) -> dict[str, An
         blocking_text = list(blocking)
         reasons.extend(blocking_text)
 
+    # Optional review-policy fields. Minor findings never send an item back; they ride
+    # along as follow-ups. The round number turns a late "changes requested" into an
+    # owner decision.
+    follow_ups = record.get("follow_ups", [])
+    if not isinstance(follow_ups, list) or any(not _nonempty_string(item) for item in follow_ups):
+        structural_errors.append("follow_ups must be a list of non-empty strings.")
+        follow_ups = []
+    review_round = record.get("review_round")
+    if review_round is not None and (type(review_round) is not int or review_round < 1):
+        structural_errors.append("review_round must be a positive integer.")
+        review_round = None
+    reviewer = record.get("reviewer") if _nonempty_string(record.get("reviewer")) else None
+    extra = {"follow_ups": list(follow_ups), "review_round": review_round, "reviewer": reviewer}
+
     required = record.get("required_validations")
     required_names: list[str] | None
     if required is None:
@@ -209,7 +229,7 @@ def evaluate(record: object, *, branch_sha: str, state_dir: str) -> dict[str, An
     if structural_errors or validation_conflict:
         reasons.extend(structural_errors)
         return _result(branch_sha, record_id=record_id, reasons=reasons,
-                       evidence_path=evidence_path)
+                       evidence_path=evidence_path, **extra)
 
     failed_required = [
         name for name in (required_names or [])
@@ -222,13 +242,18 @@ def evaluate(record: object, *, branch_sha: str, state_dir: str) -> dict[str, An
         if review_status == "failed":
             reasons.append("The review reported failure.")
         return _result(branch_sha, record_id=record_id, status="failed", reasons=reasons,
-                       evidence_path=evidence_path)
+                       evidence_path=evidence_path, **extra)
 
     if blocking_text or review_status == "changes_requested":
         if review_status == "changes_requested" and not blocking_text:
             reasons.append("The review requested changes.")
+        if review_round is not None and review_round >= ROUND_LIMIT:
+            reasons.append(f"Review round {review_round} still found blocking or serious points; "
+                           f"after {ROUND_LIMIT} rounds the owner decides.")
+            return _result(branch_sha, record_id=record_id, status="owner_decides",
+                           reasons=reasons, evidence_path=evidence_path, **extra)
         return _result(branch_sha, record_id=record_id, status="changes_requested",
-                       reasons=reasons, evidence_path=evidence_path)
+                       reasons=reasons, evidence_path=evidence_path, **extra)
 
     if required_names is None:
         reasons.append("Required validations were not declared before execution.")
@@ -245,10 +270,11 @@ def evaluate(record: object, *, branch_sha: str, state_dir: str) -> dict[str, An
         reasons.append("The review has no explicit clean verdict.")
     if reasons:
         return _result(branch_sha, record_id=record_id, reasons=reasons,
-                       evidence_path=evidence_path)
+                       evidence_path=evidence_path, **extra)
 
-    return _result(branch_sha, record_id=record_id, status="ready", reasons=[],
-                   evidence_path=evidence_path)
+    return _result(branch_sha, record_id=record_id,
+                   status="ready_with_follow_ups" if follow_ups else "ready", reasons=[],
+                   evidence_path=evidence_path, **extra)
 
 
 def select(records: list[object], *, branch_sha: str, state_dir: str) -> dict[str, Any]:

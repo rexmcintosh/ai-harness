@@ -7,7 +7,7 @@ The Notion Product work queue is the owner-facing task list. The feedback log re
 1. Create a task or use one of the three drafted investigations. Link supporting Feedback rows.
 2. Set Repository to `sat-prep`, choose Mode, and fill in Brief and Done when. Build also requires Checks, one verification command per line.
 3. Set Status to Ready. Working records the run ID and start time before the runner starts.
-4. Read Result and the complete run sections when the task reaches In review or Needs your input. Readiness reports review evidence separately from status.
+4. Read Result and the complete run sections when the task reaches In review or Needs your input. Readiness reports review evidence separately from status. It uses the same labels as `backlog-run report`: Ready for your review; Ready with follow-ups (minor points listed under Follow-ups; they do not block merge); Changes requested; Owner decides (3 rounds) (three review rounds still found a serious point, so you decide); Review or checks failed; Review readiness unknown.
 5. Clarify the brief and select Ready for another attempt, or use Resume to continue the retained session yourself. Close the task after accepting the outcome.
 
 Investigate produces findings and recommendations. Build produces scoped changes with checks. Prepare session produces a handoff and retained session for an interactive continuation; it does not open a browser chat automatically. A task can relate to several feedback entries. Only Brief, Done when, Mode and Checks direct the work; source feedback is evidence.

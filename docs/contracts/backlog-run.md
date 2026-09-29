@@ -4,7 +4,7 @@
 
 ## Purpose and authority
 
-**Default mode:** bounded change-producing preparation. At 22:00 UTC (03:00 UTC until 2026-09-21), work eligible open backlog items in isolated `claude/bl-*` worktrees (at most two until the budget-driven loop of 2026-09-25 ships; from then on, while the DIEM balance is at least 1.5, an item can finish before 23:30 UTC, and fewer than 10 sessions ran, see `backlogrun/README.md` § "The budget-driven loop"), council-review the result, and leave it `in_review` or `held`. Local cron documentation and host configuration confirm UTC scheduling. Canonical item state is `/home/dev/projects/backlog/backlog.yaml`; completed and dropped records are stored in `archive.yaml`.
+**Default mode:** bounded change-producing preparation. At 22:00 UTC (03:00 UTC until 2026-09-21), work eligible open backlog items in isolated `claude/bl-*` worktrees (at most two until the budget-driven loop of 2026-09-25 ships; from then on, while the DIEM balance is at least 1.5, an item can finish before 23:30 UTC, and fewer than 10 sessions ran, see `backlogrun/README.md` § "The budget-driven loop"), review the result (council panel for code, light review for docs-only, Claude at night; see `backlogrun/README.md` § "Review policy"), and leave it `in_review` or `held`. Local cron documentation and host configuration confirm UTC scheduling. Canonical item state is `/home/dev/projects/backlog/backlog.yaml`; completed and dropped records are stored in `archive.yaml`.
 
 It may create local worktrees and branches, run the scoped agent, write runner records, and transition only still-open items to `in_review` or `held`. It must not push, merge, deploy, send externally except its configured summary, or approve its own work. Human approval under the canonical merge protocol remains the merge authority; `backlog-run approve` is an explicit operator command, not a clock action.
 
@@ -12,7 +12,7 @@ It may create local worktrees and branches, run the scoped agent, write runner r
 
 ## Success and evidence
 
-Success is a per-item run record, a council review file, and an item transition consistent with the recorded outcome. Inspect `/home/dev/projects/.backlog-run/cron.log`, `runs/<timestamp>-<id>.json`, `reviews/<id>.md`, `report.json`, `report.md`, and the backlog item. The runner’s own test suite covers its state transitions with fake workers.
+Success is a per-item run record, a review file, and an item transition consistent with the recorded outcome. Inspect `/home/dev/projects/.backlog-run/cron.log`, `runs/<timestamp>-<id>.json`, `reviews/<id>.md`, `report.json`, `report.md`, and the backlog item. Every review file starts with the same line, `# council review — <id> — <time>`, whichever reviewer ran (council panel or Claude); the next line, `Reviewer: <label>, because <reason>. Review round N of 3.`, names the reviewer that actually ran. A skipped review has no `Reviewer:` line. The runner’s own test suite covers its state transitions with fake workers.
 
 ## Failure, escalation, and gaps
 
@@ -42,7 +42,7 @@ The nightly run fires at 22:00 UTC, two hours before Venice's 00:00 UTC DIEM res
 council reviews spend allowance that would expire. On a day the allowance is already gone a
 review started before the reset is billed in USD (the account is on Venice's paid tier; on
 2026-09-21 DIEM was 0 by mid-afternoon and reviews kept running on the USD balance), or fails
-on a key with USD off. So the real reviewer (`council_review`) first reads the balance with the review key
+on a key with USD off. So both council reviewers (`council_review`, `council_docs_review`) first read the balance with the review key
 (`backlogrun/review_budget.py`):
 
 - balance at least 1.5 DIEM: review now.
@@ -58,3 +58,53 @@ wait ends: at most from 21:50 UTC to 00:02 UTC. An unreadable balance is logged 
 eats into the run's 3-hour deadline: on an empty-balance night the second item is usually
 deferred to the next night. `BACKLOG_REVIEW_WAIT=off` turns the guard off; the test suite
 runs with it off (`tests/conftest.py`), so no test reads the balance or sleeps.
+
+## Review each item, sized to risk (added 2026-09-28)
+
+The safety contract's "council-review each item" is now "review each item: council panel for
+code, light review for docs-only (Claude at night)". Every worked branch is still reviewed, and
+every round is a full review. Full rules: `backlogrun/README.md` § "Review policy".
+
+- **Code** (any path that is not clearly prose or data; unsure is code): the full council
+  `code-review` panel, as before.
+- **Docs-only** (every changed path is `.md`, `.txt`, `.csv` and similar, or YAML inside a docs
+  folder; no script, config, agent instruction file, dot folder or cron text):
+  - 22:00-07:00 UTC: a fresh read-only Claude session (`claude -p --model claude-opus-5-5
+    --effort high --tools ""`, no MCP servers, scrubbed environment). It spends the owner's
+    Claude plan, not DIEM, and has no tools that could write.
+  - otherwise: the council `spec-review` panel cut to its cheapest seat, which also chairs.
+- **Severity gate**: only a blocking/serious finding (chair-blocking, high/critical severity, or
+  a verified correctness/security defect) makes readiness "Changes requested". Minor points
+  make it "Ready with follow-ups" and are saved on the item as `follow_ups`.
+- **Round limit**: rounds are counted on the item (`review_rounds`). From round 3 a review that
+  still finds a serious point reads "Owner decides (3 rounds)"; `backlog-run rework` then refuses
+  without `--force`.
+- Which reviewer ran and why is recorded in the review's `inputs.json` (`reviewer`,
+  `reviewer_reason`, `review_round`) and shown by `report` and `show`.
+
+### Operator: backlog README text
+
+The canonical safety contract lives outside this repository, in
+`/home/dev/projects/backlog/README.md` § "Safety contract for the 3am runner". Before this
+branch's review policy runs at night, the operator replaces that section's item 3 with the text
+below, exactly as written, in the same change as the merge:
+
+```markdown
+3. **Review each worked item, sized to risk, and record the verdict.** Every worked item is
+   reviewed, and every round is a full review. Code (any changed path that is not clearly
+   prose or data; unsure counts as code) gets the full council `code-review` panel
+   (`council review --diff`). Docs-only changes (every changed path is prose or data, such as
+   `.md`, `.txt`, `.csv`, or YAML inside a docs folder; no script, config, agent instruction
+   file, dot folder or cron text) get a light review: from 22:00 to 07:00 UTC a fresh
+   read-only Claude session (`claude -p --model claude-opus-5-5 --effort high`, no tools that
+   write), otherwise the council `spec-review` panel cut to its one cheapest seat. The runner
+   records which reviewer ran and why. Only a blocking or serious finding (council blocking,
+   high or critical severity, or a verified correctness or security defect) makes readiness
+   "Changes requested"; minor points make it "Ready with follow-ups" and are saved on the item
+   as follow-ups. Review rounds are counted per item; from round 3 a review that still finds
+   a serious point reads "Owner decides (3 rounds)", and once an item has 3 rounds
+   `backlog-run rework` refuses without `--force`. A review never approves work: rule 4 still
+   holds.
+```
+
+Items 1, 2 and 4 and the rest of that section stay as they are.

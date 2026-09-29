@@ -83,6 +83,9 @@ def _git_identity(monkeypatch):
     def tripwire(cfg, diff, *, item_id):
         raise AssertionError("council_review called from a test (network!)")
     monkeypatch.setattr(br, "council_review", tripwire)
+    # The docs-only reviewers (a Claude session, one council seat) are tripwired the same way.
+    monkeypatch.setattr(br, "claude_docs_review", tripwire)
+    monkeypatch.setattr(br, "council_docs_review", tripwire)
 
 
 def make_repo(root: Path, name: str, *, remote: bool = True) -> Path:
@@ -385,7 +388,9 @@ def test_work_done_flow_end_to_end(world):
     # main untouched, remote untouched
     assert git(world.repo, "rev-list", "--count", "origin/main..main").strip() == "0"
     # review file + run log + backlog commit
-    assert (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text().startswith("# council review")
+    review_md = (Path(cfg.reviews_dir) / "2026-01-01-a.md").read_text()
+    assert review_md.startswith("# council review — 2026-01-01-a — ")   # same header whichever reviewer ran
+    assert "Reviewer: injected reviewer, because reviewer supplied by the caller." in review_md
     assert list(Path(cfg.runs_dir).glob("*-2026-01-01-a.json"))
     assert "backlog: 2026-01-01-a -> in_review (claude/bl-a)" in git(cfg.backlog_dir, "log", "-1", "--format=%s")
     # what the session saw
@@ -1406,7 +1411,8 @@ def test_jev_line_shows_in_report_and_show_and_readiness_stays_unknown(world, mo
     result = br.work_one(cfg, p, reviewer=jev_reviewer(), log=lambda *a: None)
     assert result["review_readiness"]["status"] == "unknown"
     info = br._review_readiness(cfg, load_items(cfg)[0])
-    standard = {"schema_version", "record_id", "branch_sha", "status", "reasons", "evidence_path", "review_path"}
+    standard = {"schema_version", "record_id", "branch_sha", "status", "reasons", "evidence_path", "review_path",
+                "follow_ups", "review_round", "reviewer"}
     assert info["status"] == "unknown" and set(info) == standard          # readiness carries no Jev field
     report = br.write_report(cfg)
     assert report.count(JEV_LINE) == 1 and "- " + JEV_LINE in report.splitlines()
@@ -1584,6 +1590,8 @@ def _both_jev_uses_on(monkeypatch, *, outward: float):
         return {"model": MODEL, "answers": answers, "usage": {"input_tokens": 7}}
     monkeypatch.setattr(shared_client, "http_post", transport)
     monkeypatch.setattr(br, "council_review", REAL_COUNCIL_REVIEW)      # cmd_work uses the module's reviewer
+    # The fake session writes a .txt file; these tests are about the code panel, so size it as code.
+    monkeypatch.setattr(br.review_policy, "classify_paths", lambda paths: "code")
     return seen
 
 
