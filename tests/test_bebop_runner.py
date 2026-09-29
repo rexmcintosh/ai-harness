@@ -361,3 +361,31 @@ def test_a_hanging_findings_helper_is_still_cut_off_under_its_own_interpreter(tm
         findings_helper="#!/usr/bin/env python3\nimport time\ntime.sleep(30)\n",
         extra_env={"BEBOP_BACKLOG_TIMEOUT": "1"})
     assert proc.returncode == 0 and sent == [BRIEFING] and "findings_line=0" in log[0]
+
+
+# --- council review: the findings budget counts the separator it actually adds ------
+# After the backlog line the findings line joins with one newline, not two. Budgeting a
+# flat +2 rejected a message that came out at exactly TG_MAX_CHARS (4000).
+
+def _briefing_so_the_final_message_is(total: int) -> str:
+    fixed = len("\n\n") + len(BACKLOG_LINE) + len("\n") + len(FINDINGS_LINE)
+    return "x" * (total - fixed)                    # ASCII, so bytes == characters
+
+
+def test_backlog_plus_findings_at_exactly_the_limit_both_go(tmp_path):
+    briefing = _briefing_so_the_final_message_is(4000)
+    proc, calls, sent, log, state = run(tmp_path, [briefing], backlog=BACKLOG,
+                                        findings=FINDINGS)
+    assert proc.returncode == 0
+    assert sent == [f"{briefing}\n\n{BACKLOG_LINE}\n{FINDINGS_LINE}"]
+    assert len(sent[0]) == 4000
+    assert "backlog_line=1 findings_line=1" in log[0]
+
+
+def test_one_character_over_the_limit_drops_only_the_findings_line(tmp_path):
+    briefing = _briefing_so_the_final_message_is(4001)
+    proc, calls, sent, log, state = run(tmp_path, [briefing], backlog=BACKLOG,
+                                        findings=FINDINGS)
+    assert proc.returncode == 0
+    assert sent == [f"{briefing}\n\n{BACKLOG_LINE}"]
+    assert "backlog_line=1 findings_line=0" in log[0]

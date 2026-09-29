@@ -189,16 +189,19 @@ if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAIL
       "$FINDINGS_PY" "$FINDINGS_HELPER" 2>/dev/null || true)
   fi
   MESSAGE="$RESULT"
+  # Budget each append with the separator it really adds (${#SEP}): two newlines before
+  # the first line, one between the two lines. A flat +2 wrongly refused a message that
+  # came out at exactly TG_MAX_CHARS.
   SEP="
 
 "
-  if [ -n "$BACKLOG_LINE" ] && [ $(( ${#MESSAGE} + ${#BACKLOG_LINE} + 2 )) -le "$TG_MAX_CHARS" ]; then
+  if [ -n "$BACKLOG_LINE" ] && [ $(( ${#MESSAGE} + ${#SEP} + ${#BACKLOG_LINE} )) -le "$TG_MAX_CHARS" ]; then
     MESSAGE="$MESSAGE$SEP$BACKLOG_LINE"
     BACKLOG_FLAG=1
     SEP="
 "
   fi
-  if [ -n "$FINDINGS_LINE" ] && [ $(( ${#MESSAGE} + ${#FINDINGS_LINE} + 2 )) -le "$TG_MAX_CHARS" ]; then
+  if [ -n "$FINDINGS_LINE" ] && [ $(( ${#MESSAGE} + ${#SEP} + ${#FINDINGS_LINE} )) -le "$TG_MAX_CHARS" ]; then
     MESSAGE="$MESSAGE$SEP$FINDINGS_LINE"
     FINDINGS_FLAG=1
   fi
