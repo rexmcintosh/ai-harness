@@ -186,7 +186,8 @@ def test_estimates_recorded_from_balance_delta(tmp_path):
     run_checkpoint(cfg, now=NOW, balance=FakeBalance([50.0, 47.0, 14.0]), queue=q,
                    estimates=est, reviewed=rev, runner=FakeRunner())
     cost, _dur = est.estimate("ask")
-    assert cost == pytest.approx(0.5 + 0.3 * (3.0 - 0.5))  # EMA toward observed 3.0
+    seed = cfg.seeds["ask"]["cost"]
+    assert cost == pytest.approx(seed + 0.3 * (3.0 - seed))  # EMA toward observed 3.0
 
 
 # --- UTC / midnight-reset (00:00 UTC epoch) config ---
@@ -440,3 +441,47 @@ def test_an_item_that_expires_while_the_checkpoint_runs_is_not_started(tmp_path)
     run_checkpoint(cfg, now=NOW, balance=FakeBalance([90.0, 89.0, 89.0, 88.0]), queue=q,
                    estimates=est, reviewed=rev, runner=r)
     assert [i.payload.get("question") for i in r.ran] == ["first"]
+
+
+def test_a_blocking_review_lands_in_the_findings_file(tmp_path):
+    from diem.findings import Findings
+    cfg = _cfg(tmp_path)
+    q, est, rev = _bits(tmp_path, cfg)
+    block = new_item("review", {"repo": "/r/swim", "range": "a..b", "head": "b"},
+                     created=NOW_ISO)
+    ok = new_item("review", {"repo": "/r/site", "range": "c..d", "head": "d"},
+                  created=NOW_ISO)
+    q.add(block); q.add(ok)
+    outs = {}
+    for it, rec in ((block, "Request changes before merge. Race."), (ok, "Approve. Fine.")):
+        p = tmp_path / f"{it.id}.md"
+        p.write_text(f"## Council\n\n### Recommendation (confidence 8/10)\n\n{rec}\n")
+        outs[it.id] = RunResult(True, 60.0, output_path=str(p))
+    r = FakeRunner(outs)
+    summary = run_checkpoint(cfg, now=NOW, balance=FakeBalance([90.0]), queue=q,
+                             estimates=est, reviewed=rev, runner=r)
+    assert sum(i.type == "review" for i in r.ran) == 2
+    recs = Findings(cfg.state_dir).all()
+    assert [(x["id"], x["repo"], x["reviewed"], x["status"]) for x in recs] == \
+        [(block.id, "swim", "a..b", "new")]
+    ran = [e for e in summary["ran"] if e["type"] == "review"]
+    assert [e.get("finding", False) for e in ran] == [e["id"] == block.id for e in ran]
+
+
+def test_default_seeds_still_run_leftover_asks_after_reviews(tmp_path):
+    """The banked audit asks sit at priority 900 behind reviews with not_before 23:00.
+    With the billed-cost seeds a thin floor-0 balance still reaches them."""
+    cfg = _cfg(tmp_path)
+    q, est, rev = _bits(tmp_path, cfg)
+    q.add(new_item("review", {"repo": "/r/a", "range": "a..b", "head": "b"},
+                   created=NOW_ISO))
+    ask = new_item("ask", {"question": "audit", "panel": "code-review"},
+                   created=NOW_ISO, not_before="23:00")
+    ask.priority = 900
+    q.add(ask)
+    at = datetime(2026, 7, 4, 0, 20)          # floor 0 slot
+    bal = FakeBalance([0.95, 0.47, 0.47, 0.0, 0.0, 0.0])  # old 1.0/0.5 seeds: nothing ran
+    r = FakeRunner()
+    run_checkpoint(cfg, now=at, balance=bal, queue=q, estimates=est,
+                   reviewed=rev, runner=r)
+    assert [i.type for i in r.ran][:2] == ["review", "ask"]

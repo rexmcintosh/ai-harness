@@ -154,6 +154,20 @@ case "$BACKLOG_TIMEOUT" in ''|*[!0-9]*) BACKLOG_TIMEOUT=10 ;; esac
 [ "$BACKLOG_TIMEOUT" -le "$BACKLOG_TIMEOUT_CAP" ] || BACKLOG_TIMEOUT="$BACKLOG_TIMEOUT_CAP"
 TG_MAX_CHARS=4000                     # Telegram refuses a message over 4096 characters
 
+# --- code-review findings line, morning only ---------------------------------------
+# The diem drain reviews every repo's main each night; a "request changes" verdict lands in
+# ~/.local/state/diem/findings.json as `new` until Rex runs `diem findings --ack`. Same
+# contract as the backlog line: code not model, silent at zero, fail open, same timeout,
+# appended under the backlog line and dropped first if the message would get too long.
+FINDINGS_LINE=""
+FINDINGS_FLAG=0
+FINDINGS_HELPER="$DIR/findings_line.py"
+# Its own interpreter, not BACKLOG_PY: that one is picked for PyYAML, and the findings helper
+# is stdlib only, so a broken or missing venv must not cost this line too. System python3
+# first; the venv python is the fallback only when no python3 is on PATH.
+FINDINGS_PY="$(command -v python3 || true)"
+[ -n "$FINDINGS_PY" ] || { [ -x "$DIR/../.venv/bin/python" ] && FINDINGS_PY="$DIR/../.venv/bin/python"; }
+
 # --- send: agent output IS the briefing text (or FAILED:<reason>) ---
 # Success contract for the log stays `rc=0 ... result="SENT..."` — the watchdog's
 # check_bebop_runs parses `[ts] ... rc=N` from these lines; keep that shape.
@@ -170,18 +184,33 @@ if [ $RC -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAIL
     BACKLOG_LINE=$(timeout -k 2 "$BACKLOG_TIMEOUT" \
       "$BACKLOG_PY" "$BACKLOG_HELPER" 2>/dev/null || true)
   fi
+  if [ "$MODE" = "morning" ] && [ -r "$FINDINGS_HELPER" ] && [ -n "$FINDINGS_PY" ]; then
+    FINDINGS_LINE=$(timeout -k 2 "$BACKLOG_TIMEOUT" \
+      "$FINDINGS_PY" "$FINDINGS_HELPER" 2>/dev/null || true)
+  fi
   MESSAGE="$RESULT"
-  if [ -n "$BACKLOG_LINE" ] && [ $(( ${#RESULT} + ${#BACKLOG_LINE} + 2 )) -le "$TG_MAX_CHARS" ]; then
-    MESSAGE="$RESULT
+  # Budget each append with the separator it really adds (${#SEP}): two newlines before
+  # the first line, one between the two lines. A flat +2 wrongly refused a message that
+  # came out at exactly TG_MAX_CHARS.
+  SEP="
 
-$BACKLOG_LINE"
+"
+  if [ -n "$BACKLOG_LINE" ] && [ $(( ${#MESSAGE} + ${#SEP} + ${#BACKLOG_LINE} )) -le "$TG_MAX_CHARS" ]; then
+    MESSAGE="$MESSAGE$SEP$BACKLOG_LINE"
     BACKLOG_FLAG=1
+    SEP="
+"
+  fi
+  if [ -n "$FINDINGS_LINE" ] && [ $(( ${#MESSAGE} + ${#SEP} + ${#FINDINGS_LINE} )) -le "$TG_MAX_CHARS" ]; then
+    MESSAGE="$MESSAGE$SEP$FINDINGS_LINE"
+    FINDINGS_FLAG=1
   fi
   if printf '%s' "$MESSAGE" | "$TG_SEND" "$CHAT_ID" -; then
     SEND_OK=1
   else
     RC=1
     BACKLOG_FLAG=0                      # nothing reached Rex, so nothing was added
+    FINDINGS_FLAG=0
     RESULT="FAILED:tg-send (Bot API) send failed"
   fi
 else
@@ -193,12 +222,12 @@ fi
 RESULT_1LINE="$(printf '%s' "$RESULT" | tr '\n' ' ')"
 
 if [ $SEND_OK -eq 1 ]; then
-  echo "[$TS] mode=$MODE rc=0 result=\"SENT ${RESULT_1LINE:0:80}\" $USAGE backlog_line=$BACKLOG_FLAG" >> "$LOG"
+  echo "[$TS] mode=$MODE rc=0 result=\"SENT ${RESULT_1LINE:0:80}\" $USAGE backlog_line=$BACKLOG_FLAG findings_line=$FINDINGS_FLAG" >> "$LOG"
   python3 -c "import json;open('$STATE_FILE','w').write(json.dumps({'last_run_epoch':$NOW_EPOCH,'last_run_iso':'$TS','last_mode':'$MODE'},indent=2)+'\n')"
   echo "ok: sent"
   exit 0
 else
-  echo "[$TS] mode=$MODE rc=$RC result=\"${RESULT_1LINE:0:90}\" $USAGE backlog_line=$BACKLOG_FLAG" >> "$LOG"
+  echo "[$TS] mode=$MODE rc=$RC result=\"${RESULT_1LINE:0:90}\" $USAGE backlog_line=$BACKLOG_FLAG findings_line=$FINDINGS_FLAG" >> "$LOG"
   "$TG_SEND" "$CHAT_ID" "⚠️ Bebop $MODE briefing failed (rc=$RC). Check ~/projects/ai-harness/bebop/logs/." || true
   echo "FAILED rc=$RC result=$RESULT" >&2
   exit 1

@@ -38,6 +38,7 @@ cron (07:00 + 18:00 Lisbon)
 | `prompts/briefing-morning.md` | Morning briefing instructions (today's schedule + important new email). The thing to tune. |
 | `prompts/briefing-evening.md` | Evening wrap + tomorrow preview. |
 | `run-briefing.sh` | Runner. Computes the delta window, invokes headless Claude, logs cost, manages state, pings on failure. |
+| `findings_line.py` | Builds the one code-review findings line the morning briefing carries. Stdlib only, reads the diem findings file and nothing else. |
 | `backlog_line.py` | Builds the one backlog line the morning briefing carries. Stdlib + PyYAML, reads the backlog file and nothing else. |
 | `state.json` | Last successful run (epoch + iso). Gitignored. The delta mechanism. |
 | `logs/runs.log` | One line per run: mode, rc, result, cost, tokens. Gitignored. Watch this to track cost. |
@@ -146,3 +147,21 @@ The line is left out when it would push the message past 4000 characters (Telegr
 is 4096), and the item name in it is cleaned to one printable line of at most 60 characters.
 Tests: `tests/test_bebop_backlog_line.py` (the builder) and `tests/test_bebop_runner.py`
 (the append, the modes, the fail-open paths).
+
+## The code-review findings line (morning only)
+
+The diem drain reviews each repo's new commits on main every night. A review that asks
+for changes is recorded in `~/.local/state/diem/findings.json` as `new` (see
+`diem/README.md`, "Review findings"). `findings_line.py` counts those and prints
+`N new code-review findings on main. Look: diem findings`, or nothing at zero.
+
+- Same contract as the backlog line: built in code, appended after the model answers,
+  morning only, never under the failure ping, fail open, bounded by `BEBOP_BACKLOG_TIMEOUT`.
+- It sits under the backlog line, and is dropped first if the message would pass 4000 chars.
+- It runs under system `python3` (the venv python only if there is none), not the
+  backlog line's PyYAML interpreter, so a broken venv costs the backlog line alone.
+- `BEBOP_FINDINGS_FILE` overrides the path (tests use it).
+- `runs.log` gains `findings_line=1|0`.
+- `diem findings --ack <id>` is how a finding stops being counted.
+
+Tests: `tests/test_bebop_findings_line.py` and `tests/test_bebop_runner.py`.

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .balance import BalanceUnavailable
 from .discover import discover
+from .findings import record_review
 from .queue import new_item
 from .state import Lock, pause_until
 
@@ -253,6 +254,9 @@ def run_checkpoint(cfg, *, now: datetime, balance, queue, estimates, reviewed,
                 queue.archive(picked, meta)
                 if picked.type == "review" and picked.payload.get("head"):
                     reviewed.set(picked.payload["repo"], picked.payload["head"])
+                if picked.type == "review" and record_review(
+                        cfg.state_dir, picked, res.output_path, now=eff_now):
+                    entry["finding"] = True  # "request changes": see `diem findings`
             else:
                 picked.attempts += 1
                 if picked.attempts < picked.max_attempts:

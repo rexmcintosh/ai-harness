@@ -33,8 +33,8 @@ time = "00:15"
 floor = 0.0
 
 [seeds]
-ask = {cost = 0.5, duration_s = 120}
-review = {cost = 1.0, duration_s = 180}
+ask = {cost = 0.45, duration_s = 120}
+review = {cost = 0.45, duration_s = 180}
 images = {cost = 2.0, duration_s = 180}
 backfill = {cost = 1.0, duration_s = 300}
 cmd = {cost = 1.0, duration_s = 300}
@@ -132,7 +132,58 @@ diem queue list
 diem queue rm <id>
 ```
 
+**Review findings:** a drain review whose council "### Recommendation" asks for changes
+(request changes / block / reject / do not merge; any "Approve ..." does not count) is
+recorded in `~/.local/state/diem/findings.json` with status `new`, one record per review id
+(repo, reviewed range, date, first sentence of the recommendation, output path). Other
+"Request a ..." wording counts only when its first sentence asks for the change before merge
+and mentions no after-merge or follow-up work ("Request a follow-up issue after merge" is not
+a finding). Recording never fails the drain job; the summary entry gets `"finding": true`.
+The drain, `--ack` and `--backfill` may run at once: each write holds an flock on
+`findings.json.lock` and re-reads the file under it, so none drops another's record or ack.
+```bash
+diem findings                 # new findings (what the morning briefing counts)
+diem findings --all           # include acked ones
+diem findings --ack 1a2b3c4d  # mark seen: full id or a unique prefix, several allowed
+diem findings --backfill      # record findings from the last 14 days of saved reviews (idempotent)
+```
+Bebop's morning briefing carries `N new code-review findings on main. Look: diem findings`
+while any are `new`, and nothing when none are (see `bebop/README.md`).
+
 Output destinations: review reports → `~/.local/state/diem/outputs/reviews/`; ask answers → `~/.local/state/diem/outputs/asks/`; logs → `~/.local/state/diem/outputs/logs/`; morning report → `~/.local/state/diem/reports/YYYY-MM-DD.md`; drain summary → `~/.local/state/diem/summaries/YYYY-MM-DD.jsonl`.
+
+## Billed review/ask cost seeds (measured 2026-09-20..27)
+
+The `review` and `ask` cost seeds are what one 4-seat code-review panel run is actually
+**billed**, not what the ledger estimates. `venice-usage reconcile --since 2026-09-20
+--until 2026-09-27 --project council` matched 521 ledger rows to billed requests:
+
+| seat | ledger est. | billed | billed / est. |
+|---|---|---|---|
+| openai-gpt-56-sol | 11.07 | 24.55 | 2.22x |
+| openai-gpt-53-codex | 18.36 | 18.32 | 1.00x |
+| deepseek-v4-pro | 6.13 | 5.93 | 0.97x |
+| grok-4-3 | 4.67 | 4.64 | 0.99x |
+
+Per run (mean per-seat call, all four seats) that is 0.32 DIEM estimated and **0.43 DIEM
+billed**. The drain's own balance deltas agree: mean 0.42 over 106 successful reviews since
+2026-09-13. The old `review` seed (1.0) was about 2x too high, so the floor pre-check turned
+away reviews that would have fit. The seeds are now `0.45` for both (a small margin over
+0.43; the banked audit asks use the same panel on similar-size prompts). Durations are
+unchanged. The floor logic is unchanged: the live balance is re-read between jobs.
+
+Seeds are only priors. Once `estimates.json` holds an EWMA for a type, that wins. Your
+`~/.config/diem/config.toml` does not override `ask` or `review`, so the new defaults
+apply after the package is reinstalled. To pin them explicitly anyway, add these lines under
+its existing `[seeds]` table:
+
+```toml
+ask = {cost = 0.45, duration_s = 120}
+review = {cost = 0.45, duration_s = 180}
+```
+
+Re-measure with the same reconcile command over a fresh week when the panel or its
+models change; refresh the price table first if the tolerance warning fires.
 
 ## Scheduling & semantics
 
