@@ -2,7 +2,9 @@
 
 Formerly `build-ai-automation-workflow` (renamed 2026-09-18). Older docs use the old name.
 
-Home of the VPS + Venice AI multi-agent PR review setup, plus the automation workflow built on top of it.
+Home of the Venice AI review setup and personal automation running on `bebop-vm`,
+a Linux VM on the Mac mini. The Hetzner VPS was retired on 2026-10-02 without a snapshot.
+Start with the [current runtime and retirement record](docs/vps-decommission-2026-10-02.md).
 
 For current automation work, start with the [outcome-led assessment](docs/automation-ops-2026-09-05.md)
 and [scheduled-job contracts](docs/contracts/README.md). They distinguish observed
@@ -12,7 +14,9 @@ runtime behavior from the historical architecture below.
 > non-technical explanation of what this project is and the thinking behind it
 > (the @levelsio × Naval inspiration, the AI-builds → AI-panel-reviews → human-approves model).
 
-The dev infrastructure model: **Claude Code runs on a Hetzner VPS → opens PRs → a Venice AI council critiques every PR → you merge → CI deploys to the same VPS.** See `setup/PLAYBOOK.md` for the full architecture, provisioning steps, and day-to-day loop.
+Claude Code and Codex run on the VM. Venice supplies independent reviews;
+the owner approves merges and deployments. The older phases below document the
+original Hetzner setup and are retained as history.
 
 ## Two phases
 

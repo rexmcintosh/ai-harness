@@ -1,5 +1,11 @@
 # Mac Mini Setup — the home anchor
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 > **Where this fits:** In [ARCHITECTURE.md](ARCHITECTURE.md) the Mini has two
 > jobs: **workstation when you're home** and **always-on backup anchor** for the
 > whole mesh. This doc configures both. Everything here is also the **shared
