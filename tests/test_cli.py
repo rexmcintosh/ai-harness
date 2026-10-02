@@ -23,6 +23,27 @@ def test_ask_runs_and_prints_recommendation(capsys, member_json):
     assert "do X" in capsys.readouterr().out
 
 
+def test_ask_forwards_task_type_ask_for_usage_logging(capsys, member_json):
+    # council/cli.py's ask path must thread task_type="ask" all the way down to
+    # every complete() call (router + panel + chair) for accurate usage attribution.
+    settings, panels, client = _env(member_json)
+    cli.main(["ask", "ship X?"], _settings=settings, _panels=panels, _client=client)
+    assert client.calls  # sanity: calls actually happened
+    assert all(c["task_type"] == "ask" for c in client.calls)
+
+
+def test_review_cmd_leaves_task_type_at_default(capsys, member_json, tmp_path):
+    # council/cli.py's single-file/dir/diff `review` subcommand is distinct from
+    # council/review.py's PR-review path — only the latter was asked to log "review".
+    settings, panels, client = _env(member_json)
+    f = tmp_path / "app.py"
+    f.write_text("print('hi')\n")
+    cli.main(["review", str(f), "--panel", "code-review"],
+             _settings=settings, _panels=panels, _client=client)
+    assert client.calls
+    assert all(c["task_type"] == "chat" for c in client.calls)
+
+
 def test_panels_lists_names(capsys, member_json):
     settings, panels, client = _env(member_json)
     rc = cli.main(["panels"], _settings=settings, _panels=panels, _client=client)
@@ -159,6 +180,41 @@ def test_review_code_file_autopicks_code_review(tmp_path, member_json):
     cli.main(["review", str(f)], _settings=settings, _panels=panels, _client=client)
     models = {c["model"] for c in client.calls}
     assert "code1" in models and "doc1" not in models
+
+
+# ── per-panel chair: a panel that names a chair gets it, every other panel the global one ──
+def _env_with_panel_chair(member_json):
+    settings, panels, client = _env_with_spec(member_json)
+    panels["code-review"].chair_model = "pc"           # only code-review names its own chair
+    client.by_model["pc"] = client.by_model["c"]
+    return settings, panels, client
+
+
+def _models(client):
+    return [c["model"] for c in client.calls]
+
+
+def test_review_on_code_review_calls_that_panels_chair(tmp_path, member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    f = tmp_path / "app.py"
+    f.write_text("print('hi')\n")
+    cli.main(["review", str(f)], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["code1", "pc"]           # the panel's chair, never the global one
+
+
+def test_review_on_another_panel_calls_the_global_chair(tmp_path, member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    f = tmp_path / "design.md"
+    f.write_text("# Design\nsome spec prose\n")
+    cli.main(["review", str(f)], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["doc1", "c"]             # spec-review names no chair
+
+
+def test_ask_uses_the_chair_of_the_panel_it_runs(member_json):
+    settings, panels, client = _env_with_panel_chair(member_json)
+    cli.main(["ask", "x", "--panel", "code-review"], _settings=settings, _panels=panels, _client=client)
+    cli.main(["ask", "x", "--panel", "spec-review"], _settings=settings, _panels=panels, _client=client)
+    assert _models(client) == ["code1", "pc", "doc1", "c"]
 
 
 def test_review_explicit_panel_overrides_autopick(tmp_path, member_json):

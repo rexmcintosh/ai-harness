@@ -1,0 +1,425 @@
+[
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:40:47+00:00",
+    "chapter_col": "6",
+    "sha": "2d87c19378ea0c88ea0a10e0e9be6366734a98a6d1e697996aed80327c1beb7a",
+    "prompt_tokens": 4595,
+    "cost_usd": 0.130397,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:45:44+00:00",
+    "chapter_col": "14",
+    "sha": "5ef1d9b943ea968cb3fa1cea9af05740ae1ff3cdf738e50e7552ee0fb60812c5",
+    "prompt_tokens": 5236,
+    "cost_usd": 0.12603,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:46:23+00:00",
+    "chapter_col": "15",
+    "sha": "9bb3d5d32e7f4d263abb84231f226a766899eb8b9d3b5dbef9fa53fcc22a5623",
+    "prompt_tokens": 5482,
+    "cost_usd": 0.104447,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:50:04+00:00",
+    "chapter_col": "20",
+    "sha": "d76b18b3d791dec6981273cdb7cadbb6726e7b1ee47a15d157e89291bad904e8",
+    "prompt_tokens": 5520,
+    "cost_usd": 0.155965,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:50:57+00:00",
+    "chapter_col": "22",
+    "sha": "ef80e433279b096e093d4f2b98e00e4aa45b3378dab483e28278dd4c81e52b45",
+    "prompt_tokens": 5606,
+    "cost_usd": 0.091901,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-08-01T03:52:03+00:00",
+    "chapter_col": "24",
+    "sha": "5c929454d9402280e24af7581901417e1aa957fba60d89ede7f8b49d6f027a3a",
+    "prompt_tokens": 4696,
+    "cost_usd": 0.095125,
+    "reason": "exact chapter text version not recoverable"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:35:09+00:00",
+    "chapter_col": "1",
+    "sha": "d52f46b8179e5d8752bed6ac48952591d6f801dfaf0baac443a8821e87bfae14",
+    "prompt_tokens": 5173,
+    "cost_usd": 0.119103,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:35:45+00:00",
+    "chapter_col": "2",
+    "sha": "6330de5eb377afaf45c64af9835a50fc30a9a8fd3eae1c9ccba97556a053383b",
+    "prompt_tokens": 5544,
+    "cost_usd": 0.095467,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:36:40+00:00",
+    "chapter_col": "0",
+    "sha": "7db9715f550a7c7a3a276e322c5339fb29b601c8177f8d76920deb05a046341b",
+    "prompt_tokens": 5321,
+    "cost_usd": 0.139287,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:37:16+00:00",
+    "chapter_col": "7",
+    "sha": "4039cb7ec10db058837662faea2fce277ac3d0ab7cf27240c038f85f6a4e42c1",
+    "prompt_tokens": 5509,
+    "cost_usd": 0.095357,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:37:33+00:00",
+    "chapter_col": "8",
+    "sha": "079dd8fce879882c995813818c8b2eb56fe33eac2f283570eeddc2aedd60f739",
+    "prompt_tokens": 5263,
+    "cost_usd": 0.052475,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:37:50+00:00",
+    "chapter_col": "0",
+    "sha": "7db9715f550a7c7a3a276e322c5339fb29b601c8177f8d76920deb05a046341b",
+    "prompt_tokens": 5321,
+    "cost_usd": 0.042113,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:39:36+00:00",
+    "chapter_col": "13",
+    "sha": "2e9c2e1ecfe95c5d79b6cdc6bc9ecec6c29eec3639d43b915dfccd9d10e46a68",
+    "prompt_tokens": 5040,
+    "cost_usd": 0.057793,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:40:34+00:00",
+    "chapter_col": "14",
+    "sha": "5a57fa527bde7b9d79957898b9c935baf8b42b95501e5a5d4db73a799c8a7df2",
+    "prompt_tokens": 5722,
+    "cost_usd": 0.137215,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:41:19+00:00",
+    "chapter_col": "15",
+    "sha": "7ea5ba39de5b41c54ea3a1e6936ef56c5bd656833e9db38b1b7d7701ce55aea8",
+    "prompt_tokens": 5692,
+    "cost_usd": 0.119693,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:42:14+00:00",
+    "chapter_col": "0",
+    "sha": "7db9715f550a7c7a3a276e322c5339fb29b601c8177f8d76920deb05a046341b",
+    "prompt_tokens": 5321,
+    "cost_usd": 0.127258,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:43:28+00:00",
+    "chapter_col": "20",
+    "sha": "2f90eb1620882b7cc54afbaa1b230e2ecf762915771d93578c1a8e8d943565ca",
+    "prompt_tokens": 5526,
+    "cost_usd": 0.183413,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:44:25+00:00",
+    "chapter_col": "21",
+    "sha": "43f8368df66ef83dccc5ce693ec0ec2631bdb4e4e7e6bd94f30182d3cad4c2d4",
+    "prompt_tokens": 5064,
+    "cost_usd": 0.152244,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:45:13+00:00",
+    "chapter_col": "22",
+    "sha": "15b673e8bb28e0f8c6759acdd854b4f88c7b5f64eb430f2add7ca2ea7173834d",
+    "prompt_tokens": 6149,
+    "cost_usd": 0.127102,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:45:42+00:00",
+    "chapter_col": "0",
+    "sha": "7db9715f550a7c7a3a276e322c5339fb29b601c8177f8d76920deb05a046341b",
+    "prompt_tokens": 5321,
+    "cost_usd": 0.068696,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "high-tide",
+    "ts": "2026-09-10T18:48:53+00:00",
+    "chapter_col": "0",
+    "sha": "108f24a4e11b6d27d30670f1f25e9d78836f50c40155f6695db9722e067fe8a1",
+    "prompt_tokens": 5321,
+    "cost_usd": 0.208472,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:37:53+00:00",
+    "chapter_col": "12",
+    "sha": "af509fd0e5822ca0671a77aee72651d95df42e78721bdc9de8ec1e7d06f3a8b3",
+    "prompt_tokens": 4571,
+    "cost_usd": 0.078547,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:38:54+00:00",
+    "chapter_col": "1",
+    "sha": "d7a253fca9dc8298a5e727f694c914e52daa2356b4c81b503823d7ddce1eb2a9",
+    "prompt_tokens": 4768,
+    "cost_usd": 0.144193,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:39:44+00:00",
+    "chapter_col": "2",
+    "sha": "c1efca61dfc301adae0dd26849b0836a43f6ebce7fe7c8fdea6497baac93bc18",
+    "prompt_tokens": 4807,
+    "cost_usd": 0.150669,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:40:51+00:00",
+    "chapter_col": "3",
+    "sha": "bf7c0e3c6fc916c80dd48ece7dd8c8108f35ee5bac623e41779a18f9080a9a2f",
+    "prompt_tokens": 4400,
+    "cost_usd": 0.110423,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:41:34+00:00",
+    "chapter_col": "4",
+    "sha": "88a93a71f974f01de6bd246088d396d46c98dbb7167eec5107a3d80ecfedc677",
+    "prompt_tokens": 5064,
+    "cost_usd": 0.114701,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:42:03+00:00",
+    "chapter_col": "5",
+    "sha": "3bdaaec499fba592dc1f91a1c99d55984985455cddb6e17aa2a17b25fda7fcd3",
+    "prompt_tokens": 4384,
+    "cost_usd": 0.086403,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:42:37+00:00",
+    "chapter_col": "6",
+    "sha": "10b6120e5d9e66a6da60dd11146be016f00c2d9ea4c9b0adfb92c77fcdc9ea7c",
+    "prompt_tokens": 4801,
+    "cost_usd": 0.090152,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:43:29+00:00",
+    "chapter_col": "7",
+    "sha": "94308c7c827e18e0e07ed22e85b3f3c97822e82e2f392ae428575b68017ba3de",
+    "prompt_tokens": 4328,
+    "cost_usd": 0.154885,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:44:13+00:00",
+    "chapter_col": "8",
+    "sha": "a3833c717a7691502d97c51154ef9f0815697d64145f7379492ba14fae103845",
+    "prompt_tokens": 4422,
+    "cost_usd": 0.124986,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:44:31+00:00",
+    "chapter_col": "9",
+    "sha": "96e59a0960e77a97626bbed886a661d227f65c95d7a1e2ffa2a69382ddb6ddfa",
+    "prompt_tokens": 4708,
+    "cost_usd": 0.045436,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:44:53+00:00",
+    "chapter_col": "10",
+    "sha": "bb70483638725915dc49bed1be9fa10074c7873dd6ac93023c3356bbb3e959a0",
+    "prompt_tokens": 4733,
+    "cost_usd": 0.053223,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:45:31+00:00",
+    "chapter_col": "11",
+    "sha": "6d77780d71852ca46242279a70b92be9698ca230196f92697407c33439d5488e",
+    "prompt_tokens": 4531,
+    "cost_usd": 0.1151,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:46:07+00:00",
+    "chapter_col": "12",
+    "sha": "af509fd0e5822ca0671a77aee72651d95df42e78721bdc9de8ec1e7d06f3a8b3",
+    "prompt_tokens": 4571,
+    "cost_usd": 0.090915,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:46:42+00:00",
+    "chapter_col": "13",
+    "sha": "e29820ed86a6f8731c4f8de7666abe047090a45c4076768774c2e8488dc1c72b",
+    "prompt_tokens": 4765,
+    "cost_usd": 0.108745,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:47:26+00:00",
+    "chapter_col": "14",
+    "sha": "e74fdc57305de2e368f2d74299c159011c1133091f2426555f534ac10fe684eb",
+    "prompt_tokens": 4814,
+    "cost_usd": 0.137832,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:48:19+00:00",
+    "chapter_col": "15",
+    "sha": "9b1d9c011f79a06799c38627a9784b05728fd1f9db806ec6f784463ca1d2e70b",
+    "prompt_tokens": 4735,
+    "cost_usd": 0.153696,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:48:57+00:00",
+    "chapter_col": "16",
+    "sha": "4e5965bc76eb2a69860ebad66e02e50dc5223922259247f73e048c722f2e2f75",
+    "prompt_tokens": 5089,
+    "cost_usd": 0.110906,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:49:25+00:00",
+    "chapter_col": "17",
+    "sha": "a15b48bd8bb1112b9e2f44cebda8007e397860477bd1ee8d14737b37ee96112b",
+    "prompt_tokens": 4512,
+    "cost_usd": 0.087555,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:49:53+00:00",
+    "chapter_col": "18",
+    "sha": "5a983a63abc5b56040d6be4cec01f77c821fb8efd10dc1373c6aeac0fd504537",
+    "prompt_tokens": 4391,
+    "cost_usd": 0.089696,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:50:40+00:00",
+    "chapter_col": "19",
+    "sha": "acae39d1779af7a36fbb5ce6f4627796bfd5ef91c19399f2b05d7fa8c1260b74",
+    "prompt_tokens": 4335,
+    "cost_usd": 0.133174,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:51:32+00:00",
+    "chapter_col": "20",
+    "sha": "512ff7150363c3cc57795abcc77d9dcbb6bc87be24509f7a6b709e86ff887a80",
+    "prompt_tokens": 4189,
+    "cost_usd": 0.134917,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:52:26+00:00",
+    "chapter_col": "21",
+    "sha": "bb505afb1ad66a16caae77d45d6b3d36e7996992a3539a8dfd3340c6e1ab97ad",
+    "prompt_tokens": 4250,
+    "cost_usd": 0.128246,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:53:47+00:00",
+    "chapter_col": "22",
+    "sha": "8aa5e711f6c4571cab9d5057c3a57cbd008aea44dfdc697bbe5c957e4e847b0d",
+    "prompt_tokens": 4891,
+    "cost_usd": 0.203234,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:54:48+00:00",
+    "chapter_col": "23",
+    "sha": "5539e47143eecbb910dd2571bb52836eefac0cfccb67a03a62d59533b88fcb38",
+    "prompt_tokens": 4525,
+    "cost_usd": 0.171106,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:55:18+00:00",
+    "chapter_col": "24",
+    "sha": "d8862d625b0af245e83b893cae026e0656a2af7f2e54118cfda9b60d83af25f9",
+    "prompt_tokens": 4240,
+    "cost_usd": 0.096123,
+    "reason": "no surviving report version holds this scan's output"
+  },
+  {
+    "book": "open-water",
+    "ts": "2026-07-13T23:56:42+00:00",
+    "chapter_col": "25",
+    "sha": "9bc8cf739dfe818464cbddcf20f61fb5988855638eef8864f4b1d65867c21c09",
+    "prompt_tokens": 4694,
+    "cost_usd": 0.15291,
+    "reason": "no surviving report version holds this scan's output"
+  }
+]

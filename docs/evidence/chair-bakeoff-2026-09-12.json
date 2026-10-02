@@ -1,0 +1,1508 @@
+{
+  "chair_models": [
+    "claude-opus-4-8",
+    "claude-sonnet-5",
+    "openai-gpt-56-sol",
+    "z-ai-glm-5-3"
+  ],
+  "claim": "detection, not effect estimation: 3 fixtures x N repeats, one chair each",
+  "council": {
+    "commit": "026900319c4deb479d6c9abe01fd537ac5ac09a4",
+    "path": "/home/dev/projects/build-ai-automation-workflow/.claude/worktrees/chair-bakeoff-run/council/__init__.py",
+    "version": "0.5.0"
+  },
+  "experiment": "chair bake-off (docs/chair-bakeoff-design-2026-09-11.md)",
+  "fixtures": {
+    "aris-pr1": {
+      "chair_prompt_bytes": 18056,
+      "panel_candidates": 1,
+      "tier": "full"
+    },
+    "baw-pr11": {
+      "chair_prompt_bytes": 45490,
+      "panel_candidates": 0,
+      "tier": "reduced"
+    },
+    "stw-pr11": {
+      "chair_prompt_bytes": 13596,
+      "panel_candidates": 0,
+      "tier": "reduced"
+    }
+  },
+  "generated_at": "2026-09-12T09:39:42.467636+00:00",
+  "mode": "paid",
+  "panel_replayed": true,
+  "repeats": 3,
+  "runs": [
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "All three case images use loading=\"lazy\", including the first case which may render above the fold, a minor LCP consideration",
+        "PNG source assets are added without a format-conversion or size guardrail"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary flagged as high (c9) that Image lacks width/height and only CSS height:auto is set; Eng Manager and Security Officer did not raise this",
+          "resolution": "Dropped. When Astro's <Image> is fed a local ESM-imported asset (contractImg, swimtrackImg, aiCouncilImg here), it infers intrinsic width/height from the image metadata at build time and emits them on the <img> element automatically. Explicit width/height props are not required in this usage, so the CLS claim is refuted by the code.",
+          "topic": "Missing width/height causing CLS",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary claims astro:assets won't optimize without config; Eng Manager suggests modern formats",
+          "resolution": "Partially refuted. Astro's default image service optimizes and can emit modern formats; the <Image> component with widths/sizes already produces responsive, re-encoded output. Whether to force AVIF/WebP is a tuning choice, not a defect. Legitimate as a suggestion, not a blocker.",
+          "topic": "Image not auto-optimized / stuck as PNG",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. This is a straightforward content/asset addition using Astro's built-in Image component. The panel raised only performance and a11y refinements, none of which are verified defects.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"All three case images use loading=\\\"lazy\\\", including the first case which may render above the fold, a minor LCP consideration\",\n    \"PNG source assets are added without a format-conversion or size guardrail\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing width/height causing CLS\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary flagged as high (c9) that Image lacks width/height and only CSS height:auto is set; Eng Manager and Security Officer did not raise this\",\n      \"resolution\": \"Dropped. When Astro's <Image> is fed a local ESM-imported asset (contractImg, swimtrackImg, aiCouncilImg here), it infers intrinsic width/height from the image metadata at build time and emits them on the <img> element automatically. Explicit width/height props are not required in this usage, so the CLS claim is refuted by the code.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Image not auto-optimized / stuck as PNG\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claims astro:assets won't optimize without config; Eng Manager suggests modern formats\",\n      \"resolution\": \"Partially refuted. Astro's default image service optimizes and can emit modern formats; the <Image> component with widths/sizes already produces responsive, re-encoded output. Whether to force AVIF/WebP is a tuning choice, not a defect. Legitimate as a suggestion, not a blocker.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image performance tuning (lazy-loading the above-fold image, format/size optimization)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. This is a straightforward content/asset addition using Astro's built-in Image component. The panel raised only performance and a11y refinements, none of which are verified defects.",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 13.04,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "All three images use loading=\"lazy\" including the likely above-the-fold first case, which can delay LCP (raised by Eng Manager and Adversary)",
+        "PNG sources with no explicit modern-format (WebP/AVIF) output strategy may ship larger-than-necessary payloads (Eng Manager and Adversary)"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary rated this 'high c9'; Security Officer and Eng Manager did not raise it",
+          "resolution": "Refuted. Astro's <Image> component with a statically imported local asset (contractImg, etc.) infers intrinsic width and height from the imported ImageMetadata and emits them automatically. Explicit width/height props are not required to prevent CLS in this case. Dropped \u2014 not a blocking finding.",
+          "topic": "Missing width/height causing CLS",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary claimed astro:assets won't auto-optimize without config; Eng Manager treated modern formats as an optional improvement",
+          "resolution": "Astro's Image service optimizes assets by default (sharp) and applies quality/widths. Format conversion to WebP/AVIF is an opt-in enhancement, not a bug. Treat as a suggestion, not a defect.",
+          "topic": "Auto-optimization of PNGs",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. This is a straightforward, well-formed addition of portfolio images using Astro's built-in Image component. The concerns raised are performance/a11y refinements, not defects.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"All three images use loading=\\\"lazy\\\" including the likely above-the-fold first case, which can delay LCP (raised by Eng Manager and Adversary)\",\n    \"PNG sources with no explicit modern-format (WebP/AVIF) output strategy may ship larger-than-necessary payloads (Eng Manager and Adversary)\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing width/height causing CLS\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary rated this 'high c9'; Security Officer and Eng Manager did not raise it\",\n      \"resolution\": \"Refuted. Astro's <Image> component with a statically imported local asset (contractImg, etc.) infers intrinsic width and height from the imported ImageMetadata and emits them automatically. Explicit width/height props are not required to prevent CLS in this case. Dropped \u2014 not a blocking finding.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Auto-optimization of PNGs\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claimed astro:assets won't auto-optimize without config; Eng Manager treated modern formats as an optional improvement\",\n      \"resolution\": \"Astro's Image service optimizes assets by default (sharp) and applies quality/widths. Format conversion to WebP/AVIF is an opt-in enhancement, not a bug. Treat as a suggestion, not a defect.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image performance tuning (lazy-loading the LCP image, modern formats, source-size budgets) \u2014 real but non-blocking optimization opportunities\",\n    \"Accessibility: alt texts are long and narrative; consider tightening for screen-reader clarity\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. This is a straightforward, well-formed addition of portfolio images using Astro's built-in Image component. The concerns raised are performance/a11y refinements, not defects.",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 13.09,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "loading=\"lazy\" on the first case image may hurt LCP since it's likely near the top of the viewport",
+        "PNG sources ship without modern-format (WebP/AVIF) output strategy; potential byte savings left on the table",
+        "No size guardrail on the new binary assets"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary rated this high (c9); other panelists did not raise it",
+          "resolution": "Refuted. Astro's <Image> component infers intrinsic width/height automatically from locally imported assets (contractImg, swimtrackImg, aiCouncilImg are static imports carrying metadata). The component emits width/height attributes, so this does not cause CLS. Dropped.",
+          "topic": "Missing width/height causing CLS",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary/Eng Manager claim no auto-optimization",
+          "resolution": "Partly refuted. astro:assets optimizes local images by default (resizing per widths, quality=80 applied). Format conversion to WebP/AVIF is not automatic without a Picture component or config, so that specific sub-point stands as a valid optimization suggestion, not a defect.",
+          "topic": "Images won't be optimized without config",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. This is a straightforward static-content addition (three portfolio images) using Astro's built-in Image component correctly. The main flagged concerns are refuted by how astro:assets works, and the rest are minor optimizations.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"loading=\\\"lazy\\\" on the first case image may hurt LCP since it's likely near the top of the viewport\",\n    \"PNG sources ship without modern-format (WebP/AVIF) output strategy; potential byte savings left on the table\",\n    \"No size guardrail on the new binary assets\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing width/height causing CLS\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary rated this high (c9); other panelists did not raise it\",\n      \"resolution\": \"Refuted. Astro's <Image> component infers intrinsic width/height automatically from locally imported assets (contractImg, swimtrackImg, aiCouncilImg are static imports carrying metadata). The component emits width/height attributes, so this does not cause CLS. Dropped.\"\n    },\n    {\n      \"topic\": \"Images won't be optimized without config\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary/Eng Manager claim no auto-optimization\",\n      \"resolution\": \"Partly refuted. astro:assets optimizes local images by default (resizing per widths, quality=80 applied). Format conversion to WebP/AVIF is not automatic without a Picture component or config, so that specific sub-point stands as a valid optimization suggestion, not a defect.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image performance/optimization (lazy-loading of first image, format choice) surfaced by both the Eng Manager and Adversary lenses\",\n    \"Security lens found no trust-boundary concerns\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. This is a straightforward static-content addition (three portfolio images) using Astro's built-in Image component correctly. The main flagged concerns are refuted by how astro:assets works, and the rest are minor optimizations.",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 11.83,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "All three images use loading=\"lazy\" including the first case, which is likely near the initial viewport and could affect LCP",
+        "PNGs are shipped without an explicit modern-format (webp/avif) conversion strategy, which may increase payload size"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary claims high-severity CLS risk from missing width/height attributes; Eng Manager and Security Officer do not raise this",
+          "resolution": "Astro's astro:assets Image component automatically infers and injects width/height attributes from statically imported local images, so this claim is not verified against the actual behavior of the component being used here \u2014 treated as unconfirmed/refuted",
+          "topic": "Whether the Image component causes CLS due to missing width/height",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager and Adversary flag it as med severity performance concern; Security Officer sees no issue at all",
+          "resolution": "This is a real perf best-practice miss but not a guaranteed defect or user-facing break \u2014 first-case image is below a hero section and heading text, so LCP impact is plausible but not certain; treated as a taste/perf suggestion, not blocking",
+          "topic": "Severity of lazy-loading the first (likely above-the-fold) image",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"All three images use loading=\\\"lazy\\\" including the first case, which is likely near the initial viewport and could affect LCP\",\n    \"PNGs are shipped without an explicit modern-format (webp/avif) conversion strategy, which may increase payload size\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Whether the Image component causes CLS due to missing width/height\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claims high-severity CLS risk from missing width/height attributes; Eng Manager and Security Officer do not raise this\",\n      \"resolution\": \"Astro's astro:assets Image component automatically infers and injects width/height attributes from statically imported local images, so this claim is not verified against the actual behavior of the component being used here \u2014 treated as unconfirmed/refuted\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Severity of lazy-loading the first (likely above-the-fold) image\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary flag it as med severity performance concern; Security Officer sees no issue at all\",\n      \"resolution\": \"This is a real perf best-practice miss but not a guaranteed defect or user-facing break \u2014 first-case image is below a hero section and heading text, so LCP impact is plausible but not certain; treated as a taste/perf suggestion, not blocking\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image loading/performance optimization (lazy attribute placement, format choice, no size guardrails)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 12.75,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "All non-first images (and arguably all three) are marked loading='lazy', which could delay LCP for the above-the-fold first case image",
+        "New PNG binary assets added without an explicit modern-format (WebP/AVIF) conversion step or size budget"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary claims high-severity CLS risk from missing width/height on <Image>; other panelists did not raise this",
+          "resolution": "Refuted \u2014 Astro's built-in <Image> component (astro:assets) automatically infers and sets width/height attributes from the imported local image's metadata at build time, so intrinsic dimensions are present unless explicitly overridden. This is standard Astro behavior for local image imports (as used here: `import contractImg from '../assets/images/...'`), so the claimed CLS defect does not exist as described.",
+          "topic": "Missing width/height causing CLS",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager and Adversary both flag this as a performance concern (med/high); Security Officer has no objection",
+          "resolution": "Valid perf nitpick but not a functional defect \u2014 worst case is a slightly delayed LCP for one image, not a broken page. Taste/perf-tuning issue, not a blocker.",
+          "topic": "Lazy loading on first (likely above-fold) image",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"All non-first images (and arguably all three) are marked loading='lazy', which could delay LCP for the above-the-fold first case image\",\n    \"New PNG binary assets added without an explicit modern-format (WebP/AVIF) conversion step or size budget\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing width/height causing CLS\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claims high-severity CLS risk from missing width/height on <Image>; other panelists did not raise this\",\n      \"resolution\": \"Refuted \u2014 Astro's built-in <Image> component (astro:assets) automatically infers and sets width/height attributes from the imported local image's metadata at build time, so intrinsic dimensions are present unless explicitly overridden. This is standard Astro behavior for local image imports (as used here: `import contractImg from '../assets/images/...'`), so the claimed CLS defect does not exist as described.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Lazy loading on first (likely above-fold) image\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary both flag this as a performance concern (med/high); Security Officer has no objection\",\n      \"resolution\": \"Valid perf nitpick but not a functional defect \u2014 worst case is a slightly delayed LCP for one image, not a broken page. Taste/perf-tuning issue, not a blocker.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image optimization/performance tuning (lazy-loading strategy, format/size budget) raised from multiple angles but none rise to functional defects\"\n  ],\n  \"blocking_findings\": [],\n  \"overall_note\": \"Straightforward addition of three static images to a portfolio page using Astro's built-in optimized Image component. No security, correctness, or trust-boundary issues. Perf suggestions (eager-load first image, consider WebP/AVIF, add size budget) are reasonable follow-ups but do not block merge.\"\n}",
+      "recommendation": "approve",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 14.8,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "All three images are marked loading=\"lazy\", including the first one likely in the initial viewport, which is a legitimate LCP/perf concern raised by two panelists",
+        "PNG-only output with no explicit modern-format (webp/avif) configuration was flagged as a size/perf concern by two panelists"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary claims Image lacks width/height and will cause layout shift; no other panelist raised this",
+          "resolution": "Refuted \u2014 Astro's astro:assets Image component automatically infers and emits width/height (and aspect-ratio) from the imported local image's metadata unless overridden, so CLS protection is already present. Drop this finding.",
+          "topic": "Missing width/height causing CLS",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary flagged long narrative alt text as an a11y/truncation risk; no one else raised it",
+          "resolution": "Taste \u2014 long descriptive alt text is valid for content-rich portfolio images and not a defect; not blocking.",
+          "topic": "Alt text length/style",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"All three images are marked loading=\\\"lazy\\\", including the first one likely in the initial viewport, which is a legitimate LCP/perf concern raised by two panelists\",\n    \"PNG-only output with no explicit modern-format (webp/avif) configuration was flagged as a size/perf concern by two panelists\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing width/height causing CLS\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claims Image lacks width/height and will cause layout shift; no other panelist raised this\",\n      \"resolution\": \"Refuted \u2014 Astro's astro:assets Image component automatically infers and emits width/height (and aspect-ratio) from the imported local image's metadata unless overridden, so CLS protection is already present. Drop this finding.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Alt text length/style\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary flagged long narrative alt text as an a11y/truncation risk; no one else raised it\",\n      \"resolution\": \"Taste \u2014 long descriptive alt text is valid for content-rich portfolio images and not a defect; not blocking.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image loading strategy (lazy on above-the-fold image) and lack of modern-format optimization are the only substantive, recurring concerns\"\n  ],\n  \"blocking_findings\": [],\n  \"notes\": \"No security issues (security officer approved). Performance/optimization suggestions (eager-load first image, use webp/avif, verify source image sizes) are valid improvement items but are perf/taste concerns, not verified defects or guaranteed failures, and do not meet the bar to block merge.\"\n}",
+      "recommendation": "approve",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 14.48,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The first case image is explicitly lazy-loaded along with later images, which could delay it if it appears in the initial viewport.",
+        "The new PNG assets have no explicit modern output format or repository-level file-size budget."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Adversary predicted CLS because width and height props are absent; the Security Officer approved the implementation without this concern.",
+          "resolution": "Drop the claim. For imported local assets, Astro's Image component reads intrinsic metadata and generates dimensions; explicit width and height props are not required here.",
+          "topic": "Whether omitted width and height cause layout shift",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary claimed astro:assets will not optimize without extra configuration; the Engineering Manager more narrowly noted that no modern output format is explicitly selected; the Security Officer approved.",
+          "resolution": "Astro does process imported local images and the supplied widths create responsive variants. However, no WebP or AVIF output is explicitly requested, so potential byte savings remain a non-blocking performance improvement.",
+          "topic": "Whether Astro leaves the images unoptimized",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary claimed the alt texts exceed 200 characters and risk truncation; the other panelists raised no accessibility objection.",
+          "resolution": "Drop the claim. The provided alt strings are descriptive and do not exceed 200 characters; punctuation such as an em dash is not an accessibility defect.",
+          "topic": "Alt-text length and accessibility",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Engineering Manager and Adversary recommended eager-loading the first image; the Security Officer approved as written.",
+          "resolution": "Keep as a non-blocking optimization. The code confirms loading=\"lazy\", but the preceding hero and case heading mean the evidence does not establish that this image is the page's LCP element or initially visible across target viewports.",
+          "topic": "Lazy-loading the first case image",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve with non-blocking performance follow-ups\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The first case image is explicitly lazy-loaded along with later images, which could delay it if it appears in the initial viewport.\",\n    \"The new PNG assets have no explicit modern output format or repository-level file-size budget.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Whether omitted width and height cause layout shift\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary predicted CLS because width and height props are absent; the Security Officer approved the implementation without this concern.\",\n      \"resolution\": \"Drop the claim. For imported local assets, Astro's Image component reads intrinsic metadata and generates dimensions; explicit width and height props are not required here.\"\n    },\n    {\n      \"topic\": \"Whether Astro leaves the images unoptimized\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary claimed astro:assets will not optimize without extra configuration; the Engineering Manager more narrowly noted that no modern output format is explicitly selected; the Security Officer approved.\",\n      \"resolution\": \"Astro does process imported local images and the supplied widths create responsive variants. However, no WebP or AVIF output is explicitly requested, so potential byte savings remain a non-blocking performance improvement.\"\n    },\n    {\n      \"topic\": \"Alt-text length and accessibility\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary claimed the alt texts exceed 200 characters and risk truncation; the other panelists raised no accessibility objection.\",\n      \"resolution\": \"Drop the claim. The provided alt strings are descriptive and do not exceed 200 characters; punctuation such as an em dash is not an accessibility defect.\"\n    },\n    {\n      \"topic\": \"Lazy-loading the first case image\",\n      \"type\": \"taste\",\n      \"positions\": \"The Engineering Manager and Adversary recommended eager-loading the first image; the Security Officer approved as written.\",\n      \"resolution\": \"Keep as a non-blocking optimization. The code confirms loading=\\\"lazy\\\", but the preceding hero and case heading mean the evidence does not establish that this image is the page's LCP element or initially visible across target viewports.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image-delivery performance, especially lazy-loading behavior and output formats\",\n    \"Responsive image sizing and control of binary asset weight\",\n    \"Accessibility and layout stability were examined, but the concrete implementation does not substantiate a defect\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve with non-blocking performance follow-ups",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 19.45,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The Eng Manager and Adversary both noted that lazily loading every case image could delay the first image if it falls within or near the initial viewport.",
+        "The Eng Manager and Adversary both recommended evaluating WebP or AVIF output and checking the payload sizes of the new PNG assets."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Adversary called this a high-severity CLS defect; the other panelists did not raise it.",
+          "resolution": "Not a defect: these are statically imported local assets, so Astro's Image component can infer intrinsic dimensions and emit the corresponding image dimensions.",
+          "topic": "Whether the images cause layout shift because width and height props are absent",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager and Adversary raised image-loading and encoding concerns, while the Security Officer approved the change.",
+          "resolution": "Do not block. Astro processes the local images and generates responsive candidates from the supplied widths. A modern output format could reduce bytes further, but no asset sizes or measurements establish a serious regression, and the first image's actual LCP status is not demonstrated.",
+          "topic": "Whether the performance concerns should prevent merge",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary considered the descriptions excessively long and narrative; the other panelists raised no accessibility objection.",
+          "resolution": "Do not block. The descriptions are meaningful, remain below the claimed 200-character threshold, and no concrete accessibility failure is shown.",
+          "topic": "Alt-text length and style",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve with non-blocking performance follow-ups\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The Eng Manager and Adversary both noted that lazily loading every case image could delay the first image if it falls within or near the initial viewport.\",\n    \"The Eng Manager and Adversary both recommended evaluating WebP or AVIF output and checking the payload sizes of the new PNG assets.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Whether the images cause layout shift because width and height props are absent\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary called this a high-severity CLS defect; the other panelists did not raise it.\",\n      \"resolution\": \"Not a defect: these are statically imported local assets, so Astro's Image component can infer intrinsic dimensions and emit the corresponding image dimensions.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Whether the performance concerns should prevent merge\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager and Adversary raised image-loading and encoding concerns, while the Security Officer approved the change.\",\n      \"resolution\": \"Do not block. Astro processes the local images and generates responsive candidates from the supplied widths. A modern output format could reduce bytes further, but no asset sizes or measurements establish a serious regression, and the first image's actual LCP status is not demonstrated.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Alt-text length and style\",\n      \"type\": \"taste\",\n      \"positions\": \"The Adversary considered the descriptions excessively long and narrative; the other panelists raised no accessibility objection.\",\n      \"resolution\": \"Do not block. The descriptions are meaningful, remain below the claimed 200-character threshold, and no concrete accessibility failure is shown.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image delivery performance, especially lazy-loading behavior and the absence of explicit WebP or AVIF output.\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve with non-blocking performance follow-ups",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 32.37,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The Eng Manager and Adversary both noted that lazy-loading every image may delay the first case image if it is initially visible.",
+        "The Eng Manager and Adversary both raised concern that retaining PNG output without an explicit modern-format strategy may produce larger payloads than WebP or AVIF."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Adversary claimed the Image lacks dimensions and therefore causes CLS; the other panelists did not raise this.",
+          "resolution": "Drop the claim. These are statically imported local images, so Astro reads their metadata and its Image component emits intrinsic width and height information.",
+          "topic": "Missing explicit image dimensions causing layout shift",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary said Image will not auto-optimize without configuration; the Eng Manager more narrowly noted the absence of an explicit modern output format; the Security Officer approved.",
+          "resolution": "Astro's Image component does process local assets and generates the requested responsive widths. It may preserve PNG as the output format absent an explicit format choice, so modern-format conversion is a reasonable optimization but not a correctness defect.",
+          "topic": "Whether Astro leaves the images unoptimized",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager and Adversary recommended eager-loading the first image; the Security Officer found no merge concern.",
+          "resolution": "Non-blocking. The first image may be visible in some viewports, but that depends on viewport size and preceding content. Eager loading or fetch priority should be guided by measured LCP.",
+          "topic": "Lazy-loading the first case image",
+          "type": "taste"
+        },
+        {
+          "positions": "The Adversary considered the descriptions too long and potentially poor for accessibility; the other panelists raised no accessibility concern.",
+          "resolution": "Do not block. The descriptions are meaningful and there is no general 200-character truncation rule. They could be shortened editorially if they duplicate information conveyed by nearby prose.",
+          "topic": "Alt-text length and style",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"approve with non-blocking performance suggestions\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The Eng Manager and Adversary both noted that lazy-loading every image may delay the first case image if it is initially visible.\",\n    \"The Eng Manager and Adversary both raised concern that retaining PNG output without an explicit modern-format strategy may produce larger payloads than WebP or AVIF.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Missing explicit image dimensions causing layout shift\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary claimed the Image lacks dimensions and therefore causes CLS; the other panelists did not raise this.\",\n      \"resolution\": \"Drop the claim. These are statically imported local images, so Astro reads their metadata and its Image component emits intrinsic width and height information.\"\n    },\n    {\n      \"topic\": \"Whether Astro leaves the images unoptimized\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary said Image will not auto-optimize without configuration; the Eng Manager more narrowly noted the absence of an explicit modern output format; the Security Officer approved.\",\n      \"resolution\": \"Astro's Image component does process local assets and generates the requested responsive widths. It may preserve PNG as the output format absent an explicit format choice, so modern-format conversion is a reasonable optimization but not a correctness defect.\"\n    },\n    {\n      \"topic\": \"Lazy-loading the first case image\",\n      \"type\": \"taste\",\n      \"positions\": \"The Eng Manager and Adversary recommended eager-loading the first image; the Security Officer found no merge concern.\",\n      \"resolution\": \"Non-blocking. The first image may be visible in some viewports, but that depends on viewport size and preceding content. Eager loading or fetch priority should be guided by measured LCP.\"\n    },\n    {\n      \"topic\": \"Alt-text length and style\",\n      \"type\": \"taste\",\n      \"positions\": \"The Adversary considered the descriptions too long and potentially poor for accessibility; the other panelists raised no accessibility concern.\",\n      \"resolution\": \"Do not block. The descriptions are meaningful and there is no general 200-character truncation rule. They could be shortened editorially if they duplicate information conveyed by nearby prose.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Responsive-image delivery and page-load performance\",\n    \"Choosing lazy versus eager loading based on initial viewport placement\",\n    \"Potential payload savings from explicit WebP or AVIF output\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve with non-blocking performance suggestions",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 18.49,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 8,
+      "consensus": [
+        "loading=\"lazy\" is applied to all three case images including the first, whose top edge sits roughly 450px down the page (hero \u2248 344px + section padding + heading) and is therefore likely in or near the initial viewport on desktop \u2014 a possible LCP delay (raised independently by Eng Manager and Adversary).",
+        "Three new binary PNG assets are committed with no visible size/dimension guardrail, so source weight and build-artifact growth are unverified (raised by Eng Manager as low, Adversary as med)."
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary (high, c9): no width/height props, so CSS height:auto causes layout shift on slow loads; Eng Manager and Security Officer did not flag it.",
+          "resolution": "Dropped \u2014 mechanical. astro:assets infers intrinsic width/height from statically imported images (import contractImg from '../assets/images/...') and emits width/height attributes on the rendered <img>; combined with .work-case__img { width:100%; height:auto; } the aspect ratio is locked before load, so no CLS occurs.",
+          "topic": "CLS caused by missing width/height on <Image>",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary (med, c8): astro:assets Image 'won't auto-optimize without config'; Eng Manager (low): PNG sources with no explicit modern output strategy ship larger payloads than necessary.",
+          "resolution": "Largely refuted \u2014 mechanical. Astro's default sharp image service transforms images at build time (default webp output) for statically prerendered pages like this one; no config is required. The residual, shared concern is only the unverifiable source-file size, which is a guardrail suggestion, not a defect.",
+          "topic": "Whether the PNGs get optimized without explicit config",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary (low, c7): alt texts exceed 200 chars and risk truncation/poor a11y; no other panelist flagged it.",
+          "resolution": "Refuted factually \u2014 the three alt strings measure roughly 155, 120, and 143 characters, all under 200. Descriptive alt on content images is acceptable a11y practice; shortening to bare factual descriptions is taste, not a defect.",
+          "topic": "Alt text length",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve. This is a clean, idiomatic use of astro:assets: statically imported PNGs rendered via <Image> with responsive widths, a matching sizes attribute, descriptive alt text, and scoped CSS that preserves aspect ratio (width:100%; height:auto). The Security Officer found no risks, and the performance suggestions from the other two reviewers (eager-load the first image, confirm webp/avif output, cap source asset size) are worthwhile follow-ups but none is a verified defect. The two highest-severity claims from the Adversary \u2014 CLS from missing dimensions and 'no auto-optimization without config' \u2014 are refuted by how astro:assets works.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"loading=\\\"lazy\\\" is applied to all three case images including the first, whose top edge sits roughly 450px down the page (hero \u2248 344px + section padding + heading) and is therefore likely in or near the initial viewport on desktop \u2014 a possible LCP delay (raised independently by Eng Manager and Adversary).\",\n    \"Three new binary PNG assets are committed with no visible size/dimension guardrail, so source weight and build-artifact growth are unverified (raised by Eng Manager as low, Adversary as med).\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"CLS caused by missing width/height on <Image>\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary (high, c9): no width/height props, so CSS height:auto causes layout shift on slow loads; Eng Manager and Security Officer did not flag it.\",\n      \"resolution\": \"Dropped \u2014 mechanical. astro:assets infers intrinsic width/height from statically imported images (import contractImg from '../assets/images/...') and emits width/height attributes on the rendered <img>; combined with .work-case__img { width:100%; height:auto; } the aspect ratio is locked before load, so no CLS occurs.\"\n    },\n    {\n      \"topic\": \"Whether the PNGs get optimized without explicit config\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary (med, c8): astro:assets Image 'won't auto-optimize without config'; Eng Manager (low): PNG sources with no explicit modern output strategy ship larger payloads than necessary.\",\n      \"resolution\": \"Largely refuted \u2014 mechanical. Astro's default sharp image service transforms images at build time (default webp output) for statically prerendered pages like this one; no config is required. The residual, shared concern is only the unverifiable source-file size, which is a guardrail suggestion, not a defect.\"\n    },\n    {\n      \"topic\": \"Alt text length\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary (low, c7): alt texts exceed 200 chars and risk truncation/poor a11y; no other panelist flagged it.\",\n      \"resolution\": \"Refuted factually \u2014 the three alt strings measure roughly 155, 120, and 143 characters, all under 200. Descriptive alt on content images is acceptable a11y practice; shortening to bare factual descriptions is taste, not a defect.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image delivery performance dominated both critical reviews: lazy-loading/LCP on the first image, output format, and source asset weight.\",\n    \"No security, correctness, or runtime concerns surfaced from any lens \u2014 the change is static content plus Astro's standard Image component against a pinned Node 22 / Astro 6 toolchain.\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve. This is a clean, idiomatic use of astro:assets: statically imported PNGs rendered via <Image> with responsive widths, a matching sizes attribute, descriptive alt text, and scoped CSS that preserves aspect ratio (width:100%; height:auto). The Security Officer found no risks, and the performance suggestions from the other two reviewers (eager-load the first image, confirm webp/avif output, cap source asset size) are worthwhile follow-ups but none is a verified defect. The two highest-severity claims from the Adversary \u2014 CLS from missing dimensions and 'no auto-optimization without config' \u2014 are refuted by how astro:assets works.",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 52.33,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 8,
+      "consensus": [
+        "loading=\"lazy\" is applied to all three case images including the first, which may sit in or near the initial viewport \u2014 potential LCP delay (work.astro:71)",
+        "PNG sources are used with no explicit modern-format output strategy, raising payload concerns (work.astro:64-72 plus the three new binaries)",
+        "No size/dimension guardrails exist for the newly committed binary assets"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary (high, c9): no width/height props, only CSS height:auto, so layout shifts on slow loads. Eng Manager and Security Officer did not flag it.",
+          "resolution": "Refuted. Astro's <Image> component automatically emits width and height attributes derived from the imported image's intrinsic metadata (per Astro docs: if neither is provided, the original dimensions are used). Combined with width:100%/height:auto CSS, the browser reserves the correct aspect ratio \u2014 the standard responsive pattern. No CLS.",
+          "topic": "CLS from missing width/height on <Image>",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary (med): Image won't auto-optimize without config. Eng Manager (low): PNG sources with no explicit modern output strategy likely ship larger payloads than necessary.",
+          "resolution": "Largely refuted. Astro's default sharp image service converts to webp at the requested widths, and with the Cloudflare adapter the compile service precompiles variants at build time. astro.config is not in the provided context, so the exact service can't be confirmed, but the framework defaults optimize \u2014 this does not meet the verified-defect bar.",
+          "topic": "Whether astro:assets optimizes the PNGs",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager (med) and Adversary (med): the first image may be above the fold, so loading=\"lazy\" could delay LCP.",
+          "resolution": "Legitimate polish \u2014 making the first image eager (optionally with fetchpriority=\"high\") is a reasonable fast-follow. Not a defect: browsers load in-viewport lazy images during initial page load, and Astro's Image component defaults to lazy anyway, so the explicit prop changes nothing.",
+          "topic": "Lazy-loading the first case image",
+          "type": "taste"
+        },
+        {
+          "positions": "Adversary (low): alt texts exceed 200 characters and risk truncation/poor a11y.",
+          "resolution": "Factually wrong \u2014 the longest alt text is ~143 characters (\"A pile of paper contracts\u2026\"); all three are descriptive, factual, and within norms. Dropped.",
+          "topic": "Alt text length",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve \u2014 merge. The change is a clean, idiomatic use of Astro's built-in Image component with correctly imported local assets, descriptive alt text, and matching CSS. No verified defects; the panel's concerns are optimization polish, not bugs.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"loading=\\\"lazy\\\" is applied to all three case images including the first, which may sit in or near the initial viewport \u2014 potential LCP delay (work.astro:71)\",\n    \"PNG sources are used with no explicit modern-format output strategy, raising payload concerns (work.astro:64-72 plus the three new binaries)\",\n    \"No size/dimension guardrails exist for the newly committed binary assets\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"CLS from missing width/height on <Image>\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary (high, c9): no width/height props, only CSS height:auto, so layout shifts on slow loads. Eng Manager and Security Officer did not flag it.\",\n      \"resolution\": \"Refuted. Astro's <Image> component automatically emits width and height attributes derived from the imported image's intrinsic metadata (per Astro docs: if neither is provided, the original dimensions are used). Combined with width:100%/height:auto CSS, the browser reserves the correct aspect ratio \u2014 the standard responsive pattern. No CLS.\"\n    },\n    {\n      \"topic\": \"Whether astro:assets optimizes the PNGs\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary (med): Image won't auto-optimize without config. Eng Manager (low): PNG sources with no explicit modern output strategy likely ship larger payloads than necessary.\",\n      \"resolution\": \"Largely refuted. Astro's default sharp image service converts to webp at the requested widths, and with the Cloudflare adapter the compile service precompiles variants at build time. astro.config is not in the provided context, so the exact service can't be confirmed, but the framework defaults optimize \u2014 this does not meet the verified-defect bar.\"\n    },\n    {\n      \"topic\": \"Lazy-loading the first case image\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager (med) and Adversary (med): the first image may be above the fold, so loading=\\\"lazy\\\" could delay LCP.\",\n      \"resolution\": \"Legitimate polish \u2014 making the first image eager (optionally with fetchpriority=\\\"high\\\") is a reasonable fast-follow. Not a defect: browsers load in-viewport lazy images during initial page load, and Astro's Image component defaults to lazy anyway, so the explicit prop changes nothing.\"\n    },\n    {\n      \"topic\": \"Alt text length\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary (low): alt texts exceed 200 characters and risk truncation/poor a11y.\",\n      \"resolution\": \"Factually wrong \u2014 the longest alt text is ~143 characters (\\\"A pile of paper contracts\u2026\\\"); all three are descriptive, factual, and within norms. Dropped.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image delivery performance (source format, payload size, lazy/eager strategy) dominated both the Eng Manager and Adversary reviews\",\n    \"Asset governance \u2014 no size budget or dimension cap for committed binaries\",\n    \"Security surface is nil: static local assets rendered via the framework's Image component; the Security Officer found nothing\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve \u2014 merge. The change is a clean, idiomatic use of Astro's built-in Image component with correctly imported local assets, descriptive alt text, and matching CSS. No verified defects; the panel's concerns are optimization polish, not bugs.",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 62.82,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 8,
+      "consensus": [
+        "loading=\"lazy\" is applied to all three case images including the first, which sits below a ~350-470px hero and is plausibly in or near the initial viewport on desktop \u2014 a potential LCP delay (Eng Manager med, Adversary med). Worth a follow-up (eager + fetchpriority on the first image), but the page renders and loads correctly, so it is an optimization, not a defect.",
+        "Both Eng Manager and Adversary raised image payload concerns (PNG sources, no explicit format strategy, no size guardrails for the new binaries). Astro's default sharp service converts to webp at the requested quality and generates the responsive srcset at build time for prerendered pages, so the delivered payload is optimized in the standard path; the remaining substance is repo hygiene (source PNG size) and verifying output under the Cloudflare adapter \u2014 non-blocking."
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary claimed the Image at src/pages/work.astro:66-74 lacks width/height and that CSS height:auto alone guarantees layout shift; no other panelist concurred.",
+          "resolution": "Refuted by framework behavior: astro:assets <Image> automatically infers width/height attributes from imported image metadata (and with the widths prop, sets them from the specified breakpoints), so the aspect-ratio box is reserved before load; the CSS width:100%/height:auto then preserves it. No CLS. Dropped.",
+          "topic": "CLS from missing width/height on <Image> (Adversary, high c9)",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary asserted astro:assets Image 'won't auto-optimize without config'; Eng Manager only noted the absence of an explicit modern-format strategy.",
+          "resolution": "The Adversary's claim is wrong for the standard path: Astro's default sharp image service outputs webp at the given quality and builds the srcset for the declared widths with no extra config. The Cloudflare adapter's imageService setting could affect runtime generation, but astro.config is not in evidence, so the stronger claim is unverified. Non-blocking; suggest confirming the built output ships webp variants.",
+          "topic": "Whether the images will be optimized at all (Adversary med c8 vs Eng Manager's softer 'no explicit strategy')",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary claimed alt texts exceed 200 chars and that narrative dashes risk truncation; no other panelist flagged it.",
+          "resolution": "The factual premise fails \u2014 the three alt strings measure roughly 140, 118, and 142 characters, all under 200, and em dashes are valid in alt text. The remaining 'shorten to factual descriptions' suggestion is taste. Dropped.",
+          "topic": "Alt text length and style (Adversary, low c7)",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "aris-pr1",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 1,
+      "prompt_bytes": 18056,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. The change is a correct, idiomatic use of astro:assets <Image> with imported local assets, responsive widths + matching sizes, quality, alt text, and CSS that preserves aspect ratio. All panelist concerns are either performance optimizations, refuted by Astro's documented behavior, or factually incorrect; none meet the blocking bar.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"loading=\\\"lazy\\\" is applied to all three case images including the first, which sits below a ~350-470px hero and is plausibly in or near the initial viewport on desktop \u2014 a potential LCP delay (Eng Manager med, Adversary med). Worth a follow-up (eager + fetchpriority on the first image), but the page renders and loads correctly, so it is an optimization, not a defect.\",\n    \"Both Eng Manager and Adversary raised image payload concerns (PNG sources, no explicit format strategy, no size guardrails for the new binaries). Astro's default sharp service converts to webp at the requested quality and generates the responsive srcset at build time for prerendered pages, so the delivered payload is optimized in the standard path; the remaining substance is repo hygiene (source PNG size) and verifying output under the Cloudflare adapter \u2014 non-blocking.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"CLS from missing width/height on <Image> (Adversary, high c9)\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary claimed the Image at src/pages/work.astro:66-74 lacks width/height and that CSS height:auto alone guarantees layout shift; no other panelist concurred.\",\n      \"resolution\": \"Refuted by framework behavior: astro:assets <Image> automatically infers width/height attributes from imported image metadata (and with the widths prop, sets them from the specified breakpoints), so the aspect-ratio box is reserved before load; the CSS width:100%/height:auto then preserves it. No CLS. Dropped.\"\n    },\n    {\n      \"topic\": \"Whether the images will be optimized at all (Adversary med c8 vs Eng Manager's softer 'no explicit strategy')\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary asserted astro:assets Image 'won't auto-optimize without config'; Eng Manager only noted the absence of an explicit modern-format strategy.\",\n      \"resolution\": \"The Adversary's claim is wrong for the standard path: Astro's default sharp image service outputs webp at the given quality and builds the srcset for the declared widths with no extra config. The Cloudflare adapter's imageService setting could affect runtime generation, but astro.config is not in evidence, so the stronger claim is unverified. Non-blocking; suggest confirming the built output ships webp variants.\"\n    },\n    {\n      \"topic\": \"Alt text length and style (Adversary, low c7)\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary claimed alt texts exceed 200 chars and that narrative dashes risk truncation; no other panelist flagged it.\",\n      \"resolution\": \"The factual premise fails \u2014 the three alt strings measure roughly 140, 118, and 142 characters, all under 200, and em dashes are valid in alt text. The remaining 'shorten to factual descriptions' suggestion is taste. Dropped.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Image delivery performance: lazy-vs-eager loading and LCP (Eng Manager, Adversary)\",\n    \"Image format/payload optimization and asset size governance for the three new PNGs (Eng Manager, Adversary)\",\n    \"Layout stability of the newly inserted images (Adversary explicitly; implicitly touched by the others' loading/payload discussion)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. The change is a correct, idiomatic use of astro:assets <Image> with imported local assets, responsive widths + matching sizes, quality, alt text, and CSS that preserves aspect ratio. All panelist concerns are either performance optimizations, refuted by Astro's documented behavior, or factually incorrect; none meet the blocking bar.",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 63.61,
+      "tier": "full"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "The change is directionally good and safely introduces local .env loading",
+        "Only ENOENT is swallowed; other errors (malformed/permissions) propagate \u2014 panelists split on whether this is a defect, but the code comment shows it is intentional and desirable"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager (med) and Adversary (high) claim TypeError/crash on Node <20.6/pinned Node 18/20.5; Security Officer approves without raising it",
+          "resolution": "Refuted by package.json engines: node >=22.12.0. process.loadEnvFile is stable in Node 22.x, so the crash scenario cannot occur under the pinned runtime. Not blocking. A defensive typeof guard is a reasonable but optional nicety.",
+          "topic": "process.loadEnvFile availability on older Node",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager suggests only loading .env in modes needing credentials; others unconcerned",
+          "resolution": "Taste/optimization only. Loading .env is a cheap no-op when absent and harmless when present. Not blocking.",
+          "topic": "Loading .env in --check mode",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. The change is a clean, well-documented addition that loads a local .env via Node's built-in process.loadEnvFile, correctly swallows only ENOENT and re-throws real errors. The primary panelist concern \u2014 process.loadEnvFile being unavailable on older Node \u2014 is refuted by package.json engines pinning node >=22.12.0, where the API is stable.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"The change is directionally good and safely introduces local .env loading\",\n    \"Only ENOENT is swallowed; other errors (malformed/permissions) propagate \u2014 panelists split on whether this is a defect, but the code comment shows it is intentional and desirable\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"process.loadEnvFile availability on older Node\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager (med) and Adversary (high) claim TypeError/crash on Node <20.6/pinned Node 18/20.5; Security Officer approves without raising it\",\n      \"resolution\": \"Refuted by package.json engines: node >=22.12.0. process.loadEnvFile is stable in Node 22.x, so the crash scenario cannot occur under the pinned runtime. Not blocking. A defensive typeof guard is a reasonable but optional nicety.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Loading .env in --check mode\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager suggests only loading .env in modes needing credentials; others unconcerned\",\n      \"resolution\": \"Taste/optimization only. Loading .env is a cheap no-op when absent and harmless when present. Not blocking.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Node runtime compatibility of process.loadEnvFile (resolved by pinned engines)\",\n    \".env secret hygiene (already satisfied \u2014 .env and .env.production are gitignored)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. The change is a clean, well-documented addition that loads a local .env via Node's built-in process.loadEnvFile, correctly swallows only ENOENT and re-throws real errors. The primary panelist concern \u2014 process.loadEnvFile being unavailable on older Node \u2014 is refuted by package.json engines pinning node >=22.12.0, where the API is stable.",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 12.68,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "The change is directionally good and safely adds local .env loading for the translation API key",
+        ".env is properly gitignored, so no secret-commit risk",
+        "Only ENOENT is swallowed; other errors (EACCES, malformed file) propagate"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager (med) and Adversary (high) claim an unguarded TypeError on Node <20.6; Security Officer approved without raising it",
+          "resolution": "Refuted by package.json engines.node >=22.12.0. process.loadEnvFile is available and stable in all supported runtimes, so the TypeError path cannot occur under the pinned runtime. Not blocking.",
+          "topic": "process.loadEnvFile availability on older Node",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary flags this as a defect; the code comment states it is intentional to surface real problems",
+          "resolution": "This is a deliberate, documented design choice \u2014 a malformed .env or permission error should fail loudly rather than silently leave the key unset. Acceptable.",
+          "topic": "Propagating non-ENOENT errors (EACCES/malformed)",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. The change correctly loads a local .env via Node's built-in process.loadEnvFile, guards the expected missing-file case, and intentionally surfaces other errors. The primary panelist concern \u2014 a crash on Node versions lacking process.loadEnvFile \u2014 is refuted by package.json, which pins engines.node to >=22.12.0 (the API is stable since 20.6.0).\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"The change is directionally good and safely adds local .env loading for the translation API key\",\n    \".env is properly gitignored, so no secret-commit risk\",\n    \"Only ENOENT is swallowed; other errors (EACCES, malformed file) propagate\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"process.loadEnvFile availability on older Node\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager (med) and Adversary (high) claim an unguarded TypeError on Node <20.6; Security Officer approved without raising it\",\n      \"resolution\": \"Refuted by package.json engines.node >=22.12.0. process.loadEnvFile is available and stable in all supported runtimes, so the TypeError path cannot occur under the pinned runtime. Not blocking.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Propagating non-ENOENT errors (EACCES/malformed)\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary flags this as a defect; the code comment states it is intentional to surface real problems\",\n      \"resolution\": \"This is a deliberate, documented design choice \u2014 a malformed .env or permission error should fail loudly rather than silently leave the key unset. Acceptable.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Node-version compatibility of the built-in env loader (mechanically resolved by the engines pin)\",\n    \"Correct scoping of which errors are swallowed vs. surfaced\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. The change correctly loads a local .env via Node's built-in process.loadEnvFile, guards the expected missing-file case, and intentionally surfaces other errors. The primary panelist concern \u2014 a crash on Node versions lacking process.loadEnvFile \u2014 is refuted by package.json, which pins engines.node to >=22.12.0 (the API is stable since 20.6.0).",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 12.41,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "The direction is good \u2014 auto-loading .env removes a manual `source` step for local translation runs",
+        "Real environment variables are preserved and not overwritten; missing .env is a safe no-op"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager (med) and Adversary (high) flagged a Node <20.6 compatibility trap; Security Officer approved",
+          "resolution": "Refuted by package.json engines: node >=22.12.0. process.loadEnvFile is stable in Node 22, so the TypeError path cannot occur under the pinned runtime. Not a blocking defect.",
+          "topic": "process.loadEnvFile may throw TypeError on older Node, hard-failing the script",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager and Adversary flagged as a concern",
+          "resolution": "This is intentional and documented in the code comment \u2014 a malformed or unreadable .env should surface loudly rather than silently leaving the key unset. Correct behavior, not a defect.",
+          "topic": "Only ENOENT is swallowed; EACCES/malformed .env still throws",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. The change is a small, well-reasoned addition that loads a local .env via Node's built-in process.loadEnvFile, with real environment variables taking precedence and ENOENT correctly treated as a no-op. The primary panel concerns (Node-version compatibility for process.loadEnvFile) are refuted by package.json's engines pin of node >=22.12.0, where the API is stable and always present.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"The direction is good \u2014 auto-loading .env removes a manual `source` step for local translation runs\",\n    \"Real environment variables are preserved and not overwritten; missing .env is a safe no-op\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"process.loadEnvFile may throw TypeError on older Node, hard-failing the script\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager (med) and Adversary (high) flagged a Node <20.6 compatibility trap; Security Officer approved\",\n      \"resolution\": \"Refuted by package.json engines: node >=22.12.0. process.loadEnvFile is stable in Node 22, so the TypeError path cannot occur under the pinned runtime. Not a blocking defect.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Only ENOENT is swallowed; EACCES/malformed .env still throws\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary flagged as a concern\",\n      \"resolution\": \"This is intentional and documented in the code comment \u2014 a malformed or unreadable .env should surface loudly rather than silently leaving the key unset. Correct behavior, not a defect.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Node runtime compatibility of process.loadEnvFile (resolved by engines pin)\",\n    \"Secret hygiene for .env (already gitignored)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. The change is a small, well-reasoned addition that loads a local .env via Node's built-in process.loadEnvFile, with real environment variables taking precedence and ENOENT correctly treated as a no-op. The primary panel concerns (Node-version compatibility for process.loadEnvFile) are refuted by package.json's engines pin of node >=22.12.0, where the API is stable and always present.",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 11.65,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "process.loadEnvFile is only ENOENT-tolerant; any other error (malformed file, EACCES) propagates and aborts the script",
+        ".env loading runs unconditionally for all modes including --check"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary flag this as high/critical risk of TypeError on older Node; Security Officer raised no such concern",
+          "resolution": "Refuted by repo context: package.json pins engines.node >= 22.12.0, and process.loadEnvFile has been stable in Node since well before that version. This cannot occur under the pinned runtime, so it does not block per the review rules.",
+          "topic": "Node version compatibility of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager and Adversary treat this as a robustness gap",
+          "resolution": "This is an explicit, documented design choice in the diff's own comments ('real problem surfaces instead of leaving the key silently unset'). Reasonable behavior, not a defect \u2014 taste, not blocking.",
+          "topic": "Non-ENOENT errors (malformed .env, permissions) aborting the script",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"process.loadEnvFile is only ENOENT-tolerant; any other error (malformed file, EACCES) propagates and aborts the script\",\n    \".env loading runs unconditionally for all modes including --check\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Node version compatibility of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager and Adversary flag this as high/critical risk of TypeError on older Node; Security Officer raised no such concern\",\n      \"resolution\": \"Refuted by repo context: package.json pins engines.node >= 22.12.0, and process.loadEnvFile has been stable in Node since well before that version. This cannot occur under the pinned runtime, so it does not block per the review rules.\"\n    },\n    {\n      \"topic\": \"Non-ENOENT errors (malformed .env, permissions) aborting the script\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary treat this as a robustness gap\",\n      \"resolution\": \"This is an explicit, documented design choice in the diff's own comments ('real problem surfaces instead of leaving the key silently unset'). Reasonable behavior, not a defect \u2014 taste, not blocking.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Concerns about error handling scope of loadDotEnv (only ENOENT swallowed)\",\n    \"Whether .env should load for all CLI modes\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 9.05,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "The .env loading feature is a reasonable convenience for local translation runs",
+        "Concerns raised about process.loadEnvFile failing on older/incompatible Node versions",
+        ".env is already gitignored so no secret-leak risk"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary flag this as a high-severity crash risk on Node <20.6/22; Security Officer and Chair note package.json pins engines >=22.12.0",
+          "resolution": "Refuted by repo context \u2014 package.json engines field pins Node >=22.12.0, where process.loadEnvFile is stable and available. This is exactly the class of hypothetical the review rules require dropping.",
+          "topic": "process.loadEnvFile Node version compatibility",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary and Eng Manager flag this as fragile; code comment explicitly states this is intentional (surface real problems)",
+          "resolution": "This is documented, intended behavior, not a defect \u2014 not blocking.",
+          "topic": "Only ENOENT is swallowed; EACCES/malformed file still throws",
+          "type": "taste"
+        },
+        {
+          "positions": "Eng Manager calls this unnecessary; no one else raised it",
+          "resolution": "Minor stylistic nit, not a functional defect \u2014 does not block.",
+          "topic": "Loading .env in --check mode where credentials aren't needed",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"The .env loading feature is a reasonable convenience for local translation runs\",\n    \"Concerns raised about process.loadEnvFile failing on older/incompatible Node versions\",\n    \".env is already gitignored so no secret-leak risk\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"process.loadEnvFile Node version compatibility\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager and Adversary flag this as a high-severity crash risk on Node <20.6/22; Security Officer and Chair note package.json pins engines >=22.12.0\",\n      \"resolution\": \"Refuted by repo context \u2014 package.json engines field pins Node >=22.12.0, where process.loadEnvFile is stable and available. This is exactly the class of hypothetical the review rules require dropping.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Only ENOENT is swallowed; EACCES/malformed file still throws\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary and Eng Manager flag this as fragile; code comment explicitly states this is intentional (surface real problems)\",\n      \"resolution\": \"This is documented, intended behavior, not a defect \u2014 not blocking.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Loading .env in --check mode where credentials aren't needed\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager calls this unnecessary; no one else raised it\",\n      \"resolution\": \"Minor stylistic nit, not a functional defect \u2014 does not block.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Node runtime compatibility of process.loadEnvFile (refuted by engines pin)\",\n    \"Error-handling granularity of the dotenv loader (by design, not a bug)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 10.41,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "process.loadEnvFile is only guarded for ENOENT; other errors (EACCES, malformed file) propagate and abort the script",
+        ".env loading happens unconditionally for all modes including --check"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary both flag this as high/critical risk (TypeError on Node <20.6/22); Security Officer and diff author treat it as safe",
+          "resolution": "Refuted by repo context: package.json pins \"engines\": { \"node\": \">=22.12.0\" }, and process.loadEnvFile has been stable since Node 20.6/22. Under the pinned runtime this cannot fail. Dropped per grounding rules.",
+          "topic": "Node version compatibility of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Eng Manager and Adversary call this a robustness gap; the code comment explicitly documents this as intentional (\"real problem surfaces instead of leaving the key silently unset\")",
+          "resolution": "Intentional, documented design choice for a local dev tool, not a defect \u2014 taste, not a blocker.",
+          "topic": "Non-ENOENT errors (malformed .env, permissions) aborting the script",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"process.loadEnvFile is only guarded for ENOENT; other errors (EACCES, malformed file) propagate and abort the script\",\n    \".env loading happens unconditionally for all modes including --check\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Node version compatibility of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager and Adversary both flag this as high/critical risk (TypeError on Node <20.6/22); Security Officer and diff author treat it as safe\",\n      \"resolution\": \"Refuted by repo context: package.json pins \\\"engines\\\": { \\\"node\\\": \\\">=22.12.0\\\" }, and process.loadEnvFile has been stable since Node 20.6/22. Under the pinned runtime this cannot fail. Dropped per grounding rules.\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Non-ENOENT errors (malformed .env, permissions) aborting the script\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary call this a robustness gap; the code comment explicitly documents this as intentional (\\\"real problem surfaces instead of leaving the key silently unset\\\")\",\n      \"resolution\": \"Intentional, documented design choice for a local dev tool, not a defect \u2014 taste, not a blocker.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Two panelists independently raised the same theoretical Node-version compatibility concern, but it does not hold given the pinned engines field\",\n    \"Multiple panelists noted .env loading occurs even in --check mode where it may be unnecessary \u2014 minor, non-blocking\"\n  ],\n  \"blocking_findings\": [],\n  \"confidence_note\": \"Straightforward, well-scoped DX improvement; the one substantive risk raised by two panelists is refuted by package.json's Node engine pin.\"\n}",
+      "recommendation": "approve",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 9.0,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile on older Node releases.",
+        "The Engineering Manager and Adversary both noted that non-ENOENT failures while loading .env abort the command."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Engineering Manager and Adversary considered older Node runtimes a failure case; the Security Officer approved the change.",
+          "resolution": "Not a defect: package.json requires Node >=22.12.0, where process.loadEnvFile is available. The older-runtime scenario is outside the declared supported environment.",
+          "topic": "Availability of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Engineering Manager and Adversary viewed aborting on non-ENOENT errors as a robustness concern; the implementation explicitly describes this as intentional fail-fast behavior.",
+          "resolution": "Accept the stated policy. Swallowing only ENOENT while surfacing permission or parsing problems is a reasonable design choice and not a merge-blocking defect.",
+          "topic": "Failing on unreadable or otherwise invalid .env files",
+          "type": "taste"
+        },
+        {
+          "positions": "The Engineering Manager questioned making credential-free modes inspect .env; other panelists did not identify this as a problem.",
+          "resolution": "Non-blocking. Loading configuration uniformly at CLI startup is defensible, although limiting it to run mode could reduce incidental failures.",
+          "topic": "Loading .env in --check and --dry-run modes",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile on older Node releases.\",\n    \"The Engineering Manager and Adversary both noted that non-ENOENT failures while loading .env abort the command.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Availability of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Engineering Manager and Adversary considered older Node runtimes a failure case; the Security Officer approved the change.\",\n      \"resolution\": \"Not a defect: package.json requires Node >=22.12.0, where process.loadEnvFile is available. The older-runtime scenario is outside the declared supported environment.\"\n    },\n    {\n      \"topic\": \"Failing on unreadable or otherwise invalid .env files\",\n      \"type\": \"taste\",\n      \"positions\": \"The Engineering Manager and Adversary viewed aborting on non-ENOENT errors as a robustness concern; the implementation explicitly describes this as intentional fail-fast behavior.\",\n      \"resolution\": \"Accept the stated policy. Swallowing only ENOENT while surfacing permission or parsing problems is a reasonable design choice and not a merge-blocking defect.\"\n    },\n    {\n      \"topic\": \"Loading .env in --check and --dry-run modes\",\n      \"type\": \"taste\",\n      \"positions\": \"The Engineering Manager questioned making credential-free modes inspect .env; other panelists did not identify this as a problem.\",\n      \"resolution\": \"Non-blocking. Loading configuration uniformly at CLI startup is defensible, although limiting it to run mode could reduce incidental failures.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Runtime compatibility and failure behavior of the new built-in .env loader\",\n    \"Whether optional .env handling should ignore only missing files or tolerate broader failures\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 18.03,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 10,
+      "consensus": [
+        "The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile being unavailable on older Node.js versions.",
+        "The Engineering Manager and Adversary both noted that non-ENOENT failures while loading .env abort the command."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Engineering Manager and Adversary considered older Node.js runtimes a failure risk; the Security Officer approved the change.",
+          "resolution": "Not a defect: package.json requires Node.js >=22.12.0, where process.loadEnvFile is available. Unsupported Node 18 or early Node 20 installations do not justify blocking.",
+          "topic": "Availability of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary treated propagation of EACCES, EPERM, or parsing failures as a concern; the implementation explicitly describes this as intentional fail-fast behavior.",
+          "resolution": "Not a defect: the catch suppresses only an absent optional file and deliberately surfaces other local configuration errors rather than silently ignoring them.",
+          "topic": "Failure on unreadable or malformed .env files",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Engineering Manager suggested loading it only when credentials are needed; no other panelist considered this harmful.",
+          "resolution": "Non-blocking design preference. Loading a repository-local, gitignored .env consistently across CLI modes is reasonable.",
+          "topic": "Loading .env in --check and --dry-run modes",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 10,\n  \"consensus\": [\n    \"The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile being unavailable on older Node.js versions.\",\n    \"The Engineering Manager and Adversary both noted that non-ENOENT failures while loading .env abort the command.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Availability of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Engineering Manager and Adversary considered older Node.js runtimes a failure risk; the Security Officer approved the change.\",\n      \"resolution\": \"Not a defect: package.json requires Node.js >=22.12.0, where process.loadEnvFile is available. Unsupported Node 18 or early Node 20 installations do not justify blocking.\"\n    },\n    {\n      \"topic\": \"Failure on unreadable or malformed .env files\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary treated propagation of EACCES, EPERM, or parsing failures as a concern; the implementation explicitly describes this as intentional fail-fast behavior.\",\n      \"resolution\": \"Not a defect: the catch suppresses only an absent optional file and deliberately surfaces other local configuration errors rather than silently ignoring them.\"\n    },\n    {\n      \"topic\": \"Loading .env in --check and --dry-run modes\",\n      \"type\": \"taste\",\n      \"positions\": \"The Engineering Manager suggested loading it only when credentials are needed; no other panelist considered this harmful.\",\n      \"resolution\": \"Non-blocking design preference. Loading a repository-local, gitignored .env consistently across CLI modes is reasonable.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Runtime compatibility of the built-in environment-file loader\",\n    \"Whether environment-file errors should be ignored or surfaced\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 14.22,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile on older Node versions and suggested feature detection.",
+        "Multiple panelists examined failure behavior around loading .env files, including missing, unreadable, or malformed files."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Engineering Manager and Adversary considered older Node runtimes a failure case; the Security Officer approved the change.",
+          "resolution": "Not a defect under the repository's declared runtime: package.json requires Node >=22.12.0, where process.loadEnvFile is available. The older-Node claims are therefore refuted by provided context.",
+          "topic": "Whether process.loadEnvFile creates a runtime compatibility defect",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary treated propagated EACCES, EPERM, and parse failures as a concern; the implementation explicitly documents that only a missing file is optional and other errors must surface.",
+          "resolution": "The behavior is intentional and mechanically consistent with the comments. Propagating genuine access or parsing errors is not a verified defect.",
+          "topic": "Whether unreadable or malformed .env files should abort execution",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Engineering Manager considered this an unnecessary startup dependency; no other panelist identified a concrete failure caused by it.",
+          "resolution": "Loading once for all CLI modes is a minor design choice, not a merge blocker.",
+          "topic": "Loading .env in --check and --dry-run modes",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The Engineering Manager and Adversary both raised compatibility concerns about process.loadEnvFile on older Node versions and suggested feature detection.\",\n    \"Multiple panelists examined failure behavior around loading .env files, including missing, unreadable, or malformed files.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Whether process.loadEnvFile creates a runtime compatibility defect\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Engineering Manager and Adversary considered older Node runtimes a failure case; the Security Officer approved the change.\",\n      \"resolution\": \"Not a defect under the repository's declared runtime: package.json requires Node >=22.12.0, where process.loadEnvFile is available. The older-Node claims are therefore refuted by provided context.\"\n    },\n    {\n      \"topic\": \"Whether unreadable or malformed .env files should abort execution\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary treated propagated EACCES, EPERM, and parse failures as a concern; the implementation explicitly documents that only a missing file is optional and other errors must surface.\",\n      \"resolution\": \"The behavior is intentional and mechanically consistent with the comments. Propagating genuine access or parsing errors is not a verified defect.\"\n    },\n    {\n      \"topic\": \"Loading .env in --check and --dry-run modes\",\n      \"type\": \"taste\",\n      \"positions\": \"The Engineering Manager considered this an unnecessary startup dependency; no other panelist identified a concrete failure caused by it.\",\n      \"resolution\": \"Loading once for all CLI modes is a minor design choice, not a merge blocker.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Runtime compatibility and error handling for the built-in .env loader\",\n    \"Safe handling of local credentials and environment variables\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 13.89,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 9,
+      "consensus": [
+        "process.loadEnvFile is invoked without a feature-detect guard, flagged independently by Eng Manager and Adversary as a crash risk on older Node runtimes; both suggested a typeof check or explicit version error.",
+        "Only ENOENT is swallowed \u2014 malformed, EACCES, or EPERM errors propagate and abort the script (raised by Adversary explicitly, and by Eng Manager via the suggested malformed-file hard-fail tests).",
+        "The feature exists to inject VENICE_API_KEY locally, so secret hygiene around .env is a shared concern (Security Officer's gitignore check; the diff's stated purpose)."
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager (med) and Adversary (high) claim a TypeError crash on Node <20.12 before any translation logic runs; Security Officer approves with no compat concern.",
+          "resolution": "mechanical \u2014 REFUTED by repo context: package.json pins \"engines\": { \"node\": \">=22.12.0\" }, and process.loadEnvFile has existed since Node 20.12.0, so the failure cannot occur under the pinned runtime. Claim dropped per grounding rules; the suggested typeof guard is unnecessary defense against an unsupported configuration.",
+          "topic": "Node runtime compatibility of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary wants broader tolerance so the script never aborts on a bad .env; the code deliberately re-throws non-ENOENT errors, per its own comment, so a real problem surfaces instead of leaving the key silently unset; Eng Manager implicitly accepts this by asking for tests of the behavior rather than its removal.",
+          "resolution": "taste \u2014 the fail-fast design is explicit, documented in the diff, and arguably safer than silently proceeding without credentials. Keep as-is; tests would be nice-to-have but their absence does not block.",
+          "topic": "Error-handling breadth: swallow only ENOENT vs. tolerate EACCES/EPERM/malformed .env",
+          "type": "taste"
+        },
+        {
+          "positions": "Eng Manager suggests gating .env loading to credential-needing modes; Security Officer raises no objection.",
+          "resolution": "taste \u2014 in check/dry-run modes the client is a stub and the load is a harmless no-op when .env is absent (CI), and it never overwrites real env vars. Not worth the added branching.",
+          "topic": "Loading .env in --check/--dry-run modes that don't need credentials",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve \u2014 merge. The change is small, well-commented, and every raised defect is refuted by the provided repo context (engines pin, .gitignore) or is intentional documented behavior.\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"process.loadEnvFile is invoked without a feature-detect guard, flagged independently by Eng Manager and Adversary as a crash risk on older Node runtimes; both suggested a typeof check or explicit version error.\",\n    \"Only ENOENT is swallowed \u2014 malformed, EACCES, or EPERM errors propagate and abort the script (raised by Adversary explicitly, and by Eng Manager via the suggested malformed-file hard-fail tests).\",\n    \"The feature exists to inject VENICE_API_KEY locally, so secret hygiene around .env is a shared concern (Security Officer's gitignore check; the diff's stated purpose).\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Node runtime compatibility of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Eng Manager (med) and Adversary (high) claim a TypeError crash on Node <20.12 before any translation logic runs; Security Officer approves with no compat concern.\",\n      \"resolution\": \"mechanical \u2014 REFUTED by repo context: package.json pins \\\"engines\\\": { \\\"node\\\": \\\">=22.12.0\\\" }, and process.loadEnvFile has existed since Node 20.12.0, so the failure cannot occur under the pinned runtime. Claim dropped per grounding rules; the suggested typeof guard is unnecessary defense against an unsupported configuration.\"\n    },\n    {\n      \"topic\": \"Error-handling breadth: swallow only ENOENT vs. tolerate EACCES/EPERM/malformed .env\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary wants broader tolerance so the script never aborts on a bad .env; the code deliberately re-throws non-ENOENT errors, per its own comment, so a real problem surfaces instead of leaving the key silently unset; Eng Manager implicitly accepts this by asking for tests of the behavior rather than its removal.\",\n      \"resolution\": \"taste \u2014 the fail-fast design is explicit, documented in the diff, and arguably safer than silently proceeding without credentials. Keep as-is; tests would be nice-to-have but their absence does not block.\"\n    },\n    {\n      \"topic\": \"Loading .env in --check/--dry-run modes that don't need credentials\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager suggests gating .env loading to credential-needing modes; Security Officer raises no objection.\",\n      \"resolution\": \"taste \u2014 in check/dry-run modes the client is a stub and the load is a harmless no-op when .env is absent (CI), and it never overwrites real env vars. Not worth the added branching.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Robustness of the new .env loading path \u2014 API availability and error-code breadth \u2014 raised by both the engineering and adversarial lenses.\",\n    \"Secret hygiene around .env, since the feature's sole purpose is injecting VENICE_API_KEY (Security Officer verified .env is gitignored; the diff comment documents env-var precedence).\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve \u2014 merge. The change is small, well-commented, and every raised defect is refuted by the provided repo context (engines pin, .gitignore) or is intentional documented behavior.",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 32.08,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 8,
+      "consensus": [
+        "Both Eng Manager and Adversary independently flagged process.loadEnvFile availability on older Node runtimes as a potential crash source, and both suggested a feature-detection guard (typeof process.loadEnvFile !== 'function')",
+        "Both Eng Manager and Adversary engaged with the narrow ENOENT-only catch \u2014 Eng Manager framed hard-fail-on-malformed as intended behavior worth testing, while Adversary framed it as an abort risk",
+        "Robustness of the .env loading path across local vs CI environments was a shared concern"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary rated it high severity (crash on Node <20.6, claiming 'pinned Node 18/20.5'); Eng Manager rated it medium; Security Officer raised no concern",
+          "resolution": "mechanical \u2014 refuted by the repo itself: package.json engines pins node >=22.12.0, and process.loadEnvFile has existed since Node 20.12.0, so the TypeError cannot occur under the declared supported runtime. The Adversary's premise of a Node 18/20.5 pin is factually wrong for this repo. Dropped per grounding rules.",
+          "topic": "Node version compatibility of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary called it a med-severity defect; Eng Manager treated hard-fail-on-malformed as the intended contract and suggested tests for it",
+          "resolution": "taste \u2014 the code comment explicitly documents the intent: a malformed or unreadable .env should surface loudly rather than leave VENICE_API_KEY silently unset. Failing fast with a clear stack trace is a defensible, deliberate design choice, not a defect. Not blocking.",
+          "topic": "Re-throwing non-ENOENT errors (EACCES, EPERM, malformed .env) aborts the script",
+          "type": "taste"
+        },
+        {
+          "positions": "Eng Manager (low severity) suggested loading only in credential-needing modes; no other panelist objected",
+          "resolution": "taste \u2014 single-lens concern. In check mode the client is a stub ({ completeJSON: async () => { throw ... } }) and runTranslate pushes to stale before any client call, so the loaded env vars are never read; real environment variables take precedence per Node's loadEnvFile semantics. Harmless. Not blocking.",
+          "topic": "Loading .env in every mode including --check",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"Both Eng Manager and Adversary independently flagged process.loadEnvFile availability on older Node runtimes as a potential crash source, and both suggested a feature-detection guard (typeof process.loadEnvFile !== 'function')\",\n    \"Both Eng Manager and Adversary engaged with the narrow ENOENT-only catch \u2014 Eng Manager framed hard-fail-on-malformed as intended behavior worth testing, while Adversary framed it as an abort risk\",\n    \"Robustness of the .env loading path across local vs CI environments was a shared concern\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Node version compatibility of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary rated it high severity (crash on Node <20.6, claiming 'pinned Node 18/20.5'); Eng Manager rated it medium; Security Officer raised no concern\",\n      \"resolution\": \"mechanical \u2014 refuted by the repo itself: package.json engines pins node >=22.12.0, and process.loadEnvFile has existed since Node 20.12.0, so the TypeError cannot occur under the declared supported runtime. The Adversary's premise of a Node 18/20.5 pin is factually wrong for this repo. Dropped per grounding rules.\"\n    },\n    {\n      \"topic\": \"Re-throwing non-ENOENT errors (EACCES, EPERM, malformed .env) aborts the script\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary called it a med-severity defect; Eng Manager treated hard-fail-on-malformed as the intended contract and suggested tests for it\",\n      \"resolution\": \"taste \u2014 the code comment explicitly documents the intent: a malformed or unreadable .env should surface loudly rather than leave VENICE_API_KEY silently unset. Failing fast with a clear stack trace is a defensible, deliberate design choice, not a defect. Not blocking.\"\n    },\n    {\n      \"topic\": \"Loading .env in every mode including --check\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager (low severity) suggested loading only in credential-needing modes; no other panelist objected\",\n      \"resolution\": \"taste \u2014 single-lens concern. In check mode the client is a stub ({ completeJSON: async () => { throw ... } }) and runTranslate pushes to stale before any client call, so the loaded env vars are never read; real environment variables take precedence per Node's loadEnvFile semantics. Harmless. Not blocking.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Node runtime compatibility of process.loadEnvFile (raised by Eng Manager and Adversary, refuted by the engines pin)\",\n    \"Error-handling granularity in loadDotEnv \u2014 which failures to swallow vs surface (Eng Manager and Adversary)\",\n    \"Local vs CI behavior of the .env fallback path (Eng Manager and Adversary)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 31.8,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 9,
+      "consensus": [
+        "Node-version availability of process.loadEnvFile was raised independently by the Eng Manager and the Adversary, and both suggested a typeof feature-detection guard.",
+        "Both the Eng Manager and the Adversary scrutinized the error-classification surface of loadDotEnv \u2014 specifically the decision to swallow only ENOENT and re-throw everything else (malformed file, EACCES/EPERM)."
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary rated it high severity (TypeError crash on Node <20.6, immediate failure in CI or pinned Node 18/20.5); Eng Manager rated it medium; the Security Officer did not raise it.",
+          "resolution": "Mechanical \u2014 refuted by repo context. package.json engines pins node >=22.12.0, and process.loadEnvFile has existed since Node 20.12.0, so the missing-API TypeError cannot occur under the pinned runtime. In CI the typical absence of .env yields ENOENT, which is swallowed. Dropped from the gate; a typeof guard would be harmless polish but is not required.",
+          "topic": "Node version compatibility of process.loadEnvFile",
+          "type": "mechanical"
+        },
+        {
+          "positions": "Adversary treated it as a medium defect (script aborts on an unreadable or malformed .env); the in-code comment and the Eng Manager's reading treat it as intentional fail-loud design so a real problem surfaces rather than leaving VENICE_API_KEY silently unset.",
+          "resolution": "Taste \u2014 the re-throw is explicitly documented as deliberate in the diff itself. Failing loudly on a malformed or unreadable .env is a defensible and arguably preferable design for a credentials-loading path; it is not a defect.",
+          "topic": "Re-throwing non-ENOENT errors from loadDotEnv (malformed .env, EACCES/EPERM)",
+          "type": "taste"
+        },
+        {
+          "positions": "Eng Manager flagged it as a low-severity unnecessary startup dependency for a mode that uses a stub client; no other panelist objected.",
+          "resolution": "Taste \u2014 in --check mode the client is a throwing stub and no API call is made, so loading .env is a harmless no-op when the file is absent. Not a blocker.",
+          "topic": "Loading .env in every mode, including --check",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 0,
+      "fixture": "stw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 13596,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. The change is small, correct under the pinned runtime, and well-documented. Every concern raised by the panel is either refuted by repo context, an intentional fail-loud design choice documented in the code, or already handled outside the diff.\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"Node-version availability of process.loadEnvFile was raised independently by the Eng Manager and the Adversary, and both suggested a typeof feature-detection guard.\",\n    \"Both the Eng Manager and the Adversary scrutinized the error-classification surface of loadDotEnv \u2014 specifically the decision to swallow only ENOENT and re-throw everything else (malformed file, EACCES/EPERM).\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Node version compatibility of process.loadEnvFile\",\n      \"type\": \"mechanical\",\n      \"positions\": \"Adversary rated it high severity (TypeError crash on Node <20.6, immediate failure in CI or pinned Node 18/20.5); Eng Manager rated it medium; the Security Officer did not raise it.\",\n      \"resolution\": \"Mechanical \u2014 refuted by repo context. package.json engines pins node >=22.12.0, and process.loadEnvFile has existed since Node 20.12.0, so the missing-API TypeError cannot occur under the pinned runtime. In CI the typical absence of .env yields ENOENT, which is swallowed. Dropped from the gate; a typeof guard would be harmless polish but is not required.\"\n    },\n    {\n      \"topic\": \"Re-throwing non-ENOENT errors from loadDotEnv (malformed .env, EACCES/EPERM)\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary treated it as a medium defect (script aborts on an unreadable or malformed .env); the in-code comment and the Eng Manager's reading treat it as intentional fail-loud design so a real problem surfaces rather than leaving VENICE_API_KEY silently unset.\",\n      \"resolution\": \"Taste \u2014 the re-throw is explicitly documented as deliberate in the diff itself. Failing loudly on a malformed or unreadable .env is a defensible and arguably preferable design for a credentials-loading path; it is not a defect.\"\n    },\n    {\n      \"topic\": \"Loading .env in every mode, including --check\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager flagged it as a low-severity unnecessary startup dependency for a mode that uses a stub client; no other panelist objected.\",\n      \"resolution\": \"Taste \u2014 in --check mode the client is a throwing stub and no API call is made, so loading .env is a harmless no-op when the file is absent. Not a blocker.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Robustness of the .env loading path \u2014 both API availability and error classification \u2014 was the dominant concern across the engineering and adversarial lenses.\",\n    \"Secret hygiene: the Security Officer's suggestion to ensure .env is gitignored is already satisfied; .gitignore explicitly lists both .env and .env.production, so no secret-commit path is introduced by this diff.\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. The change is small, correct under the pinned runtime, and well-documented. Every concern raised by the panel is either refuted by repo context, an intentional fail-loud design choice documented in the code, or already handled outside the diff.",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 33.63,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "GitHub API error handling is incomplete for 429/secondary-rate-limit responses since _gh only retries on 5xx and connection errors",
+        "The overall hardening (path traversal guard, UTF-8 byte accounting, upfront env validation, retry logic) is sound and well-tested"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager flagged that PATCHing a foreign comment containing the marker returns 403; Adversary/Security did not raise it",
+          "resolution": "Not blocking. The MARKER is an HTML comment the workflow itself appends; a third party would have to deliberately craft a comment containing our internal marker to trigger this. It is a hardening suggestion (verify author before PATCH), not a real defect in normal operation. File as follow-up.",
+          "topic": "Marker-only comment ownership can cause a 403 fail-closed",
+          "type": "taste"
+        },
+        {
+          "positions": "Adversary and Eng Manager want 429/408 retried; code only retries 5xx",
+          "resolution": "Real robustness gap but not a guaranteed failure \u2014 GITHUB_TOKEN in Actions has generous limits and calls are few. Worth a follow-up to add 429/Retry-After handling; does not block.",
+          "topic": "429 responses returned immediately then .raise_for_status fails the job",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. This is well-tested, defensively-written hardening of a CI shim; the panel's concerns are robustness/edge-case improvements (429 handling, comment authorship check, pagination) that are worth filing as follow-ups but none constitute a verified defect that guarantees failure under normal operation.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"GitHub API error handling is incomplete for 429/secondary-rate-limit responses since _gh only retries on 5xx and connection errors\",\n    \"The overall hardening (path traversal guard, UTF-8 byte accounting, upfront env validation, retry logic) is sound and well-tested\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Marker-only comment ownership can cause a 403 fail-closed\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager flagged that PATCHing a foreign comment containing the marker returns 403; Adversary/Security did not raise it\",\n      \"resolution\": \"Not blocking. The MARKER is an HTML comment the workflow itself appends; a third party would have to deliberately craft a comment containing our internal marker to trigger this. It is a hardening suggestion (verify author before PATCH), not a real defect in normal operation. File as follow-up.\"\n    },\n    {\n      \"topic\": \"429 responses returned immediately then .raise_for_status fails the job\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary and Eng Manager want 429/408 retried; code only retries 5xx\",\n      \"resolution\": \"Real robustness gap but not a guaranteed failure \u2014 GITHUB_TOKEN in Actions has generous limits and calls are few. Worth a follow-up to add 429/Retry-After handling; does not block.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Incomplete transient-error handling (429/secondary rate limits) in the GitHub API layer\",\n    \"No outer try/except around the comment/engine calls so a non-retryable API error aborts before the fail-closed logic\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. This is well-tested, defensively-written hardening of a CI shim; the panel's concerns are robustness/edge-case improvements (429 handling, comment authorship check, pagination) that are worth filing as follow-ups but none constitute a verified defect that guarantees failure under normal operation.",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 11.52,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 8,
+      "consensus": [
+        "GitHub API error handling is incomplete for 429/secondary-rate-limit responses \u2014 _gh only retries 5xx and returns 4xx (including 429) straight to raise_for_status()",
+        "The overall hardening direction (retries, byte-accurate caps, path-traversal guard, fail-closed env validation) is sound and well covered by tests"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary both flagged it high; but it is a degraded-mode robustness gap, not a guaranteed failure",
+          "resolution": "Treat as non-blocking follow-up. A 429 would cause raise_for_status() to fail the job (fail-closed), which is undesirable but not a security hole or a certain failure on normal traffic. Legitimate improvement, not a gate.",
+          "topic": "Severity of 429/rate-limit handling gap",
+          "type": "taste"
+        },
+        {
+          "positions": "Eng Manager rated high; a spoofed council-review marker in a foreign comment could make PATCH 403 and fail the job",
+          "resolution": "",
+          "topic": "Marker-only comment ownership causing PATCH 403 DoS",
+          "type": "user-challenge"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"Approve and merge. This is a well-tested hardening pass with grounded improvements (byte-accurate caps, path-traversal guard, retry logic, upfront env validation). The panel-raised concerns are robustness edge cases (429 handling, comment pagination, marker-only ownership) that are real quality suggestions but do not meet the merge-gate bar: none is a guaranteed runtime failure under expected traffic or a security hole. They should be tracked as follow-ups.\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"GitHub API error handling is incomplete for 429/secondary-rate-limit responses \u2014 _gh only retries 5xx and returns 4xx (including 429) straight to raise_for_status()\",\n    \"The overall hardening direction (retries, byte-accurate caps, path-traversal guard, fail-closed env validation) is sound and well covered by tests\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of 429/rate-limit handling gap\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary both flagged it high; but it is a degraded-mode robustness gap, not a guaranteed failure\",\n      \"resolution\": \"Treat as non-blocking follow-up. A 429 would cause raise_for_status() to fail the job (fail-closed), which is undesirable but not a security hole or a certain failure on normal traffic. Legitimate improvement, not a gate.\"\n    },\n    {\n      \"topic\": \"Marker-only comment ownership causing PATCH 403 DoS\",\n      \"type\": \"user-challenge\",\n      \"positions\": \"Eng Manager rated high; a spoofed council-review marker in a foreign comment could make PATCH 403 and fail the job\",\n      \"resolution\": \"\",\n      \"what_we_might_miss\": \"If an untrusted user plants the MARKER string in a PR comment, upsert would try to PATCH a comment it doesn't own; GitHub may return 403 and fail the gate. This is a plausible but unconfirmed griefing vector, not verified against GitHub's actual PATCH permission model for the workflow token.\",\n      \"if_wrong_cost\": \"Low-to-moderate: a malicious PR author could force the review gate to error (fail-closed), causing noise/blocked merges on their own PR \u2014 no code bypass, no data exposure. Easily mitigated by an author check in a follow-up.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"Incomplete GitHub API error handling under load (429, secondary rate limits, non-retryable 4xx)\",\n    \"Comment upsert robustness (pagination for >100 comments, ownership verification before PATCH)\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "Approve and merge. This is a well-tested hardening pass with grounded improvements (byte-accurate caps, path-traversal guard, retry logic, upfront env validation). The panel-raised concerns are robustness edge cases (429 handling, comment pagination, marker-only ownership) that are real quality suggestions but do not meet the merge-gate bar: none is a guaranteed runtime failure under expected traffic or a security hole. They should be tracked as follow-ups.",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 15.66,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-opus-4-8",
+      "confidence": 7,
+      "consensus": [
+        "_gh only retries 5xx, so 429/secondary-rate-limit responses are returned immediately and can surface via raise_for_status (Eng Manager, Adversary)",
+        "Comment upsert/lookup has edge-case fragility (single-page lookup, no author check, no concurrency handling) that can break the one-rolling-comment invariant or fail on foreign comments (Eng Manager, Adversary)"
+      ],
+      "disagreements": [],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\"recommendation\":\"Approve \u2014 merge. Solid hardening round with good test coverage; the remaining concerns are robustness improvements, not verified defects that meet the blocking bar.\",\"confidence\":7,\"consensus\":[\"_gh only retries 5xx, so 429/secondary-rate-limit responses are returned immediately and can surface via raise_for_status (Eng Manager, Adversary)\",\"Comment upsert/lookup has edge-case fragility (single-page lookup, no author check, no concurrency handling) that can break the one-rolling-comment invariant or fail on foreign comments (Eng Manager, Adversary)\"],\"disagreements\":[],\"cross_panel_themes\":[\"GitHub API resilience under real PR load (rate limiting, pagination, non-retryable errors) is the recurring worry across both concerned panelists\"],\"blocking_findings\":[]}",
+      "recommendation": "Approve \u2014 merge. Solid hardening round with good test coverage; the remaining concerns are robustness improvements, not verified defects that meet the blocking bar.",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 5.9,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 8,
+      "consensus": [
+        "GitHub API failure handling is incomplete: non-5xx errors (429, 403, 409, 422) are not retried and are not wrapped in try/except, so an API hiccup can crash with an unhandled exception rather than a clean fail-closed message",
+        "The comment-upsert logic (find_council_comment + upsert_comment) has edge cases \u2014 pagination limits and marker-matching ambiguity \u2014 that could break the 'one rolling comment' invariant in atypical PRs"
+      ],
+      "disagreements": [
+        {
+          "positions": "Adversary rates this high (c9), EM rates related retry gaps as low/med; both flag it but treat severity differently",
+          "resolution": "Not blocking \u2014 an unhandled HTTPError still exits the process with a non-zero code, which is functionally consistent with the module's documented fail-closed intent, just with a noisier traceback instead of a formatted ::error:: message. This is a robustness/polish gap, not a defect that breaks the gate's guarantees or introduces incorrect pass/fail behavior.",
+          "topic": "Severity of the missing 429/4xx handling",
+          "type": "taste"
+        },
+        {
+          "positions": "EM raises this as a high-severity DoS risk (a non-bot comment containing the marker text could cause a 403 on PATCH and fail the job)",
+          "resolution": "",
+          "topic": "Marker-only comment ownership check",
+          "type": "user-challenge"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"GitHub API failure handling is incomplete: non-5xx errors (429, 403, 409, 422) are not retried and are not wrapped in try/except, so an API hiccup can crash with an unhandled exception rather than a clean fail-closed message\",\n    \"The comment-upsert logic (find_council_comment + upsert_comment) has edge cases \u2014 pagination limits and marker-matching ambiguity \u2014 that could break the 'one rolling comment' invariant in atypical PRs\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of the missing 429/4xx handling\",\n      \"type\": \"taste\",\n      \"positions\": \"Adversary rates this high (c9), EM rates related retry gaps as low/med; both flag it but treat severity differently\",\n      \"resolution\": \"Not blocking \u2014 an unhandled HTTPError still exits the process with a non-zero code, which is functionally consistent with the module's documented fail-closed intent, just with a noisier traceback instead of a formatted ::error:: message. This is a robustness/polish gap, not a defect that breaks the gate's guarantees or introduces incorrect pass/fail behavior.\"\n    },\n    {\n      \"topic\": \"Marker-only comment ownership check\",\n      \"type\": \"user-challenge\",\n      \"positions\": \"EM raises this as a high-severity DoS risk (a non-bot comment containing the marker text could cause a 403 on PATCH and fail the job)\",\n      \"what_we_might_miss\": \"If an external contributor or bot posts a comment that happens to contain the literal HTML marker string, the gate could start failing on every PR via a 403, which is hard to diagnose\",\n      \"if_wrong_cost\": \"Low-to-moderate: would require a very specific adversarial or coincidental comment; recoverable by manually deleting the offending comment or fixing the matching logic in a fast follow-up; does not compromise security or produce incorrect merge decisions, just an availability nuisance\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub API interaction hardening (retry scope, error handling, pagination) is more of a partial improvement than a complete one\",\n    \"No panelist found a security vulnerability, incorrect gating logic, or a guaranteed crash under normal single-PR usage\"\n  ],\n  \"blocking_findings\": []\n}",
+      "recommendation": "approve",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 24.73,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [
+        {
+          "point": "find_council_comment matches any comment containing the MARKER string with no author check; scripts/venice_review.py:113-128 (and setup/templates copy)",
+          "severity": "high",
+          "why": "Verified against the code: find_council_comment loops over all comments and returns the id of the first one containing MARKER, with no check that it was authored by github-actions[bot]/the workflow identity. upsert_comment then PATCHes that id unconditionally. On a public repo (or any repo where non-collaborators can comment on PRs), an external actor can post a comment containing the literal `<!-- council-review -->` string; the next gate run resolves that comment id, attempts to PATCH a comment it doesn't own, GitHub returns 403, and raise_for_status() throws an uncaught HTTPError \u2014 crashing the job and breaking the merge gate for that PR (fail-closed already turns this into a hard CI failure) until someone manually deletes the spoofed comment. This is a concrete, low-effort, externally triggerable denial-of-service against the review gate itself."
+        }
+      ],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 6,
+      "consensus": [
+        "GitHub API error handling is incomplete: only 5xx and connection errors are retried, so 429/403/4xx responses on comment lookup/update or unhandled engine exceptions can still crash the job unexpectedly",
+        "Retry/backoff logic in _gh doesn't cover rate-limiting (429/secondary limits), a realistic failure mode for a CI bot posting/patching comments"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary both flag this as high/medium severity blocking; no panelist argues it's fine as-is",
+          "resolution": "Real gap but not a guaranteed failure under normal CI traffic volumes for a single-PR comment bot; treat as a follow-up hardening item, not a merge blocker",
+          "topic": "Severity of missing 429/backoff handling",
+          "type": "taste"
+        },
+        {
+          "positions": "Only Eng Manager raised this explicitly; no one else evaluated it",
+          "resolution": "This is a concrete, verifiable defect: any PR commenter (including external/forked-repo contributors on public repos) can post a comment containing the literal marker text, causing find_council_comment to return that comment's id; upsert_comment will then attempt a PATCH the workflow token doesn't own, GitHub returns 403, raise_for_status() throws uncaught, and the job crashes \u2014 permanently breaking the review gate for that PR until the spoofed comment is deleted. This is a low-effort, externally-triggerable denial-of-service against the merge gate itself.",
+          "topic": "Marker-only comment ownership check (find_council_comment matches any comment containing the marker string, regardless of author)",
+          "type": "user-challenge"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"approve with follow-up\",\n  \"confidence\": 6,\n  \"consensus\": [\n    \"GitHub API error handling is incomplete: only 5xx and connection errors are retried, so 429/403/4xx responses on comment lookup/update or unhandled engine exceptions can still crash the job unexpectedly\",\n    \"Retry/backoff logic in _gh doesn't cover rate-limiting (429/secondary limits), a realistic failure mode for a CI bot posting/patching comments\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of missing 429/backoff handling\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary both flag this as high/medium severity blocking; no panelist argues it's fine as-is\",\n      \"resolution\": \"Real gap but not a guaranteed failure under normal CI traffic volumes for a single-PR comment bot; treat as a follow-up hardening item, not a merge blocker\",\n      \"what_we_might_miss\": \"\",\n      \"if_wrong_cost\": \"\"\n    },\n    {\n      \"topic\": \"Marker-only comment ownership check (find_council_comment matches any comment containing the marker string, regardless of author)\",\n      \"type\": \"user-challenge\",\n      \"positions\": \"Only Eng Manager raised this explicitly; no one else evaluated it\",\n      \"resolution\": \"This is a concrete, verifiable defect: any PR commenter (including external/forked-repo contributors on public repos) can post a comment containing the literal marker text, causing find_council_comment to return that comment's id; upsert_comment will then attempt a PATCH the workflow token doesn't own, GitHub returns 403, raise_for_status() throws uncaught, and the job crashes \u2014 permanently breaking the review gate for that PR until the spoofed comment is deleted. This is a low-effort, externally-triggerable denial-of-service against the merge gate itself.\",\n      \"what_we_might_miss\": \"Whether GITHUB_TOKEN in this workflow context actually has permission to PATCH arbitrary users' comments at all (some repos restrict issue comment edit by GITHUB_TOKEN scope) \u2014 if GitHub always 403s cross-author edits regardless, the failure mode is confirmed; if some org policy allows it, impact could be worse (post/edit as bot) rather than just DoS\",\n      \"if_wrong_cost\": \"low \u2014 worst case we ask for a defensive author-check that is cheap to add and harmless if the scenario turns out to be unreachable\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub API robustness (rate limiting, non-5xx errors, exception handling around _gh calls)\",\n    \"Comment upsert correctness under adversarial/edge-case PR comment activity\"\n  ],\n  \"blocking_findings\": [\n    {\n      \"point\": \"find_council_comment matches any comment containing the MARKER string with no author check; scripts/venice_review.py:113-128 (and setup/templates copy)\",\n      \"severity\": \"high\",\n      \"why\": \"Verified against the code: find_council_comment loops over all comments and returns the id of the first one containing MARKER, with no check that it was authored by github-actions[bot]/the workflow identity. upsert_comment then PATCHes that id unconditionally. On a public repo (or any repo where non-collaborators can comment on PRs), an external actor can post a comment containing the literal `<!-- council-review -->` string; the next gate run resolves that comment id, attempts to PATCH a comment it doesn't own, GitHub returns 403, and raise_for_status() throws an uncaught HTTPError \u2014 crashing the job and breaking the merge gate for that PR (fail-closed already turns this into a hard CI failure) until someone manually deletes the spoofed comment. This is a concrete, low-effort, externally triggerable denial-of-service against the review gate itself.\"\n    }\n  ]\n}",
+      "recommendation": "approve with follow-up",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 30.94,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": null,
+      "chair_model": "claude-sonnet-5",
+      "confidence": 7,
+      "consensus": [
+        "GitHub API error handling is incomplete: only 5xx and connection errors are retried; 429/403/4xx responses propagate via raise_for_status() and can abort the job",
+        "No pagination on comment listing (`per_page=100`) risks missing the marker comment on PRs with many comments, which could re-break the single-rolling-comment invariant",
+        "Marker-based comment lookup has no author/identity check, so any comment containing the literal marker string could be mistaken for the bot's own comment"
+      ],
+      "disagreements": [
+        {
+          "positions": "Eng Manager and Adversary rate these high/critical as production reliability risks; a stricter reading treats them as conditional, fail-safe robustness gaps rather than guaranteed defects",
+          "resolution": "Downgraded to non-blocking: both failure modes cause the gate to fail closed (CI failure, safe direction), not silent merge of bad code or data exfiltration; they are real but conditional robustness gaps worth fixing in a fast-follow, not a merge blocker",
+          "topic": "Severity of unhandled 429/4xx and marker-hijack scenarios",
+          "type": "taste"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"approve\",\n  \"confidence\": 7,\n  \"consensus\": [\n    \"GitHub API error handling is incomplete: only 5xx and connection errors are retried; 429/403/4xx responses propagate via raise_for_status() and can abort the job\",\n    \"No pagination on comment listing (`per_page=100`) risks missing the marker comment on PRs with many comments, which could re-break the single-rolling-comment invariant\",\n    \"Marker-based comment lookup has no author/identity check, so any comment containing the literal marker string could be mistaken for the bot's own comment\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of unhandled 429/4xx and marker-hijack scenarios\",\n      \"type\": \"taste\",\n      \"positions\": \"Eng Manager and Adversary rate these high/critical as production reliability risks; a stricter reading treats them as conditional, fail-safe robustness gaps rather than guaranteed defects\",\n      \"resolution\": \"Downgraded to non-blocking: both failure modes cause the gate to fail closed (CI failure, safe direction), not silent merge of bad code or data exfiltration; they are real but conditional robustness gaps worth fixing in a fast-follow, not a merge blocker\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub API resiliency (retry coverage, rate limiting, pagination) is the dominant remaining gap after this hardening pass\",\n    \"The comment-upsert mechanism (marker matching, ownership) is not fully hardened against adversarial or noisy PR comment threads\"\n  ],\n  \"blocking_findings\": [],\n  \"additional_notes\": \"Path traversal protection (resolve + is_relative_to), UTF-8 byte-accurate caps, required-env fail-closed check, and the general retry/backoff addition are all correctly implemented and verified against the full file contents and accompanying tests. Both the live workflow copy and the setup/templates copy were changed in lockstep, avoiding drift. The remaining concerns (429 handling, comment pagination, marker/author check) are legitimate follow-up hardening items but do not constitute guaranteed runtime failures or security vulnerabilities in the current diff \u2014 the system already fails closed in all raised scenarios, which is the intended safety posture.\"\n}",
+      "recommendation": "approve",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 24.93,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [
+        {
+          "point": "Public marker is trusted without comment ownership validation; scripts/venice_review.py:109-129 and setup/templates/venice_review.py:109-129",
+          "severity": "high",
+          "why": "find_council_comment accepts the first issue comment whose body contains the publicly known <!-- council-review --> marker and returns its ID without checking its author or app identity. upsert_comment then PATCHes that selected comment. A PR participant can seed such a comment before the workflow lookup, causing the action either to attempt modification of a comment it does not own and fail with 403, blocking the required gate, or to overwrite unrelated user content if the token is permitted to edit it. This is a concrete untrusted-input-to-privileged-API-target vulnerability introduced by the rolling-comment implementation."
+        }
+      ],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The GitHub retry helper handles connection errors and 5xx responses but returns 429 and other transient 4xx responses immediately, after which raise_for_status fails the workflow.",
+        "Failures while finding or updating the review comment propagate and can fail the merge gate without updating the rolling comment."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Eng Manager rated this low, while the Adversary rated the 429 path high.",
+          "resolution": "Non-blocking. The behavior reduces resilience, but the resulting nonzero workflow outcome is consistent with the documented fail-closed policy.",
+          "topic": "Severity of missing 429 and secondary-rate-limit retries",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager called for an author/ownership check; the Adversary suggested retrying 403 responses; the Security Officer offered no assessment.",
+          "resolution": "Blocking. Retrying 403 does not address the trust-boundary defect: an arbitrary issue comment can select the PATCH target solely by embedding the public marker.",
+          "topic": "Handling comments containing the council marker",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary considered the lack of a top-level exception handler a defect; no other panelist raised it.",
+          "resolution": "Non-blocking. Uncaught exceptions still fail the job closed as documented, and the provided file shows run_pr_review executes before upsert_comment, contrary to the claim that comment lookup aborts before review.",
+          "topic": "Uncaught engine and API exceptions",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager noted that only the first 100 comments are searched; no other panelist raised it.",
+          "resolution": "Real but non-blocking robustness issue. A sufficiently long PR can cause duplicate council comments, but this is not a high-severity failure.",
+          "topic": "Single-page comment lookup",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"request changes\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The GitHub retry helper handles connection errors and 5xx responses but returns 429 and other transient 4xx responses immediately, after which raise_for_status fails the workflow.\",\n    \"Failures while finding or updating the review comment propagate and can fail the merge gate without updating the rolling comment.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of missing 429 and secondary-rate-limit retries\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager rated this low, while the Adversary rated the 429 path high.\",\n      \"resolution\": \"Non-blocking. The behavior reduces resilience, but the resulting nonzero workflow outcome is consistent with the documented fail-closed policy.\"\n    },\n    {\n      \"topic\": \"Handling comments containing the council marker\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager called for an author/ownership check; the Adversary suggested retrying 403 responses; the Security Officer offered no assessment.\",\n      \"resolution\": \"Blocking. Retrying 403 does not address the trust-boundary defect: an arbitrary issue comment can select the PATCH target solely by embedding the public marker.\"\n    },\n    {\n      \"topic\": \"Uncaught engine and API exceptions\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary considered the lack of a top-level exception handler a defect; no other panelist raised it.\",\n      \"resolution\": \"Non-blocking. Uncaught exceptions still fail the job closed as documented, and the provided file shows run_pr_review executes before upsert_comment, contrary to the claim that comment lookup aborts before review.\"\n    },\n    {\n      \"topic\": \"Single-page comment lookup\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager noted that only the first 100 comments are searched; no other panelist raised it.\",\n      \"resolution\": \"Real but non-blocking robustness issue. A sufficiently long PR can cause duplicate council comments, but this is not a high-severity failure.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub comment-upsert behavior remains the main reliability and trust-boundary risk.\",\n    \"The fail-closed design amplifies comment API edge cases into merge-gate failures.\",\n    \"Retry coverage is narrower than the hardening documentation implies.\"\n  ],\n  \"blocking_findings\": [\n    {\n      \"point\": \"Public marker is trusted without comment ownership validation; scripts/venice_review.py:109-129 and setup/templates/venice_review.py:109-129\",\n      \"severity\": \"high\",\n      \"why\": \"find_council_comment accepts the first issue comment whose body contains the publicly known <!-- council-review --> marker and returns its ID without checking its author or app identity. upsert_comment then PATCHes that selected comment. A PR participant can seed such a comment before the workflow lookup, causing the action either to attempt modification of a comment it does not own and fail with 403, blocking the required gate, or to overwrite unrelated user content if the token is permitted to edit it. This is a concrete untrusted-input-to-privileged-API-target vulnerability introduced by the rolling-comment implementation.\"\n    }\n  ]\n}",
+      "recommendation": "request changes",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 76.13,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [
+        {
+          "point": "Untrusted marker can hijack comment upsert; scripts/venice_review.py:111-130",
+          "severity": "high",
+          "why": "find_council_comment accepts the first PR comment whose user-controlled body contains the marker, without verifying its author, and upsert_comment then PATCHes that comment ID. A commenter can therefore make the workflow target a comment not owned by the workflow actor; the resulting forbidden update reaches an uncaught raise_for_status and fails the required gate. The same vulnerable implementation is copied into setup/templates/venice_review.py."
+        }
+      ],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 8,
+      "consensus": [
+        "The GitHub retry helper handles connection failures and 5xx responses but returns HTTP 429 immediately, after which raise_for_status aborts the job.",
+        "Unhandled failures in the comment lookup/update path can terminate the required review gate without successfully publishing the review."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Adversary rated it high; the Eng Manager rated it low.",
+          "resolution": "Confirmed reliability defect, but non-blocking and medium severity: a 429 causes fail-closed behavior rather than an incorrect merge decision, and its occurrence depends on external rate limiting.",
+          "topic": "Severity of missing HTTP 429 retry handling",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary considered uncaught engine exceptions a medium concern; no other panelist raised it.",
+          "resolution": "Non-blocking: an unexpected exception already exits nonzero, which is consistent with the documented fail-closed policy, although it may prevent posting a useful failure comment.",
+          "topic": "Need for a top-level exception handler around the engine",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager identified the lack of pagination as a medium defect; other panelists did not address it.",
+          "resolution": "Confirmed but non-blocking: once the council comment falls outside the first 100 results, subsequent runs can create duplicates, violating the rolling-comment invariant without compromising the review decision.",
+          "topic": "Single-page existing-comment lookup",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"request changes before merge\",\n  \"confidence\": 8,\n  \"consensus\": [\n    \"The GitHub retry helper handles connection failures and 5xx responses but returns HTTP 429 immediately, after which raise_for_status aborts the job.\",\n    \"Unhandled failures in the comment lookup/update path can terminate the required review gate without successfully publishing the review.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of missing HTTP 429 retry handling\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary rated it high; the Eng Manager rated it low.\",\n      \"resolution\": \"Confirmed reliability defect, but non-blocking and medium severity: a 429 causes fail-closed behavior rather than an incorrect merge decision, and its occurrence depends on external rate limiting.\"\n    },\n    {\n      \"topic\": \"Need for a top-level exception handler around the engine\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary considered uncaught engine exceptions a medium concern; no other panelist raised it.\",\n      \"resolution\": \"Non-blocking: an unexpected exception already exits nonzero, which is consistent with the documented fail-closed policy, although it may prevent posting a useful failure comment.\"\n    },\n    {\n      \"topic\": \"Single-page existing-comment lookup\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager identified the lack of pagination as a medium defect; other panelists did not address it.\",\n      \"resolution\": \"Confirmed but non-blocking: once the council comment falls outside the first 100 results, subsequent runs can create duplicates, violating the rolling-comment invariant without compromising the review decision.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub comment API resilience is incomplete despite the new retry layer.\",\n    \"The fail-closed design turns comment-management edge cases into merge-gate availability failures.\",\n    \"Tests cover connection retries but not marker ownership, pagination, HTTP 429, or other response-level failures.\"\n  ],\n  \"blocking_findings\": [\n    {\n      \"point\": \"Untrusted marker can hijack comment upsert; scripts/venice_review.py:111-130\",\n      \"severity\": \"high\",\n      \"why\": \"find_council_comment accepts the first PR comment whose user-controlled body contains the marker, without verifying its author, and upsert_comment then PATCHes that comment ID. A commenter can therefore make the workflow target a comment not owned by the workflow actor; the resulting forbidden update reaches an uncaught raise_for_status and fails the required gate. The same vulnerable implementation is copied into setup/templates/venice_review.py.\"\n    }\n  ]\n}",
+      "recommendation": "request changes before merge",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 90.25,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [
+        {
+          "point": "Untrusted marker permits persistent comment-ownership CI denial of service; scripts/venice_review.py:111-130",
+          "severity": "high",
+          "why": "find_council_comment accepts any issue comment whose body contains the public marker, without checking its author. upsert_comment then PATCHes that comment ID. A PR participant can post the marker before the workflow creates its own marker comment; the workflow token cannot edit another user's comment, so raise_for_status receives a 403 and every subsequent review run that selects that comment fails. This is a concrete, attacker-triggerable availability failure in the merge gate."
+        }
+      ],
+      "chair_error": null,
+      "chair_model": "openai-gpt-56-sol",
+      "confidence": 9,
+      "consensus": [
+        "The GitHub API retry policy does not retry 429 rate-limit responses.",
+        "Failures during GitHub comment lookup or update can terminate the merge-gate run."
+      ],
+      "disagreements": [
+        {
+          "positions": "The Eng Manager rated it high; the Adversary and Security Officer did not identify it.",
+          "resolution": "Verified high-severity availability vulnerability and merge blocker: an untrusted comment containing the marker can be selected for PATCH even though the workflow token does not own it.",
+          "topic": "Severity of marker-only comment ownership",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary rated immediate failure on 429 high; the Eng Manager rated the incomplete retry coverage low.",
+          "resolution": "Real but non-blocking robustness issue. The action fails closed rather than silently accepting a review, and a 429 is workload-dependent rather than a guaranteed defect.",
+          "topic": "429 handling",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary considered uncaught API and engine exceptions medium severity; other panelists did not raise this.",
+          "resolution": "Not a blocker. An uncaught exception still produces a nonzero action result, which preserves the documented fail-closed behavior, though diagnostics and failure-comment delivery could be improved.",
+          "topic": "Missing top-level exception handling",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Eng Manager identified loss of the one-comment invariant after the first 100 comments; other panelists did not raise it.",
+          "resolution": "Verified functional limitation but not high severity. Pagination should be added, but duplicate comments on unusually long PR threads do not justify blocking by themselves.",
+          "topic": "Single-page comment lookup",
+          "type": "mechanical"
+        },
+        {
+          "positions": "The Adversary raised possible 409/422 failures; other panelists did not.",
+          "resolution": "Not blocking because the supplied code does not establish that ordinary concurrent comment edits produce those statuses. Concurrent runs could still create duplicate comments, but that is a separate robustness concern.",
+          "topic": "Concurrent PATCH/POST conflicts",
+          "type": "mechanical"
+        }
+      ],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "strict",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "{\n  \"recommendation\": \"request changes before merge\",\n  \"confidence\": 9,\n  \"consensus\": [\n    \"The GitHub API retry policy does not retry 429 rate-limit responses.\",\n    \"Failures during GitHub comment lookup or update can terminate the merge-gate run.\"\n  ],\n  \"disagreements\": [\n    {\n      \"topic\": \"Severity of marker-only comment ownership\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager rated it high; the Adversary and Security Officer did not identify it.\",\n      \"resolution\": \"Verified high-severity availability vulnerability and merge blocker: an untrusted comment containing the marker can be selected for PATCH even though the workflow token does not own it.\"\n    },\n    {\n      \"topic\": \"429 handling\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary rated immediate failure on 429 high; the Eng Manager rated the incomplete retry coverage low.\",\n      \"resolution\": \"Real but non-blocking robustness issue. The action fails closed rather than silently accepting a review, and a 429 is workload-dependent rather than a guaranteed defect.\"\n    },\n    {\n      \"topic\": \"Missing top-level exception handling\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary considered uncaught API and engine exceptions medium severity; other panelists did not raise this.\",\n      \"resolution\": \"Not a blocker. An uncaught exception still produces a nonzero action result, which preserves the documented fail-closed behavior, though diagnostics and failure-comment delivery could be improved.\"\n    },\n    {\n      \"topic\": \"Single-page comment lookup\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Eng Manager identified loss of the one-comment invariant after the first 100 comments; other panelists did not raise it.\",\n      \"resolution\": \"Verified functional limitation but not high severity. Pagination should be added, but duplicate comments on unusually long PR threads do not justify blocking by themselves.\"\n    },\n    {\n      \"topic\": \"Concurrent PATCH/POST conflicts\",\n      \"type\": \"mechanical\",\n      \"positions\": \"The Adversary raised possible 409/422 failures; other panelists did not.\",\n      \"resolution\": \"Not blocking because the supplied code does not establish that ordinary concurrent comment edits produce those statuses. Concurrent runs could still create duplicate comments, but that is a separate robustness concern.\"\n    }\n  ],\n  \"cross_panel_themes\": [\n    \"GitHub comment-management resilience under API errors and rate limiting\",\n    \"Preserving the one-rolling-comment invariant\",\n    \"Fail-closed behavior versus graceful diagnostics and comment delivery\"\n  ],\n  \"blocking_findings\": [\n    {\n      \"point\": \"Untrusted marker permits persistent comment-ownership CI denial of service; scripts/venice_review.py:111-130\",\n      \"severity\": \"high\",\n      \"why\": \"find_council_comment accepts any issue comment whose body contains the public marker, without checking its author. upsert_comment then PATCHes that comment ID. A PR participant can post the marker before the workflow creates its own marker comment; the workflow token cannot edit another user's comment, so raise_for_status receives a 403 and every subsequent review run that selects that comment fails. This is a concrete, attacker-triggerable availability failure in the merge gate.\"\n    }\n  ]\n}",
+      "recommendation": "request changes before merge",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 72.1,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": "ValueError: empty or non-string response",
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 0,
+      "consensus": [],
+      "disagreements": [],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "empty",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "",
+      "recommendation": "(synthesis unavailable \u2014 see raw panel below)",
+      "repeat": 1,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 92.09,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": "ValueError: empty or non-string response",
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 0,
+      "consensus": [],
+      "disagreements": [],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "empty",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "",
+      "recommendation": "(synthesis unavailable \u2014 see raw panel below)",
+      "repeat": 2,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 72.44,
+      "tier": "reduced"
+    },
+    {
+      "blocking": 0,
+      "blocking_findings": [],
+      "chair_error": "ValueError: empty or non-string response",
+      "chair_model": "z-ai-glm-5-3",
+      "confidence": 0,
+      "consensus": [],
+      "disagreements": [],
+      "error": null,
+      "expected_blocking": 2,
+      "fixture": "baw-pr11",
+      "jsonparse_branch": "empty",
+      "panel_candidates": 0,
+      "prompt_bytes": 45490,
+      "raw_response": "",
+      "recommendation": "(synthesis unavailable \u2014 see raw panel below)",
+      "repeat": 3,
+      "required_changes": null,
+      "review_status": "unknown",
+      "seconds": 112.77,
+      "tier": "reduced"
+    }
+  ],
+  "schema_version": 1,
+  "transport_spend": {
+    "calls": 36.0,
+    "refused": 0.0,
+    "spent": 2.2123120000000007
+  }
+}

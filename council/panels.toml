@@ -10,10 +10,39 @@ chair_model   = "claude-opus-4-8"    # strongest reasoner — synthesizes the pa
 byte_cap      = 200000
 timeout       = 180
 
+# ---- output ceilings -------------------------------------------------------
+# Completion-token ceilings sent as `max_completion_tokens` (Venice's current
+# field; `max_tokens` is deprecated). Venice counts REASONING tokens against
+# these, and every seat here is a reasoning model.
+#
+# Sized from ~/.local/state/venice-usage/ledger.db — 1,732 real council rows,
+# 2026-07-20..2026-09-11. Largest completion ever recorded, per role:
+#
+#     member seats pooled (n=1312)   p99 10,804   p99.9 14,549   max 17,142
+#     chair claude-opus-4-8 (n=420)  p99  3,656   p99.9  4,690   max  5,174
+#
+# Nothing in that history would have been truncated by the numbers below. Do not
+# lower them without new ledger evidence: a cap that cuts a seat's JSON short is
+# a failed seat, and on the CI gate path enough failed seats is a fail-closed
+# merge block. 0 = no cap (the kill switch).
+max_completion_tokens        = 24000   # any panel seat  — 1.40x the observed max
+chair_max_completion_tokens  = 8000    # the chair       — 1.55x the observed max
+router_max_completion_tokens = 2000    # picks a panel, emits {"panel": "..."}
+
+# `deep` rigor is meant to surface more, so it gets more room — still bounded.
+# 30000, not 32000: grok-4-3's catalogue maxCompletionTokens IS 32000, and asking
+# a model for exactly its ceiling is a needless edge to sit on.
+[settings.rigor.deep]
+max_completion_tokens       = 30000
+chair_max_completion_tokens = 12000
+
 # ---- code-review -----------------------------------------------------------
 [panels.code-review]
 description   = "Review a code change for correctness, security, and design."
 default_rigor = "daily"
+# This panel's own chair (owner decision 2026-09-20). Every other panel keeps the global
+# [settings] chair_model. Record: docs/council-chair-decision-2026-09-20.md
+chair_model   = "openai-gpt-56-sol"
 
 [[panels.code-review.members]]
 name   = "Eng Manager"

@@ -1,0 +1,141 @@
+{
+  "initiatives": [
+    {
+      "id": "romance",
+      "name": "Romance",
+      "repos": [
+        "romance-empire",
+        "romance-elliecalloway.com",
+        "romance-tessacross.com",
+        "flight-7-publishing"
+      ],
+      "purpose": "Produce books readers value, supported by a sustainable commercial operation.",
+      "ideal_url": "",
+      "evidence": "Ops connects owner decisions to production. The engagement pilot is still running; its cash contribution is not established.",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "assessment": "partial"
+    },
+    {
+      "id": "attain",
+      "name": "Attain Prep",
+      "repos": [
+        "sat-prep",
+        "attainprep-site",
+        "sat-prep-dark-mode",
+        "sat-prep-tutor-preview"
+      ],
+      "purpose": "Independent, retained learning that fits the student\u2019s time and a solo operator.",
+      "ideal_url": "https://app.notion.com/p/3d645d882ebb81db9d50e35698091788",
+      "evidence": "Activity is recorded. Independent retained learning has not yet been demonstrated in the inspected evidence.",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "assessment": "partial"
+    },
+    {
+      "id": "up",
+      "name": "Ultimate Portugal",
+      "repos": [
+        "ultimate-portugal",
+        "ultimate-portugal-visuals"
+      ],
+      "purpose": "Trusted guidance that helps readers decide and supports an affiliate-only business.",
+      "ideal_url": "https://app.notion.com/p/3d645d882ebb81fc951fd6b4918dd767",
+      "evidence": "The local registry has 15 unactivated programs. A first affiliate case is prepared; income is not established.",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "assessment": "partial"
+    },
+    {
+      "id": "swim",
+      "name": "SwimTrack",
+      "repos": [
+        "swimtrack",
+        "swimtrack-website",
+        "swimtrack-coach"
+      ],
+      "purpose": "A useful Portugal Meet Navigator, supported by clear guidance for swimming parents.",
+      "ideal_url": "https://app.notion.com/p/3d745d882ebb8162be7fe53e04539ce9",
+      "evidence": "The live account flag is on and checkout is off. Local payment checks pass; release evidence remains incomplete.",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "assessment": "partial"
+    },
+    {
+      "id": "harness",
+      "name": "Shared operating harness",
+      "repos": [
+        "ai-harness",
+        "backlog",
+        "vps-tools",
+        "harness-engineering",
+        "MCP-Configuration-Assistant"
+      ],
+      "purpose": "Turn accepted direction into verified progress with the least justified effort and machinery.",
+      "ideal_url": "",
+      "evidence": "Execution and local safeguards exist. Portfolio allocation, learning handoffs, and delivery need the audited repairs.",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "assessment": "partial"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "up-affiliate",
+      "initiative": "Ultimate Portugal",
+      "title": "Give the first affiliate route a cash test",
+      "recommendation": "Apply to Airalo, then test one existing-page placement if approved terms and tracking support it.",
+      "why": "The content is close to a purchase decision, but product facts, tracking and partner approval still need evidence.",
+      "horizon": "First tangible result: within 3 months of an approved live test",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "source_url": "/decisions/2026-09-12-up-airalo-affiliate-activation.md"
+    },
+    {
+      "id": "swim-release",
+      "initiative": "SwimTrack",
+      "title": "Prove the season-pass release before charging",
+      "recommendation": "Keep checkout off while completing the concrete release checks.",
+      "why": "Payment code exists. A parent must be able to buy, receive access and recover from an error before paid launch.",
+      "horizon": "First tangible result: within 3 months of a healthy paid launch",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "source_url": "/decisions/2026-09-12-swimtrack-season-pass-release.md"
+    },
+    {
+      "id": "editorial-use",
+      "initiative": "SwimTrack",
+      "title": "Reduce recurring work without a proven consumer",
+      "recommendation": "Review the proposed pause of daily editorial scanning; keep the manual route.",
+      "why": "Four sampled candidates have no demonstrated downstream consumer. An integration is not justified by output alone.",
+      "horizon": "Decision now; any retained trial returns to Rex",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "source_url": "/decisions/2026-09-12-swimtrack-editorial-consumer-check.md"
+    },
+    {
+      "id": "monthly-review",
+      "initiative": "Across the portfolio",
+      "title": "Tie the next allocation to a result",
+      "recommendation": "Use the prepared monthly sheet to review both spending and the Ideal States.",
+      "why": "Recorded use is available. Actual cash, allocations and customer outcomes still need reconciliation.",
+      "horizon": "Monthly review; 3, 6 and 12 month result horizons",
+      "observed_at": "2026-09-12T18:29:29Z",
+      "source_url": "/decisions/2026-09-12-portfolio-monthly-spend-outcome-review.md"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Attain product queue heartbeat",
+      "path": "{home}/.local/state/attain-work-queue/health.json",
+      "time_field": "checked_at",
+      "max_age_seconds": 2700,
+      "meaning": "Controller check within 45 minutes; this is not proof of product benefit."
+    },
+    {
+      "name": "Backlog morning report",
+      "path": "{projects}/.backlog-run/report.json",
+      "time_field": "written",
+      "max_age_seconds": 129600,
+      "meaning": "A report within 36 hours. Readiness and delivered business benefit remain separate."
+    }
+  ],
+  "coverage_notes": [
+    "MeetTrack supply jobs are intentionally paused. Their silence is not a failure.",
+    "Remote-only n8n, Bento, Zernio, other devices, and remaining expected-output checks are not fully connected.",
+    "Other inventoried projects still need initiative-level assessment: NATO-support, Santa_Amaro_Home_Renovation, aris-management-website, bank-sales, blkout-dice-roller, bubblepop-art, caimcintosh-website, combat-arms-transition, crypto-portfolio, dump, finance-tracker, game-idea-aaow-civil-war, game-idea-prydain-tower, govcon-hunt-list, liam_mobility, macmcintosh, monthly-bidding, roam, splash_poller, tax-advisor.",
+    "The five initiative summaries use dated audit evidence. Refreshing the page does not make those outcome observations new."
+  ]
+}

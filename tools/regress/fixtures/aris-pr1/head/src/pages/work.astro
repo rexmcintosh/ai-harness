@@ -1,0 +1,175 @@
+---
+import { Image } from 'astro:assets';
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import CtaSection from '../components/CtaSection.astro';
+import Footer from '../components/Footer.astro';
+import contractImg from '../assets/images/work-contract-intelligence.png';
+import swimtrackImg from '../assets/images/work-swimtrack.png';
+import aiCouncilImg from '../assets/images/work-ai-council.png';
+
+const cases = [
+  {
+    heading: 'Turning a procurement team’s contracts into answers.',
+    image: contractImg,
+    alt: 'A pile of paper contracts dissolving into a network of structured data — payment terms, legal entities, and risk flowing into connected nodes.',
+    paras: [
+      'A global medical-device manufacturer had thousands of suppliers, thousands of purchase orders, and hundreds of people making buying decisions — and the terms that governed all of it sat locked in PDF contracts across scattered folders. Answering a basic question — what did we agree to pay, what’s our exposure, why is this payment held — meant a person hunting through files for days.',
+      'I built the pipeline that ends that. Raw contract PDFs go in; structured, queryable supplier data comes out — payment terms, legal entities, indemnification, risk — parsed against a taxonomy we trained on the language that actually governs the business. The same question now takes seconds.',
+      'That’s phase one. Once the data is structured, you get a supplier 360: ask anything about a supplier and get a real answer, fast enough to act on. The quieter payoff is the one nobody markets — structuring the data forces the policies, definitions, and procedures underneath it to get crisp. The point was never the model. It was moving a back-office function off non-value-added work and onto judgment.',
+    ],
+  },
+  {
+    heading: 'A consumer product, built solo, live at a real event.',
+    image: swimtrackImg,
+    alt: 'Meet results in PDFs and XML flowing into the SwimTrack app on a phone held by a spectator at a championship swim meet.',
+    paras: [
+      'SwimTrack is a parent-first platform for competitive-swimming families — the progress view the sport never built for the people paying for it. I designed and built it end to end: a real-time data pipeline, a Supabase backend, and a spectator app that was live at a championship meet in May 2026.',
+      'The hard part is the same one every business has: the source data is a mess. Results arrive as unstructured PDFs and federation XML. The pipeline ingests them, resolves each swimmer’s identity, and turns the pile into structured, queryable data — automatically, on a polling loop, with no manual entry. It’s the same move as the contract work above, at a different scale: unstructured in, structured and useful out.',
+    ],
+  },
+  {
+    heading: 'An AI team of one — that reviews its own work.',
+    image: aiCouncilImg,
+    alt: 'A person at a table reviewing work alongside a council of translucent AI figures, each inspecting a different concern before a single approval.',
+    paras: [
+      'I run a working setup where an AI builder opens pull requests and a council of models reviews each one before anything ships — several specialist reviewers, each on a different model, each hunting a different failure: design, bugs, security, over-complication. A chair synthesizes their verdicts into one recommendation. I stay in the approval seat.',
+      'It’s a small, concrete answer to the question every leader is actually asking: how do you let AI do real work without losing control of quality? The guardrails — version everything, review before merge, a human signs off — are the part that makes the speed safe. The tooling is open source.',
+    ],
+  },
+];
+---
+
+<Layout
+  title="Work — Aris Management"
+  description="What I've built: an anonymized enterprise contract-intelligence pipeline, a consumer product shipped solo, and an AI build-and-review system. The same move at every scale — turn an unstructured mess into structured, decision-ready data."
+>
+  <Nav />
+
+  <section class="work-hero">
+    <div class="work-hero__prose">
+      <h1 class="work-hero__title">I don't just advise on AI adoption — I build it.</h1>
+      <p class="work-hero__lead">
+        The same move at every scale: turn an unstructured mess into structured, decision-ready
+        data, then put it where the work actually happens.
+      </p>
+    </div>
+  </section>
+
+  <section class="work-cases">
+    <div class="work-cases__prose">
+      {
+        cases.map((c) => (
+          <article class="work-case">
+            <SectionHeading heading={c.heading} />
+            <Image
+              src={c.image}
+              alt={c.alt}
+              widths={[672, 1008, 1344]}
+              sizes="(max-width: 688px) calc(100vw - 48px), 42rem"
+              quality={80}
+              loading="lazy"
+              class="work-case__img"
+            />
+            {c.paras.map((p) => (
+              <p class="work-case__body">{p}</p>
+            ))}
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <CtaSection />
+  <Footer />
+</Layout>
+
+<style>
+  @reference "../styles/global.css";
+
+  .work-hero {
+    @apply bg-paper;
+    padding: 80px 24px 48px;
+  }
+
+  .work-hero__prose {
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+
+  .work-hero__title {
+    @apply font-heading;
+    color: var(--color-ink);
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin: 0 0 24px 0;
+  }
+
+  .work-hero__lead {
+    @apply font-body;
+    color: var(--color-slate);
+    font-weight: 400;
+    font-size: 21px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .work-cases {
+    @apply bg-paper;
+    padding: 32px 24px 80px;
+  }
+
+  .work-cases__prose {
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+
+  .work-case {
+    padding: 40px 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .work-case:first-child {
+    border-top: none;
+    padding-top: 8px;
+  }
+
+  .work-case__img {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 24px 0 8px 0;
+    border-radius: 10px;
+    border: 1px solid var(--color-line);
+  }
+
+  .work-case__body {
+    @apply font-body;
+    color: var(--color-ink);
+    font-weight: 400;
+    font-size: 19px;
+    line-height: 1.65;
+    margin: 16px 0 0 0;
+  }
+
+  @media (max-width: 640px) {
+    .work-hero {
+      padding: 56px 20px 36px;
+    }
+    .work-hero__title {
+      font-size: 36px;
+    }
+    .work-hero__lead {
+      font-size: 19px;
+    }
+    .work-cases {
+      padding: 24px 20px 56px;
+    }
+    .work-case__body {
+      font-size: 18px;
+    }
+  }
+</style>

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Attain Prep Ready tasks every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+Unit=attain-work-queue.service
+
+[Install]
+WantedBy=timers.target

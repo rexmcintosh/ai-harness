@@ -1,0 +1,7 @@
+Source: Ideal State v0.2 (2026-09-09), revision SHA `17f3a24f…e00f567`.
+
+The already-authorized one-file pause-control repair can proceed through one focused, read-only verification: inspect the merged implementation and identify the deployed version/commit expected to contain it. No new design approval is needed.
+
+The merged branch proves implementation integration only; it does not prove customer delivery or that IS-03 is met. Counterevidence remains: no deployed customer check exists, and persistence alone does not demonstrate a usable stop/resume journey.
+
+Keep the feedback in review/unresolved. Customer resolution requires observing the deployed flow under IS-03’s check: a student with a declared short time budget pauses mid-activity, returns, sees saved answers and a clear next action, and reports whether stopping felt legitimate. The proportional next step is one deployed customer or realistic test-family observation, recording app version/commit and any failure.

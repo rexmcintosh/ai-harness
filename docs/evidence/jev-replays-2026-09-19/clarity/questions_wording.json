@@ -1,0 +1,41 @@
+{
+  "_note": "FROZEN before any Jev call was made. Derived from CLARITY_READER (src/venice/proofread_personas.py: credo + CLARITY_CONTRACT). Not edited afterwards.",
+  "_frozen_at": "2026-09-19, before the first request to api.typesafe.ai",
+  "_state_shape": "The state is the raw chapter prose (design A) or one consecutive window of it (design B). No title, tense or book metadata is added: the decision is about the sentences.",
+
+  "design_a": {
+    "state": "whole chapter text",
+    "questions": {
+      "breaks": {
+        "type": "noul",
+        "instructions": "At least one sentence in this passage fails to resolve to a single, clear, unambiguous meaning for a reader moving through it once, left to right, in order.",
+        "criteria": {
+          "true": "At least one sentence makes the meaning break. Examples of a break: a pro-verb or elliptical stand-in ('do', 'is', 'did', 'one') stands for a verb or phrase the sentence never supplies, so the reader cannot recover what is meant; the natural first parse of a sentence contradicts what it must mean, forcing a reread (garden path or mis-bracketing); a modifier attaches to the wrong noun; the two halves of an interrupted quotation, read as one sentence across the action beat, say something other than what the speaker means; a pronoun or definite phrase ('it', 'that', 'this', 'the guy') has no antecedent the reader can pin; the phrasing is logically inverted or self-contradicting; a second unintended reading (crude, comic, or literal) collides with the scene; a plainly wrong word is used for the intended meaning; a stated count or number contradicts what the passage itself shows.",
+          "false": "Every sentence resolves to one meaning on a first straight-through read. Rough grammar in the service of voice is NOT a break and does not make this true: sentence fragments and one-word sentences used for pacing; run-on 'and ... and ... and' stacking and comma splices inside first-person narration or dialogue; sentences opening with And, But, So or Because; trailing, interrupted or repeated-for-rhythm sentences; compressed or elliptical phrasing whose meaning the reader still recovers inside the same sentence."
+        }
+      },
+      "clean": {
+        "type": "score",
+        "instructions": "How cleanly does this passage read on a single straight-through first pass, judged only on whether each sentence resolves to one meaning?",
+        "criteria": [
+          "Several sentences break: a reader moving once through the passage lands on the wrong meaning or on no meaning more than twice, and has to stop and re-read to recover the sense.",
+          "One or two sentences break: a reader moving once through the passage lands on the wrong meaning or no meaning once or twice and has to re-read those sentences.",
+          "No sentence breaks, but one or more sentences are compressed or elliptical enough that the reader works briefly for the meaning before recovering it inside the same sentence.",
+          "Every sentence resolves to one meaning immediately on the first pass; nothing makes the reader work for the sense."
+        ]
+      }
+    }
+  },
+
+  "design_b": {
+    "state": "one consecutive window of the chapter, about 400-500 words, split on paragraph boundaries; windows cover the chapter with no overlap",
+    "chapter_score": "max over the chapter's windows of P(breaks = true); the mean is recorded too",
+    "questions": {
+      "breaks": {
+        "type": "noul",
+        "instructions": "IDENTICAL to design_a.questions.breaks (same instructions and same criteria strings), so the only difference between the two designs is how much text the model sees at once.",
+        "same_as": "design_a.questions.breaks"
+      }
+    }
+  }
+}

@@ -11,11 +11,12 @@
 #   echo "your task" | parallel-attempts.sh
 #   MODELS="claude-opus-4-8,gemini-3-1-pro-preview,deepseek-v4-pro" parallel-attempts.sh "..."
 #
-# Needs VENICE_API_KEY (sourced from /home/dev/.env if present).
+# Needs VENICE_COUNCIL_KEY (preferred) or VENICE_API_KEY (fallback), sourced
+# from /home/dev/.env if present — resolved by council.config.get_api_key(),
+# same as the rest of council, so spend bills to council's own key.
 set -uo pipefail
 
 [ -f /home/dev/.env ] && set -a && . /home/dev/.env && set +a
-: "${VENICE_API_KEY:?VENICE_API_KEY not set}"
 
 TASK="${1:-$(cat)}"
 [ -n "$TASK" ] || { echo "usage: parallel-attempts.sh \"task\"" >&2; exit 2; }
@@ -28,9 +29,10 @@ IFS=',' read -ra MODEL_ARR <<< "$MODELS"
 gen() {  # $1 = model, $2 = outfile
   TASK="$TASK" python3 - "$1" "$2" <<'PY'
 import os, sys
+from council.config import get_api_key
 from council.venice import VeniceClient
 model, out = sys.argv[1], sys.argv[2]
-client = VeniceClient(os.environ["VENICE_API_KEY"])
+client = VeniceClient(get_api_key())
 try:
     text = client.complete(
         model,

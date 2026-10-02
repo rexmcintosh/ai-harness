@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ document.title }} | Portfolio</title><link rel="stylesheet" href="/static/app.css"></head>
+<body class="evidence-page"><main class="evidence-main">
+  <a href="/#initiative-{{ document.initiative_id }}">Back to the initiative</a>
+  <h1>{{ document.title }}</h1>
+  <p>Inspected {{ document.as_of }}. {{ document.note }}</p>
+  {% if document.changed %}<p class="error">This document changed after the assessment. Its claims need review.</p>{% endif %}
+  <pre class="source-document">{{ document.body }}</pre>
+</main></body></html>

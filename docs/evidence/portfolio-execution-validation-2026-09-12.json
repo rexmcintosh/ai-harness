@@ -1,0 +1,227 @@
+{
+  "date": "2026-09-12",
+  "state": "prepared locally; not merged, pushed or deployed",
+  "repositories": {
+    "shared": {
+      "branch": "claude/portfolio-harness-20260912",
+      "base_commit": "bbb2907831702eff741668e15fab8ca93395a03a",
+      "changed_source_sha256": {
+        ".github/workflows/venice-review.yml": "4bf855aee5bc3735aee6b9a36b74af2f686765f0573d287a3be5fa5602d19ff1",
+        "backlogrun/cli.py": "a390d4cf2a0443c2ffed935d5ec6f09fe6ea2b74d997cc1859901d6b3e69eca8",
+        "backlogrun/context.py": "12dd5f2dbc60848204b5e22fdc72e4f41a5391b619df1f4b921adcc61ee5feaa",
+        "bin/tg-send": "88f772f10e779d20705872c40cd6e67a2024c072c97ba01e0d391e81bb801c70",
+        "cockpit/__init__.py": "bdaa05230619e6397978cb4efbf7933c9163511126785f9863598aadfc60ad0d",
+        "cockpit/__main__.py": "e17e131f8310a0ab519b4c2e62f26548165f409520f9f79467ba1aee545bb9c5",
+        "cockpit/actions.py": "a13a7abf57863970ac256d2a6552bf083305cf690cf84eeac97f5e290a632130",
+        "cockpit/app.py": "0eabb772c2f96c031540bfa704b368a1223436907bad323cd22f2f392457d155",
+        "cockpit/remote.py": "2ea6cda83f2c25842ab25a97edc89f51fa83a16d0823fe9d6eb008dec536cc7e",
+        "cockpit/sources.py": "a90a7e8b77007d062ca07d26daf5a8a87d38e2a651d0df74b5ed0d69c3e940ef",
+        "council/gate.py": "405b75082d8d1ee69d5dd5651dead23948a9f7f90f4e8a17bf228d7a2eb49a06",
+        "pyproject.toml": "eeb1b395a1e9e87e061a2ccb6aeb71f60ee47fefbd6881fd6f260709fd736f87",
+        "session-bridge/src/main.ts": "74ab01df237a53a7ea2f92cef2ec610b9f298232a8dfb5e7769bcbea948280ef",
+        "session-bridge/src/router.ts": "88ee49a33480b9531164c51e437bfb533b1277528d98005225db2aec57d865e6",
+        "session-bridge/src/state.ts": "e8416ebab78023319f8d4697255197a4e40b0880d880a432f31342ab965982b8",
+        "session-bridge/src/telegram.ts": "e82c708ca937c77cf2cfbc633f94e96d95f0380b3dde35c1ac0d6b10d768b261",
+        "session-bridge/src/tmux.ts": "9e143c17a6d60f452ddd5f27343d29a29149211a70a697b4843012b9f95c3765",
+        "session-bridge/test/action-state.test.ts": "50154c26aaca44987a6db1657d55df4661599f4f620eb30931603c1175d20ad8",
+        "session-bridge/test/approval-race.test.ts": "7976cc95f2731461abaa47b73c32cce40769d75762511bd3b25c24e05c15499a",
+        "session-bridge/test/identity.test.ts": "bf8186ef374599c5fcace3e9bf549198e5c5b1c3360bf5cbe52b9ab782d0f2f7",
+        "session-bridge/test/interrupted-write.test.ts": "b30c7877d901ce271bee19b400382212e8ca9e23ac699e9287c815b258951ede",
+        "session-bridge/test/pending-expiry.test.ts": "382e69bf62a17c7047b62edb8a17642d2dcea5fbc30122ab04a3dc8f9c24b927",
+        "session-bridge/test/state.test.ts": "f5146bb330c70a740e63ac598005c951a1cbcfd915c8c98508b5b37e4bdf7ba0",
+        "session-bridge/test/telegram.test.ts": "9a67d0be8c06749625d7eaf49ce7562be5d7a3c0960769936308d107039842fa",
+        "session-bridge/test/tmux-generation.test.ts": "19fedf292bd733d8df8514aa42033707737ad7d07aa1e8ddd37d0055a45a7cb8",
+        "tests/test_backlogrun.py": "f87d4b9cd0e27f94d66c33b7d91ed62db9d4a4ded00c27ce38a5f69d81d55b14",
+        "tests/test_ci_usage_workflow_proposal.py": "320a0d749ef6224a7eb60bd2624643f0a7581265e6e5c3e9c46ffc9b1fd6a511",
+        "tests/test_cockpit.py": "329b5c80df8b85ae8e07549449d0ead48b9099c3b1c3e6718fc180b4f66cbb6c",
+        "tests/test_gate.py": "e79279005f0f4e57ab3aa9c0f5605a9ff4b1b5cb829732b661fb1ef85061176a",
+        "tests/test_tg_send.py": "8423582fc14c66bedb428fd9cfb0c221902f2d160aae04fb037313366c5a3f6e",
+        "tests/test_tg_send_compat.py": "c924c16e0d0bd07570dc27bd7b71772fe56ebec1df18c6ea0886411d8892212e",
+        "tests/test_watchdog_delivery.py": "1e59dafde638120cd56e95658d9841eaf2c47e3ab963bed28d157126065bb762",
+        "tests/test_watchdog_receipt_validation.py": "17f48d0423f1866997999901e2182f4a157bbe24bcddd08e23e921cbaf3e3650",
+        "tests/test_watchdog_recovery.py": "96736084d4f705f06619625204779b8ebca3324d0872e82706a01151d12985a8",
+        "tests/test_watchdog_retry.py": "c21911424416db38b91947af431de0e2848b1718735e46ec5f5d3d04212767b0",
+        "tests/test_watchdog_wrapper.py": "66ccddeb8bf17b3ab663a6fbf5f77eda2e4812476cd3c124a9ffd713848390fc",
+        "tests/test_workqueue.py": "c6ff35ad99b319f477144a844e47f4ba0da77cd69cba6f9faa501ad1dcaffa0a",
+        "tests/test_workqueue_direction.py": "c236e211261784964642de7a86ac6b040d17973db31794092320c38e25ac761a",
+        "tests/test_workqueue_runner.py": "7e32b00f741b1508681a065d422679b4298bd4a9d62e125182b76aa5842dcc24",
+        "watchdog/run-watchdog.sh": "70534cd9410eb30eedf67118fc3faf71eec92d4f8186cf3825a8acccffe89e3e",
+        "watchdog/run.py": "33ef516b9abc293cbf1aafb150c2077fce18efbe2a37b4d12211ae8808ca9d2a",
+        "workqueue/__init__.py": "58ab3d2fdd50b423a78cb0db42166a10a173b94881218da05d8ae83214fa97bf",
+        "workqueue/cli.py": "a15b5a28a5e70691d87a179cb071b6fb76164c9517c38b8df133a4a1f7dc6fb2",
+        "workqueue/notion.py": "f6222d2274ad63b2b5da1e100e5c17a9c618ce578f6f8a0981e94266355d2a85",
+        "workqueue/runner.py": "8f0084491bc8689fabd7caf6d038463105749a07ad87565e5d07d8a4415a196d",
+        "workqueue/service.py": "dde408e8fb9cf48a5775d928c2431589b97005cc4aad7099e78e101725a08271",
+        "workqueue/setup.py": "03b61ef1dbd26fec5bdc7411931075024196cb8091a3a2770616f03455a6378c"
+      }
+    },
+    "vps": {
+      "branch": "claude/portfolio-delivery-20260912",
+      "base_commit": "371deaf8c6487caf66ab0987133251427c5d32d0",
+      "changed_source_sha256": {
+        "bin/agents": "f84239c17a4a1407752609b1c61a3c3c828475bd64276621a46b411a7484bf9b",
+        "tests/test_agents_delivery.py": "763a54bdb06eb5c80b3b0f6cf2c728d526baebd79e4086949f069e2fc6e847b5",
+        "tests/test_agents_delivery_safety.py": "4fbf614d79fe533fff949265b380ba7fea289a26a8832de9157c79161ef09094"
+      }
+    },
+    "romance": {
+      "branch": "claude/portfolio-rework-20260912",
+      "base_commit": "8395ddce820f754c8bf8e802430b87f09edc1fd4",
+      "changed_source_sha256": {
+        "src/ops/actions.py": "acc09ada02638846e328e961edce195bb96a7757e32729abe07bfa1dfddd2a1d",
+        "tests/test_ops_actions.py": "0c063a514540496bb7901c8313a31f1091114f659a789237221366a38288d769",
+        "tests/test_ops_cli.py": "76e1b0e29d008c096d14142b0ffdb88ca2bb40def7a04e53613c0131a2933456"
+      }
+    },
+    "attain": {
+      "branch": "claude/portfolio-feedback-20260912",
+      "base_commit": "14e4fb445d0f356479917807130db29c4a418ae5",
+      "changed_source_sha256": {
+        "scripts/feedback-sync.ts": "b07a839ff36a7699e8afd4c630a2ec46426dcdeef23319e6b27ee9b37e6c0da6",
+        "src/lib/feedbackBacklog.test.ts": "29994abac7261f4d757bb401ba483cd621c533cc3231e35287f529d514476eea",
+        "src/lib/feedbackBacklog.ts": "53032fbda5c9f21357742fba391ddcf56824d00b1cf13e2491e2357118b5339a",
+        "src/lib/feedbackController.test.ts": "c390cada0d196c29e7f93051ec72479c38f04312506ed05f66ea7242de3b92d1",
+        "src/lib/feedbackReconcile.test.ts": "69e90b840b58d56e73116bfebfd412a63e01f6da2117d69a28b916d59a14da8d",
+        "src/lib/feedbackReconcile.ts": "c359d999478aa395e3e7e862ef5d4ad5abc79643f3e2b169a22ad6b54fb88f9e"
+      }
+    }
+  },
+  "checks": [
+    {
+      "check": "shared Python tests",
+      "result": "1086 passed; 5 skipped",
+      "local_log": "/tmp/portfolio-harness-tests.log",
+      "log_sha256": "566d7f03afcb27a325e14374efa728bf7c8291be650b9d931ec2e4ef73fa5f81"
+    },
+    {
+      "check": "session bridge tests",
+      "result": "94 passed; 0 failed",
+      "local_log": "/tmp/portfolio-bridge-tests.log",
+      "log_sha256": "c097fae10acdd3b90f941b37f5113e4dfd927fbcb43be6c7d1c803b9f4ad11ff"
+    },
+    {
+      "check": "session bridge build",
+      "result": "8 modules bundled; exit 0",
+      "local_log": "/tmp/portfolio-bridge-build.log",
+      "log_sha256": "e914204283a6313d9d6bc8585d0d1384c5b44203011fee4a36d5387981b5ed56"
+    },
+    {
+      "check": "VPS unittest suite",
+      "result": "26 passed",
+      "local_log": "/tmp/portfolio-vps-tests.log",
+      "log_sha256": "4e6783dcab54f9944debd03bd89b921d6e25fad687c931e4554af9ca25aa8898"
+    },
+    {
+      "check": "Romance operating-loop tests",
+      "result": "133 passed",
+      "local_log": "/tmp/portfolio-romance-tests.log",
+      "log_sha256": "e03a024488df0286aed7856edd14b2303f13e12ac863509a19ce57f45a158fa4"
+    },
+    {
+      "check": "Attain test and worker type check",
+      "result": "523 passed in 58 files; worker type check exit 0; subsequent tsc -b exit 0",
+      "local_log": "/tmp/portfolio-feedback-tests.log",
+      "log_sha256": "1d1416b96124afb0ddde35eb4795c2e0798b2df238b57f3d272028e03beebc96"
+    },
+    {
+      "check": "SwimTrack season tests",
+      "result": "55 passed in 10 files",
+      "local_log": "/tmp/portfolio-swim-tests.log",
+      "log_sha256": "a227766df30037ef9c5c84b98c74bda6b0ce5a79269acd5095e6e24711b9d93e"
+    },
+    {
+      "check": "SwimTrack database check",
+      "result": "migration execution, RLS, grants and payment sequences passed",
+      "local_log": "/tmp/portfolio-swim-db.log",
+      "log_sha256": "d8b9fef9b803cf2f4e656885c3f4ef0651db83a128814005c8d225739b273842"
+    },
+    {
+      "check": "SwimTrack lint",
+      "result": "exit 0; 0 errors, 0 warnings, 5 hints in Astro diagnostics; Wrangler experimental-field notice",
+      "local_log": "/tmp/portfolio-swim-lint.log",
+      "log_sha256": "493f788c394d8021569f94c7e6485e0c0bed214e26ed2fe699ef018be5866cbc"
+    },
+    {
+      "check": "SwimTrack build",
+      "result": "build complete; exit 0",
+      "local_log": "/tmp/portfolio-swim-build.log",
+      "log_sha256": "4d20937e5f3a988051c05e7b9ce1373778d66e26c782501bb7b6a0474b87deea"
+    }
+  ],
+  "reviews": [
+    {
+      "local_artifact": "/tmp/portfolio-council-harness.md",
+      "sha256": "71e0a7c281ef07186d356836686de381b6c883d501e7d70560a1b9ad3d6c1911",
+      "bytes": 8079,
+      "coverage": "initial diff exceeded cap; partial; supplemented by complete bridge/package/document and correction reviews"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-bridge.md",
+      "sha256": "443fcdf866b4474e1bb2e1f509754e3e31d7ef9f005d72ad08813fc0df4282ae",
+      "bytes": 8214,
+      "coverage": "complete omitted-span supplement"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-harness-final.md",
+      "sha256": "1fbae3ed37fe0fe7a9d4d7d8f22ea268848781f0d47b7e8386391f5e67cdb674",
+      "bytes": 6310,
+      "coverage": "complete correction diff"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-vps.json",
+      "sha256": "8c887668029339488b877c4b193a066eb070bf41775cf785a95bfd2093711c65",
+      "bytes": 5609,
+      "coverage": "initial complete diff; output is Markdown despite extension"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-vps-final.md",
+      "sha256": "e34688b2f540088b61922944cc713a56fc680601235972fc24d6f19aadf27d84",
+      "bytes": 8339,
+      "coverage": "complete correction diff"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-romance.json",
+      "sha256": "8016e91658a78ab5898b74434ca24ecab5c9a017f47d079aedda896abd042394",
+      "bytes": 6502,
+      "coverage": "initial complete diff; output is Markdown despite extension"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-romance-final.md",
+      "sha256": "1933d4d4370b813e3b222bdb8ef57c45a1c4cbfdbfe46177a62feac95c80c975",
+      "bytes": 7707,
+      "coverage": "complete correction diff"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-feedback.md",
+      "sha256": "47c433d9c0730af6877d39e7a66a48dc4f05c661ea910ee7ed6323ec38ae3c2d",
+      "bytes": 7053,
+      "coverage": "initial complete diff"
+    },
+    {
+      "local_artifact": "/tmp/portfolio-council-feedback-final.md",
+      "sha256": "8b0788bf3e3ada8e3d6acc3b66e6e3d253d18b2a8dec3b69873d8e8ef5bfbec5",
+      "bytes": 6253,
+      "coverage": "complete correction diff"
+    }
+  ],
+  "reviews_note": "Council reviews are advisory. Substantive findings were adjudicated and revised behavior tested; incomplete seats are not counted as clean verdicts. The historical queue dependency review is recorded in docs/superpowers/plans/2026-09-09-notion-work-queue.md. No claim that every final byte received a further model re-review.",
+  "browser": {
+    "sizes": [
+      "1440x1100",
+      "390x844"
+    ],
+    "observed_work_items": 140,
+    "real_feeds": "read only",
+    "Hold": "disposable queue only",
+    "servers": "stopped after verification",
+    "screenshots": [
+      "cockpit-desktop-2026-09-12.png",
+      "cockpit-mobile-2026-09-12.png"
+    ]
+  },
+  "learning": {
+    "scope": "one fresh Codex worker with controller-supplied packet; not universal automatic retrieval",
+    "source_revision_sha256": "17f3a24f56db70f7d484ddd1d13dee8cd6c7f919527ca28d6bd426f51e00f567",
+    "response": "fresh-worker-direction-2026-09-12.txt"
+  }
+}

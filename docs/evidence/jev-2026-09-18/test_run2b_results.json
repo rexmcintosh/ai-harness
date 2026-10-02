@@ -1,0 +1,92 @@
+[
+  {
+    "case": "permission-modal",
+    "expect": "BLOCKED",
+    "jev": {
+      "type": "choice",
+      "choice": "BLOCKED",
+      "confidence": 1.0,
+      "probabilities": {
+        "WAITING": 0.0,
+        "WORKING": 0.0,
+        "BLOCKED": 1.0,
+        "IDLE": 0.0
+      }
+    }
+  },
+  {
+    "case": "in-flight",
+    "expect": "WORKING",
+    "jev": {
+      "type": "choice",
+      "choice": "WORKING",
+      "confidence": 0.99,
+      "probabilities": {
+        "WAITING": 0.01,
+        "IDLE": 0.0,
+        "WORKING": 0.99,
+        "BLOCKED": 0.0
+      }
+    }
+  },
+  {
+    "case": "finished-turn",
+    "expect": "WAITING",
+    "jev": {
+      "type": "choice",
+      "choice": "WAITING",
+      "confidence": 0.98,
+      "probabilities": {
+        "IDLE": 0.0,
+        "WAITING": 0.99,
+        "WORKING": 0.0,
+        "BLOCKED": 0.01
+      }
+    }
+  },
+  {
+    "case": "question-no-status-line",
+    "expect": "WAITING",
+    "jev": {
+      "type": "choice",
+      "choice": "WAITING",
+      "confidence": 0.85,
+      "probabilities": {
+        "WAITING": 0.89,
+        "IDLE": 0.0,
+        "BLOCKED": 0.11,
+        "WORKING": 0.0
+      }
+    }
+  },
+  {
+    "case": "fresh-empty",
+    "expect": "IDLE",
+    "jev": {
+      "type": "choice",
+      "choice": "IDLE",
+      "confidence": 0.93,
+      "probabilities": {
+        "WAITING": 0.04,
+        "BLOCKED": 0.01,
+        "IDLE": 0.95,
+        "WORKING": 0.0
+      }
+    }
+  },
+  {
+    "case": "new-modal-wording",
+    "expect": "BLOCKED",
+    "jev": {
+      "type": "choice",
+      "choice": "BLOCKED",
+      "confidence": 1.0,
+      "probabilities": {
+        "IDLE": 0.0,
+        "BLOCKED": 1.0,
+        "WORKING": 0.0,
+        "WAITING": 0.0
+      }
+    }
+  }
+]

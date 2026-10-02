@@ -4,6 +4,10 @@ import requests
 
 VENICE_API = "https://api.venice.ai/api/v1/chat/completions"
 
+# complete() needs to tell "caller said nothing" from "caller said 0", because 0
+# is the operator's kill switch for the output cap and must beat a client default.
+_UNSET = object()
+
 # Only these are worth retrying — a 4xx (bad model name, auth, bad request) will
 # fail identically every time, so retrying just burns time and billing.
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -13,20 +17,49 @@ class VeniceError(RuntimeError):
     pass
 
 
+# Models (name prefixes) that must NOT be sent `response_format: json_object`. Venice's
+# forced-JSON decoder garbles deepseek-v4-pro's first key ('{": ": ", "}', '{".stance": ...')
+# and the model often stops there: 0 of 4 replies usable with it on, 4 of 4 clean with it
+# off, same seat and payload (2026-09-19). The prompts still demand JSON and loads_lenient
+# reads an unforced reply. Add a model here only with that kind of on/off evidence.
+NO_FORCED_JSON = ("deepseek-v4-pro",)
+
+
 class VeniceClient:
     """Thin Venice chat client. `post` is injectable for tests."""
 
     def __init__(self, api_key, *, base_url=VENICE_API, timeout=180,
-                 retries=2, backoff=1.5, post=None, temperature=0.2):
+                 retries=2, backoff=1.5, post=None, temperature=0.2,
+                 max_completion_tokens=None, transport_is_real=None,
+                 no_forced_json=None):
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_COUNCIL_KEY, VENICE_API_KEY)")
+        if isinstance(no_forced_json, str):
+            raise TypeError("no_forced_json takes a tuple of model names, not one string")
+        self.no_forced_json = tuple(NO_FORCED_JSON if no_forced_json is None else no_forced_json)
+        if not all(isinstance(n, str) and n.strip() for n in self.no_forced_json):
+            # "" is a prefix of every model: it would switch forced JSON off everywhere.
+            raise TypeError("no_forced_json takes non-empty model names")
         self.api_key = api_key
+        # Default output ceiling for every call this client makes, so no call
+        # site can be left unbounded by omission. Individual calls (the chair,
+        # the router, a per-seat override) pass their own. None or <= 0 sends
+        # nothing, which is Venice's own "use the model default".
+        self.max_completion_tokens = max_completion_tokens
         self.base_url = base_url
         self.timeout = timeout
         self.retries = retries
         self.backoff = backoff
         self.temperature = temperature
         self._post = post or requests.post
+        # An injected transport means this client is not making real Venice
+        # calls, so the usage it would log is synthetic and must not reach the
+        # production ledger (see venice_usage/guard.py — a hand-run demo put 13
+        # fabricated rows into it on 2026-09-11). A wrapper that DOES call
+        # Venice for real — a budget cap, a retry shim — says so here, once.
+        self._transport_is_real = (
+            (post is None or post is requests.post) if transport_is_real is None
+            else bool(transport_is_real))
 
     def _scrub(self, text):
         # Defense in depth: never let our own API key ride along in a prompt,
@@ -36,7 +69,24 @@ class VeniceClient:
             return text.replace(self.api_key, "<redacted>")
         return text
 
-    def complete(self, model, system, user, *, json_mode=True):
+    def _log_usage(self, data, model, task_type):
+        # Usage logging must never break or slow the Venice call — any failure here
+        # (ledger package missing, malformed usage block, disk full, ...) is swallowed.
+        try:
+            import venice_usage
+            venice_usage.log_client_call(
+                data=data,
+                model=model,
+                project="council",
+                task_type=task_type,
+                source="council/venice",
+                transport_is_real=self._transport_is_real,
+            )
+        except Exception:
+            pass
+
+    def complete(self, model, system, user, *, json_mode=True, task_type="chat",
+                 max_completion_tokens=_UNSET):
         payload = {
             "model": model,
             "messages": [
@@ -45,8 +95,17 @@ class VeniceClient:
             ],
             "temperature": self.temperature,
         }
-        if json_mode:
+        if json_mode and not str(model).startswith(self.no_forced_json):
             payload["response_format"] = {"type": "json_object"}
+        # `max_completion_tokens`, not `max_tokens`: Venice's OpenAPI spec
+        # (20260911.122036) marks max_tokens deprecated in favour of it, and
+        # defines it as the bound on "visible output tokens AND reasoning
+        # tokens" — every council seat is a reasoning model, so the reasoning
+        # half is the half that runs away.
+        cap = (self.max_completion_tokens if max_completion_tokens is _UNSET
+               else max_completion_tokens)
+        if cap is not None and int(cap) > 0:
+            payload["max_completion_tokens"] = int(cap)
         headers = {"Authorization": f"Bearer {self.api_key}",
                    "Content-Type": "application/json"}
         last = None
@@ -71,7 +130,10 @@ class VeniceClient:
             except Exception as e:  # noqa: BLE001
                 raise VeniceError(f"Venice HTTP {status} (not retryable): {e}") from e
             try:
-                return r.json()["choices"][0]["message"]["content"]
+                data = r.json()
+                content = data["choices"][0]["message"]["content"]
             except Exception as e:  # noqa: BLE001 — malformed envelope won't fix on retry
                 raise VeniceError(f"Venice returned an unparseable response: {e}") from e
+            self._log_usage(data, model, task_type)
+            return content
         raise VeniceError(f"Venice call failed after {self.retries + 1} tries: {last}")

@@ -1,0 +1,33 @@
+{
+  "diff": {
+    "path": "change.diff",
+    "sha256": "924c6ddafaeb255c4e6537a7a04a8a9b3f24b75bafa21c7669de2018968ab07c"
+  },
+  "expected_blocking": 0,
+  "fixture_id": "aris-pr1",
+  "head_files": {
+    ".gitignore": {
+      "bytes": 690,
+      "sha256": "04ad167b9919140c4ddce4e0762ac369e5ccf50549a52dab89d27eb7bf7a7537"
+    },
+    ".nvmrc": {
+      "bytes": 3,
+      "sha256": "f14b4987904bcb5814e4459a057ed4d20f58a633152288a761214dcd28780b56"
+    },
+    "package.json": {
+      "bytes": 898,
+      "sha256": "7d2ab8223bdb3be7f3b04a4a53c1ca8edc26b17935a26c96edd0e871c785a309"
+    },
+    "src/pages/work.astro": {
+      "bytes": 6744,
+      "sha256": "f9240ae8457c16e8a1c8468d943fe4c6f28c9d20a7be212f52152a752a0bafd9"
+    }
+  },
+  "schema_version": 1,
+  "source": {
+    "base": "489b60706923e0cc9bdc529863e3b932c51e459f",
+    "head": "0595eaf9fc58ed3abb7ec2311c2b649fd6130463",
+    "pr": 1,
+    "repo": "https://github.com/rexmcintosh/aris-management-website"
+  }
+}

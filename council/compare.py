@@ -26,10 +26,14 @@ def _format_candidates(candidates) -> str:
     return "\n\n".join(f"=== CANDIDATE {label} ===\n{text}" for label, text in candidates)
 
 
-def _ask_voter(member: Member, context: str, client) -> CandidateVote:
+def _ask_voter(member: Member, context: str, client,
+               max_completion_tokens=None) -> CandidateVote:
     try:
-        raw = client.complete(member.model, member.system + "\n\n" + COMPARE_OUTPUT, context)
+        raw = client.complete(member.model, member.system + "\n\n" + COMPARE_OUTPUT, context,
+                              max_completion_tokens=max_completion_tokens)
         d = loads_lenient(raw)
+        if not isinstance(d, dict) or not str(d.get("pick") or "").strip():
+            raise ValueError(f"no usable answer in the reply ({len(raw or '')} chars)")
         return CandidateVote(
             member=member.name, model=member.model,
             pick=str(d.get("pick", "")),
@@ -41,7 +45,8 @@ def _ask_voter(member: Member, context: str, client) -> CandidateVote:
                              error=f"{type(e).__name__}: {e}")
 
 
-def _synthesize_comparison(task, candidates, votes, client, *, chair_model) -> ComparisonResult:
+def _synthesize_comparison(task, candidates, votes, client, *, chair_model,
+                           max_completion_tokens=None) -> ComparisonResult:
     labels = [label for label, _ in candidates]
     digest = []
     for v in votes:
@@ -53,7 +58,8 @@ def _synthesize_comparison(task, candidates, votes, client, *, chair_model) -> C
     user = (f"TASK:\n{task}\n\nCANDIDATE LABELS: {labels}\n\n"
             f"PANELIST RANKINGS (independent, blind to each other):\n" + "\n".join(digest))
     try:
-        d = loads_lenient(client.complete(chair_model, COMPARE_SYNTH, user))
+        d = loads_lenient(client.complete(chair_model, COMPARE_SYNTH, user,
+                                          max_completion_tokens=max_completion_tokens))
         return ComparisonResult(
             winner=str(d.get("winner", "")),
             rationale=str(d.get("rationale", "")),
@@ -68,7 +74,7 @@ def _synthesize_comparison(task, candidates, votes, client, *, chair_model) -> C
 
 
 def run_compare(task: str, candidates, panel: Panel, client, *,
-                chair_model: str, max_workers=None) -> ComparisonResult:
+                chair_model: str, max_workers=None, budget=None) -> ComparisonResult:
     """Rank `candidates` (a list of (label, text)) against `task` with `panel`,
     then synthesize a winner. Raises ValueError on fewer than two candidates —
     there is nothing to compare."""
@@ -79,9 +85,12 @@ def run_compare(task: str, candidates, panel: Panel, client, *,
 
     workers = max_workers or min(8, max(1, len(panel.members)))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_ask_voter, m, context, client): m for m in panel.members}
+        futures = {pool.submit(_ask_voter, m, context, client,
+                               budget.member(m.name) if budget else None): m
+                   for m in panel.members}
         votes = [f.result() for f in concurrent.futures.as_completed(futures)]
     order = [m.name for m in panel.members]
     votes.sort(key=lambda v: order.index(v.member))
 
-    return _synthesize_comparison(task, candidates, votes, client, chair_model=chair_model)
+    return _synthesize_comparison(task, candidates, votes, client, chair_model=chair_model,
+                                  max_completion_tokens=budget.chair if budget else None)

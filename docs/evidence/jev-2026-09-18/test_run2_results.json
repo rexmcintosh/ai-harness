@@ -1,0 +1,541 @@
+{
+  "logs": [
+    {
+      "case": "clean-counters",
+      "expect": false,
+      "regex": false,
+      "jev": 0.02,
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "needs_human": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "usage": {
+          "input_tokens": 438,
+          "output_tokens": 22
+        }
+      }
+    },
+    {
+      "case": "recovered-transient",
+      "expect": false,
+      "regex": true,
+      "jev": 0.03,
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "needs_human": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "usage": {
+          "input_tokens": 486,
+          "output_tokens": 22
+        }
+      }
+    },
+    {
+      "case": "real-traceback",
+      "expect": true,
+      "regex": true,
+      "jev": 0.97,
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "needs_human": {
+            "type": "noul",
+            "noul": 0.97
+          }
+        },
+        "usage": {
+          "input_tokens": 439,
+          "output_tokens": 22
+        }
+      }
+    },
+    {
+      "case": "silent-failure",
+      "expect": true,
+      "regex": false,
+      "jev": 0.97,
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "needs_human": {
+            "type": "noul",
+            "noul": 0.97
+          }
+        },
+        "usage": {
+          "input_tokens": 457,
+          "output_tokens": 22
+        }
+      }
+    },
+    {
+      "case": "error-word-in-data",
+      "expect": false,
+      "regex": true,
+      "jev": 0.03,
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "needs_human": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "usage": {
+          "input_tokens": 461,
+          "output_tokens": 22
+        }
+      }
+    }
+  ],
+  "panes": [
+    {
+      "case": "permission-modal",
+      "expect": "BLOCKED",
+      "regex": "BLOCKED",
+      "jev": {
+        "type": "choice",
+        "choice": "BLOCKED",
+        "confidence": 0.94,
+        "probabilities": {
+          "IDLE": 0.0,
+          "WAITING": 0.04,
+          "BLOCKED": 0.96,
+          "WORKING": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "BLOCKED",
+            "confidence": 0.94,
+            "probabilities": {
+              "IDLE": 0.0,
+              "WAITING": 0.04,
+              "BLOCKED": 0.96,
+              "WORKING": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 497,
+          "output_tokens": 53
+        }
+      }
+    },
+    {
+      "case": "in-flight",
+      "expect": "WORKING",
+      "regex": "WORKING",
+      "jev": {
+        "type": "choice",
+        "choice": "WORKING",
+        "confidence": 0.99,
+        "probabilities": {
+          "WAITING": 0.0,
+          "IDLE": 0.01,
+          "WORKING": 0.99,
+          "BLOCKED": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "WORKING",
+            "confidence": 0.99,
+            "probabilities": {
+              "WAITING": 0.0,
+              "IDLE": 0.01,
+              "WORKING": 0.99,
+              "BLOCKED": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 479,
+          "output_tokens": 52
+        }
+      }
+    },
+    {
+      "case": "finished-turn",
+      "expect": "WAITING",
+      "regex": "WAITING",
+      "jev": {
+        "type": "choice",
+        "choice": "WAITING",
+        "confidence": 0.97,
+        "probabilities": {
+          "WORKING": 0.0,
+          "WAITING": 0.97,
+          "BLOCKED": 0.02,
+          "IDLE": 0.01
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "WAITING",
+            "confidence": 0.97,
+            "probabilities": {
+              "WORKING": 0.0,
+              "WAITING": 0.97,
+              "BLOCKED": 0.02,
+              "IDLE": 0.01
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 475,
+          "output_tokens": 53
+        }
+      }
+    },
+    {
+      "case": "question-no-status-line",
+      "expect": "WAITING",
+      "regex": "IDLE",
+      "jev": {
+        "type": "choice",
+        "choice": "BLOCKED",
+        "confidence": 0.71,
+        "probabilities": {
+          "WORKING": 0.0,
+          "WAITING": 0.22,
+          "BLOCKED": 0.78,
+          "IDLE": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "BLOCKED",
+            "confidence": 0.71,
+            "probabilities": {
+              "WORKING": 0.0,
+              "WAITING": 0.22,
+              "BLOCKED": 0.78,
+              "IDLE": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 481,
+          "output_tokens": 53
+        }
+      }
+    },
+    {
+      "case": "fresh-empty",
+      "expect": "IDLE",
+      "regex": "IDLE",
+      "jev": {
+        "type": "choice",
+        "choice": "IDLE",
+        "confidence": 0.88,
+        "probabilities": {
+          "WAITING": 0.02,
+          "WORKING": 0.0,
+          "BLOCKED": 0.06,
+          "IDLE": 0.92
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "IDLE",
+            "confidence": 0.88,
+            "probabilities": {
+              "WAITING": 0.02,
+              "WORKING": 0.0,
+              "BLOCKED": 0.06,
+              "IDLE": 0.92
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 525,
+          "output_tokens": 52
+        }
+      }
+    },
+    {
+      "case": "new-modal-wording",
+      "expect": "BLOCKED",
+      "regex": "IDLE",
+      "jev": {
+        "type": "choice",
+        "choice": "BLOCKED",
+        "confidence": 0.99,
+        "probabilities": {
+          "WAITING": 0.01,
+          "BLOCKED": 0.99,
+          "IDLE": 0.0,
+          "WORKING": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "state": {
+            "type": "choice",
+            "choice": "BLOCKED",
+            "confidence": 0.99,
+            "probabilities": {
+              "WAITING": 0.01,
+              "BLOCKED": 0.99,
+              "IDLE": 0.0,
+              "WORKING": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 473,
+          "output_tokens": 53
+        }
+      }
+    }
+  ],
+  "router": [
+    {
+      "case": "diff",
+      "expect": "code-review",
+      "jev": {
+        "type": "choice",
+        "choice": "code-review",
+        "confidence": 1.0,
+        "probabilities": {
+          "decision": 0.0,
+          "red-team": 0.0,
+          "code-review": 1.0,
+          "brainstorm": 0.0,
+          "spec-review": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "code-review",
+            "confidence": 1.0,
+            "probabilities": {
+              "decision": 0.0,
+              "red-team": 0.0,
+              "code-review": 1.0,
+              "brainstorm": 0.0,
+              "spec-review": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 496,
+          "output_tokens": 58
+        }
+      }
+    },
+    {
+      "case": "tradeoff",
+      "expect": "decision",
+      "jev": {
+        "type": "choice",
+        "choice": "decision",
+        "confidence": 1.0,
+        "probabilities": {
+          "code-review": 0.0,
+          "red-team": 0.0,
+          "brainstorm": 0.0,
+          "decision": 1.0,
+          "spec-review": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "decision",
+            "confidence": 1.0,
+            "probabilities": {
+              "code-review": 0.0,
+              "red-team": 0.0,
+              "brainstorm": 0.0,
+              "decision": 1.0,
+              "spec-review": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 452,
+          "output_tokens": 57
+        }
+      }
+    },
+    {
+      "case": "ideas",
+      "expect": "brainstorm",
+      "jev": {
+        "type": "choice",
+        "choice": "brainstorm",
+        "confidence": 1.0,
+        "probabilities": {
+          "red-team": 0.0,
+          "spec-review": 0.0,
+          "brainstorm": 1.0,
+          "code-review": 0.0,
+          "decision": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "brainstorm",
+            "confidence": 1.0,
+            "probabilities": {
+              "red-team": 0.0,
+              "spec-review": 0.0,
+              "brainstorm": 1.0,
+              "code-review": 0.0,
+              "decision": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 441,
+          "output_tokens": 59
+        }
+      }
+    },
+    {
+      "case": "break-it",
+      "expect": "red-team",
+      "jev": {
+        "type": "choice",
+        "choice": "red-team",
+        "confidence": 0.99,
+        "probabilities": {
+          "brainstorm": 0.0,
+          "code-review": 0.0,
+          "red-team": 1.0,
+          "decision": 0.0,
+          "spec-review": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "red-team",
+            "confidence": 0.99,
+            "probabilities": {
+              "brainstorm": 0.0,
+              "code-review": 0.0,
+              "red-team": 1.0,
+              "decision": 0.0,
+              "spec-review": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 441,
+          "output_tokens": 58
+        }
+      }
+    },
+    {
+      "case": "spec",
+      "expect": "spec-review",
+      "jev": {
+        "type": "choice",
+        "choice": "spec-review",
+        "confidence": 0.99,
+        "probabilities": {
+          "code-review": 0.0,
+          "spec-review": 1.0,
+          "red-team": 0.0,
+          "brainstorm": 0.0,
+          "decision": 0.0
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "spec-review",
+            "confidence": 0.99,
+            "probabilities": {
+              "code-review": 0.0,
+              "spec-review": 1.0,
+              "red-team": 0.0,
+              "brainstorm": 0.0,
+              "decision": 0.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 458,
+          "output_tokens": 58
+        }
+      }
+    },
+    {
+      "case": "ambiguous",
+      "expect": null,
+      "jev": {
+        "type": "choice",
+        "choice": "spec-review",
+        "confidence": 0.47,
+        "probabilities": {
+          "code-review": 0.01,
+          "red-team": 0.0,
+          "decision": 0.04,
+          "spec-review": 0.58,
+          "brainstorm": 0.37
+        }
+      },
+      "raw": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "panel": {
+            "type": "choice",
+            "choice": "spec-review",
+            "confidence": 0.47,
+            "probabilities": {
+              "code-review": 0.01,
+              "red-team": 0.0,
+              "decision": 0.04,
+              "spec-review": 0.58,
+              "brainstorm": 0.37
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 428,
+          "output_tokens": 58
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "diff": {
+    "path": "change.diff",
+    "sha256": "5dd9b10f8fb91a4970c0793a66560451150159662681cc8a4580459603f4ec3c"
+  },
+  "expected_blocking": 2,
+  "fixture_id": "baw-pr11",
+  "head_files": {
+    ".github/workflows/venice-review.yml": {
+      "bytes": 1405,
+      "sha256": "f6a9e6f356b8ab2d5574a691f36fa97d191c9e0b1e46dd495f8587a2ece679d0"
+    },
+    ".gitignore": {
+      "bytes": 107,
+      "sha256": "aec8f5da8b7e24882f1e0750093f21345fa9ba834b413fff40c1c6a491e37eeb"
+    },
+    "scripts/venice_review.py": {
+      "bytes": 7922,
+      "sha256": "b6b223d09dd26f7fb3c03867e76d9d99af68409a99b70a0cc42c4432af122a43"
+    },
+    "setup/templates/venice-review.yml": {
+      "bytes": 1405,
+      "sha256": "f6a9e6f356b8ab2d5574a691f36fa97d191c9e0b1e46dd495f8587a2ece679d0"
+    },
+    "setup/templates/venice_review.py": {
+      "bytes": 7922,
+      "sha256": "b6b223d09dd26f7fb3c03867e76d9d99af68409a99b70a0cc42c4432af122a43"
+    },
+    "tests/test_venice_review_refactor.py": {
+      "bytes": 3807,
+      "sha256": "e7839e10b73cc65f9b973b619131277ceb9e3d2b9ee5eb731a82ad16c5c72d43"
+    }
+  },
+  "schema_version": 1,
+  "source": {
+    "base": "6b4c81feebf120a51d8d01ac35131f81b78c3887",
+    "head": "d74db9085caffa3ed9e16035dd3cc2ca159de103",
+    "pr": 11,
+    "repo": "https://github.com/rexmcintosh/build-ai-automation-workflow"
+  }
+}

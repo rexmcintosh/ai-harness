@@ -1,0 +1,3 @@
+# Unified-diff fixtures retain required blank context markers byte-for-byte.
+tools/regress/fixtures/*/change.diff -whitespace
+tools/regress/fixtures/** -text

@@ -1,0 +1,2 @@
+# reapply.sh saves upstream plugin files here per version for diff review — transient, keep out of git
+*.orig-*

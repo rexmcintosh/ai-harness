@@ -1,0 +1,179 @@
+{
+  "observed_at": "2026-09-12T17:26:18.213359+00:00",
+  "scope": "Read-only shared-system assessment: local source and runtime metadata, configured Cloudflare account list calls, and offline pinned dependency probe. No live mutations.",
+  "cloudflare": [
+    {
+      "endpoint": "workers/scripts",
+      "success": true,
+      "result_info": null,
+      "items": [
+        {
+          "id": "aris-management-website",
+          "created_on": "2026-05-22T12:34:45.637918Z",
+          "modified_on": "2026-09-08T13:14:58.564246Z"
+        },
+        {
+          "id": "attain-prep-site",
+          "created_on": "2026-08-31T21:58:02.588642Z",
+          "modified_on": "2026-09-06T14:38:03.001652Z"
+        },
+        {
+          "id": "authorelliecalloway-website",
+          "created_on": "2026-07-19T11:10:00.102787Z",
+          "modified_on": "2026-09-03T15:56:50.157374Z"
+        },
+        {
+          "id": "authortessacross-com",
+          "created_on": "2026-07-23T14:59:18.269223Z",
+          "modified_on": "2026-07-27T23:12:10.90071Z"
+        },
+        {
+          "id": "caimcintosh-website",
+          "created_on": "2026-06-10T13:10:55.70524Z",
+          "modified_on": "2026-06-17T11:02:35.105802Z"
+        },
+        {
+          "id": "flight7publishing-website",
+          "created_on": "2026-07-22T12:16:00.59555Z",
+          "modified_on": "2026-08-30T13:41:01.745367Z"
+        },
+        {
+          "id": "roam-payments",
+          "created_on": "2026-09-07T21:22:49.08454Z",
+          "modified_on": "2026-09-07T21:22:52.106659Z"
+        },
+        {
+          "id": "roam-payments-test",
+          "created_on": "2026-09-07T14:26:27.74247Z",
+          "modified_on": "2026-09-07T15:01:51.71769Z"
+        },
+        {
+          "id": "sat-prep",
+          "created_on": "2026-08-08T20:57:23.689247Z",
+          "modified_on": "2026-09-09T22:27:02.262208Z"
+        },
+        {
+          "id": "satprep-market",
+          "created_on": "2026-08-19T13:46:24.808311Z",
+          "modified_on": "2026-09-09T22:27:48.400191Z"
+        },
+        {
+          "id": "satprep-tutor-preview",
+          "created_on": "2026-09-09T15:16:20.88757Z",
+          "modified_on": "2026-09-09T15:33:38.738309Z"
+        },
+        {
+          "id": "swimtrack-website",
+          "created_on": "2026-05-18T13:42:42.729983Z",
+          "modified_on": "2026-09-12T07:45:05.59736Z"
+        },
+        {
+          "id": "ultimate-portugal",
+          "created_on": "2026-07-29T13:27:38.40011Z",
+          "modified_on": "2026-09-10T06:01:38.590932Z"
+        }
+      ]
+    },
+    {
+      "endpoint": "access/apps",
+      "http_status": 403,
+      "verified": false
+    },
+    {
+      "endpoint": "pages/projects",
+      "http_status": 403,
+      "verified": false
+    }
+  ],
+  "local_observed_at": "2026-09-12T17:27:40.341212+00:00",
+  "services": "Type=oneshot\nResult=success\nExecMainStartTimestamp=Sat 2026-09-12 17:27:05 UTC\nExecMainExitTimestamp=Sat 2026-09-12 17:27:07 UTC\nId=attain-work-queue.service\nActiveState=inactive\nSubState=dead\n\nType=simple\nResult=success\nExecMainStartTimestamp=Wed 2026-08-05 15:25:14 UTC\nExecMainExitTimestamp=\nId=session-bridge.service\nActiveState=active\nSubState=running\n",
+  "timers": "NEXT                            LEFT LAST                         PASSED UNIT                           ACTIVATES\nSat 2026-09-12 17:29:07 UTC 1min 26s Sat 2026-09-12 17:27:05 UTC 34s ago attain-work-queue.timer        attain-work-queue.service\nSat 2026-09-12 22:33:05 UTC  5h 5min Fri 2026-09-11 22:33:05 UTC 18h ago launchpadlib-cache-clean.timer launchpadlib-cache-clean.service\n\n2 timers listed.\n",
+  "notion_queue_health": {
+    "checked_at": "2026-09-12T17:27:07.030559+00:00",
+    "status": "healthy"
+  },
+  "queue_installed_root": "/home/dev/.local/share/attain-work-queue/releases/20260909-v1",
+  "queue_source_comparison": [
+    {
+      "installed_path": "/home/dev/.local/share/attain-work-queue/releases/20260909-v1/lib/python3.12/site-packages/workqueue/runner.py",
+      "reference_path": "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/runner.py",
+      "sha256": "7db5543e77421e5ed01cbf6d2cf1f4329216c9c44c213278b7294e0ea196d166",
+      "matches": true
+    },
+    {
+      "installed_path": "/home/dev/.local/share/attain-work-queue/releases/20260909-v1/lib/python3.12/site-packages/workqueue/service.py",
+      "reference_path": "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/service.py",
+      "sha256": "9e9e67e1f36d653b7135171d093b911d69845eafac444978f30d958cf62df780",
+      "matches": true
+    },
+    {
+      "installed_path": "/home/dev/.local/share/attain-work-queue/releases/20260909-v1/lib/python3.12/site-packages/workqueue/notion.py",
+      "reference_path": "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/notion.py",
+      "sha256": "a0c0f7bfa9a364ad19ff050dbe6fc56e803a6a007d53b41c31be34caa1101259",
+      "matches": true
+    }
+  ],
+  "queue_run_phase_counts": {
+    "published": 2
+  },
+  "ci_pin_probe": {
+    "pin": "4a01298dcce2734115ac57f02592146969d76f48",
+    "attribute_available": false,
+    "consumer": "scripts/venice_review.py:186",
+    "result": "Pinned Settings raises AttributeError for the attribute required by the current review script. Offline class probe only; no CI run triggered."
+  },
+  "source_provenance": {
+    "repository": "/home/dev/projects/build-ai-automation-workflow",
+    "head": "bbb2907831702eff741668e15fab8ca93395a03a",
+    "inspected_source_files": [
+      {
+        "path": ".github/workflows/venice-review.yml",
+        "sha256": "f6a9e6f356b8ab2d5574a691f36fa97d191c9e0b1e46dd495f8587a2ece679d0"
+      },
+      {
+        "path": "scripts/venice_review.py",
+        "sha256": "82007bf59c6188938b1394fa7b2bb1ef21ecf6fdb09d75217c3c3f55c91efa6e"
+      },
+      {
+        "path": "session-bridge/src/router.ts",
+        "sha256": "fce43996e458c4b7f8135429c8566016b79e3a00b69c7755674f83923a4c74ba"
+      },
+      {
+        "path": "watchdog/run.py",
+        "sha256": "0dd15109c7ad68ba1d5ef3dd81c549838f8204769cdabfa458b3b36802123931"
+      },
+      {
+        "path": "watchdog/run-watchdog.sh",
+        "sha256": "608fc0d15087d5c87ec9fc8fbafc5e440d58243b229d116f02f4e2a9c8b45752"
+      },
+      {
+        "path": "bin/tg-send",
+        "sha256": "ddbcc6d157455f5bf1e03252d9bba9d1fa97db7c3595a83e4776a54cf5a7f1a6"
+      },
+      {
+        "path": "diem/queue.py",
+        "sha256": "1368492d911d7deaf713a35590a38c93e25bb279fb51abdb8dc4e65b37acb347"
+      },
+      {
+        "path": "diem/drain.py",
+        "sha256": "3aa6f817f74b5691078e61e8e34b9c08f7ce1ac5bb6d1a3a10b5c7c82b0719db"
+      },
+      {
+        "path": "diem/report.py",
+        "sha256": "8a45bb2a01d70a00dba35864dd6dc3783162cf5ba4e441073687f68ee5b068d6"
+      },
+      {
+        "path": "backlogrun/cli.py",
+        "sha256": "27203c9ac90063001055c51e1e018e8f5f5e3fa67200f8b04e61e018e5a41b1d"
+      },
+      {
+        "path": "bebop/prompts/briefing-morning.md",
+        "sha256": "1f6a2ee2c3d532182e7f3b6f320cce54a118697abf841c1c24d1d36b8bf57dd2"
+      }
+    ]
+  },
+  "audit_effort": {
+    "shared_flow_helper_reported_tokens": 145355,
+    "interpretation": "Tool-reported token measure; not cash cost or full session total. Future passes should use bounded evidence journeys."
+  }
+}

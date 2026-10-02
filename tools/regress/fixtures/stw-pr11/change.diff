@@ -1,0 +1,29 @@
+diff --git a/tools/i18n/translate.mjs b/tools/i18n/translate.mjs
+index e2c13fd..a6ab838 100644
+--- a/tools/i18n/translate.mjs
++++ b/tools/i18n/translate.mjs
+@@ -68,7 +68,24 @@ export async function runTranslate({ uiJson, articlesDir, manifest, client, glos
+ }
+ 
+ // ── CLI ──────────────────────────────────────────────────────────────────
++// Load a local .env (if present) so `npm run translate` picks up VENICE_API_KEY
++// without a manual `source`. Uses Node's built-in parser (process.loadEnvFile),
++// which correctly handles quoting/comments/CRLF; real environment variables take
++// precedence and are never overwritten. No-op when no .env exists (e.g. CI),
++// where the script falls back to the real environment.
++function loadDotEnv(path) {
++  try {
++    process.loadEnvFile(path);
++  } catch (err) {
++    // A missing .env (e.g. in CI) is expected — fall back to the real
++    // environment. Re-throw anything else (malformed file, permissions) so a
++    // real problem surfaces instead of leaving the key silently unset.
++    if (err?.code !== 'ENOENT') throw err;
++  }
++}
++
+ function main() {
++  loadDotEnv(join(ROOT, '.env'));
+   const args = process.argv.slice(2);
+   const mode = args.includes('--check') ? 'check' : args.includes('--dry-run') ? 'dry-run' : 'run';
+   const uiJson = JSON.parse(readFileSync(join(ROOT, UI_JSON), 'utf8'));

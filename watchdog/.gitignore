@@ -1,2 +1,5 @@
 state.json
 logs/
+metrics-history.json
+delivery-pending.json
+delivery-last.json

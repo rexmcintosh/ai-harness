@@ -1,0 +1,45 @@
+name: Venice Review Council
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Pinned to the council-v0.4.0 commit SHA so the merge gate is reproducible
+      # Bump intentionally on each council release. (When published to PyPI,
+      # simplify to a pinned: pip install "council==X.Y.Z".)
+      - name: Install council
+        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@4a01298dcce2734115ac57f02592146969d76f48"
+
+      - name: Compute diff
+        id: diff
+        run: |
+          git diff --no-color "origin/${{ github.base_ref }}...HEAD" > /tmp/pr.diff
+          echo "size=$(wc -c </tmp/pr.diff)" >> "$GITHUB_OUTPUT"
+
+      - name: Run Venice review council
+        env:
+          VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          DIFF_PATH: /tmp/pr.diff
+        run: python scripts/venice_review.py

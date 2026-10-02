@@ -57,6 +57,13 @@ disagree differently, and the Adversary is always a non-Claude model for genuine
 independence. Edit `council/panels.toml` (or drop a `~/.config/council/panels.toml`
 override) to change personas/models or add seats.
 
+**The chair, per panel.** `[settings] chair_model` is the chair for every panel. A panel
+can name its own with `chair_model = "..."` under `[panels.<name>]`, and that model then
+synthesizes every run of that panel: `ask`, `review`, `compare`, `sweep`, the backlog
+runner's review, and that panel's slice of `run_pr_review`. A panel that names none uses
+the global chair. Today only `code-review` names one (`openai-gpt-56-sol`). The evidence,
+the scope and the rollback are in `docs/council-chair-decision-2026-09-20.md`.
+
 ## Rigor (the noise gate)
 
 - `daily` (default): show findings with confidence ≥ 8; demote 5–7 to a
@@ -64,6 +71,44 @@ override) to change personas/models or add seats.
 - `deep` (default for `red-team`): show everything ≥ 2, flagged tentative.
 
 The gate is presentation-only — the chair always sees the full set.
+
+## Merge gate (PR review)
+
+`run_pr_review` (used by `setup/templates/venice_review.py`) splits a PR diff into a
+**code** slice (gated) and a **doc** slice (advisory). What blocks a merge is decided
+by `council.gate`, not by any single panelist:
+
+- **Chair-arbitrated + grounded.** Only findings the chair lists in `blocking_findings`
+  block. The chair sees the full contents of the changed files (passed as `file_context`
+  by the shim) and is told to **drop** any finding the code refutes — so "X used before
+  declaration" when X is declared, or "no engines pin" when `package.json` has one, no
+  longer fails the build. A raw panelist finding can no longer gate on its own.
+- **Blast-radius tiered.** `risk_tier` puts production source on the `full` bar
+  (`critical`, or `high` ≥ 8) and developer tooling (`tools/`, `scripts/`, configs) on a
+  `reduced` bar (`critical` or `high`, each only at confidence ≥ 8). The bar decides what is
+  *eligible*; the chair still has to confirm it against the code. High-risk segments
+  (auth/payment/…) force `full`. Decision record: `docs/council-gate-policy-2026-09-18.md`.
+- **Deterministic + fail-closed.** The shim runs the gate at temperature 0. A genuine
+  chair/panel outage still fails closed; `COUNCIL_ENFORCE=0` makes findings advisory.
+
+See `docs/council-audit-2026-06-25.md` for the failure modes this replaced.
+
+## Jev shadow signals (display only)
+
+After the chair has answered, `council review` asks Jev (TypeSafe's small typed judge, model
+`jev-1.13.0`) three label-and-score questions and prints the answers as one last section:
+how it reads the chair's verdict, which findings two seats both raised ("raised by 2 of 3
+seats"), and which panel finding each chair block confirms. `council sweep` adds one note
+with the findings Jev would also group. This is **shadow mode**: the answers are shown and
+logged (`~/.local/state/council/jev-shadow.jsonl`, ids and numbers only) and nothing reads
+them. The panel, the chair, the gate, `run_pr_review` and every exit code are unchanged.
+Every call goes through the shared client (`jev/`, `docs/contracts/jev.md`). `COUNCIL_JEV=0`
+turns it off, and so does the shared `JEV_DISABLED=1`. Scope is an allow list of repositories
+(`IN_SCOPE_REPOS` in `jev/scope.py`, shared with the backlog hold gate: the five the signals
+were measured on; adding one is an owner decision). No `TYPESAFE_API_KEY`, or a repository that is not on the list, means no
+call and byte-identical output. Text on stdin, or a diff saved outside any repository, is
+judged by the working directory's repository alone. Details, the data rule and what
+is deliberately not built: `docs/council-jev-shadow-2026-09-19.md`.
 
 ## Secret
 

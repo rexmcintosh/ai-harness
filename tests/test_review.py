@@ -4,6 +4,9 @@ from tests.conftest import FakeClient
 
 CODE = ("diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ b/src/app.py\n"
         "@@ -1 +1 @@\n-old\n+new\n")
+# A developer-tooling change -> 'reduced' blast-radius tier.
+CODE_TOOLS = ("diff --git a/tools/i18n/translate.mjs b/tools/i18n/translate.mjs\n"
+              "--- a/tools/i18n/translate.mjs\n+++ b/tools/i18n/translate.mjs\n@@ -1 +1 @@\n-old\n+new\n")
 DOC = ("diff --git a/docs/design.md b/docs/design.md\n--- a/docs/design.md\n+++ b/docs/design.md\n"
        "@@ -1 +1 @@\n-old\n+new\n")
 
@@ -15,42 +18,125 @@ def _panels():
     }
 
 
-def _chair(rec="ok"):
+def _chair(rec="ok", blocking=()):
     return {"recommendation": rec, "confidence": 8, "consensus": [],
-            "disagreements": [], "cross_panel_themes": []}
+            "disagreements": [], "cross_panel_themes": [],
+            "blocking_findings": [{"point": p, "severity": s, "why": w} for (p, s, w) in blocking]}
 
 
-def test_mixed_pr_runs_both_blocking_counts_code_only(member_json):
+def test_chair_confirmed_code_finding_blocks(member_json):
+    # Panel raises a candidate (high c9) AND the chair confirms it -> blocks.
     client = FakeClient(by_model={
         "code1": member_json(stance="oppose", headline="bug",
                              findings=[("nil deref at app.py:1", "high", 9)]),
-        "doc1": member_json(stance="concerns", headline="vague",
-                            findings=[("undefined term", "high", 9)]),
-        "c": _chair("address both"),
+        "c": _chair("fix it", blocking=[("nil deref at app.py:1", "high", "verified in file")]),
     })
-    body, blocking, unavailable = run_pr_review(CODE + DOC, _panels(), client, chair_model="c")
-    assert "Code review (gate)" in body and "Docs review (advisory)" in body
-    assert blocking == 1          # only the code finding counts
+    body, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert blocking == 1
     assert unavailable is False
+
+
+def test_unconfirmed_candidate_does_not_block(member_json):
+    # The grounding fix (F4/A): a high-confidence candidate the chair does NOT confirm
+    # (e.g. "ROOT undefined" refuted by the full file) must NOT block.
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug",
+                             findings=[("ROOT used before declaration", "critical", 9)]),
+        "c": _chair("looks fine — ROOT is declared at the top of the file", blocking=()),
+    })
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert blocking == 0
+    assert unavailable is False
+
+
+def test_dev_tooling_confident_high_blocks_when_the_chair_confirms_it(member_json):
+    # Blast-radius (F6) as amended 2026-09: a high c>=8 on a tools/ change is eligible,
+    # and a chair that verifies it against the code blocks the merge (baw-pr11).
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="ownership",
+                             findings=[("deletes comments it does not own", "high", 9)]),
+        "c": _chair("request changes", blocking=[("deletes comments it does not own", "high", "verified")]),
+    })
+    _, blocking, unavailable = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")
+    assert blocking == 1 and unavailable is False
+
+
+def test_dev_tooling_high_the_chair_refutes_does_not_block(member_json):
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="node compat",
+                             findings=[("breaks on old Node", "high", 9)]),
+        "c": _chair("approve: engines pins Node >= 22.12", blocking=()),
+    })
+    _, blocking, unavailable = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")
+    assert blocking == 0 and unavailable is False
+
+
+def test_dev_tooling_low_confidence_high_does_not_block(member_json):
+    # A hedged high (c7) is not eligible on any tier, so even a chair that lists it cannot block.
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="node compat",
+                             findings=[("breaks on old Node", "high", 7)]),
+        "c": _chair("request changes", blocking=[("breaks on old Node", "high", "x")]),
+    })
+    _, blocking, _ = run_pr_review(CODE_TOOLS, _panels(), client, chair_model="c")
+    assert blocking == 0
+
+
+def test_chair_and_panel_receive_file_context(member_json):
+    # S1/E1: the file context must reach BOTH the panel and the chair so grounding works.
+    client = FakeClient(by_model={
+        "code1": member_json(stance="approve", headline="ok"),
+        "c": _chair(),
+    })
+    run_pr_review(CODE, _panels(), client, chair_model="c",
+                  file_context="FULL FILE: const ROOT = '/repo'")
+    member_call = next(c for c in client.calls if c["model"] == "code1")
+    chair_call = next(c for c in client.calls if c["model"] == "c")
+    assert "const ROOT" in member_call["user"]
+    assert "const ROOT" in chair_call["user"]          # chair can now ground (was 'Code review' before)
+    assert "src/app.py" in chair_call["user"]           # chair sees the diff, not just a label
 
 
 def test_docs_only_pr_never_blocks(member_json):
     client = FakeClient(by_model={
         "doc1": member_json(stance="oppose", headline="bad",
                             findings=[("fatal gap", "critical", 9)]),
-        "c": _chair("clarify"),
+        "c": _chair("clarify", blocking=[("fatal gap", "critical", "x")]),
     })
     body, blocking, unavailable = run_pr_review(DOC, _panels(), client, chair_model="c")
     assert "Docs review (advisory)" in body
     assert "Code review (gate)" not in body
-    assert blocking == 0          # docs never block, even a critical
+    assert blocking == 0          # docs never block, even a confirmed critical
     assert unavailable is False
+
+
+def test_mixed_pr_gates_on_code_only(member_json):
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug",
+                             findings=[("nil deref at app.py:1", "high", 9)]),
+        "doc1": member_json(stance="concerns", headline="vague",
+                            findings=[("undefined term", "critical", 9)]),
+        "c": _chair("address both", blocking=[("nil deref at app.py:1", "high", "real")]),
+    })
+    body, blocking, unavailable = run_pr_review(CODE + DOC, _panels(), client, chair_model="c")
+    assert "Code review (gate)" in body and "Docs review (advisory)" in body
+    assert blocking == 1          # only the code finding counts
 
 
 def test_code_panel_outage_fails_closed(member_json):
     client = FakeClient(by_model={"c": _chair()}, raises_for={"code1"})
     _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
     assert unavailable is True     # whole (1-member) code panel errored
+
+
+def test_chair_outage_fails_closed(member_json):
+    # If the arbiter is down we cannot ground -> fail closed (the gate's safety property).
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug",
+                             findings=[("x", "critical", 9)])},
+        raises_for={"c"})
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert unavailable is True
 
 
 def test_doc_panel_outage_does_not_block(member_json):
@@ -65,3 +151,76 @@ def test_doc_panel_outage_does_not_block(member_json):
 def test_empty_diff_is_noop():
     body, blocking, unavailable = run_pr_review("", _panels(), FakeClient(), chair_model="c")
     assert blocking == 0 and unavailable is False
+
+
+def test_run_pr_review_forwards_task_type_review(member_json):
+    # council/review.py's PR-review path must thread task_type="review" down to
+    # every complete() call (both panels + both chairs) for accurate usage logging.
+    client = FakeClient(by_model={
+        "code1": member_json(stance="approve", headline="ok"),
+        "doc1": member_json(stance="approve", headline="ok"),
+        "c": _chair(),
+    })
+    run_pr_review(CODE + DOC, _panels(), client, chair_model="c")
+    assert client.calls  # sanity: calls actually happened
+    assert all(c["task_type"] == "review" for c in client.calls)
+
+
+# ── per-panel chair: the caller still passes ONE chair_model (the per-repo CI shims do) ────
+def _mixed_client(member_json, **chairs):
+    return FakeClient(by_model={
+        "code1": member_json(stance="approve", headline="ok"),
+        "doc1": member_json(stance="approve", headline="ok"),
+        **{name: _chair(f"verdict from {name}") for name in chairs.values()}})
+
+
+def _chair_of(client, seat):
+    """The model called right after `seat`: a one-seat panel's chair call follows its seat."""
+    models = [c["model"] for c in client.calls]
+    return models[models.index(seat) + 1]
+
+
+def test_mixed_diff_uses_the_code_panels_chair_for_code_and_the_global_chair_for_docs(member_json):
+    panels = _panels()
+    panels["code-review"].chair_model = "pc"
+    client = _mixed_client(member_json, code="pc", docs="c")
+    body, _, unavailable = run_pr_review(CODE + DOC, panels, client, chair_model="c")
+    assert [c["model"] for c in client.calls] == ["code1", "pc", "doc1", "c"]
+    assert unavailable is False
+    # each section shows the answer of the chair that was asked for it
+    assert (body.index("verdict from pc") < body.index("Docs review (advisory)")
+            < body.index("verdict from c"))
+
+
+def test_the_doc_slice_uses_spec_reviews_own_chair_when_it_names_one(member_json):
+    panels = _panels()
+    panels["spec-review"].chair_model = "pd"
+    client = _mixed_client(member_json, code="c", docs="pd")
+    run_pr_review(CODE + DOC, panels, client, chair_model="c")
+    assert _chair_of(client, "code1") == "c" and _chair_of(client, "doc1") == "pd"
+
+
+def test_the_code_panels_chair_is_the_gate_arbiter_and_its_outage_fails_closed(member_json):
+    # The gate's safety property follows the chair that is actually asked: the panel's own.
+    panels = _panels()
+    panels["code-review"].chair_model = "pc"
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug", findings=[("nil deref", "high", 9)]),
+        "c": _chair()}, raises_for={"pc"})
+    _, blocking, unavailable = run_pr_review(CODE, panels, client, chair_model="c")
+    assert unavailable is True and "c" not in [c["model"] for c in client.calls]
+
+
+def test_junk_but_valid_json_from_every_seat_fails_closed(member_json):
+    client = FakeClient(by_model={"code1": '{": ": ", "}', "c": _chair("approve")})
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert blocking == 0 and unavailable is True
+
+
+def test_junk_but_valid_json_from_the_chair_fails_closed(member_json):
+    client = FakeClient(by_model={
+        "code1": member_json(stance="oppose", headline="bug", findings=[("nil deref", "high", 9)]),
+        "c": '{": ": ", "}'})
+    _, blocking, unavailable = run_pr_review(CODE, _panels(), client, chair_model="c")
+    assert unavailable is True
+

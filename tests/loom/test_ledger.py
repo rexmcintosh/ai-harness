@@ -46,4 +46,22 @@ def test_reconcile_from_git_marks_committed(tmp_path):
 
 
 def test_states_constant():
-    assert set(LEARNING_STATES) == {"planned", "woven", "committed", "deferred", "rejected"}
+    assert set(LEARNING_STATES) == {"planned", "woven", "committed", "deferred",
+                                    "rejected", "quarantined"}
+
+
+def test_quarantine_is_settled_and_surfaced(tmp_path):
+    """Guard-flagged learnings must not vanish: settled (never silently retried,
+    so they burn no DIEM) but surfaced for human review — unlike `rejected`,
+    which is a permanent discard."""
+    led = WeaveLedger(tmp_path / "l.json")
+    led.plan("s1#0", "decisions/vps-harden-mesh-only.md", "create")
+    led.quarantine("s1#0", "sentinel hit: priv-write")
+    assert led.status_of("s1#0") == "quarantined"
+    assert led.quarantined() == [("s1#0", "sentinel hit: priv-write")]
+    assert led.pending_ids() == []          # settled: not retried
+    assert led.rejected() == []             # distinct from permanent discard
+
+
+def test_quarantined_is_a_known_state(tmp_path):
+    assert "quarantined" in LEARNING_STATES

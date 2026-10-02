@@ -1,0 +1,110 @@
+# Backlog runner
+
+**Contract:** v1.0 · **Date:** 2026-09-05 · **Observed command:** `backlog-run work`
+
+## Purpose and authority
+
+**Default mode:** bounded change-producing preparation. At 22:00 UTC (03:00 UTC until 2026-09-21), work eligible open backlog items in isolated `claude/bl-*` worktrees (at most two until the budget-driven loop of 2026-09-25 ships; from then on, while the DIEM balance is at least 1.5, an item can finish before 23:30 UTC, and fewer than 10 sessions ran, see `backlogrun/README.md` § "The budget-driven loop"), review the result (council panel for code, light review for docs-only, Claude at night; see `backlogrun/README.md` § "Review policy"), and leave it `in_review` or `held`. Local cron documentation and host configuration confirm UTC scheduling. Canonical item state is `/home/dev/projects/backlog/backlog.yaml`; completed and dropped records are stored in `archive.yaml`.
+
+It may create local worktrees and branches, run the scoped agent, write runner records, and transition only still-open items to `in_review` or `held`. It must not push, merge, deploy, send externally except its configured summary, or approve its own work. Human approval under the canonical merge protocol remains the merge authority; `backlog-run approve` is an explicit operator command, not a clock action.
+
+**Secrets, names only:** `VENICE_COUNCIL_KEY` or `VENICE_API_KEY`, `TELEGRAM_BOT_TOKEN`; the runner passes a whitelist environment to the worker.
+
+## Success and evidence
+
+Success is a per-item run record, a review file, and an item transition consistent with the recorded outcome. Inspect `/home/dev/projects/.backlog-run/cron.log`, `runs/<timestamp>-<id>.json`, `reviews/<id>.md`, `report.json`, `report.md`, and the backlog item. Every review file starts with the same line, `# council review — <id> — <time>`, whichever reviewer ran (council panel or Claude); the next line, `Reviewer: <label>, because <reason>. Review round N of 3.`, names the reviewer that actually ran. A skipped review has no `Reviewer:` line. The runner’s own test suite covers its state transitions with fake workers.
+
+## Failure, escalation, and gaps
+
+Lock contention exits 75 and is visible in the cron log. Failed or ambiguous work is held or recorded rather than merged. The owner must use the morning report to judge work. The contract is reinforced by the backlog README safety contract but is not a replacement for it.
+
+## Pre-session hold gate (added 2026-09-19)
+
+Before a session is spent on an item, `backlogrun/gate.py` asks Jev one yes/no question through the shared client (`docs/contracts/jev.md`): does finishing this item need an outward-facing or irreversible action? A score of 0.7 or more turns `work` into `held` with a note that says why and how to release it. The freed slot goes to the next item. The gate may only add a hold. No answer (no key, an outage, `JEV_DISABLED`) means no hold, so the run is what it was before the gate existed.
+
+- The owner's decision wins: `backlog-run reopen <id> --gate-ok` records `gate_ok: true` on the item and the gate never asks about it again.
+- Off switches: `backlog-run work --no-gate`, or `BACKLOG_GATE=off`.
+- What is sent: the repo name, the title, and the prompt with addresses and token-shaped strings removed. Never the runner note, the council verdict, or the outcome.
+- Which items are sent (owner decision 2026-09-19): only items whose `repo` is on the allow-list in `jev/scope.py` (`IN_SCOPE_REPOS`: `ai-harness`, `swimtrack`, `swimtrack-website`, `ultimate-portugal`, `aris-management-website`) and whose id holds no out-of-scope word. An item from any other repository (for example `sat-prep` or `monthly-bidding`), an unknown one, or one with no repository skips the gate: no call, no usage-ledger row, no gate hold, and it runs as it did before the gate existed. Student, customer, financial and tax work never goes to TypeSafe, and redaction does not change that. Adding a repository is an owner decision.
+- At most 10 items are screened per run; after that the rest are deferred to the next night.
+- Evidence: `docs/jev-replays-2026-09-19.md` and `docs/evidence/jev-replays-2026-09-19/backlog/`. The wording and the 0.7 line were measured together; `tests/test_backlogrun_gate.py` fails if the wording changes without a new hash.
+- Known gap: Jev cannot read dates. "Do not run before <date>" in a prompt is invisible to this gate.
+- This gate reinforces README safety rule 2. It does not replace the session's own duty to stop and report HELD.
+
+## Date rules are read by code (added 2026-09-19)
+
+An item may say when it must not run yet: a `not_before: YYYY-MM-DD` field, or in its title or prompt one of "NOT BEFORE <date>", "do not run/start/work ... before <date>", "if today is before <date>". `backlogrun.cli.not_before()` reads it, and `plan()` defers the item until that UTC date: it stays `open`, takes no slot, is not shown to the Jev gate, and runs by itself on the day. A deadline ("must be stable before <date>") is not a gate and is ignored. Several gates mean the latest. A date rule that cannot be read (a typo, a day that does not exist) holds the item with a note, because the owner meant to gate it. This is code on purpose: Jev cannot compare dates.
+
+
+## A review waits for the DIEM reset (added 2026-09-21)
+
+The nightly run fires at 22:00 UTC, two hours before Venice's 00:00 UTC DIEM reset, so its
+council reviews spend allowance that would expire. On a day the allowance is already gone a
+review started before the reset is billed in USD (the account is on Venice's paid tier; on
+2026-09-21 DIEM was 0 by mid-afternoon and reviews kept running on the USD balance), or fails
+on a key with USD off. So both council reviewers (`council_review`, `council_docs_review`) first read the balance with the review key
+(`backlogrun/review_budget.py`):
+
+- balance at least 1.5 DIEM: review now.
+- lower, and the reset is at most 2 h 10 min away: sleep until 90 seconds after the reset,
+  then review on the new day's allowance. One wait, never a loop.
+- lower, and the reset is further away (a hand run in the afternoon): review now and let it
+  report what it finds.
+- the balance cannot be read: review now. The guard never blocks a review it cannot help.
+
+The runner holds its lock while it waits, so the `diem` drain keeps its `[reserve]`, and any
+other `backlog-run` command that needs the lock (`approve`, `hold`, `reopen`) exits 75 until the
+wait ends: at most from 21:50 UTC to 00:02 UTC. An unreadable balance is logged by type. A wait
+eats into the run's 3-hour deadline: on an empty-balance night the second item is usually
+deferred to the next night. `BACKLOG_REVIEW_WAIT=off` turns the guard off; the test suite
+runs with it off (`tests/conftest.py`), so no test reads the balance or sleeps.
+
+## Review each item, sized to risk (added 2026-09-28)
+
+The safety contract's "council-review each item" is now "review each item: council panel for
+code, light review for docs-only (Claude at night)". Every worked branch is still reviewed, and
+every round is a full review. Full rules: `backlogrun/README.md` § "Review policy".
+
+- **Code** (any path that is not clearly prose or data; unsure is code): the full council
+  `code-review` panel, as before.
+- **Docs-only** (every changed path is `.md`, `.txt`, `.csv` and similar, or YAML inside a docs
+  folder; no script, config, agent instruction file, dot folder or cron text):
+  - 22:00-07:00 UTC: a fresh read-only Claude session (`claude -p --model claude-opus-5-5
+    --effort high --tools ""`, no MCP servers, scrubbed environment). It spends the owner's
+    Claude plan, not DIEM, and has no tools that could write.
+  - otherwise: the council `spec-review` panel cut to its cheapest seat, which also chairs.
+- **Severity gate**: only a blocking/serious finding (chair-blocking, high/critical severity, or
+  a verified correctness/security defect) makes readiness "Changes requested". Minor points
+  make it "Ready with follow-ups" and are saved on the item as `follow_ups`.
+- **Round limit**: rounds are counted on the item (`review_rounds`). From round 3 a review that
+  still finds a serious point reads "Owner decides (3 rounds)"; `backlog-run rework` then refuses
+  without `--force`.
+- Which reviewer ran and why is recorded in the review's `inputs.json` (`reviewer`,
+  `reviewer_reason`, `review_round`) and shown by `report` and `show`.
+
+### Operator: backlog README text
+
+The canonical safety contract lives outside this repository, in
+`/home/dev/projects/backlog/README.md` § "Safety contract for the 3am runner". Before this
+branch's review policy runs at night, the operator replaces that section's item 3 with the text
+below, exactly as written, in the same change as the merge:
+
+```markdown
+3. **Review each worked item, sized to risk, and record the verdict.** Every worked item is
+   reviewed, and every round is a full review. Code (any changed path that is not clearly
+   prose or data; unsure counts as code) gets the full council `code-review` panel
+   (`council review --diff`). Docs-only changes (every changed path is prose or data, such as
+   `.md`, `.txt`, `.csv`, or YAML inside a docs folder; no script, config, agent instruction
+   file, dot folder or cron text) get a light review: from 22:00 to 07:00 UTC a fresh
+   read-only Claude session (`claude -p --model claude-opus-5-5 --effort high`, no tools that
+   write), otherwise the council `spec-review` panel cut to its one cheapest seat. The runner
+   records which reviewer ran and why. Only a blocking or serious finding (council blocking,
+   high or critical severity, or a verified correctness or security defect) makes readiness
+   "Changes requested"; minor points make it "Ready with follow-ups" and are saved on the item
+   as follow-ups. Review rounds are counted per item; from round 3 a review that still finds
+   a serious point reads "Owner decides (3 rounds)", and once an item has 3 rounds
+   `backlog-run rework` refuses without `--force`. A review never approves work: rule 4 still
+   holds.
+```
+
+Items 1, 2 and 4 and the rest of that section stay as they are.

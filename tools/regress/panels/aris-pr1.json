@@ -1,0 +1,74 @@
+[
+  {
+    "member": "Eng Manager",
+    "model": "openai-gpt-53-codex",
+    "stance": "concerns",
+    "headline": "The feature works, but current image loading and encoding choices introduce avoidable performance risk.",
+    "findings": [
+      {
+        "point": "src/pages/work.astro:71 sets loading=\"lazy\" for all case images, including the first one that is likely in or near the initial viewport; this can delay LCP at page load.",
+        "severity": "med",
+        "confidence": 8
+      },
+      {
+        "point": "src/pages/work.astro:64-72 uses <Image> with PNG sources and no explicit modern output strategy; this commonly ships larger payloads than necessary for non-transparent content.",
+        "severity": "low",
+        "confidence": 6
+      },
+      {
+        "point": "src/assets/images/work-contract-intelligence.png:1, src/assets/images/work-swimtrack.png:1, src/assets/images/work-ai-council.png:1 add new binary assets with no visible size guardrail, increasing risk of oversized source images and heavier build artifacts.",
+        "severity": "low",
+        "confidence": 5
+      }
+    ],
+    "suggestions": [
+      "Make the first image eager (and optionally high fetch priority), keep later images lazy.",
+      "Use modern formats (e.g., via Picture/webp/avif pipeline) and verify byte savings against current output.",
+      "Add a CI image budget check (max source dimensions/file size) to prevent regressions."
+    ],
+    "error": null
+  },
+  {
+    "member": "Security Officer",
+    "model": "deepseek-v4-pro",
+    "stance": "approve",
+    "headline": "Adding static images to portfolio page with Astro’s built-in Image component; no injection or trust-boundary risks.",
+    "findings": [],
+    "suggestions": [],
+    "error": null
+  },
+  {
+    "member": "Adversary",
+    "model": "grok-4-3",
+    "stance": "concerns",
+    "headline": "Image component usage and asset handling introduce layout shift and unoptimized binary delivery risks.",
+    "findings": [
+      {
+        "point": "Image lacks width/height props; only CSS height:auto at src/pages/work.astro:118-124 triggers CLS on slow loads",
+        "severity": "high",
+        "confidence": 9
+      },
+      {
+        "point": "PNG binaries added raw with no format conversion or size caps; astro:assets Image at src/pages/work.astro:66-73 won't auto-optimize without config",
+        "severity": "med",
+        "confidence": 8
+      },
+      {
+        "point": "Alt texts exceed 200 chars and contain narrative dashes; src/pages/work.astro:9,15,22 risk truncation or poor a11y",
+        "severity": "low",
+        "confidence": 7
+      },
+      {
+        "point": "All three images use loading=lazy even if first case renders above fold; src/pages/work.astro:70",
+        "severity": "med",
+        "confidence": 6
+      }
+    ],
+    "suggestions": [
+      "Add explicit width/height or aspect-ratio to Image",
+      "Configure image service for WebP/AVIF output",
+      "Shorten alt texts to factual descriptions"
+    ],
+    "error": null
+  }
+]

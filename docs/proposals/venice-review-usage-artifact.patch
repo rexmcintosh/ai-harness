@@ -1,0 +1,56 @@
+diff --git a/.github/workflows/venice-review.yml b/.github/workflows/venice-review.yml
+index 34b4d7f..5ebfbef 100644
+--- a/.github/workflows/venice-review.yml
++++ b/.github/workflows/venice-review.yml
+@@ -23,11 +23,16 @@ jobs:
+         with:
+           python-version: "3.12"
+ 
+-      # Pinned to the council-v0.4.0 commit SHA so the merge gate is reproducible
+-      # Bump intentionally on each council release. (When published to PyPI,
+-      # simplify to a pinned: pip install "council==X.Y.Z".)
++      # Pinned to a commit SHA so the merge gate is reproducible.
++      # This pin is NOT optional for the usage steps below: council-v0.4.0
++      # (4a01298) packaged `council` alone, so it ships no venice_usage — the
++      # gate logs no spend at all there, and `venice-usage` is not a command.
++      # 0269003 is origin/main at 2026-09-12; it packages venice_usage and
++      # keeps run_pr_review's `settings=` optional, so an un-updated
++      # scripts/venice_review.py still runs against it.
++      # Bump intentionally on each council release.
+       - name: Install council
+-        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@4a01298dcce2734115ac57f02592146969d76f48"
++        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/ai-harness@026900319c4deb479d6c9abe01fd537ac5ac09a4"
+ 
+       - name: Compute diff
+         id: diff
+@@ -42,4 +47,30 @@ jobs:
+           PR_NUMBER: ${{ github.event.pull_request.number }}
+           REPO: ${{ github.repository }}
+           DIFF_PATH: /tmp/pr.diff
++          # Put the usage ledger somewhere we can find it again. Without this it
++          # lands in the runner's $HOME and dies with the job.
++          VENICE_USAGE_DB: ${{ runner.temp }}/venice-usage.db
+         run: python scripts/venice_review.py
++
++      # Accounting must never be the reason a merge gate fails: always(), and
++      # continue-on-error on both steps. A lost usage row is a lost row; a
++      # blocked merge is a blocked merge.
++      - name: Export Venice usage
++        if: always()
++        continue-on-error: true
++        env:
++          VENICE_USAGE_DB: ${{ runner.temp }}/venice-usage.db
++          PR_NUMBER: ${{ github.event.pull_request.number }}
++        run: venice-usage export --output "${{ runner.temp }}/venice-usage.jsonl"
++
++      - name: Upload Venice usage
++        if: always()
++        continue-on-error: true
++        uses: actions/upload-artifact@v4
++        with:
++          # run_attempt keeps a re-run from colliding with the immutable v4
++          # artifact of attempt 1 — and a re-run really is a second panel.
++          name: venice-usage-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/venice-usage.jsonl
++          retention-days: 90
++          if-no-files-found: warn

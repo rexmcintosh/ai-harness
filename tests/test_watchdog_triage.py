@@ -3,7 +3,9 @@ from watchdog.triage import (
     CheckStatus,
     check_bebop_runs,
     check_cron_log,
+    check_log_coverage,
     check_disk,
+    check_orphan_processes,
     check_service_active,
     triage,
 )
@@ -160,3 +162,142 @@ def test_triage_recovery_clears_state():
     out = triage([CheckStatus("disk", "ok", "fine")], prior, NOW)
     assert out["escalate"] is False
     assert "disk" not in out["state"]          # recovered -> dropped from state
+
+
+# --- check_orphan_processes -------------------------------------------------
+
+# `ps -eo pid,ppid,etime,args` output. PPID 1 means the launching session died
+# and the process was reparented to init.
+PS_HEADER = "    PID    PPID     ELAPSED COMMAND"
+CODEX = ("/home/dev/.nvm/versions/node/v22.22.3/lib/node_modules/@openai/codex/"
+         "node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex "
+         "exec review -c sandbox_mode=read-only --model gpt-5.6-sol")
+
+
+def _ps(*rows):
+    return "\n".join([PS_HEADER, *rows]) + "\n"
+
+
+def test_orphan_check_flags_a_weeks_old_codex_review():
+    out = check_orphan_processes(_ps(f"2430396       1  47-20:29:37 {CODEX}"))
+    assert out.name == "proc:orphans"
+    assert out.level == "warn"
+    assert "47d" in out.summary
+    assert "2430396" in out.evidence
+
+
+def test_orphan_check_counts_every_orphan_and_leads_with_the_oldest():
+    out = check_orphan_processes(
+        _ps(
+            f"1413812       1  18-20:22:43 {CODEX}",
+            f"2430396       1  47-20:29:37 {CODEX}",
+            "1414648       1  18-20:22:16 codex-code-mode --port 1234",
+        )
+    )
+    assert out.level == "warn"
+    assert out.summary.startswith("3 orphaned codex process")
+    assert "47d" in out.summary
+    assert out.evidence.splitlines()[0].startswith("pid 2430396")
+
+
+def test_orphan_check_ignores_codex_with_a_living_parent():
+    out = check_orphan_processes(_ps(f"660312  660311  1-07:50:02 {CODEX}"))
+    assert out.level == "ok"
+    assert out.evidence == ""
+
+
+def test_orphan_check_ignores_a_young_orphan():
+    # a review that is merely slow is not a leak
+    out = check_orphan_processes(_ps(f"1425942       1     2:47:02 {CODEX}"), min_hours=6)
+    assert out.level == "ok"
+
+
+def test_orphan_check_reads_short_elapsed_formats():
+    out = check_orphan_processes(
+        _ps(
+            f"1 1 59:45 {CODEX}",          # mm:ss, young
+            f"2 1 08:15:00 {CODEX}",       # hh:mm:ss, over the threshold
+        ),
+        min_hours=6,
+    )
+    assert out.level == "warn"
+    assert out.summary.startswith("1 orphaned codex process")
+    assert "8h" in out.summary
+
+
+def test_orphan_check_ignores_non_codex_orphans():
+    # plenty of daemons legitimately live under init
+    out = check_orphan_processes(_ps("999       1  10-00:00:00 /usr/bin/tailscaled --state /var/lib"))
+    assert out.level == "ok"
+
+
+def test_orphan_check_survives_unusable_ps_output():
+    for text in ("", PS_HEADER + "\n", "ps: command not found\n", "garbage\n\n"):
+        out = check_orphan_processes(text)
+        assert out.level == "ok"
+
+
+def test_orphan_check_reports_an_orphan_whose_elapsed_time_is_unreadable():
+    # a dropped row would hide the orphan forever; report it with an unknown age
+    out = check_orphan_processes(_ps(f"777       1  12-34-56 {CODEX}"))
+    assert out.level == "warn"
+    assert "unknown" in out.summary
+    assert "pid 777" in out.evidence
+
+
+def test_orphan_check_does_not_match_neighbouring_command_names():
+    out = check_orphan_processes(
+        _ps(
+            "801       1  10-00:00:00 /usr/local/bin/codexctl daemon",
+            "802       1  10-00:00:00 codexd --serve",
+        )
+    )
+    assert out.level == "ok"
+
+
+def test_cron_log_ignores_json_zero_counters():
+    # loom and diem write JSON summaries; a zero or null counter is not an error.
+    log = '[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 3, "failed": 0, "error": null, "errors": []}\n'
+    assert check_cron_log("loom", log).level == "ok"
+
+
+def test_cron_log_still_fires_on_nonzero_json_counter():
+    log = '[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 3, "failed": 2}\n'
+    assert check_cron_log("loom", log).level == "warn"
+
+
+def test_cron_log_still_fires_on_json_error_message():
+    assert check_cron_log("diem", '   "error": "timeout after 900s (deadline backstop)"\n').level == "warn"
+
+
+# --- check_log_coverage -----------------------------------------------------
+
+def test_log_coverage_warns_when_no_configured_log_is_readable():
+    st = check_log_coverage(found=[], missing=["loom", "meettrack-ingest"])
+    assert st.level == "warn"
+    assert "loom" in st.summary
+
+
+def test_log_coverage_ok_when_some_logs_are_readable_and_names_the_missing():
+    st = check_log_coverage(found=["loom"], missing=["meettrack-ingest"])
+    assert st.level == "ok"
+    assert "meettrack-ingest" in st.summary
+
+
+def test_log_coverage_ok_when_nothing_is_configured():
+    assert check_log_coverage(found=[], missing=[]).level == "ok"
+
+
+def test_cron_log_ignores_words_inside_json_data_lists():
+    # loom repeats its standing quarantine list and promoted article names in every
+    # run summary. Those strings are data about items, not the outcome of this run.
+    log = ('[2026-09-18T03:00:01+01:00] rc=0 {"distilled": 4, "failed": 0, "quarantined_items": '
+           '[["22f8#2", "dead-letter: repeated weave exceptions"], ["bm2#2", "weave failed guards after retry"]], '
+           '"limit_hit": false}\n'
+           '[2026-09-18T03:00:02+01:00] promote rc=0 {"promoted": true, "articles": ["patterns/error-handling.md"]}\n')
+    assert check_cron_log("loom", log).level == "ok"
+
+
+def test_cron_log_still_fires_when_the_run_itself_failed_next_to_a_data_list():
+    log = '[2026-09-18T03:00:01+01:00] rc=1 {"distilled": 0, "failed": 3, "quarantined_items": [["a#1", "x"]]}\n'
+    assert check_cron_log("loom", log).level == "warn"

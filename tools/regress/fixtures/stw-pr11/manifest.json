@@ -1,0 +1,29 @@
+{
+  "diff": {
+    "path": "change.diff",
+    "sha256": "46062bb90037b58c3972cf4abbe9e2eb8169bde6eac261fe0774a7ac44a2e584"
+  },
+  "expected_blocking": 0,
+  "fixture_id": "stw-pr11",
+  "head_files": {
+    ".gitignore": {
+      "bytes": 630,
+      "sha256": "7f496f2d9367e1d1f86e4f9d0efe51b0a99154bc62ae1fa3e170e6bf8925da7c"
+    },
+    "package.json": {
+      "bytes": 1128,
+      "sha256": "2920ec42196cfe3edcc88829ebab5a348c175b6659cdb40453acf1d113294e4e"
+    },
+    "tools/i18n/translate.mjs": {
+      "bytes": 5971,
+      "sha256": "214ef57df102cb901ec83d62bb9e607a8acd980a49a134df99583d19b380fd87"
+    }
+  },
+  "schema_version": 1,
+  "source": {
+    "base": "95c87b723454e7f88dffa241d6cb6a5d40de5e6a",
+    "head": "eba8b54037228994c883f5559ae9b24c3316954b",
+    "pr": 11,
+    "repo": "https://github.com/rexmcintosh/swimtrack-website"
+  }
+}

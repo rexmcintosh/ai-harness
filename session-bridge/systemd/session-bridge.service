@@ -1,0 +1,14 @@
+[Unit]
+Description=session-bridge — per-tmux-session Telegram topics
+# A permanent startup failure (bad config, corrupt state) must land in `failed`,
+# not restart forever: 6 starts in 120 s trips the limit.
+StartLimitIntervalSec=120
+StartLimitBurst=6
+
+[Service]
+ExecStart=/usr/local/bin/bun run /home/dev/projects/ai-harness/session-bridge/src/main.ts
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

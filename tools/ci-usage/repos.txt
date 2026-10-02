@@ -1,0 +1,28 @@
+# Repos whose CI runs the Venice review council (one per line, owner/name).
+#
+# These are GITHUB repo names, NOT ~/projects directory names — three of them
+# differ, and `gh` 404s on the directory spelling:
+#   ~/projects/Santa_Amaro_Home_Renovation -> rexmcintosh/santa-amaro-home-renovation
+#   ~/projects/liam_mobility               -> rexmcintosh/liam-mobility
+#   ~/projects/splash_poller               -> rexmcintosh/swimtrack-splash-poller
+# Derive an entry with `git -C <dir> remote get-url origin`, never from the
+# directory name. Verified against the GitHub contents API on 2026-09-12: all
+# 18 carry .github/workflows/venice-review.yml on their default branch.
+rexmcintosh/mcp-configuration-assistant
+rexmcintosh/santa-amaro-home-renovation
+rexmcintosh/aris-management-website
+rexmcintosh/blkout-dice-roller
+rexmcintosh/bubblepop-art
+rexmcintosh/ai-harness
+rexmcintosh/combat-arms-transition
+rexmcintosh/crypto-portfolio
+rexmcintosh/dump
+rexmcintosh/finance-tracker
+rexmcintosh/liam-mobility
+rexmcintosh/macmcintosh
+rexmcintosh/monthly-bidding
+rexmcintosh/romance-empire
+rexmcintosh/swimtrack-splash-poller
+rexmcintosh/swimtrack
+rexmcintosh/swimtrack-website
+rexmcintosh/ultimate-portugal

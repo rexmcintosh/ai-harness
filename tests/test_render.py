@@ -1,5 +1,21 @@
 from council.render import render_markdown, gate_findings, render_combined
-from council.models import MemberResult, Finding, Synthesis
+from council.models import MemberResult, Finding, Synthesis, ConfirmedBlock
+
+
+def test_render_surfaces_chair_confirmed_blocking_findings():
+    syn = Synthesis(recommendation="request changes", confidence=9,
+                    blocking_findings=[ConfirmedBlock("SQLi at db.py:40", "critical",
+                                                      "user input concatenated")])
+    md = render_markdown("Code changes", syn, [MemberResult("Eng", "m", "oppose", "h")])
+    assert "Blocking" in md                      # a clear gate section
+    assert "SQLi at db.py:40" in md
+    assert md.index("SQLi at db.py:40") < md.index("request changes") or "Blocking" in md
+
+
+def test_render_omits_blocking_section_when_none():
+    syn = Synthesis(recommendation="looks good", confidence=8)
+    md = render_markdown("Code changes", syn, [MemberResult("Eng", "m", "approve", "h")])
+    assert "Blocking finding" not in md          # no scary empty section on a clean review
 
 
 def test_gate_daily_keeps_high_and_critical():

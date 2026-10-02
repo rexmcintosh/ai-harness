@@ -1,0 +1,2641 @@
+{
+  "questions": "see questions_wording.json (frozen before this run)",
+  "opus_history": {
+    "n_with_full_decision": 2,
+    "n_filtered_no_text": 3,
+    "scan_date": "2026-06-07T22:33:47Z",
+    "items": [
+      {
+        "id": "360308060d62",
+        "truth": {
+          "title": "Pasadena City College Postpones 2026-27 Swim Season",
+          "source": "SwimSwam",
+          "in_scope": true,
+          "pillar": "pathways"
+        },
+        "jev": {
+          "id": "360308060d62",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.66,
+              "probabilities": {
+                "mindset": 0.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.71,
+                "pathways": 0.29,
+                "training": 0.0,
+                "body": 0.0,
+                "competition": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.84,
+              "confidence": 0.82,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.17,
+                "1": 0.82,
+                "2": 0.01,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1340,
+          "seconds": 0.616
+        }
+      },
+      {
+        "id": "ab781d3508dc",
+        "truth": {
+          "title": "Josh Liendo Wins 50 Free on Night Two of Mel Zajac Jr. International Meet",
+          "source": "SwimSwam News",
+          "in_scope": true,
+          "pillar": "competition"
+        },
+        "jev": {
+          "id": "ab781d3508dc",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.97,
+              "probabilities": {
+                "none_of_these": 0.97,
+                "training": 0.0,
+                "body": 0.0,
+                "pathways": 0.0,
+                "mindset": 0.0,
+                "competition": 0.03,
+                "safety": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1367,
+          "seconds": 0.618
+        }
+      }
+    ]
+  },
+  "blind_labelled": {
+    "n": 45,
+    "collected_at": "2026-09-19T10:25:44Z",
+    "select_top_n": 5,
+    "items": [
+      {
+        "id": "cd47ddbd90cc",
+        "truth": {
+          "title": "Virginia Lands First 2028 Verbal Pledge From Versatile Shelby Hutchinson",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Single-athlete college verbal-commitment announcement: ephemeral recruiting news, no standalone lesson.",
+          "rank_score": 0.715,
+          "would_reach_opus_top5": true
+        },
+        "jev": {
+          "id": "cd47ddbd90cc",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.76,
+              "probabilities": {
+                "body": 0.0,
+                "parent_role": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.21,
+                "pathways": 0.79,
+                "mindset": 0.0,
+                "competition": 0.0,
+                "training": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1357,
+          "seconds": 0.591
+        }
+      },
+      {
+        "id": "d5812c8cfab2",
+        "truth": {
+          "title": "1:01/2:12 Breaststroker Isabella Green Makes Verbal Pledge to Florida for 2028-29",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement, same as above.",
+          "rank_score": 0.7,
+          "would_reach_opus_top5": true
+        },
+        "jev": {
+          "id": "d5812c8cfab2",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.84,
+              "probabilities": {
+                "none_of_these": 0.14,
+                "mindset": 0.0,
+                "safety": 0.0,
+                "training": 0.0,
+                "pathways": 0.86,
+                "parent_role": 0.0,
+                "competition": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1383,
+          "seconds": 0.564
+        }
+      },
+      {
+        "id": "15dc33878011",
+        "truth": {
+          "title": "Olympic Medalist Elizabeth Beisel Is On a National Tour, for Music, Not Swimming",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Human-interest gossip (ex-swimmer's music tour); no parent takeaway.",
+          "rank_score": 0.7,
+          "would_reach_opus_top5": true
+        },
+        "jev": {
+          "id": "15dc33878011",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "parent_role": 0.0,
+                "training": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0,
+                "none_of_these": 1.0,
+                "pathways": 0.0,
+                "body": 0.0,
+                "competition": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.21,
+              "confidence": 0.79,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.8,
+                "1": 0.2,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1340,
+          "seconds": 0.589
+        }
+      },
+      {
+        "id": "18c6b6b23d5b",
+        "truth": {
+          "title": "Ledecky, Finke, Regan Smith, Marchand, Kos, and Crooks All Registered to Race at Virginia SCM Meet in October",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "competition",
+          "marginal": false,
+          "reason": "Meet-field/roster announcement (who is registered to race); ephemeral logistics news, no standalone lesson.",
+          "rank_score": 0.7,
+          "would_reach_opus_top5": true
+        },
+        "jev": {
+          "id": "18c6b6b23d5b",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.98,
+              "probabilities": {
+                "pathways": 0.0,
+                "body": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.99,
+                "training": 0.0,
+                "mindset": 0.0,
+                "competition": 0.01,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1358,
+          "seconds": 0.605
+        }
+      },
+      {
+        "id": "bf039ef40241",
+        "truth": {
+          "title": "NC State Earns First 2028 Verbal From Junior National Finalist Veronica Metz",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement.",
+          "rank_score": 0.675,
+          "would_reach_opus_top5": true
+        },
+        "jev": {
+          "id": "bf039ef40241",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.8,
+              "probabilities": {
+                "none_of_these": 0.18,
+                "mindset": 0.0,
+                "pathways": 0.82,
+                "training": 0.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "competition": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1348,
+          "seconds": 0.648
+        }
+      },
+      {
+        "id": "756975b0acd0",
+        "truth": {
+          "title": "YMCA National Champion Claire Burns Hands Alabama First 2028 Verbal",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement.",
+          "rank_score": 0.615,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "756975b0acd0",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.77,
+              "probabilities": {
+                "mindset": 0.0,
+                "competition": 0.0,
+                "body": 0.0,
+                "none_of_these": 0.2,
+                "training": 0.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "pathways": 0.8
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1345,
+          "seconds": 0.596
+        }
+      },
+      {
+        "id": "270ca6ff47dd",
+        "truth": {
+          "title": "Rutgers Lands 1st 2028 Verbal Commitment from 4x Michigan High School State Champ Caroline Bryan",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "270ca6ff47dd",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.9,
+              "probabilities": {
+                "parent_role": 0.0,
+                "body": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.09,
+                "training": 0.0,
+                "mindset": 0.0,
+                "competition": 0.0,
+                "pathways": 0.91
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1357,
+          "seconds": 0.564
+        }
+      },
+      {
+        "id": "20f2055e752e",
+        "truth": {
+          "title": "James Magnussen, Marius Kusch, Shane Ryan, Evgenii Somov, Felipe Lima, and Josif Miladinov No Longer With Enhanced",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Roster/contract news about the pro 'Enhanced Games' league; elite gossip, no parent takeaway.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "20f2055e752e",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "mindset": 0.0,
+                "body": 0.0,
+                "pathways": 0.0,
+                "training": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 1.0,
+                "competition": 0.0,
+                "safety": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.93,
+              "confidence": 0.91,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.08,
+                "1": 0.91,
+                "2": 0.01,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1365,
+          "seconds": 0.599
+        }
+      },
+      {
+        "id": "218817c96d59",
+        "truth": {
+          "title": "Cameron McEvoy Testing 100 Free at Silk Road World Cup Tour",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "competition",
+          "marginal": false,
+          "reason": "Elite athlete's race-schedule news (which meet he'll swim next); athlete-performance news.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "218817c96d59",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.96,
+              "probabilities": {
+                "mindset": 0.0,
+                "training": 0.0,
+                "body": 0.0,
+                "none_of_these": 0.97,
+                "competition": 0.03,
+                "parent_role": 0.0,
+                "safety": 0.0,
+                "pathways": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1338,
+          "seconds": 0.652
+        }
+      },
+      {
+        "id": "83ee80e7fc45",
+        "truth": {
+          "title": "Winter Juniors Qualifier Macy Malinski Verbals To Utah For Fall 2027",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "83ee80e7fc45",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.04
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.87,
+              "probabilities": {
+                "competition": 0.0,
+                "training": 0.0,
+                "pathways": 0.89,
+                "body": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.11,
+                "mindset": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1348,
+          "seconds": 0.633
+        }
+      },
+      {
+        "id": "4ba297080177",
+        "truth": {
+          "title": "Shaine Casas Hired As Head Coach at St. Stephen\u2019s Episcopal School, Coby Carrozza Brought On As Assistant",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Coaching-hire announcement; ephemeral career news, no standalone parent lesson. Could be argued as 'pathways' if reframed, but as written it's just a hire notice.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "4ba297080177",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.9,
+              "probabilities": {
+                "competition": 0.0,
+                "training": 0.0,
+                "pathways": 0.09,
+                "body": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.91,
+                "mindset": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.99,
+              "confidence": 0.99,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.99,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1353,
+          "seconds": 0.638
+        }
+      },
+      {
+        "id": "6f487f56b796",
+        "truth": {
+          "title": "NCAA Champion Chris Swanson Is Getting Inducted Into Penn Athletics Hall of Fame",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Hall of Fame induction notice; gossip/honor news, no parent takeaway.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "6f487f56b796",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.71,
+              "probabilities": {
+                "none_of_these": 0.75,
+                "safety": 0.0,
+                "pathways": 0.25,
+                "mindset": 0.0,
+                "body": 0.0,
+                "training": 0.0,
+                "competition": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.92,
+              "confidence": 0.91,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.08,
+                "1": 0.92,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1344,
+          "seconds": 0.735
+        }
+      },
+      {
+        "id": "4dd4a6984ac6",
+        "truth": {
+          "title": "SPEEDO INTRODUCES SPEEDO iQ: A NEW ERA OF CONNECTED INTELLIGENCE IN SPORT",
+          "source": "SwimSwam",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Sponsored product-launch press release (partner content), not developmental content.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "4dd4a6984ac6",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.06
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.94,
+              "probabilities": {
+                "mindset": 0.0,
+                "safety": 0.0,
+                "competition": 0.0,
+                "none_of_these": 0.95,
+                "pathways": 0.0,
+                "training": 0.05,
+                "parent_role": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.75,
+              "confidence": 0.25,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.63,
+                "1": 0.01,
+                "2": 0.36,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1362,
+          "seconds": 0.601
+        }
+      },
+      {
+        "id": "3f334592ae78",
+        "truth": {
+          "title": "Texas Men Lead 26-27 CSCAA Division I Preseason Poll",
+          "source": "SwimSwam News",
+          "in_scope": false,
+          "pillar": "competition",
+          "marginal": false,
+          "reason": "Preseason poll/rankings update -- explicitly the kind of ephemeral news EDITORIAL_SYS excludes.",
+          "rank_score": 0.6,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "3f334592ae78",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.97,
+              "probabilities": {
+                "none_of_these": 0.98,
+                "safety": 0.0,
+                "pathways": 0.02,
+                "mindset": 0.0,
+                "training": 0.0,
+                "body": 0.0,
+                "competition": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1343,
+          "seconds": 0.561
+        }
+      },
+      {
+        "id": "a2a7faaadcbf",
+        "truth": {
+          "title": "New European Aquatics national water polo rankings announced",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Water polo rankings: out-of-scope sport, and a rankings update on top of that.",
+          "rank_score": 0.59,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "a2a7faaadcbf",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "competition": 0.0,
+                "training": 0.0,
+                "pathways": 0.0,
+                "none_of_these": 1.0,
+                "body": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.17,
+              "confidence": 0.83,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.83,
+                "1": 0.17,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1352,
+          "seconds": 0.582
+        }
+      },
+      {
+        "id": "2b9414b38e55",
+        "truth": {
+          "title": "Three-Time Olympic Champion Mike Burton Dies at 79; Packaged Legendary Career in Distance Freestyle",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Obituary/tribute; elite gossip with no standalone parent-development takeaway.",
+          "rank_score": 0.575,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "2b9414b38e55",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "mindset": 0.0,
+                "parent_role": 0.0,
+                "safety": 0.0,
+                "competition": 0.0,
+                "pathways": 0.0,
+                "none_of_these": 1.0,
+                "training": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.99,
+              "confidence": 0.99,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.99,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1345,
+          "seconds": 0.605
+        }
+      },
+      {
+        "id": "04ee3bc01b91",
+        "truth": {
+          "title": "Backstroker Toula Hickmon To Join Air Force Class of 2032",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "pathways",
+          "marginal": false,
+          "reason": "Verbal-commitment announcement.",
+          "rank_score": 0.575,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "04ee3bc01b91",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.04
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "pathways",
+              "confidence": 0.64,
+              "probabilities": {
+                "body": 0.0,
+                "none_of_these": 0.31,
+                "safety": 0.0,
+                "training": 0.0,
+                "competition": 0.0,
+                "pathways": 0.69,
+                "parent_role": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 1.0,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 1.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1349,
+          "seconds": 0.592
+        }
+      },
+      {
+        "id": "0e5beda8abce",
+        "truth": {
+          "title": "Bid for a Great Cause: 2026 Golden Goggle Awards Auction (See All Items)",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Charity awards-auction announcement/event listing, not developmental content.",
+          "rank_score": 0.575,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "0e5beda8abce",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "parent_role": 0.0,
+                "none_of_these": 1.0,
+                "competition": 0.0,
+                "mindset": 0.0,
+                "body": 0.0,
+                "pathways": 0.0,
+                "safety": 0.0,
+                "training": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.21,
+              "confidence": 0.79,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.8,
+                "1": 0.2,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1358,
+          "seconds": 0.615
+        }
+      },
+      {
+        "id": "9e0472592eca",
+        "truth": {
+          "title": "The Start of the Season: 5 Ways to Embark on a Successful Campaign",
+          "source": "Swimming World",
+          "in_scope": true,
+          "pillar": "mindset",
+          "marginal": true,
+          "reason": "Genuine evergreen 'how to start a season well' explainer with no news hook; reads like true developmental content, though the exact pillar (mindset vs. training) is a judgment call.",
+          "rank_score": 0.575,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "9e0472592eca",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.74
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "mindset",
+              "confidence": 0.32,
+              "probabilities": {
+                "mindset": 0.4,
+                "competition": 0.23,
+                "body": 0.0,
+                "pathways": 0.03,
+                "none_of_these": 0.1,
+                "training": 0.09,
+                "safety": 0.0,
+                "parent_role": 0.15
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.35,
+              "confidence": 0.58,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.01,
+                "2": 0.6,
+                "3": 0.38
+              }
+            }
+          },
+          "input_tokens": 1327,
+          "seconds": 0.638
+        }
+      },
+      {
+        "id": "7ac3a0e1d49d",
+        "truth": {
+          "title": "Champions League Men: Brescia and Panathinaikos roar to crucial victories on day one of qualifiers",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Water polo Champions League qualifiers; out-of-scope sport, also a results recap.",
+          "rank_score": 0.55,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "7ac3a0e1d49d",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "parent_role": 0.0,
+                "none_of_these": 0.99,
+                "competition": 0.01,
+                "body": 0.0,
+                "pathways": 0.0,
+                "training": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.21,
+              "confidence": 0.79,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.79,
+                "1": 0.21,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1388,
+          "seconds": 0.619
+        }
+      },
+      {
+        "id": "5db491245507",
+        "truth": {
+          "title": "8 Best Pull Buoys for Swimming- The Expert Review",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial gear buying-guide listicle (pull buoys); consumer shopping content, not a developmental explainer, despite touching 'training' keywords.",
+          "rank_score": 0.54,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "5db491245507",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.74
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "training",
+              "confidence": 0.92,
+              "probabilities": {
+                "competition": 0.0,
+                "mindset": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.07,
+                "pathways": 0.0,
+                "training": 0.93,
+                "safety": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.95,
+              "confidence": 0.94,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.03,
+                "1": 0.0,
+                "2": 0.97,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1302,
+          "seconds": 0.587
+        }
+      },
+      {
+        "id": "1453bdbd820f",
+        "truth": {
+          "title": "58 Swimming Quotes from Pro Swimmers You Can Learn From",
+          "source": "SwimCompetitive",
+          "in_scope": true,
+          "pillar": "mindset",
+          "marginal": true,
+          "reason": "Motivational-quotes roundup; evergreen, shareable mindset content for a swim parent, though it's a listicle rather than a full explainer.",
+          "rank_score": 0.54,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "1453bdbd820f",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.7
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "mindset",
+              "confidence": 0.99,
+              "probabilities": {
+                "mindset": 0.99,
+                "body": 0.0,
+                "none_of_these": 0.0,
+                "training": 0.0,
+                "parent_role": 0.01,
+                "pathways": 0.0,
+                "competition": 0.0,
+                "safety": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.51,
+              "confidence": 0.51,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 0.0,
+                "2": 0.48,
+                "3": 0.52
+              }
+            }
+          },
+          "input_tokens": 1315,
+          "seconds": 0.649
+        }
+      },
+      {
+        "id": "ff100b8dfbea",
+        "truth": {
+          "title": "President Antonio Silva Discusses Future of European Aquatics on Road to LA28",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Federation-president interview/press piece about organizational strategy; not parent-development content.",
+          "rank_score": 0.515,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "ff100b8dfbea",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "mindset": 0.0,
+                "competition": 0.0,
+                "body": 0.0,
+                "none_of_these": 0.99,
+                "training": 0.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "pathways": 0.01
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.54,
+              "confidence": 0.46,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.5,
+                "1": 0.47,
+                "2": 0.03,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1341,
+          "seconds": 0.549
+        }
+      },
+      {
+        "id": "5472bc062940",
+        "truth": {
+          "title": "Catherine Breed More Than Halfway Through \u2018Swim California\u2019",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Adult open-water marathon-swim feature (900-mile channel swim); not competitive pool swimming, and it's an ongoing-news update.",
+          "rank_score": 0.515,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "5472bc062940",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.97,
+              "probabilities": {
+                "none_of_these": 0.98,
+                "safety": 0.0,
+                "pathways": 0.0,
+                "mindset": 0.02,
+                "training": 0.0,
+                "body": 0.0,
+                "competition": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.77,
+              "confidence": 0.76,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.23,
+                "1": 0.77,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1335,
+          "seconds": 0.615
+        }
+      },
+      {
+        "id": "a7c3416cdfaf",
+        "truth": {
+          "title": "Asian Games Preview: South Korea, China Could Threaten Seven-Minute Barrier in 800 Freestyle Relay",
+          "source": "Swimming World",
+          "in_scope": false,
+          "pillar": "competition",
+          "marginal": false,
+          "reason": "Elite relay-record meet preview; athlete-performance/meet news.",
+          "rank_score": 0.515,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "a7c3416cdfaf",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.95,
+              "probabilities": {
+                "competition": 0.05,
+                "mindset": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.95,
+                "pathways": 0.0,
+                "training": 0.0,
+                "safety": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.0,
+              "confidence": 0.99,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.99,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1358,
+          "seconds": 0.63
+        }
+      },
+      {
+        "id": "0b3611a80cfe",
+        "truth": {
+          "title": "Leah Smith, Elizabeth Beisel & more on  Champion\u2019s Mojo Podcast",
+          "source": "SwimSwam Podcast",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Podcast-episode guest-list promo; no standalone lesson in the item itself.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "0b3611a80cfe",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.09
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "mindset",
+              "confidence": 0.65,
+              "probabilities": {
+                "mindset": 0.7,
+                "safety": 0.0,
+                "training": 0.0,
+                "competition": 0.0,
+                "body": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.3,
+                "pathways": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.97,
+              "confidence": 0.38,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.33,
+                "1": 0.38,
+                "2": 0.29,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1326,
+          "seconds": 0.602
+        }
+      },
+      {
+        "id": "8eddf5327dd9",
+        "truth": {
+          "title": "Registration now open for European Aquatics Diversity, Equity, Inclusion & Integrity Conference in Baku",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Conference registration-open notice; organizational/admin news.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "8eddf5327dd9",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.91,
+              "probabilities": {
+                "training": 0.0,
+                "pathways": 0.0,
+                "mindset": 0.0,
+                "safety": 0.07,
+                "parent_role": 0.0,
+                "competition": 0.0,
+                "body": 0.0,
+                "none_of_these": 0.93
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.18,
+              "confidence": 0.82,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.83,
+                "1": 0.16,
+                "2": 0.01,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1402,
+          "seconds": 0.567
+        }
+      },
+      {
+        "id": "fead1c1d3d06",
+        "truth": {
+          "title": "Underwater overview: spectacular new swimming images from Paris and Samorin",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Photo-gallery announcement (new camera angles at a championship); not developmental content.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "fead1c1d3d06",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "training": 0.01,
+                "none_of_these": 0.99,
+                "mindset": 0.0,
+                "parent_role": 0.0,
+                "pathways": 0.0,
+                "safety": 0.0,
+                "body": 0.0,
+                "competition": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.73,
+              "confidence": 0.72,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.28,
+                "1": 0.72,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1372,
+          "seconds": 0.597
+        }
+      },
+      {
+        "id": "157e482c9ce6",
+        "truth": {
+          "title": "Race for Champions League glory set to begin with qualification tournaments",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Water polo Champions League qualifiers preview; out-of-scope sport.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "157e482c9ce6",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.91,
+              "probabilities": {
+                "mindset": 0.0,
+                "competition": 0.07,
+                "body": 0.0,
+                "none_of_these": 0.92,
+                "training": 0.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "pathways": 0.01
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.75,
+              "confidence": 0.72,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.27,
+                "1": 0.72,
+                "2": 0.01,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1351,
+          "seconds": 0.593
+        }
+      },
+      {
+        "id": "f73297a7ae8e",
+        "truth": {
+          "title": "European Aquatics staff take part in carbon footprint measurement onboarding session",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Internal staff-training/carbon-footprint news; organizational, not parent-facing at all.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "f73297a7ae8e",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "competition": 0.0,
+                "training": 0.0,
+                "none_of_these": 1.0,
+                "pathways": 0.0,
+                "body": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.01,
+              "confidence": 0.99,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 1.0,
+                "1": 0.0,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1364,
+          "seconds": 0.615
+        }
+      },
+      {
+        "id": "76a6fb9a9ea2",
+        "truth": {
+          "title": "Swiss head coach Meloni detailing training philosophy for elite swimming at Paris 2026 coaching clinic",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "training",
+          "marginal": true,
+          "reason": "Report that a coach held a clinic and described his training philosophy; interesting but written as an event report, not an explainer a parent could act on -- no extracted, standalone lesson given in the excerpt.",
+          "rank_score": 0.49,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "76a6fb9a9ea2",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.19
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "training",
+              "confidence": 0.94,
+              "probabilities": {
+                "safety": 0.0,
+                "none_of_these": 0.05,
+                "competition": 0.0,
+                "mindset": 0.0,
+                "pathways": 0.0,
+                "body": 0.0,
+                "parent_role": 0.0,
+                "training": 0.95
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.82,
+              "confidence": 0.64,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.24,
+                "2": 0.66,
+                "3": 0.09
+              }
+            }
+          },
+          "input_tokens": 1379,
+          "seconds": 0.563
+        }
+      },
+      {
+        "id": "f1a5ec73308b",
+        "truth": {
+          "title": "151 Dryland Exercises for Swimmers of Every Level (Guide)",
+          "source": "SwimCompetitive",
+          "in_scope": true,
+          "pillar": "training",
+          "marginal": false,
+          "reason": "Genuine evergreen instructional guide (151 dryland exercises) that a swim parent could use directly with their swimmer.",
+          "rank_score": 0.44,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "f1a5ec73308b",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.89
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "training",
+              "confidence": 0.92,
+              "probabilities": {
+                "parent_role": 0.0,
+                "training": 0.9400000000000001,
+                "pathways": 0.0,
+                "none_of_these": 0.0,
+                "competition": 0.0,
+                "body": 0.06,
+                "safety": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.61,
+              "confidence": 0.61,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 0.0,
+                "2": 0.38,
+                "3": 0.62
+              }
+            }
+          },
+          "input_tokens": 1313,
+          "seconds": 0.6
+        }
+      },
+      {
+        "id": "bc644af56dd4",
+        "truth": {
+          "title": "Champions League Final Four action returns to Belgrade",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Water polo Champions League Final Four venue announcement; out-of-scope sport.",
+          "rank_score": 0.43,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "bc644af56dd4",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "none_of_these": 1.0,
+                "safety": 0.0,
+                "training": 0.0,
+                "pathways": 0.0,
+                "body": 0.0,
+                "mindset": 0.0,
+                "competition": 0.0,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.03,
+              "confidence": 0.97,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.97,
+                "1": 0.03,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1360,
+          "seconds": 0.639
+        }
+      },
+      {
+        "id": "046f03ccd3d1",
+        "truth": {
+          "title": "European Aquatics artistic swimming coaches course level 1: bulletin and registration information now available",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Artistic-swimming coaches' course notice; out-of-scope discipline (artistic swimming explicitly excluded).",
+          "rank_score": 0.43,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "046f03ccd3d1",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.03
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "none_of_these": 0.99,
+                "competition": 0.0,
+                "pathways": 0.01,
+                "safety": 0.0,
+                "training": 0.0,
+                "parent_role": 0.0,
+                "mindset": 0.0,
+                "body": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.04,
+              "confidence": 0.96,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.98,
+                "1": 0.01,
+                "2": 0.01,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1368,
+          "seconds": 0.69
+        }
+      },
+      {
+        "id": "fd511144d52f",
+        "truth": {
+          "title": "Tbilisi set to host water polo Technical Officials Intermediate Certification Course",
+          "source": "European Aquatics",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Water polo officials' certification course notice; out-of-scope sport.",
+          "rank_score": 0.43,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "fd511144d52f",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.02
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.99,
+              "probabilities": {
+                "training": 0.0,
+                "none_of_these": 1.0,
+                "safety": 0.0,
+                "parent_role": 0.0,
+                "pathways": 0.0,
+                "mindset": 0.0,
+                "body": 0.0,
+                "competition": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.01,
+              "confidence": 0.99,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.99,
+                "1": 0.01,
+                "2": 0.0,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1366,
+          "seconds": 0.577
+        }
+      },
+      {
+        "id": "b7c9ae90eaff",
+        "truth": {
+          "title": "Fish Out of Water: The SwimSwam Podcast, Episode 3 \u2013 Elvis Burrows",
+          "source": "SwimSwam Podcast",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Podcast-episode guest promo; no standalone lesson given.",
+          "rank_score": 0.39,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "b7c9ae90eaff",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.11
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.94,
+              "probabilities": {
+                "safety": 0.0,
+                "mindset": 0.03,
+                "training": 0.0,
+                "competition": 0.0,
+                "body": 0.0,
+                "parent_role": 0.01,
+                "none_of_these": 0.95,
+                "pathways": 0.01
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.47,
+              "confidence": 0.53,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.61,
+                "1": 0.3,
+                "2": 0.08,
+                "3": 0.01
+              }
+            }
+          },
+          "input_tokens": 1336,
+          "seconds": 0.614
+        }
+      },
+      {
+        "id": "c4d7e033cccb",
+        "truth": {
+          "title": "Swimming World Magazine\u2019s Bold New Chapter",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": false,
+          "reason": "Press release about the publication itself (Swimming World's relaunch); not developmental content for a parent.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "c4d7e033cccb",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.06
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 1.0,
+              "probabilities": {
+                "safety": 0.0,
+                "body": 0.0,
+                "pathways": 0.0,
+                "mindset": 0.0,
+                "competition": 0.0,
+                "training": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 1.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 0.31,
+              "confidence": 0.69,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.74,
+                "1": 0.21,
+                "2": 0.05,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1298,
+          "seconds": 0.594
+        }
+      },
+      {
+        "id": "c4373e4b4d95",
+        "truth": {
+          "title": "5 Best Swim Caps for Long Hair- The Expert Guide",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial gear buying-guide listicle (swim caps for long hair); consumer shopping content.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "c4373e4b4d95",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.56
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.97,
+              "probabilities": {
+                "mindset": 0.0,
+                "training": 0.01,
+                "body": 0.01,
+                "pathways": 0.0,
+                "competition": 0.0,
+                "safety": 0.0,
+                "none_of_these": 0.98,
+                "parent_role": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.89,
+              "confidence": 0.89,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.05,
+                "1": 0.0,
+                "2": 0.95,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1300,
+          "seconds": 0.652
+        }
+      },
+      {
+        "id": "b58b7221f123",
+        "truth": {
+          "title": "7 Best Swim Shampoos and Conditioners to Remove Chlorine",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial buying-guide listicle (shampoo/conditioner); consumer shopping content.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "b58b7221f123",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.55
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.75,
+              "probabilities": {
+                "none_of_these": 0.78,
+                "competition": 0.0,
+                "pathways": 0.0,
+                "safety": 0.0,
+                "training": 0.0,
+                "parent_role": 0.0,
+                "mindset": 0.0,
+                "body": 0.22
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.83,
+              "confidence": 0.83,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.08,
+                "1": 0.0,
+                "2": 0.92,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1323,
+          "seconds": 0.583
+        }
+      },
+      {
+        "id": "f28e1bccaef8",
+        "truth": {
+          "title": "9 Effective Swim Workouts for Weight Loss (Lose it Easily)",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "body",
+          "marginal": true,
+          "reason": "Adult general-fitness weight-loss workout listicle; audience mismatch -- not about a competitive youth swimmer or their parent, despite touching 'body' keywords.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "f28e1bccaef8",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.49
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "body",
+              "confidence": 0.4,
+              "probabilities": {
+                "mindset": 0.0,
+                "training": 0.18,
+                "parent_role": 0.0,
+                "none_of_these": 0.34,
+                "competition": 0.0,
+                "body": 0.48,
+                "safety": 0.0,
+                "pathways": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 1.8,
+              "confidence": 0.8,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.1,
+                "1": 0.0,
+                "2": 0.9,
+                "3": 0.0
+              }
+            }
+          },
+          "input_tokens": 1305,
+          "seconds": 0.567
+        }
+      },
+      {
+        "id": "335f7f4ce74d",
+        "truth": {
+          "title": "Complete Swimming Equipment List for Every Type of Swimmer",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial gear buying-guide listicle (full equipment list); consumer shopping content.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "335f7f4ce74d",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.81
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.86,
+              "probabilities": {
+                "mindset": 0.0,
+                "competition": 0.04,
+                "body": 0.0,
+                "none_of_these": 0.88,
+                "training": 0.07,
+                "pathways": 0.0,
+                "parent_role": 0.01,
+                "safety": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.0,
+              "confidence": 0.98,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.0,
+                "2": 0.98,
+                "3": 0.01
+              }
+            }
+          },
+          "input_tokens": 1306,
+          "seconds": 0.57
+        }
+      },
+      {
+        "id": "6ae3cdc4d699",
+        "truth": {
+          "title": "How Does Swimming Change Your Body? The 7 Scientific Ways",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "body",
+          "marginal": true,
+          "reason": "General adult exercise-science content ('how swimming changes your body'); audience mismatch, not competitive-swimmer/parent specific.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "6ae3cdc4d699",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.76
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "body",
+              "confidence": 0.97,
+              "probabilities": {
+                "pathways": 0.0,
+                "competition": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.02,
+                "safety": 0.0,
+                "body": 0.98,
+                "training": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.02,
+              "confidence": 0.95,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 0.0,
+                "2": 0.96,
+                "3": 0.04
+              }
+            }
+          },
+          "input_tokens": 1310,
+          "seconds": 0.581
+        }
+      },
+      {
+        "id": "1037f1a57607",
+        "truth": {
+          "title": "Swimming Warm-Up and Cool-Down: The Ultimate Guide",
+          "source": "SwimCompetitive",
+          "in_scope": true,
+          "pillar": "training",
+          "marginal": false,
+          "reason": "Genuine evergreen instructional guide (warm-up/cool-down routine) directly usable by a swim parent supporting practice habits.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "1037f1a57607",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.92
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "training",
+              "confidence": 0.59,
+              "probabilities": {
+                "body": 0.35,
+                "training": 0.65,
+                "competition": 0.0,
+                "parent_role": 0.0,
+                "none_of_these": 0.0,
+                "pathways": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.51,
+              "confidence": 0.51,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.0,
+                "1": 0.0,
+                "2": 0.49,
+                "3": 0.51
+              }
+            }
+          },
+          "input_tokens": 1310,
+          "seconds": 0.613
+        }
+      },
+      {
+        "id": "81cde972c095",
+        "truth": {
+          "title": "How Tight Should a Tech Suit Be? (Find Your Perfect Fit)",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial buying-guide (tech-suit fit); consumer shopping content.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "81cde972c095",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.83
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.83,
+              "probabilities": {
+                "parent_role": 0.01,
+                "none_of_these": 0.85,
+                "competition": 0.11,
+                "mindset": 0.0,
+                "body": 0.01,
+                "pathways": 0.01,
+                "safety": 0.0,
+                "training": 0.01
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.05,
+              "confidence": 0.93,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.0,
+                "2": 0.93,
+                "3": 0.06
+              }
+            }
+          },
+          "input_tokens": 1302,
+          "seconds": 0.611
+        }
+      },
+      {
+        "id": "9a45ee613396",
+        "truth": {
+          "title": "Why Are Tech Suits So Expensive? (And Their Average Price)",
+          "source": "SwimCompetitive",
+          "in_scope": false,
+          "pillar": "none_of_these",
+          "marginal": true,
+          "reason": "Commercial/pricing-explainer content (why tech suits cost so much); consumer/shopping angle, not developmental.",
+          "rank_score": 0.34,
+          "would_reach_opus_top5": false
+        },
+        "jev": {
+          "id": "9a45ee613396",
+          "answers": {
+            "in_scope": {
+              "type": "noul",
+              "noul": 0.69
+            },
+            "pillar": {
+              "type": "choice",
+              "choice": "none_of_these",
+              "confidence": 0.95,
+              "probabilities": {
+                "parent_role": 0.02,
+                "pathways": 0.01,
+                "competition": 0.01,
+                "body": 0.0,
+                "none_of_these": 0.96,
+                "training": 0.0,
+                "safety": 0.0,
+                "mindset": 0.0
+              }
+            },
+            "parent_value": {
+              "type": "score",
+              "score": 2.07,
+              "confidence": 0.91,
+              "legend": {
+                "0": "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+                "1": "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+                "2": "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+                "3": "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+              },
+              "probabilities": {
+                "0": 0.01,
+                "1": 0.0,
+                "2": 0.91,
+                "3": 0.08
+              }
+            }
+          },
+          "input_tokens": 1314,
+          "seconds": 0.57
+        }
+      }
+    ]
+  }
+}

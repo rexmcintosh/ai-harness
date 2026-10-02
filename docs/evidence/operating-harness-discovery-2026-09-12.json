@@ -1,0 +1,2241 @@
+{
+  "observed_at": "2026-09-12T17:50:54.253495+00:00",
+  "scope": "Local operating harness discovery, read-only except audit artifacts. Names and selected metadata only. Installed/configured does not mean effective.",
+  "projects": [
+    {
+      "directory": "MCP-Configuration-Assistant",
+      "path": "/home/dev/projects/MCP-Configuration-Assistant",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "NATO-support",
+      "path": "/home/dev/projects/NATO-support",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 2,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "Santa_Amaro_Home_Renovation",
+      "path": "/home/dev/projects/Santa_Amaro_Home_Renovation",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 4,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "aris-management-website",
+      "path": "/home/dev/projects/aris-management-website",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py",
+        "wrangler.jsonc",
+        "CLAUDE.md",
+        "package.json",
+        ".claude/commands/bridge.md",
+        ".agents/skills/repo-command-bridge/SKILL.md"
+      ],
+      "candidate_count": 8,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "attainprep-site",
+      "path": "/home/dev/projects/attainprep-site",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "candidate_count": 4,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "backlog",
+      "path": "/home/dev/projects/backlog",
+      "candidate_mechanism_paths": [
+        "README.md"
+      ],
+      "candidate_count": 1,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "bank-sales",
+      "path": "/home/dev/projects/bank-sales",
+      "candidate_mechanism_paths": [
+        "README.md"
+      ],
+      "candidate_count": 1,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "blkout-dice-roller",
+      "path": "/home/dev/projects/blkout-dice-roller",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/deploy.yml",
+        ".github/workflows/venice-review.yml",
+        "scripts/gen-icons.mjs",
+        "scripts/venice_review.py",
+        "package.json"
+      ],
+      "candidate_count": 6,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "bubblepop-art",
+      "path": "/home/dev/projects/bubblepop-art",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "build-ai-automation-workflow",
+      "path": "/home/dev/projects/build-ai-automation-workflow",
+      "candidate_mechanism_paths": [
+        "tools/ci-usage/pull.sh",
+        "tools/regress/bakeoff_grade.py",
+        "tools/regress/README.md",
+        "tools/regress/panels/aris-pr1.json",
+        "tools/regress/panels/stw-pr11.json",
+        "tools/regress/panels/baw-pr11.json",
+        "tools/regress/run.py",
+        "tools/regress/bakeoff.py",
+        "tools/regress/fixtures/baw-pr11/manifest.json",
+        "tools/regress/fixtures/baw-pr11/head/setup/templates/venice_review.py",
+        "tools/regress/fixtures/baw-pr11/head/scripts/venice_review.py",
+        "tools/regress/fixtures/baw-pr11/head/tests/test_venice_review_refactor.py",
+        "tools/regress/fixtures/stw-pr11/manifest.json",
+        "scripts/venice-usage-backfill.sh",
+        "scripts/venice_review.py",
+        "scripts/migrate-project.sh",
+        "scripts/audit-projects.sh",
+        "tools/regress/fixtures/stw-pr11/head/tools/i18n/translate.mjs",
+        "tools/regress/fixtures/stw-pr11/head/package.json",
+        "tools/regress/fixtures/aris-pr1/manifest.json",
+        "tools/regress/fixtures/aris-pr1/head/package.json",
+        "tools/regress/recover_panel.py",
+        "tools/regress/__init__.py",
+        "tools/regress/harness.py",
+        "tools/budget_transport.py",
+        "README.md",
+        "pyproject.toml",
+        ".github/workflows/venice-review.yml",
+        "AGENTS.md"
+      ],
+      "candidate_count": 29,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "caimcintosh-website",
+      "path": "/home/dev/projects/caimcintosh-website",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "package.json"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "combat-arms-transition",
+      "path": "/home/dev/projects/combat-arms-transition",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "crypto-portfolio",
+      "path": "/home/dev/projects/crypto-portfolio",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "pyproject.toml",
+        ".github/workflows/venice-review.yml",
+        "scripts/sanity_2025.py",
+        "scripts/staking_analysis.py",
+        "scripts/rocket_pool.py",
+        "scripts/summ.py",
+        "scripts/venice_review.py",
+        "scripts/discover_validators.py",
+        "scripts/env.py",
+        "scripts/reconcile_evm.py",
+        "scripts/accounts.py",
+        "scripts/rocket_pool_distributions.py",
+        "scripts/chains/etherscan.py",
+        "scripts/chains/__init__.py",
+        "scripts/chains/beaconchain.py"
+      ],
+      "candidate_count": 16,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "dump",
+      "path": "/home/dev/projects/dump",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "finance-tracker",
+      "path": "/home/dev/projects/finance-tracker",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "CLAUDE.md",
+        "package.json",
+        "scripts/venice_review.py",
+        "scripts/rebalance/ticket.ts",
+        "scripts/rebalance/check.ts",
+        "scripts/rebalance/verify.ts",
+        ".claude/skills/rebalance/SKILL.md"
+      ],
+      "candidate_count": 9,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "flight-7-publishing",
+      "path": "/home/dev/projects/flight-7-publishing",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".agents/skills/repo-command-bridge/SKILL.md",
+        "wrangler.jsonc",
+        "AGENTS.md",
+        "package.json"
+      ],
+      "candidate_count": 5,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "game-idea-aaow-civil-war",
+      "path": "/home/dev/projects/game-idea-aaow-civil-war",
+      "candidate_mechanism_paths": [
+        "package.json"
+      ],
+      "candidate_count": 1,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "game-idea-prydain-tower",
+      "path": "/home/dev/projects/game-idea-prydain-tower",
+      "candidate_mechanism_paths": [],
+      "candidate_count": 0,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "govcon-hunt-list",
+      "path": "/home/dev/projects/govcon-hunt-list",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 2,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "harness-engineering",
+      "path": "/home/dev/projects/harness-engineering",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "CLAUDE.md",
+        "AGENTS.md"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "liam_mobility",
+      "path": "/home/dev/projects/liam_mobility",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 3,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "macmcintosh",
+      "path": "/home/dev/projects/macmcintosh",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 4,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "monthly-bidding",
+      "path": "/home/dev/projects/monthly-bidding",
+      "candidate_mechanism_paths": [
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 4,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "roam",
+      "path": "/home/dev/projects/roam",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "package.json"
+      ],
+      "candidate_count": 2,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "romance-elliecalloway.com",
+      "path": "/home/dev/projects/romance-elliecalloway.com",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "CLAUDE.md",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "candidate_count": 5,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "romance-empire",
+      "path": "/home/dev/projects/romance-empire",
+      "candidate_mechanism_paths": [
+        ".github/workflows/venice-review.yml",
+        "scripts/overnight-2026-06-23.sh",
+        "scripts/proofread-resolve.py",
+        "scripts/scene-texture-scan.py",
+        "scripts/research-sweep.py",
+        "scripts/coherence-read.py",
+        "scripts/blind-bakeoff.py",
+        "scripts/trim-said-tags.py",
+        "scripts/clarity-scan.py",
+        "scripts/fix-ht-catalyst-aftermath.py",
+        "scripts/fix-undertow-timeline.py",
+        "scripts/persona-canon-bundle.py",
+        "scripts/apply-revision.py",
+        "scripts/venice_review.py",
+        "scripts/update-proofread-policy-undertow.py",
+        "scripts/world-check.py",
+        "scripts/amazon-ads-auth.py",
+        "scripts/ops.py",
+        "scripts/fix-ht-catalyst.py",
+        "scripts/apply-ht-decisions.py",
+        "scripts/plant-defects.py",
+        "scripts/timeline-check.py",
+        "scripts/ops-compose.sh",
+        "scripts/fix-ht-carmen-sisters.py",
+        "scripts/ht-splice.py",
+        "scripts/integrate-resolution.py",
+        "scripts/persona-synthesize.py",
+        "scripts/persona-research.py",
+        "scripts/ops-tick.sh",
+        "scripts/fix-ht-continuity.py",
+        "scripts/texture-pass.py",
+        "scripts/integrate-batchA.py",
+        "scripts/epistemic-probe.py",
+        "scripts/ht-decontaminate.py",
+        "scripts/trim-polish.py",
+        "scripts/rebuild-series-canon.py",
+        "scripts/proofread-worklist.py",
+        "scripts/fix-undertow-continuity.py",
+        "scripts/trim-unhurried-catalog.py",
+        "scripts/trim-emdash.py",
+        "scripts/clarity-megareport.py",
+        "scripts/trim-unhurried-saltbox.py",
+        "scripts/persona-overnight.sh",
+        "scripts/fix-sw-timeline.py",
+        "scripts/trim-ai-tells.py",
+        "scripts/integrate-rework.py",
+        "scripts/fix-lock-blockers.py",
+        "scripts/split-undertow-copy.py",
+        "scripts/repair-pov-headings.py",
+        "scripts/trim-verbal-tics-false-start.py",
+        "scripts/trim-tics-high-tide.py",
+        "scripts/engage-scan.sh",
+        ".claude/commands/advance.md",
+        ".claude/commands/status.md",
+        ".claude/commands/cover.md",
+        ".claude/commands/edit.md",
+        ".claude/commands/build.md",
+        ".claude/commands/draft.md",
+        ".claude/commands/review-series.md",
+        ".claude/commands/proofread.md",
+        ".claude/commands/metadata.md",
+        ".claude/commands/lock.md",
+        ".claude/commands/references.md",
+        ".claude/commands/review-outline.md",
+        ".claude/commands/publish.md",
+        ".claude/commands/new-book.md",
+        ".claude/commands/new-series.md",
+        "CLAUDE.md"
+      ],
+      "candidate_count": 68,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "romance-tessacross.com",
+      "path": "/home/dev/projects/romance-tessacross.com",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "CLAUDE.md",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "candidate_count": 5,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "sat-prep",
+      "path": "/home/dev/projects/sat-prep",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "package.json",
+        "AGENTS.md",
+        "IDEAL_STATE.md",
+        "scripts/stripe-live-cutover-db.sh",
+        "scripts/create-users.ts",
+        "scripts/bento-drill.ts",
+        "scripts/check-tutorial-sql.mjs",
+        "scripts/stripe-live-prep.sh",
+        "scripts/rls-test.ts",
+        "scripts/check-theme.mjs",
+        "scripts/stripe-founder-codes.sh",
+        "scripts/validate-content.ts",
+        "scripts/events-report.ts",
+        "scripts/check-bluebook-upload.mjs",
+        "scripts/bento-sync.ts",
+        "scripts/check-tutorial.mjs",
+        "scripts/create-market-project.md",
+        "scripts/import-family-student.ts",
+        "scripts/digest.ts",
+        "scripts/feedback-sync.ts",
+        "scripts/validate-vocab.ts",
+        "scripts/audit-habit-loop.ts",
+        "scripts/seed.ts",
+        "scripts/seed-staging.ts",
+        "scripts/check-khan-links.ts"
+      ],
+      "candidate_count": 27,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "sat-prep-dark-mode",
+      "path": "/home/dev/projects/sat-prep-dark-mode",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "package.json",
+        "scripts/stripe-live-cutover-db.sh",
+        "scripts/create-users.ts",
+        "scripts/bento-drill.ts",
+        "scripts/check-tutorial-sql.mjs",
+        "scripts/stripe-live-prep.sh",
+        "scripts/rls-test.ts",
+        "scripts/check-theme.mjs",
+        "scripts/stripe-founder-codes.sh",
+        "scripts/validate-content.ts",
+        "scripts/events-report.ts",
+        "scripts/check-bluebook-upload.mjs",
+        "scripts/bento-sync.ts",
+        "scripts/check-tutorial.mjs",
+        "scripts/create-market-project.md",
+        "scripts/import-family-student.ts",
+        "scripts/digest.ts",
+        "scripts/feedback-sync.ts",
+        "scripts/validate-vocab.ts",
+        "scripts/audit-habit-loop.ts",
+        "scripts/seed.ts",
+        "scripts/seed-staging.ts",
+        "scripts/check-khan-links.ts"
+      ],
+      "candidate_count": 25,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "sat-prep-tutor-preview",
+      "path": "/home/dev/projects/sat-prep-tutor-preview",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "wrangler.jsonc",
+        "package.json",
+        "scripts/stripe-live-cutover-db.sh",
+        "scripts/create-users.ts",
+        "scripts/bento-drill.ts",
+        "scripts/check-tutorial-sql.mjs",
+        "scripts/stripe-live-prep.sh",
+        "scripts/check-tutor-preview.mjs",
+        "scripts/rls-test.ts",
+        "scripts/stripe-founder-codes.sh",
+        "scripts/validate-content.ts",
+        "scripts/events-report.ts",
+        "scripts/check-bluebook-upload.mjs",
+        "scripts/bento-sync.ts",
+        "scripts/check-tutorial.mjs",
+        "scripts/create-market-project.md",
+        "scripts/import-family-student.ts",
+        "scripts/digest.ts",
+        "scripts/feedback-sync.ts",
+        "scripts/validate-vocab.ts",
+        "scripts/audit-habit-loop.ts",
+        "scripts/seed.ts",
+        "scripts/seed-staging.ts",
+        "scripts/check-khan-links.ts"
+      ],
+      "candidate_count": 25,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "splash_poller",
+      "path": "/home/dev/projects/splash_poller",
+      "candidate_mechanism_paths": [
+        ".github/workflows/venice-review.yml",
+        "scripts/venice_review.py",
+        "scripts/dedupe_swimmers.py",
+        "scripts/install_cron.sh",
+        "scripts/ingest_once.py"
+      ],
+      "candidate_count": 5,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "swimtrack",
+      "path": "/home/dev/projects/swimtrack",
+      "candidate_mechanism_paths": [
+        ".github/workflows/venice-review.yml",
+        ".github/workflows/editorial-scan.yml",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "scripts/venice_review.py"
+      ],
+      "candidate_count": 5,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "swimtrack-coach",
+      "path": "/home/dev/projects/swimtrack-coach",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "scripts/eval-parser.ts",
+        "scripts/judge.ts",
+        "scripts/extract-tac.mjs",
+        "CLAUDE.md",
+        "package.json",
+        "AGENTS.md"
+      ],
+      "candidate_count": 7,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "swimtrack-website",
+      "path": "/home/dev/projects/swimtrack-website",
+      "candidate_mechanism_paths": [
+        "engine/CRITIQUE.md",
+        "engine/EDITS.md",
+        "engine/stories/.gitkeep",
+        "engine/stories/2026-08.json",
+        "engine/stories/2026-09.json",
+        "engine/competitors.json",
+        "engine/revise-run.sh",
+        "engine/morning-run.sh",
+        "engine/verdicts/applied/2026-08-18-2026-08-18.json",
+        "engine/verdicts/applied/2026-08-03-2026-08-03.json",
+        "engine/verdicts/applied/2026-08-21-2026-08-21.json",
+        "engine/verdicts/applied/2026-09-03-2026-09-03.json",
+        "engine/verdicts/applied/2026-09-02-2026-09-02.json",
+        "engine/verdicts/applied/2026-08-14-2026-08-14.json",
+        "engine/verdicts/applied/2026-08-17-2026-08-17.json",
+        "engine/verdicts/applied/2026-08-20-2026-08-20.json",
+        "engine/verdicts/applied/2026-08-10-2026-08-10.json",
+        "engine/verdicts/applied/2026-08-26-2026-08-26.json",
+        "engine/verdicts/applied/2026-08-25-2026-08-25.json",
+        "engine/verdicts/applied/2026-08-11-2026-08-11.json",
+        "engine/verdicts/applied/2026-09-01-2026-09-01.json",
+        "engine/verdicts/applied/2026-08-31-2026-08-31.json",
+        "engine/verdicts/applied/2026-09-04-2026-09-04.json",
+        "engine/verdicts/applied/2026-08-19-2026-08-19.json",
+        "engine/verdicts/applied/2026-08-28-2026-08-28.json",
+        "engine/verdicts/applied/2026-08-12-2026-08-12.json",
+        "engine/verdicts/applied/2026-08-13-2026-08-13.json",
+        "engine/verdicts/applied/2026-08-27-2026-08-27.json",
+        "engine/MORNING.md",
+        "engine/sources.json",
+        "engine/RANKING.md",
+        "engine/VOICE.md",
+        "engine/poller-cron.sh",
+        "engine/workbench/base-season-vs-race-season-2026-08-12/brief.md",
+        "engine/workbench/base-season-vs-race-season-2026-08-12/draft.md",
+        "engine/workbench/base-season-vs-race-season-2026-08-12/humanize-verdicts.md",
+        "engine/workbench/what-a-pre-race-routine-actually-is-2026-08-21/brief.md",
+        "engine/workbench/what-a-pre-race-routine-actually-is-2026-08-21/draft.md",
+        "engine/workbench/why-is-my-kid-in-infantis-a-2026-08-13/brief.md",
+        "engine/workbench/why-is-my-kid-in-infantis-a-2026-08-13/draft.md",
+        "engine/workbench/dryland-explained-2026-08-14/brief.md",
+        "engine/workbench/dryland-explained-2026-08-14/draft.md",
+        "engine/workbench/getting-the-call-up-2026-08-28/brief.md",
+        "engine/workbench/getting-the-call-up-2026-08-28/humanizer-verdicts.md",
+        "engine/workbench/getting-the-call-up-2026-08-28/getting-the-call-up.md",
+        "engine/workbench/pool-deck-etiquette-2026-08-25/brief.md",
+        "engine/workbench/pool-deck-etiquette-2026-08-25/pool-deck-etiquette.md",
+        "engine/workbench/what-this-sport-asks-of-your-family-2026-08-19/brief.md",
+        "engine/workbench/what-this-sport-asks-of-your-family-2026-08-19/draft.md",
+        "engine/workbench/what-about-my-other-kids-2026-08-18/brief.md",
+        "engine/workbench/what-about-my-other-kids-2026-08-18/what-about-my-other-kids.md",
+        "engine/workbench/when-no-swim-is-good-enough-2026-08-17/when-no-swim-is-good-enough.md",
+        "engine/workbench/when-no-swim-is-good-enough-2026-08-17/brief.md",
+        "engine/workbench/how-many-practices-is-normal-2026-08-26/brief.md",
+        "engine/workbench/how-many-practices-is-normal-2026-08-26/how-many-practices-is-normal.md",
+        "engine/workbench/your-swimmers-first-meet-2026-08-11/brief.md",
+        "engine/workbench/your-swimmers-first-meet-2026-08-11/draft.md",
+        "engine/workbench/getting-the-call-up-2026-08-03/brief.md",
+        "IDEAL_STATE.md",
+        "scripts/engine/approval-tokens.mjs",
+        "scripts/engine/story-store.mjs",
+        "scripts/engine/mail.mjs",
+        "scripts/engine/sources.mjs",
+        "scripts/engine/feeds.mjs",
+        "scripts/collect-stories.mjs",
+        "scripts/preview-drafts.mjs",
+        "scripts/publish-draft.mjs",
+        "scripts/poll-decisions.mjs",
+        "scripts/backlog.mjs",
+        "scripts/build-navigator.mjs",
+        "scripts/venice_review.py",
+        "scripts/check-draft.mjs",
+        "scripts/apply-verdicts.mjs",
+        "scripts/fixtures/drafts/fixture-swim-example.md",
+        "scripts/fixtures/engine/verdict-valid.json",
+        "scripts/stale-flags.mjs",
+        "scripts/send-digest.mjs",
+        "scripts/check-agents.sh",
+        "scripts/check-season-migration.mjs",
+        "scripts/draft-validation.test.mjs",
+        "scripts/mark-story.mjs",
+        "scripts/draft-validation.mjs",
+        "scripts/check-navigator.mjs",
+        ".agents/skills/repo-skill-verify/SKILL.md",
+        "wrangler.jsonc",
+        "CLAUDE.md",
+        "package.json",
+        "engine/revisions/.gitkeep",
+        "engine/fix-run.sh",
+        "tools/og-image/README.md",
+        "tools/og-image/render_og.py",
+        "tools/image-engine/engine/usage_log.py",
+        "tools/image-engine/engine/briefs_people.py",
+        "tools/image-engine/engine/contact_sheet.py",
+        "tools/image-engine/engine/config.py",
+        "tools/image-engine/engine/prompts.py",
+        "tools/image-engine/engine/__init__.py",
+        "tools/image-engine/engine/venice.py",
+        "tools/image-engine/engine/briefs.py",
+        "tools/image-engine/README.md",
+        "engine/workbench/getting-the-call-up-2026-08-03/getting-the-call-up.md",
+        "engine/workbench/why-the-coach-talks-about-stroke-count-2026-08-20/brief.md",
+        "engine/workbench/why-the-coach-talks-about-stroke-count-2026-08-20/why-the-coach-talks-about-stroke-count.md",
+        "engine/workbench/the-swim-parent-identity-trap-2026-08-10/brief.md",
+        "engine/workbench/the-swim-parent-identity-trap-2026-08-10/draft.md",
+        "engine/WRITING.md",
+        "engine/stale-flags.json",
+        "engine/REVISION.md",
+        "engine/backlog.json",
+        "engine/last-run.json",
+        "engine/cron.setup.sh",
+        "engine/FLAGFIX.md",
+        "tools/agent-metadata.mjs",
+        "tools/markdown-twins.test.mjs",
+        "tools/markdown-twins.mjs",
+        "README.md",
+        ".github/workflows/venice-review.yml",
+        "tools/image-engine/tests/test_config.py",
+        "tools/image-engine/tests/test_venice.py",
+        "tools/image-engine/tests/test_call_ledger.py",
+        "tools/image-engine/tests/test_usage_log.py",
+        "tools/image-engine/tests/test_prompts.py",
+        "tools/image-engine/tests/test_briefs.py",
+        "tools/image-engine/tests/test_venice_key.py",
+        "tools/image-engine/tests/test_run.py",
+        "tools/image-engine/tests/test_contact_sheet.py",
+        "tools/image-engine/tests/__init__.py",
+        "tools/articles/bakeoff-metrics.mjs",
+        "tools/articles/usage_log.py",
+        "tools/articles/bakeoff-codex.py",
+        "tools/articles/bakeoff.py",
+        "tools/articles/draft_article.py",
+        "tools/articles/draft.py",
+        "tools/articles/tests/test_draft.py",
+        "tools/articles/tests/test_call_ledger.py",
+        "tools/articles/tests/test_usage_log.py",
+        "tools/articles/tests/test_call_truncation.py",
+        "tools/articles/tests/__init__.py",
+        "tools/i18n/manifest.mjs",
+        "tools/i18n/README.md",
+        "tools/i18n/prompt.test.mjs",
+        "tools/i18n/translate.test.mjs",
+        "tools/i18n/sources.test.mjs",
+        "tools/i18n/manifest.test.mjs",
+        "tools/i18n/prompt.mjs",
+        "tools/i18n/usageLog.mjs",
+        "tools/i18n/manifest.json",
+        "tools/i18n/article-roundtrip.test.mjs",
+        "tools/i18n/glossary.json",
+        "tools/i18n/locales.test.mjs",
+        "tools/i18n/translate.mjs",
+        "tools/i18n/venice.mjs",
+        "tools/i18n/venice.test.mjs",
+        "tools/i18n/markdown.mjs",
+        "tools/i18n/sources.mjs",
+        "tools/i18n/locales.mjs",
+        "tools/i18n/sync.test.mjs",
+        "tools/i18n/markdown.test.mjs",
+        "tools/readability/load.test.mjs",
+        "tools/readability/README.md",
+        "tools/readability/load.mjs",
+        "tools/readability/lib.mjs",
+        "tools/readability/render.test.mjs",
+        "tools/readability/render.mjs",
+        "tools/readability/check.mjs",
+        "tools/readability/lib.test.mjs",
+        "tools/image-engine/run.py",
+        "tools/image-engine/experiments/article_heroes.py",
+        "tools/image-engine/experiments/ctt_backdrop.py",
+        "tools/image-engine/experiments/article_heroes_batch2.py"
+      ],
+      "candidate_count": 170,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "tax-advisor",
+      "path": "/home/dev/projects/tax-advisor",
+      "candidate_mechanism_paths": [],
+      "candidate_count": 0,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "ultimate-portugal",
+      "path": "/home/dev/projects/ultimate-portugal",
+      "candidate_mechanism_paths": [
+        "IDEAL_STATE.md",
+        "scripts/seo-report.mjs",
+        "scripts/check-catalog.mjs",
+        "scripts/engine-health.mjs",
+        "scripts/engine/refresh-review-call.test.mjs",
+        "scripts/engine/refresh-review-call.mjs",
+        "scripts/engine/approval-tokens.mjs",
+        "scripts/engine/seo-config.mjs",
+        "scripts/engine/serp-capture.mjs",
+        "scripts/engine/story-store.mjs",
+        "scripts/engine/new-article-evidence.mjs",
+        "scripts/engine/venice-write.mjs",
+        "scripts/engine/topical-map.mjs",
+        "scripts/engine/gsc.mjs",
+        "scripts/engine/seo-ledger.mjs",
+        "scripts/engine/venice.mjs",
+        "scripts/engine/taxonomy.test.mjs",
+        "scripts/engine/v2.mjs",
+        "scripts/engine/venice-prices.mjs",
+        "scripts/engine/sources.mjs",
+        "scripts/engine/gsc-insights.mjs",
+        "scripts/engine/bento-mail.mjs",
+        "scripts/engine/venice-call.mjs",
+        "scripts/engine/agent-visibility.mjs",
+        "scripts/engine/topical-map.test.mjs",
+        "scripts/engine/feeds.mjs",
+        "scripts/engine/deploy-stage.mjs",
+        "scripts/engine/dataforseo.mjs",
+        "scripts/check-seo-edit.mjs",
+        "scripts/partner-sweep.mjs",
+        "scripts/check-research.mjs",
+        "scripts/collect-stories.mjs",
+        "scripts/verify-rents.mjs",
+        "scripts/preview-drafts.mjs",
+        "scripts/publish-draft.mjs",
+        "scripts/poll-decisions.mjs",
+        "scripts/backlog.mjs",
+        "scripts/seo-bless.mjs",
+        "scripts/venice_review.py",
+        "scripts/seo-execute.mjs",
+        "scripts/check-draft.mjs",
+        "scripts/apply-verdicts.mjs",
+        "scripts/check-new-article-v2.mjs",
+        "scripts/topical-map.mjs",
+        "scripts/seo-analyze.mjs",
+        "scripts/check-morning-runner.mjs",
+        "scripts/verify-rents.config.mjs",
+        "engine/CRITIQUE.md",
+        "engine/topical-map.json",
+        "engine/EDITS.md",
+        "engine/stories/.gitkeep",
+        "engine/stories/2026-07.json",
+        "engine/stories/2026-08.json",
+        "engine/stories/2026-09.json",
+        "engine/competitors.json",
+        "engine/v2.json",
+        "engine/revise-run.sh",
+        "engine/morning-run.sh",
+        "engine/research/place-benchmarks-2026-09-05.json",
+        "engine/TOPICAL-MAP.md",
+        "engine/WRITING-V2.md",
+        "engine/visibility/evidence/agent-citation-baseline-chatgpt-blocked-2026-09-05.json",
+        "engine/visibility/evidence/agent-evidence-preview-2026-09-05.json",
+        "engine/visibility/evidence/porto-budget-preview-2026-09-06.json",
+        "engine/visibility/evidence/residency-budget-live-2026-09-06.json",
+        "engine/visibility/evidence/residency-budget-preview-2026-09-05.json",
+        "engine/visibility/evidence/porto-budget-live-2026-09-06.json",
+        "engine/visibility/evidence/deployment-verification-2026-09-05.json",
+        "engine/visibility/evidence/porto-budget-council-2026-09-06.json",
+        "engine/visibility/evidence/agent-evidence-live-2026-09-05.json",
+        "engine/visibility/benchmark.json",
+        "engine/verdicts/applied/2026-08-18-2026-08-18.json",
+        "engine/verdicts/applied/2026-08-03-2026-08-03.json",
+        "engine/verdicts/applied/.gitkeep",
+        "engine/verdicts/applied/2026-08-21-2026-08-21.json",
+        "engine/verdicts/applied/2026-08-05-2026-08-05.json",
+        "engine/verdicts/applied/2026-08-04-2026-08-04.json",
+        "engine/verdicts/applied/2026-09-03-2026-09-03.json",
+        "engine/verdicts/applied/2026-09-02-2026-09-02.json",
+        "engine/verdicts/applied/2026-08-14-2026-08-14.json",
+        "engine/verdicts/applied/2026-08-06-2026-08-06.json",
+        "engine/verdicts/applied/2026-08-17-2026-08-17.json",
+        "engine/verdicts/applied/2026-09-10-2026-09-10.json",
+        "engine/verdicts/applied/2026-08-20-2026-08-20.json",
+        "engine/verdicts/applied/2026-08-10-2026-08-10.json",
+        "engine/verdicts/applied/2026-09-11-2026-09-11.json",
+        "engine/verdicts/applied/2026-09-09-2026-09-09.json",
+        "engine/verdicts/applied/2026-09-07-2026-09-07.json",
+        "engine/verdicts/applied/2026-08-07-2026-08-07.json",
+        "engine/verdicts/applied/2026-08-11-2026-08-11.json",
+        "engine/verdicts/applied/2026-07-31-2026-07-31.json",
+        "engine/verdicts/applied/2026-09-01-2026-09-01.json",
+        "engine/verdicts/applied/2026-08-31-2026-08-31.json",
+        "engine/verdicts/applied/2026-08-07-2-2026-08-07.json",
+        "engine/verdicts/applied/2026-09-04-2026-09-04.json",
+        "engine/verdicts/applied/2026-08-19-2026-08-19.json",
+        "engine/verdicts/applied/2026-09-11-2-2026-09-11.json",
+        "engine/verdicts/applied/2026-08-28-2026-08-28.json",
+        "engine/verdicts/applied/2026-08-12-2026-08-12.json",
+        "engine/verdicts/applied/2026-08-01-2026-08-01.json",
+        "engine/verdicts/applied/2026-09-08-2026-09-08.json",
+        "engine/verdicts/applied/2026-08-13-2026-08-13.json",
+        "engine/verdicts/applied/2026-08-27-2026-08-27.json",
+        "engine/MORNING.md",
+        "engine/sources.json",
+        "engine/refresh/evidence/2026-09-07-visas/helper-README.md",
+        "engine/refresh/evidence/2026-09-07-visas/minimum-wage-excerpt.md",
+        "engine/refresh/evidence/2026-09-07-visas/sectigo-ov-r36.pem",
+        "engine/refresh/evidence/2026-09-07-visas/financas-ifici.html",
+        "engine/refresh/evidence/2026-09-07-visas/d8-digital-nomad-visa-helper.md",
+        "engine/refresh/evidence/2026-09-07-visas/README.md",
+        "engine/refresh/evidence/2026-09-07-visas/helper-source-review.md",
+        "engine/refresh/evidence/2026-09-07-visas/root-dre-nationality.txt",
+        "engine/refresh/evidence/2026-09-07-visas/aima-permanent-residence.html",
+        "engine/refresh/evidence/2026-09-07-visas/root-dre-minimum-wage.txt",
+        "engine/refresh/evidence/2026-09-07-visas/financas-cirs-art16.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/financas-cirs-art18.html",
+        "engine/refresh/evidence/2026-09-07-visas/financas-cirs-art16.html",
+        "engine/refresh/evidence/2026-09-07-visas/manifest.json",
+        "engine/refresh/evidence/2026-09-07-visas/aima-ari-faq.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/dre-dr4-2022.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/financas-cirs-art15.html",
+        "engine/refresh/evidence/2026-09-07-visas/aima-d8-residence.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/financas-ifici.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/aima-ari.html",
+        "engine/refresh/evidence/2026-09-07-visas/golden-visa-portugal-helper.md",
+        "engine/refresh/evidence/2026-09-07-visas/aima-permanent-residence.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/aima-ari-faq.html",
+        "engine/refresh/evidence/2026-09-07-visas/aima-d8-residence.html",
+        "engine/refresh/evidence/2026-09-07-visas/dre-dr4-2022.txt",
+        "engine/refresh/evidence/2026-09-07-visas/aima-ari.headers.txt",
+        "engine/refresh/evidence/2026-09-07-visas/root-dre-residency.txt",
+        "engine/refresh/d7-visa-portugal/2026-09-07/research.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/recheck.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/protected-facts.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/brief.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/card.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/qa.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/writer-card.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/editor-changes.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/source-article.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/factual-review.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/initial-draft-gate.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/publisher-dry-run.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/article.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/draft.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/initial-factual-review.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/gate-run.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/final-refresh-gate.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/initial-refresh-gate.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/pre-review.md",
+        "engine/refresh/d7-visa-portugal/2026-09-07/run.json",
+        "engine/refresh/d7-visa-portugal/2026-09-07/final-draft-gate.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/research.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/recheck.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/protected-facts.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/brief.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/card.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/qa.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/writer-card.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/editor-changes.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/source-article.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/factual-review.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/initial-draft-gate.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/publisher-dry-run.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/article.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/draft.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/initial-factual-review.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/gate-run.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/final-refresh-gate.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/initial-refresh-gate.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/pre-review.md",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/run.json",
+        "engine/refresh/d8-digital-nomad-visa/2026-09-07/final-draft-gate.json",
+        "engine/refresh/ledger.json",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/research.md",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/recheck.json",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/protected-facts.json",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/brief.md",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/correction.json",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/qa.md",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/article.md",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/research-helper.md",
+        "engine/refresh/how-to-get-a-nif-portugal/2026-09-05/run.json",
+        "engine/refresh/reference/research.md",
+        "engine/refresh/reference/brief.md",
+        "engine/refresh/reference/qa.md",
+        "engine/refresh/reference/selection.json",
+        "engine/refresh/reference/verdict.md",
+        "engine/refresh/reference/run.json",
+        "engine/refresh/reference/benchmark-decision.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/research.md",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/recheck.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/protected-facts.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/brief.md",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/qa.md",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/.runtime/competitors/selection.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/.runtime/competitors/benchmark-decision.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/article.md",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/verdict.md",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/run.json",
+        "engine/refresh/healthcare-in-portugal/2026-09-04/evidence-addendum-2026-09-05.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/research.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/recheck.json",
+        "engine/refresh/aima-residency-appointments/2026-09-05/protected-facts.json",
+        "engine/refresh/aima-residency-appointments/2026-09-05/brief.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/card.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/correction.json",
+        "engine/refresh/aima-residency-appointments/2026-09-05/qa.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/source-fetches.json",
+        "engine/refresh/aima-residency-appointments/2026-09-05/publisher-dry-run.json",
+        "engine/refresh/aima-residency-appointments/2026-09-05/article.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/research-helper.md",
+        "engine/refresh/aima-residency-appointments/2026-09-05/run.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/research.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/recheck.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/protected-facts.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/brief.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/card.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/qa.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/writer-card.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/editor-changes.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/source-article.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/factual-review.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/initial-draft-gate.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/publisher-dry-run.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/article.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/draft.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/initial-factual-review.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/gate-run.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/final-refresh-gate.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/initial-refresh-gate.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/pre-review.md",
+        "engine/refresh/golden-visa-portugal/2026-09-07/run.json",
+        "engine/refresh/golden-visa-portugal/2026-09-07/final-draft-gate.json",
+        "engine/refresh/queue.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/research.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/recheck.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/protected-facts.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/brief.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/card.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/qa.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/price-evidence.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/qa.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/publisher-dry-run.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/article.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/research-helper.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-06/run.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/research.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/recheck.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/protected-facts.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/brief.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/card.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/correction.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/qa.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/publisher-dry-run.json",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/article.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/research-helper.md",
+        "engine/refresh/cost-of-living-portugal/2026-09-05/run.json",
+        "engine/RANKING.md",
+        "engine/VOICE.md",
+        "engine/poller-cron.sh",
+        "engine/SEO.md",
+        "engine/WRITING.md",
+        "engine/seo-transaction.sh",
+        "engine/stale-flags.json",
+        "engine/refresh-run.sh",
+        "engine/REVISION.md",
+        "engine/REFRESH.md",
+        "engine/seo/ledger.json",
+        "engine/seo/workorder.json",
+        "engine/seo/config.json",
+        "engine/seo/execution.json",
+        "engine/backlog.json",
+        "engine/briefs/which-portugal-visa-do-i-need.md",
+        "engine/briefs/tax-residency-portugal.md",
+        "engine/briefs/renting-a-home-in-portugal-as-a-foreigner.md",
+        "engine/briefs/international-school-costs-in-portugal.md",
+        "engine/briefs/sintra-day-trip-from-lisbon.md",
+        "engine/briefs/portugal-itinerary-10-days.md",
+        "engine/briefs/first-irs-tax-return-in-portugal.md",
+        "engine/briefs/public-schools-in-portugal.md",
+        "engine/cron.setup.sh",
+        "engine/FLAGFIX.md",
+        "engine/seo-run.sh",
+        "engine/fix-run.sh",
+        "README.md",
+        "scripts/fixtures/drafts/fixture-aima-example.md",
+        "scripts/fixtures/new-article-v2/research.md",
+        "scripts/fixtures/new-article-v2/reviewer-system.md",
+        "scripts/fixtures/new-article-v2/brief.md",
+        "scripts/fixtures/new-article-v2/competitors.json",
+        "scripts/fixtures/new-article-v2/benchmark.json",
+        "scripts/fixtures/new-article-v2/competitor-a.md",
+        "scripts/fixtures/engine/verdict-valid.json",
+        "scripts/fixtures/engine/digest-card.md",
+        "scripts/fixtures/ine-2026q1/data-0014704.json",
+        "scripts/fixtures/ine-2026q1/data-0014707.json",
+        "scripts/fixtures/ine-2026q1/data-0014696.json",
+        "scripts/fixtures/ine-2026q1/meta-0014696.json",
+        "scripts/fixtures/check-draft-post.md",
+        "scripts/fixtures/check-draft-guide.md",
+        "scripts/stale-flags.mjs",
+        "scripts/send-digest.mjs",
+        "scripts/refresh-queue.mjs",
+        "scripts/check-agents.sh",
+        "scripts/ts-tunnel.mjs",
+        "scripts/agent-visibility.mjs",
+        "scripts/check-refresh.mjs",
+        "scripts/publish-refresh.mjs",
+        "scripts/check-content-health.mjs",
+        "scripts/mark-story.mjs",
+        "scripts/check-seo-runner.mjs",
+        "scripts/seo-go-live.mjs",
+        "scripts/generate-og.mjs",
+        "scripts/generate-icons.mjs",
+        ".claude/commands/action-flag-fix.md",
+        ".claude/commands/refresh-diagnose.md",
+        ".claude/commands/action-revision.md",
+        ".claude/commands/refresh-run.md",
+        ".claude/commands/morning-run.md",
+        ".agents/skills/repo-command-action-revision/SKILL.md",
+        ".agents/skills/repo-command-morning-run/SKILL.md",
+        ".agents/skills/repo-command-refresh-run/SKILL.md",
+        ".agents/skills/repo-command-refresh-diagnose/SKILL.md",
+        ".agents/skills/repo-command-action-flag-fix/SKILL.md",
+        "wrangler.jsonc",
+        "package.json",
+        "AGENTS.md",
+        ".github/workflows/venice-review.yml",
+        ".github/workflows/ci.yml"
+      ],
+      "candidate_count": 331,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "ultimate-portugal-visuals",
+      "path": "/home/dev/projects/ultimate-portugal-visuals",
+      "candidate_mechanism_paths": [],
+      "candidate_count": 0,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    },
+    {
+      "directory": "vps-tools",
+      "path": "/home/dev/projects/vps-tools",
+      "candidate_mechanism_paths": [
+        "README.md",
+        "bin/telegram-orphan-reaper.sh"
+      ],
+      "candidate_count": 2,
+      "interpretation": "Discovery candidates, not one mechanism per file or proof of runtime."
+    }
+  ],
+  "shared_repository_head": "bbb2907831702eff741668e15fab8ca93395a03a",
+  "shared_installed_comparison": [
+    {
+      "relative_path": "council/cli.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/council/cli.py",
+      "matches_source": true,
+      "source_sha256": "641e9b0bd19c4b714f10c7ab149333259cc0a766944c13c57f465e5d84b15c19"
+    },
+    {
+      "relative_path": "council/config.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/council/config.py",
+      "matches_source": true,
+      "source_sha256": "792c12d08678d0a53b9e211a35863cb102c987b08cda55b9e8e5689f029ef21a"
+    },
+    {
+      "relative_path": "council/review.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/council/review.py",
+      "matches_source": true,
+      "source_sha256": "2340e7d862aeb76cd15b3a4d0dc1092f3d4138355384a1494df4886cd51d887a"
+    },
+    {
+      "relative_path": "council/gate.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/council/gate.py",
+      "matches_source": true,
+      "source_sha256": "9070b582d79d160e249325cb64795f188a7722c5c651a017048e41d2cc83c611"
+    },
+    {
+      "relative_path": "diem/drain.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/diem/drain.py",
+      "matches_source": true,
+      "source_sha256": "3aa6f817f74b5691078e61e8e34b9c08f7ce1ac5bb6d1a3a10b5c7c82b0719db"
+    },
+    {
+      "relative_path": "backlogrun/cli.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/backlogrun/cli.py",
+      "matches_source": true,
+      "source_sha256": "27203c9ac90063001055c51e1e018e8f5f5e3fa67200f8b04e61e018e5a41b1d"
+    },
+    {
+      "relative_path": "sessiongc/cli.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/sessiongc/cli.py",
+      "matches_source": true,
+      "source_sha256": "ab3aceb041441e830b46fa2d75da8b4ed3472352ea9c1a9ee038580b825dab31"
+    },
+    {
+      "relative_path": "venice_usage/ledger.py",
+      "installed_path": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/venice_usage/ledger.py",
+      "matches_source": true,
+      "source_sha256": "3ae08feb09edc37bf4bfb067807d3b57566ca5121d30e50ba1ca06a156b20388"
+    }
+  ],
+  "council": {
+    "panel_source": "/home/dev/.local/share/pipx/venvs/council/lib/python3.12/site-packages/council/panels.toml",
+    "panels": {
+      "code-review": [
+        {
+          "seat": "Eng Manager",
+          "model": "openai-gpt-53-codex"
+        },
+        {
+          "seat": "Security Officer",
+          "model": "deepseek-v4-pro"
+        },
+        {
+          "seat": "Adversary",
+          "model": "grok-4-3"
+        }
+      ],
+      "decision": [
+        {
+          "seat": "Founder",
+          "model": "gemini-3-1-pro-preview"
+        },
+        {
+          "seat": "Eng Manager",
+          "model": "openai-gpt-53-codex"
+        },
+        {
+          "seat": "Inversion Adversary",
+          "model": "deepseek-v4-pro"
+        }
+      ],
+      "brainstorm": [
+        {
+          "seat": "YC Partner",
+          "model": "claude-opus-4-7"
+        },
+        {
+          "seat": "Scope-Expansion Founder",
+          "model": "grok-4-3"
+        },
+        {
+          "seat": "Designer",
+          "model": "gemini-3-1-pro-preview"
+        }
+      ],
+      "red-team": [
+        {
+          "seat": "Adversary",
+          "model": "grok-4-3"
+        },
+        {
+          "seat": "Security Officer",
+          "model": "deepseek-v4-pro"
+        },
+        {
+          "seat": "Eng Manager",
+          "model": "openai-gpt-53-codex"
+        },
+        {
+          "seat": "Inversion Founder",
+          "model": "claude-opus-4-7"
+        }
+      ],
+      "spec-review": [
+        {
+          "seat": "Editor",
+          "model": "gemini-3-1-pro-preview"
+        },
+        {
+          "seat": "Domain Skeptic",
+          "model": "grok-4-3"
+        },
+        {
+          "seat": "Implementer",
+          "model": "openai-gpt-53-codex"
+        },
+        {
+          "seat": "Pre-mortem Adversary",
+          "model": "deepseek-v4-pro"
+        }
+      ]
+    },
+    "settings": {
+      "default_panel": "decision",
+      "router_model": "gemini-3-5-flash",
+      "chair_model": "claude-opus-4-8",
+      "max_completion_tokens": 24000,
+      "chair_max_completion_tokens": 8000,
+      "router_max_completion_tokens": 2000
+    }
+  },
+  "usage_activity_by_project": [
+    {
+      "project": "backlog-runner",
+      "source": "venice-work",
+      "rows": 25
+    },
+    {
+      "project": "council",
+      "source": "council/venice",
+      "rows": 1836
+    },
+    {
+      "project": "loom",
+      "source": "loom/venice",
+      "rows": 6711
+    },
+    {
+      "project": "romance",
+      "source": "condition_images",
+      "rows": 1600
+    },
+    {
+      "project": "romance",
+      "source": "generate_images",
+      "rows": 1921
+    },
+    {
+      "project": "romance",
+      "source": "reels",
+      "rows": 36
+    },
+    {
+      "project": "romance",
+      "source": "venice-draft-opus.sh",
+      "rows": 60
+    },
+    {
+      "project": "romance",
+      "source": "venice_runtime",
+      "rows": 4849
+    },
+    {
+      "project": "swimtrack-website",
+      "source": "i18n/venice",
+      "rows": 5837
+    },
+    {
+      "project": "swimtrack-website",
+      "source": "image-engine:hero",
+      "rows": 13
+    },
+    {
+      "project": "ultimate-portugal",
+      "source": "ultimate-portugal/venice",
+      "rows": 8
+    }
+  ],
+  "usage_window": [
+    "2026-07-19T23:36:16",
+    "2026-09-12T09:39:42"
+  ],
+  "cron_mechanisms": [
+    {
+      "schedule": "0 7 * * *",
+      "referenced_paths": [
+        "/home/dev/projects/build-ai-automation-workflow/bebop/run-briefing.sh"
+      ]
+    },
+    {
+      "schedule": "0 18 * * *",
+      "referenced_paths": [
+        "/home/dev/projects/build-ai-automation-workflow/bebop/run-briefing.sh"
+      ]
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "referenced_paths": [
+        "/home/dev/projects/build-ai-automation-workflow/watchdog/run-watchdog.sh"
+      ]
+    },
+    {
+      "schedule": "0 4 * * 1",
+      "referenced_paths": [
+        "/home/dev/projects/build-ai-automation-workflow/council/scripts/security-sweep.sh"
+      ]
+    },
+    {
+      "schedule": "0 8 * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/diem"
+      ]
+    },
+    {
+      "schedule": "0 21 * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/diem"
+      ]
+    },
+    {
+      "schedule": "0 23 * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/diem"
+      ]
+    },
+    {
+      "schedule": "40 23 * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/diem"
+      ]
+    },
+    {
+      "schedule": "* * * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/agents"
+      ]
+    },
+    {
+      "schedule": "0 2 * * *",
+      "referenced_paths": [
+        "/home/dev/loom-runtime/loom/run-absorb.sh"
+      ]
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/session-gc"
+      ]
+    },
+    {
+      "schedule": "0 8 * * 1",
+      "referenced_paths": [
+        "/home/dev/.local/bin/session-gc"
+      ]
+    },
+    {
+      "schedule": "30 7 * * 1",
+      "referenced_paths": [
+        "/home/dev/projects/build-ai-automation-workflow/setup/superpowers-slim-preamble/reapply.sh"
+      ]
+    },
+    {
+      "schedule": "15 7 * * 2",
+      "referenced_paths": [
+        "/home/dev/projects/ultimate-portugal/scripts/verify-rents.mjs"
+      ]
+    },
+    {
+      "schedule": "0 5 * * 1-5",
+      "referenced_paths": [
+        "/home/dev/projects/swimtrack-website/engine/morning-run.sh"
+      ]
+    },
+    {
+      "schedule": "*/15 6-21 * * 1-5",
+      "referenced_paths": [
+        "/home/dev/projects/swimtrack-website/engine/poller-cron.sh"
+      ]
+    },
+    {
+      "schedule": "*/15 * * * *",
+      "referenced_paths": [
+        "/home/dev/projects/sat-prep"
+      ]
+    },
+    {
+      "schedule": "0 13 * * 1",
+      "referenced_paths": [
+        "/home/dev/projects/sat-prep"
+      ]
+    },
+    {
+      "schedule": "0 3 * * *",
+      "referenced_paths": [
+        "/home/dev/.local/bin/backlog-run"
+      ]
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "referenced_paths": [
+        "/home/dev/projects/sat-prep"
+      ]
+    },
+    {
+      "schedule": "30 5 * * *",
+      "referenced_paths": [
+        "/home/dev/projects/romance-empire/scripts/engage-scan.sh"
+      ]
+    },
+    {
+      "schedule": "30 5 * * 1-5",
+      "referenced_paths": [
+        "/home/dev/projects/ultimate-portugal/engine/morning-run.sh"
+      ]
+    },
+    {
+      "schedule": "*/15 6-21 * * 1-5",
+      "referenced_paths": [
+        "/home/dev/projects/ultimate-portugal/engine/poller-cron.sh"
+      ]
+    },
+    {
+      "schedule": "0 9 * * 1",
+      "referenced_paths": [
+        "/home/dev/projects/ultimate-portugal/engine/seo-run.sh"
+      ]
+    },
+    {
+      "schedule": "0 10 * * 1-5",
+      "referenced_paths": [
+        "/home/dev/projects/ultimate-portugal/engine/refresh-run.sh"
+      ]
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "referenced_paths": [
+        "/home/dev/projects/romance-empire/scripts/ops-tick.sh"
+      ]
+    },
+    {
+      "schedule": "0 6 * * *",
+      "referenced_paths": [
+        "/home/dev/projects/romance-empire/scripts/ops-compose.sh"
+      ]
+    }
+  ],
+  "skill_files": [
+    {
+      "path": "/home/dev/.codex/skills/.system/imagegen/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/imagegen/SKILL.md",
+      "name": "imagegen",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/.system/openai-docs/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/openai-docs/SKILL.md",
+      "name": "openai-docs",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/.system/plugin-creator/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/plugin-creator/SKILL.md",
+      "name": "plugin-creator",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/.system/review-agent/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/review-agent/SKILL.md",
+      "name": "review-agent",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/.system/skill-creator/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/skill-creator/SKILL.md",
+      "name": "skill-creator",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/.system/skill-installer/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/.system/skill-installer/SKILL.md",
+      "name": "skill-installer",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/adjust-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/adjust-site/SKILL.md",
+      "name": "adjust-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/agents-sdk/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/agents-sdk/SKILL.md",
+      "name": "agents-sdk",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/brainstorming/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+      "name": "brainstorming",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-close/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-close/SKILL.md",
+      "name": "claude-command-close",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-create-command/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-create-command/SKILL.md",
+      "name": "claude-command-create-command",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-export-skill/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-export-skill/SKILL.md",
+      "name": "claude-command-export-skill",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-install-skill/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-install-skill/SKILL.md",
+      "name": "claude-command-install-skill",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-meeting-notes/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-meeting-notes/SKILL.md",
+      "name": "claude-command-meeting-notes",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-setup-mcp/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-setup-mcp/SKILL.md",
+      "name": "claude-command-setup-mcp",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-command-sweep/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-command-sweep/SKILL.md",
+      "name": "claude-command-sweep",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/claude-connectors/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/claude-connectors/SKILL.md",
+      "name": "claude-connectors",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/cloudflare/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/cloudflare/SKILL.md",
+      "name": "cloudflare",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/cloudflare-email-service/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/cloudflare-email-service/SKILL.md",
+      "name": "cloudflare-email-service",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/cloudflare-one/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/cloudflare-one/SKILL.md",
+      "name": "cloudflare-one",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/cloudflare-one-migrations/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/cloudflare-one-migrations/SKILL.md",
+      "name": "cloudflare-one-migrations",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/codex/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/codex/SKILL.md",
+      "name": "codex",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/content-humanizer/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/content-humanizer/1.1.0/skills/content-humanizer/SKILL.md",
+      "name": "content-humanizer",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/delegate/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/delegate/SKILL.md",
+      "name": "delegate",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/dispatching-parallel-agents/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+      "name": "dispatching-parallel-agents",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/durable-objects/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/durable-objects/SKILL.md",
+      "name": "durable-objects",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/executing-plans/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+      "name": "executing-plans",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/finishing-a-development-branch/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+      "name": "finishing-a-development-branch",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/frontend-design/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/frontend-design/85cce0381e78/skills/frontend-design/SKILL.md",
+      "name": "frontend-design",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/grilling/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/grilling/SKILL.md",
+      "name": "grilling",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/humanize/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/humanize/SKILL.md",
+      "name": "humanize",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/nano-banana/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/nano-banana/SKILL.md",
+      "name": "nano-banana",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/new-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/new-site/SKILL.md",
+      "name": "new-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/preview-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/preview-site/SKILL.md",
+      "name": "preview-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/push-to-device/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/push-to-device/SKILL.md",
+      "name": "push-to-device",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/receiving-code-review/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+      "name": "receiving-code-review",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/requesting-code-review/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+      "name": "requesting-code-review",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/rollback-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/rollback-site/SKILL.md",
+      "name": "rollback-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/sandbox-sdk/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/sandbox-sdk/SKILL.md",
+      "name": "sandbox-sdk",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/seo-article/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/seo-article/SKILL.md",
+      "name": "seo-article",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/seo-article-edit/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/seo-article-edit/SKILL.md",
+      "name": "seo-article-edit",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/seo-article-research/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/seo-article-research/SKILL.md",
+      "name": "seo-article-research",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/seo-article-setup/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/seo-article-setup/SKILL.md",
+      "name": "seo-article-setup",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/seo-article-write/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/authority-hacker-plugins/seo-article-writer-v2/0.1.13/skills/seo-article-write/SKILL.md",
+      "name": "seo-article-write",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/ship-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/ship-site/SKILL.md",
+      "name": "ship-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/site-flow/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/site-flow/SKILL.md",
+      "name": "site-flow",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/subagent-driven-development/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+      "name": "subagent-driven-development",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/systematic-debugging/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+      "name": "systematic-debugging",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/test-driven-development/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+      "name": "test-driven-development",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/tidy/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/tidy/SKILL.md",
+      "name": "tidy",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/topical-map-dfseo2/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/topical-map-dfseo2/SKILL.md",
+      "name": "topical-map-dfseo2",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/turnstile-spin/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/turnstile-spin/SKILL.md",
+      "name": "turnstile-spin",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/using-git-worktrees/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+      "name": "using-git-worktrees",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/using-superpowers/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+      "name": "using-superpowers",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/venice-ai/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/venice-ai/SKILL.md",
+      "name": "venice-ai",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/verification-before-completion/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+      "name": "verification-before-completion",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/web-perf/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/web-perf/SKILL.md",
+      "name": "web-perf",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/workers-best-practices/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/workers-best-practices/SKILL.md",
+      "name": "workers-best-practices",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/wrangler/SKILL.md",
+      "resolved_path": "/home/dev/.codex/skills/wrangler/SKILL.md",
+      "name": "wrangler",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/writing-plans/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+      "name": "writing-plans",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.codex/skills/writing-skills/SKILL.md",
+      "resolved_path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+      "name": "writing-skills",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/adjust-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/adjust-site/SKILL.md",
+      "name": "adjust-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/agents-sdk/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/agents-sdk/SKILL.md",
+      "name": "agents-sdk",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/cloudflare/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/cloudflare/SKILL.md",
+      "name": "cloudflare",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/cloudflare-email-service/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/cloudflare-email-service/SKILL.md",
+      "name": "cloudflare-email-service",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/cloudflare-one/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/cloudflare-one/SKILL.md",
+      "name": "cloudflare-one",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/cloudflare-one-migrations/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/cloudflare-one-migrations/SKILL.md",
+      "name": "cloudflare-one-migrations",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/durable-objects/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/durable-objects/SKILL.md",
+      "name": "durable-objects",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/grilling/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/grilling/SKILL.md",
+      "name": "grilling",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/nano-banana/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/nano-banana/SKILL.md",
+      "name": "nano-banana",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/new-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/new-site/SKILL.md",
+      "name": "new-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/preview-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/preview-site/SKILL.md",
+      "name": "preview-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/push-to-device/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/push-to-device/SKILL.md",
+      "name": "push-to-device",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/rollback-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/rollback-site/SKILL.md",
+      "name": "rollback-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/sandbox-sdk/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/sandbox-sdk/SKILL.md",
+      "name": "sandbox-sdk",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/ship-site/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/ship-site/SKILL.md",
+      "name": "ship-site",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/skill-creator/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/skill-creator/SKILL.md",
+      "name": "skill-creator",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/tidy/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/tidy/SKILL.md",
+      "name": "tidy",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/topical-map-dfseo2/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/topical-map-dfseo2/SKILL.md",
+      "name": "topical-map-dfseo2",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/turnstile-spin/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/turnstile-spin/SKILL.md",
+      "name": "turnstile-spin",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/venice-ai/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/venice-ai/SKILL.md",
+      "name": "venice-ai",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/web-perf/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/web-perf/SKILL.md",
+      "name": "web-perf",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/workers-best-practices/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/workers-best-practices/SKILL.md",
+      "name": "workers-best-practices",
+      "evidence": "File present; does not by itself establish activation."
+    },
+    {
+      "path": "/home/dev/.claude/skills/wrangler/SKILL.md",
+      "resolved_path": "/home/dev/.claude/skills/wrangler/SKILL.md",
+      "name": "wrangler",
+      "evidence": "File present; does not by itself establish activation."
+    }
+  ],
+  "codex_disabled_skill_paths": [
+    "/home/dev/.codex/skills/agents-sdk/SKILL.md",
+    "/home/dev/.codex/skills/cloudflare/SKILL.md",
+    "/home/dev/.codex/skills/cloudflare-email-service/SKILL.md",
+    "/home/dev/.codex/skills/cloudflare-one/SKILL.md",
+    "/home/dev/.codex/skills/cloudflare-one-migrations/SKILL.md",
+    "/home/dev/.codex/skills/durable-objects/SKILL.md",
+    "/home/dev/.codex/skills/nano-banana/SKILL.md",
+    "/home/dev/.codex/skills/sandbox-sdk/SKILL.md",
+    "/home/dev/.codex/skills/tidy/SKILL.md",
+    "/home/dev/.codex/skills/topical-map-dfseo2/SKILL.md",
+    "/home/dev/.codex/skills/turnstile-spin/SKILL.md",
+    "/home/dev/.codex/skills/web-perf/SKILL.md",
+    "/home/dev/.codex/skills/workers-best-practices/SKILL.md",
+    "/home/dev/.codex/skills/wrangler/SKILL.md"
+  ],
+  "claude_plugin_activation": {
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": false,
+    "frontend-design@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "github@claude-plugins-official": false,
+    "telegram@claude-plugins-official": false,
+    "delegate@authority-hacker-plugins": true,
+    "content-humanizer@authority-hacker-plugins": true,
+    "seo-article-writer-v2@authority-hacker-plugins": true
+  },
+  "global_commands": [
+    "/home/dev/.claude/commands/close.md",
+    "/home/dev/.claude/commands/create-command.md",
+    "/home/dev/.claude/commands/export-skill.md",
+    "/home/dev/.claude/commands/install-skill.md",
+    "/home/dev/.claude/commands/meeting-notes.md",
+    "/home/dev/.claude/commands/setup-mcp.md",
+    "/home/dev/.claude/commands/sweep.md"
+  ],
+  "global_hook_events": [
+    "Stop"
+  ],
+  "codex_configured_mcp_names": [
+    "authority-hacker",
+    "slack",
+    "google-drive",
+    "supabase",
+    "google-calendar",
+    "gmail",
+    "context7",
+    "playwright"
+  ],
+  "scope_limits": [
+    "External vendor account-wide workflow inventories not completed.",
+    "Project candidate paths were inventoried broadly; implementation traced selectively by family.",
+    "A file or scheduled entry does not prove effective activation or business outcome.",
+    "Historical versions, transcripts, generated content and customer records excluded."
+  ],
+  "linked_sources": {
+    "/home/dev/projects/build-ai-automation-workflow/docs/automation-ideal-state.md": {
+      "sha256": "9dd0a1c3a3bd5d97f0d5d2acc7829ebe28bb8017d53c4e67aa3e911dfa6e8ee7"
+    },
+    "/home/dev/.claude/CLAUDE.md": {
+      "sha256": "fcb6875d3c8bb7342e436334e36d22487bd8782292280b8cab770fcbd6a649da"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/AGENTS.md": {
+      "sha256": "c7ce722dfc1c851a9ae34d0b3cd5efcfdf668c6229fb9c4e46458fe62ea2b103"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/loom-ideal-state-assessment-2026-09-09.md": {
+      "sha256": "9b51e8faa114875cf3013200e4e071a4440ef5c11da6463ee837772f23d5aded"
+    },
+    "/home/dev/.codex/skills/delegate/SKILL.md": {
+      "sha256": "f02b4a8d238dbf564bb05ac03740f8804220fe6c43dafd27d6f87cca1048c40d"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/setup/claude-codex-mirror/README.md": {
+      "sha256": "02fbe8de6214c17f90b5e80ae4c079b94848ebebe6c18f19475b9ad77ed96088"
+    },
+    "/home/dev/projects/harness-engineering/README.md": {
+      "sha256": "9b6a65ee8cf67e62a31ee6a821d7d2998aded6ce6c8e3ed3a2e238c5ca1d9f07"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/session-bridge/hook/stop-hook.ts": {
+      "sha256": "4cd495ba01243ebc6b8e79fe079755bae2e50cac62cb26b6fdb19d8ecfad7609"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/cli.py": {
+      "sha256": "641e9b0bd19c4b714f10c7ab149333259cc0a766944c13c57f465e5d84b15c19"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/panels.toml": {
+      "sha256": "21c8f21efc50e0a44a0e89b2fa1243d68818304fc233b804581ec15384f97df8"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/review.py": {
+      "sha256": "2340e7d862aeb76cd15b3a4d0dc1092f3d4138355384a1494df4886cd51d887a"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/gate.py": {
+      "sha256": "9070b582d79d160e249325cb64795f188a7722c5c651a017048e41d2cc83c611"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/compare.py": {
+      "sha256": "e3992408ee19021117dc051d54a21d5a7337ee538befb10d48043c210d2cd6d2"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/scripts/parallel-attempts.sh": {
+      "sha256": "dcc96fc88ace105fa68b1edf216d4cb256b572a17620d4391804a662d6eae2a7"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/sweep.py": {
+      "sha256": "15dec503585217493e8190d02f0d5592786f94629680c4cbe012187c71b811cf"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/contracts/council-security-sweep.md": {
+      "sha256": "fbe32f81eb56af5480a9ef93f81b9596bc748428c996d3baa3086260ddcfe026"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/tools/regress/README.md": {
+      "sha256": "8c52ca4ba25fc47df58662ab40818bf0533640c5411dd550e335fa2fdf1126df"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/chair-bakeoff-results-2026-09-12.md": {
+      "sha256": "7a2e45025dbdd1d2b3abf534fc6226906a84e40d52dc6dcc925f49ef3b775562"
+    },
+    "/home/dev/projects/romance-empire/CLAUDE.md": {
+      "sha256": "aff63780281ce6036a16f093c6791ca4ba823321b0c9d39f6b7e4b393dd18cd7"
+    },
+    "/home/dev/projects/backlog/README.md": {
+      "sha256": "e511b03f6da5fb1869adcd2816aaf7172e6caa653d21cc95de0df0ec7044199c"
+    },
+    "/home/dev/.claude/commands/close.md": {
+      "sha256": "6576439f5ac18cdef0f91416e13f5bfe9997e4291a16aa22e2e947db4e05f37f"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/backlogrun/README.md": {
+      "sha256": "2f587bb31efb147f825def617632b498bafb6ff762ac7997358daefba4c6c33a"
+    },
+    "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/README.md": {
+      "sha256": "8b69ebaaa9402d9827a57c22b3cfc2e24363f46d4bb39135d5cd1d2b46c4c17c"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/fixit/README.md": {
+      "sha256": "4fe3a5a5e9730b7bc18a67599ed5bc07a911af3b54ba0d0f2df7e172519e49f6"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/diem/runners.py": {
+      "sha256": "66e98f1d3ab5d7dc952cdd12ea953565540ef7bd204c0daa34755bc4979b1f9d"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/diem/README.md": {
+      "sha256": "a864ba5ee276338bb214f5c6842520d2169cf5587a6a2ec2e084254751c7dec4"
+    },
+    "/home/dev/projects/romance-empire/docs/ops-loop.md": {
+      "sha256": "1db530e0a5331946ba8ca5a888386be54c2a0c991a22feae3d8de142518d132e"
+    },
+    "/home/dev/projects/romance-empire/src/ops/providers.py": {
+      "sha256": "d1f7874fbf431d19e3e8274f2fde1f1e7ff6960394cc14f52ce5b9c6e1a3a9fe"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/session-bridge/README.md": {
+      "sha256": "927812a85265d0026d76bd0af9746fbc610557976ab21760a6815a6271cf8d2b"
+    },
+    "/home/dev/projects/vps-tools/README.md": {
+      "sha256": "277b24d32d7ee30fdd46c8a1ff91bc993979be463a3a68d51ac8a70d8f1743a4"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/bebop/README.md": {
+      "sha256": "2e61ba1dea6549ba40400a8a1cffa86938e7eb1319beb904f481e693535c012c"
+    },
+    "/home/dev/projects/romance-empire/docs/scripts-reference.md": {
+      "sha256": "f645a785477eaa8bbf41b64d8d3b8cbc86b88868ea6260270f04f05027a3ed8a"
+    },
+    "/home/dev/projects/romance-empire/src/social/engage_scan.py": {
+      "sha256": "69576844c25491deac6c46d64ffc7751c108cdd998b13e299b004ce02a1078d3"
+    },
+    "/home/dev/projects/swimtrack/editorial/README.md": {
+      "sha256": "d083776146d6067922a9a3e8e04a3645ab57d197a2397bc0de87be9ee2e72a3e"
+    },
+    "/home/dev/projects/swimtrack/.github/workflows/editorial-scan.yml": {
+      "sha256": "66e89d55d024d3b4f39e4fbc53898bb1c34b367e86bd3d5eaa26355f5d2be8ed"
+    },
+    "/home/dev/projects/swimtrack-website/engine/MORNING.md": {
+      "sha256": "1a6943d3faf5dc798350e0554be448796322ad9099a7995d7074b8acc5ac61dc"
+    },
+    "/home/dev/projects/swimtrack-website/engine/poller-cron.sh": {
+      "sha256": "9b918d8a9d44fec115d687716c1e4794b2be642315f52ded36cf4b99d7d65423"
+    },
+    "/home/dev/projects/ultimate-portugal/AGENTS.md": {
+      "sha256": "2cdf6a40f39afcdd2a591b918b048b9a392b67e03a9ba9dac067f176127831e5"
+    },
+    "/home/dev/projects/sat-prep/README.md": {
+      "sha256": "b842e4c87dc598ac3427a354fdf84f2a8bcaa689195aaacae9ca16df16333ade"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/contracts/README.md": {
+      "sha256": "6a6917bdc7f40d43b6bba5f05c91cba4f86328bc3d92e52629d9bd2924676591"
+    },
+    "/home/dev/projects/monthly-bidding/README.md": {
+      "sha256": "adbc15a769f765ba8a157d44200343d7935cdcc52df83185a2d2050431e14c73"
+    },
+    "/home/dev/projects/govcon-hunt-list/README.md": {
+      "sha256": "f1008ed2e381a308892175de84fbd7bf8e612abb5c37d2c8fd00e04a0a294833"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/loom/README.md": {
+      "sha256": "930353575c43a07f780ba1bcc94cd008e2c874367bc322ffad995c8919e0d7d9"
+    },
+    "/home/dev/.local/bin/wiki-promote": {
+      "sha256": "77327df76abe5ccec0c27d98899b1723c5299f17def517dffe79b7cf2f7eb06d"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/context-retrieval-2026-07-23.md": {
+      "sha256": "26b3716f0ddc44cb622528f92eee8133f0f9aa7b28c72b0407d0c3382f6de45c"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/venice_usage/ledger.py": {
+      "sha256": "3ae08feb09edc37bf4bfb067807d3b57566ca5121d30e50ba1ca06a156b20388"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/venice_usage/portable.py": {
+      "sha256": "f2d8d3e2bab48f90fc57b5faa6e4bd5e13d7e4b105c8d46eead9cb549a28b73a"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/venice_usage/reconcile.py": {
+      "sha256": "b03b08ca49de2b36f8ec761430e9e8892861dceae4deb269e22c4e55259002b8"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/council/config.py": {
+      "sha256": "792c12d08678d0a53b9e211a35863cb102c987b08cda55b9e8e5689f029ef21a"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/tools/budget_transport.py": {
+      "sha256": "3feaa1afdc73d8c42596324282824289acbfb5a2c55fa0ef20f116bfe278ee57"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/watchdog/README.md": {
+      "sha256": "b1375ed6f11bc6b27dbd519f90668b46eead8ca18877cae223f4c2186634630a"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/sessiongc/README.md": {
+      "sha256": "ba8425f99d70080947c4ee7d4f28cf84aa1668c5fbbf75ce220dac032e145af3"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/backlogrun/cli.py": {
+      "sha256": "27203c9ac90063001055c51e1e018e8f5f5e3fa67200f8b04e61e018e5a41b1d"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/diem/report.py": {
+      "sha256": "8a45bb2a01d70a00dba35864dd6dc3783162cf5ba4e441073687f68ee5b068d6"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/bebop/prompts/briefing-morning.md": {
+      "sha256": "1f6a2ee2c3d532182e7f3b6f320cce54a118697abf841c1c24d1d36b8bf57dd2"
+    },
+    "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/runner.py": {
+      "sha256": "7db5543e77421e5ed01cbf6d2cf1f4329216c9c44c213278b7294e0ea196d166"
+    },
+    "/home/dev/loom-runtime/loom/cli.py": {
+      "sha256": "211d00ad7055714077e6a6f21aeeb1515bd08af9164ea1543643c14d4a24ff33"
+    },
+    "/home/dev/loom-runtime/loom/discovery.py": {
+      "sha256": "5b714602d08988c659831a2fcde20a9f23a1c2e928255123e297ebbc3ca75679"
+    },
+    "/home/dev/loom-runtime/loom/prompts/distill.md": {
+      "sha256": "2c184c1789d74079e015f5f363215e0441069cdfe7a904cd5b9c1e8535dbeea7"
+    },
+    "/home/dev/.local/bin/agents": {
+      "sha256": "6a91916f13f262389ef36b369b6dc06a6fe907df282e302a695eea2684430212"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/bin/tg-send": {
+      "sha256": "ddbcc6d157455f5bf1e03252d9bba9d1fa97db7c3595a83e4776a54cf5a7f1a6"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/watchdog/run.py": {
+      "sha256": "0dd15109c7ad68ba1d5ef3dd81c549838f8204769cdabfa458b3b36802123931"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/watchdog/run-watchdog.sh": {
+      "sha256": "608fc0d15087d5c87ec9fc8fbafc5e440d58243b229d116f02f4e2a9c8b45752"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/session-bridge/src/router.ts": {
+      "sha256": "fce43996e458c4b7f8135429c8566016b79e3a00b69c7755674f83923a4c74ba"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/alert-handoff-2026-09-06.md": {
+      "sha256": "30f4ba5643508220015cab5764ed47e9afe01c819c308528edc64161737b6e29"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/.github/workflows/venice-review.yml": {
+      "sha256": "f6a9e6f356b8ab2d5574a691f36fa97d191c9e0b1e46dd495f8587a2ece679d0"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/scripts/venice_review.py": {
+      "sha256": "82007bf59c6188938b1394fa7b2bb1ef21ecf6fdb09d75217c3c3f55c91efa6e"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/docs/ci-usage-rollout-2026-09-12.md": {
+      "sha256": "66cd2d6114b20925e17e4885d52313b94ffe3fdefdbbba5d8fed7035279f4cad"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/diem/queue.py": {
+      "sha256": "1368492d911d7deaf713a35590a38c93e25bb279fb51abdb8dc4e65b37acb347"
+    },
+    "/home/dev/projects/build-ai-automation-workflow/diem/drain.py": {
+      "sha256": "3aa6f817f74b5691078e61e8e34b9c08f7ce1ac5bb6d1a3a10b5c7c82b0719db"
+    }
+  }
+}

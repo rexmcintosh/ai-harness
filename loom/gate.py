@@ -15,9 +15,21 @@ Entropy plugins disabled:
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+
+def find_hook() -> Path | None:
+    """Locate detect-secrets-hook: beside the running interpreter first (the
+    venv install), then on PATH. None if neither — callers fail closed."""
+    sibling = Path(sys.executable).parent / "detect-secrets-hook"
+    if sibling.is_file() and os.access(sibling, os.X_OK):
+        return sibling
+    on_path = shutil.which("detect-secrets-hook")
+    return Path(on_path) if on_path else None
 
 
 def scan_clean(path: Path) -> bool:
@@ -25,11 +37,8 @@ def scan_clean(path: Path) -> bool:
     if not Path(path).is_file():
         return False  # fail-closed: nothing to scan ≠ clean
 
-    # Discover detect-secrets-hook from venv if not on PATH
-    venv_dir = Path(sys.executable).parent
-    detect_secrets_hook = venv_dir / "detect-secrets-hook"
-
-    if not detect_secrets_hook.exists():
+    detect_secrets_hook = find_hook()
+    if detect_secrets_hook is None:
         return False  # fail-closed
 
     try:

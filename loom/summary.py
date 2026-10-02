@@ -20,30 +20,41 @@ def scrub(text: str) -> str:
 
 
 def build_summary(counts: Dict[str, int], shadow_commits: int, oldest_age_days: int,
-                  rejected: List[Tuple[str, str]], proposed: List[str]) -> str:
+                  quarantined: List[Tuple[str, str]], proposed: List[str],
+                  limit_hit: bool = False) -> str:
     parts = ["🧵 Loom run"]
+    if limit_hit:
+        parts.append(
+            f"⏸️ Paused — Claude usage limit reached; distilled {counts.get('distilled', 0)} "
+            f"before pausing, rest deferred to next run"
+        )
     parts.append(" ".join(f"{k}={v}" for k, v in counts.items()))
     stale = "  ⚠️ STALE" if oldest_age_days >= STALE_DAYS else ""
     parts.append(f"loom-shadow: {shadow_commits} commits to review; oldest {oldest_age_days}d{stale}")
-    if rejected:
-        parts.append("rejected (needs requeue):")
-        parts += [f"  • {lid} — {reason}" for lid, reason in rejected]
+    if quarantined:
+        # Not auto-retryable: a deterministic guard blocked these, so re-running
+        # would trip it again. They need a human to look, hence "review".
+        parts.append("quarantined (needs review):")
+        parts += [f"  • {lid} — {reason}" for lid, reason in quarantined]
     if proposed:
         parts.append("proposed (not applied):")
         parts += [f"  • {p}" for p in proposed]
     return scrub("\n".join(parts))
 
 
-_COUNT_KEYS = ("distilled", "quarantined", "failed", "committed", "deferred",
-               "rejected", "deadline_hit")
+# "quarantined" counts SESSIONS whose transcript failed the secret gate;
+# "quarantined_learnings" counts individual learnings whose weave failed a guard.
+_COUNT_KEYS = ("distilled", "quarantined", "failed", "committed", "skipped_covered",
+               "deferred", "quarantined_learnings", "deadline_hit")
 
 
 def format_run_summary(d: dict) -> str:
     """Build the scrubbed Telegram message from an `absorb` return dict."""
     counts = {k: d[k] for k in _COUNT_KEYS if k in d}
-    rejected = [tuple(x) for x in d.get("rejected_items", [])]
+    quarantined = [tuple(x) for x in d.get("quarantined_items", [])]
     return build_summary(counts=counts,
                          shadow_commits=int(d.get("shadow_commits", 0)),
                          oldest_age_days=int(d.get("oldest_age_days", 0)),
-                         rejected=rejected,
-                         proposed=d.get("proposed", []))
+                         quarantined=quarantined,
+                         proposed=d.get("proposed", []),
+                         limit_hit=bool(d.get("limit_hit")))

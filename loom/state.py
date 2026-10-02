@@ -2,11 +2,29 @@
 or are diverted to terminal quarantined. Writes are atomic; reruns resume from the last clean state."""
 from __future__ import annotations
 
+import fcntl
 import json
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
 STATES = ("pending", "distilled", "weaved", "committed", "quarantined")
+
+
+@contextmanager
+def state_lock(path: Path, *, exclusive: bool = False):
+    """Coordinate state reads and writes through a stable sidecar lock file."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(path.name + ".lock")
+    with lock_path.open("a") as lock:
+        operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        fcntl.flock(lock.fileno(), operation)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 class LoomState:
@@ -14,7 +32,9 @@ class LoomState:
         self.path = Path(path)
         self._data: Dict[str, dict] = {}
         if self.path.exists():
-            self._data = json.loads(self.path.read_text() or "{}")
+            with state_lock(self.path):
+                if self.path.exists():
+                    self._data = json.loads(self.path.read_text() or "{}")
 
     def state_of(self, session_id: str) -> str:
         return self._data.get(session_id, {}).get("state", "pending")
@@ -31,8 +51,12 @@ class LoomState:
     def advance(self, session_id: str, state: str) -> None:
         if state not in STATES:
             raise ValueError(f"unknown state: {state}")
-        self._data.setdefault(session_id, {})["state"] = state
-        self._save()
+        with state_lock(self.path, exclusive=True):
+            entry = self._data.setdefault(session_id, {})
+            if state == "quarantined" and entry.get("state") != "quarantined":
+                entry.setdefault("quarantined_at", datetime.now(timezone.utc).isoformat())
+            entry["state"] = state
+            self._save()
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

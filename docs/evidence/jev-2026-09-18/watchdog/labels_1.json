@@ -1,0 +1,408 @@
+[
+  {
+    "id": "engage-scan-05",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Normal scan report; gate rejections are internal quality checks, not failures."
+  },
+  {
+    "id": "backlog-run-00",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Window ends mid-traceback; YAML scanner crash begins right after report sent."
+  },
+  {
+    "id": "backlog-run-03",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Starts with YAML crash traceback, but later days finish normally, report sent."
+  },
+  {
+    "id": "bento-sync-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All sync runs clean: 0 failures, only a routine test-address skip."
+  },
+  {
+    "id": "loom-runs-err-07",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated JSON decode errors in coverage check; no clear run boundaries shown."
+  },
+  {
+    "id": "writing-engine-morning-08",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Both runs end rc=0; second is a documented, normal branch-not-main skip."
+  },
+  {
+    "id": "meettrack-supervise-10",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "DNS resolution to Supabase fails; window cuts off mid unhandled traceback."
+  },
+  {
+    "id": "watchdog-cron-08",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All 50 checks report 'all checks ok' with no failures anywhere."
+  },
+  {
+    "id": "watchdog-cron-05",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Alert delivery repeatedly fails (rc=127 parse error); last visible check is ok."
+  },
+  {
+    "id": "writing-engine-morning-06",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Skips are documented branch-not-main behavior; last run finishes cleanly, digest sent."
+  },
+  {
+    "id": "engage-scan-03",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Normal scan output with dropped-candidate list; no errors or crashes present."
+  },
+  {
+    "id": "watchdog-cron-01",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Same repeated alert-delivery failures (rc=127); window ends on a clean ok line."
+  },
+  {
+    "id": "swimtrack-engine-morning-04",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Runs complete normally; one source's HTTP 429 reported, job still finished."
+  },
+  {
+    "id": "writing-engine-morning-02",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All runs finish normally (no-post days are by design); no errors seen."
+  },
+  {
+    "id": "loom-runs-err-04",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeating coverage-check JSON errors; cut off mid-traceback, no run marker."
+  },
+  {
+    "id": "diem-drain-00",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible task entries ok:true; window cuts off mid-list, no errors."
+  },
+  {
+    "id": "writing-engine-poller-04",
+    "needs_human": false,
+    "latest_run_failed": null,
+    "confidence": "low",
+    "reason": "Only wrangler config warnings repeated; no results or errors shown at all."
+  },
+  {
+    "id": "ops-tick-03",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Every tick reports errors 0 across dozens of ticks; nothing failed."
+  },
+  {
+    "id": "meettrack-supervise-11",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase DNS failure; traceback runs down to the root gaierror."
+  },
+  {
+    "id": "swimtrack-engine-morning-05",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Repeated skips are documented branch-not-main behavior; last skip finishes cleanly."
+  },
+  {
+    "id": "engage-scan-02",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Apify 502 crashes one scan; a later scan starts but its outcome is unseen."
+  },
+  {
+    "id": "diem-drain-02",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "One review task fails (invalid git diff range); batch still closes normally."
+  },
+  {
+    "id": "writing-engine-morning-00",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All runs finish and push cleanly; no-post days are normal, no errors."
+  },
+  {
+    "id": "writing-engine-poller-06",
+    "needs_human": false,
+    "latest_run_failed": null,
+    "confidence": "low",
+    "reason": "Warnings plus one 'processed 0' result; no failures, no clear run end."
+  },
+  {
+    "id": "writing-engine-poller-02",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Outcome email failed to send for a published post; later run unseen."
+  },
+  {
+    "id": "backlog-run-02",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Recurring 'no target repo directory... needs you' blocks items; cuts off before summary."
+  },
+  {
+    "id": "loom-runs-err-11",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Same repeating coverage-check JSON crash; cut off before exception message completes."
+  },
+  {
+    "id": "loom-runs-00",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Every day rc=0 with failed=0 from 09-04 through 09-18; fully clean."
+  },
+  {
+    "id": "writing-engine-morning-03",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Three consecutive morning runs finish rc=0 with drafts, digests, no errors."
+  },
+  {
+    "id": "meettrack-supervise-08",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase DNS resolution crash; window ends mid unhandled traceback."
+  },
+  {
+    "id": "meettrack-supervise-00",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Identical DNS failure traceback to Supabase; ends mid-exception unwind."
+  },
+  {
+    "id": "swimtrack-engine-morning-09",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Skips are documented branch holds; final run judges stories, completes normally."
+  },
+  {
+    "id": "loom-runs-err-10",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Repeated coverage-check JSON decode failures; no run boundary markers visible."
+  },
+  {
+    "id": "watchdog-cron-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All 50 checks 'all checks ok'; no failures or suppressed issues."
+  },
+  {
+    "id": "diem-drain-10",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Multiple clean batches (ok:true or empty); cuts off mid a new object."
+  },
+  {
+    "id": "watchdog-cron-04",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "One alert-delivery auth failure (not logged in); later checks report ok."
+  },
+  {
+    "id": "diem-drain-09",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible task entries ok:true, error:null; list cut off before closing."
+  },
+  {
+    "id": "engage-scan-01",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Two full scans complete normally; only routine gate/drop filtering, no errors."
+  },
+  {
+    "id": "diem-drain-15",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "low",
+    "reason": "One day aborts (no_checkpoint_fired, null balance); later days resume normally."
+  },
+  {
+    "id": "writing-engine-morning-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All runs finish normally with drafts queued, digest sent, no failures."
+  },
+  {
+    "id": "bento-sync-09",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Five identical clean syncs; only routine test-address skip each time."
+  },
+  {
+    "id": "meettrack-supervise-12",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase DNS failure traceback; ends mid second-exception unwind."
+  },
+  {
+    "id": "diem-drain-05",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible reviews ok:true; list cut off before batch closes."
+  },
+  {
+    "id": "watchdog-cron-00",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Repeated alert-delivery parse-error failures; window ends on clean ok lines."
+  },
+  {
+    "id": "loom-runs-err-09",
+    "needs_human": true,
+    "latest_run_failed": null,
+    "confidence": "medium",
+    "reason": "Coverage-check crashes plus two items quarantined after failed retries; no run marker."
+  },
+  {
+    "id": "bento-sync-03",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Two 'JWT issued at future' sync failures; later syncs complete cleanly."
+  },
+  {
+    "id": "engage-scan-07",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "Normal scan output with dropped-candidate list; no errors present."
+  },
+  {
+    "id": "writing-engine-poller-05",
+    "needs_human": false,
+    "latest_run_failed": null,
+    "confidence": "low",
+    "reason": "Only repeated wrangler warnings; no results or errors shown."
+  },
+  {
+    "id": "meettrack-supervise-15",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase DNS crash; window ends mid connection-attempt traceback."
+  },
+  {
+    "id": "meettrack-supervise-09",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same DNS resolution failure; ends right before the root exception line."
+  },
+  {
+    "id": "meettrack-supervise-14",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Same Supabase DNS crash repeats; ends mid-traceback before request call."
+  },
+  {
+    "id": "loom-runs-01",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Failed counts spike into the thousands and promote rc=1 once; later days recover."
+  },
+  {
+    "id": "diem-drain-13",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "Tasks skipped only for low budget (designed behavior); no real errors."
+  },
+  {
+    "id": "bento-sync-04",
+    "needs_human": true,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "One 'JWT issued at future' failure; later syncs and events fire cleanly."
+  },
+  {
+    "id": "engage-scan-00",
+    "needs_human": true,
+    "latest_run_failed": true,
+    "confidence": "high",
+    "reason": "Apify permission-denied crash (403); window ends mid unhandled exception."
+  },
+  {
+    "id": "swimtrack-engine-morning-00",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "high",
+    "reason": "All runs finish normally with drafts queued; one source's 429 just noted."
+  },
+  {
+    "id": "diem-drain-03",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible batches clean (ok:true or empty); no errors shown."
+  },
+  {
+    "id": "diem-drain-08",
+    "needs_human": false,
+    "latest_run_failed": false,
+    "confidence": "medium",
+    "reason": "All visible backfill tasks ok:true; list cut off before batch closes."
+  }
+]

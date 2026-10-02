@@ -1,0 +1,73 @@
+[
+  {
+    "member": "Eng Manager",
+    "model": "openai-gpt-53-codex",
+    "stance": "concerns",
+    "headline": "Good hardening progress, but comment upsert can still be broken or weaponized in real PR traffic.",
+    "findings": [
+      {
+        "point": "Marker-only ownership check can cause fail-closed denial of service: find_council_comment picks any comment containing `<!-- council-review -->`, then upsert tries to PATCH it; if that comment is not authored by the workflow actor, GitHub returns 403 and the job fails (scripts/venice_review.py:115-128; setup/templates/venice_review.py:115-128).",
+        "severity": "high",
+        "confidence": 9
+      },
+      {
+        "point": "Existing council comment lookup is single-page (`?per_page=100`) with no pagination/sort control, so on long PRs the marker can be missed and new comments get posted repeatedly, breaking the one-rolling-comment invariant (scripts/venice_review.py:113; setup/templates/venice_review.py:113).",
+        "severity": "med",
+        "confidence": 9
+      },
+      {
+        "point": "_gh retry logic skips transient throttling paths (e.g., 429/408) because only 5xx is retried; under bursty repo activity this can still drop comment updates and fail the gate (scripts/venice_review.py:99-101; setup/templates/venice_review.py:99-101).",
+        "severity": "low",
+        "confidence": 7
+      }
+    ],
+    "suggestions": [
+      "When finding the existing council comment, require both marker match and expected author (`github-actions[bot]` or the current token identity) before PATCH.",
+      "Fetch comments in descending order and paginate until marker is found (or exhausted) to preserve S2 on high-comment PRs.",
+      "Extend tests with: (1) marker present on non-bot comment should not be selected, (2) pagination case with marker beyond first 100 comments, (3) 429 retry behavior with Retry-After handling."
+    ],
+    "error": null
+  },
+  {
+    "member": "Security Officer",
+    "model": "deepseek-v4-pro",
+    "stance": "na",
+    "headline": "",
+    "findings": [],
+    "suggestions": [],
+    "error": null
+  },
+  {
+    "member": "Adversary",
+    "model": "grok-4-3",
+    "stance": "concerns",
+    "headline": "GitHub API errors (429, secondary rate limits, 4xx) and missing top-level exception handling still crash the gate or drop comments under load.",
+    "findings": [
+      {
+        "point": "scripts/venice_review.py:140 (_gh returns 429 immediately since <500, caller .raise_for_status fails the job)",
+        "severity": "high",
+        "confidence": 9
+      },
+      {
+        "point": "scripts/venice_review.py:172 (find_council_comment + upsert_comment have no try around _gh; any non-retryable error aborts before run_pr_review)",
+        "severity": "med",
+        "confidence": 8
+      },
+      {
+        "point": "scripts/venice_review.py:200 (no outer try around run_pr_review or client call; uncaught engine exception bypasses unavailable flag and fails closed)",
+        "severity": "med",
+        "confidence": 8
+      },
+      {
+        "point": "scripts/venice_review.py:85 (upsert_comment does PATCH then POST without checking for 422/409 on concurrent comment edits)",
+        "severity": "low",
+        "confidence": 7
+      }
+    ],
+    "suggestions": [
+      "add 429 + 403 retry with jitter",
+      "wrap main API sequence in try/except that still posts a failure comment"
+    ],
+    "error": null
+  }
+]

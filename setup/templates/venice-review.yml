@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  checks: write
 
 jobs:
   review:
@@ -24,11 +23,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Pinned to an immutable release tag so the merge gate is reproducible.
+      # Pinned to the council-v0.4.0 commit SHA so the merge gate is reproducible
       # Bump intentionally on each council release. (When published to PyPI,
       # simplify to a pinned: pip install "council==X.Y.Z".)
       - name: Install council
-        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/build-ai-automation-workflow@council-v0.2.0"
+        run: pip install --quiet "council @ git+https://github.com/rexmcintosh/ai-harness@4a01298dcce2734115ac57f02592146969d76f48"
 
       - name: Compute diff
         id: diff

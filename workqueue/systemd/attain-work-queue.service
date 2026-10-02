@@ -1,0 +1,11 @@
+[Unit]
+Description=Attain Prep Notion product work queue
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/attain-work-queue/current/bin/notion-work-queue tick
+TimeoutStartSec=75min
+KillMode=control-group
+UMask=0077
+Environment=PATH=%h/.local/bin:%h/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin

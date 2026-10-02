@@ -1,0 +1,47 @@
+# build output
+dist/
+# generated types
+.astro/
+# wrangler dev cache
+.wrangler/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+
+# Claude Code worktree cache (user-local)
+.claude/
+
+# original-named photo source files (renamed copies live in public/images/meet/)
+image examples/
+
+.gstack/
+
+# Moat task system
+.moat/
+
+# Windsurf configuration
+.windsurf/
+
+# Codex CLI configuration
+.codex/
+
+# Superpowers brainstorm companion (local-only)
+.superpowers/
+.site-flow/

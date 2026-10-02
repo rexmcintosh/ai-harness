@@ -1,0 +1,40 @@
+{
+  "_note": "Fixed BEFORE any Jev call in this experiment. Derived faithfully from EDITORIAL_SYS in /home/dev/projects/swimtrack/editorial/src/editorial/prompts.py. Not edited after seeing Jev output.",
+
+  "in_scope": {
+    "type": "noul",
+    "instructions": "This story is being considered for a competitive-swimming publication written FOR SWIM PARENTS, which publishes ONLY evergreen, developmental explainer/how-to content, never news. Is this story IN SCOPE for that publication?",
+    "criteria": {
+      "true": "In scope: evergreen, developmental content about competitive POOL swimming that is relevant to a swim parent, covering training, mindset, body/health, competition, the parent's role, pathways (recruiting, college, age-group progression), or safety. The story is in scope only if its lesson or takeaway stands on its own without the news event that prompted it -- for example 'how to read a psych sheet' or 'how young swimmers rebuild confidence after a setback'.",
+      "false": "Out of scope: water polo, diving, artistic/synchronized swimming, triathlon, masters-only content, or elite gossip with no parent takeaway. ALSO out of scope, even if it could be reframed as a mindset or comeback angle: elite/senior race recaps, meet results, heat/finals/trials reports, rankings updates, and athlete-performance news -- these are ephemeral news, not evergreen parent-development content, and their lesson does not stand on its own without the news event. For example 'Trials Day 1 heats recap: swimmer goes 59.11' or '2026 world rankings update' are out of scope."
+    }
+  },
+
+  "pillar": {
+    "type": "choice",
+    "instructions": "If this story were published as evergreen developmental content for a swim parent, which one topic (pillar) does it best fit? Pick the single best match, or none_of_these if it does not fit any of them.",
+    "criteria": {
+      "training": "Swim technique, kick, underwater work, practice structure, or how a competitive swimmer trains day to day.",
+      "mindset": "Confidence, motivation, handling pressure or nerves, and mental resilience around competing.",
+      "body": "Physical health for a competitive swimmer: nutrition, sleep, recovery, injury prevention, or fueling for training and racing.",
+      "competition": "How meets work and how to prepare for or make sense of them: psych sheets, heats, seeding, qualifying times, race-day strategy.",
+      "parent_role": "How a parent should support, encourage, or communicate with their competitive swimmer.",
+      "pathways": "The long-term route through the sport: recruiting, college swimming, age-group progression, or choosing a program or club.",
+      "safety": "Safe-sport practices, preventing burnout or abuse, or reasons swimmers drop out of the sport.",
+      "none_of_these": "None of the above pillars fit this story well, or the story is not developmental content for a swim parent at all (e.g. it is pure news, an announcement, gossip, or a commercial product listing)."
+    }
+  },
+
+  "parent_value": {
+    "type": "score",
+    "instructions": "How well would this story serve a swim parent of a competitive pool swimmer, if it were published as an evergreen explainer (not as news)?",
+    "criteria": [
+      "Not useful at all: the story is off-topic for competitive pool swimming (e.g. water polo, diving, triathlon), pure gossip or human interest, an internal organizational announcement, or a commercial product advertisement, with no developmental takeaway for a swim parent.",
+      "Weak: the story is ephemeral sports news -- a race recap, meet result, ranking update, recruiting/commitment announcement, or athlete-career news -- with no standalone lesson a swim parent could use once the news itself is old.",
+      "Useful: the story touches a real training, mindset, competition, pathways, body, safety, or parent-role topic a swim parent cares about, but it is thin, generic, written as a commercial buying guide, or aimed at a different audience (e.g. recreational adult swimmers) rather than at a developmental competitive swimmer's parent.",
+      "Very useful: a clear, evergreen, parent-relevant lesson about training, mindset, competition, the body, pathways, parent role, or safety that stands on its own and would help a swim parent support their competitive swimmer, regardless of when they read it."
+    ]
+  },
+
+  "_state_spec": "State sent to Jev per item: {\"title\": <title>, \"source\": <source>, \"excerpt\": <raw_excerpt truncated to 600 chars>}. Title + excerpt + source only, per the experiment brief -- no rank_score, no pillar hints, no prior labels."
+}

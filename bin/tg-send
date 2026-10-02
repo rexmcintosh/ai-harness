@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# tg-send — send plain-text Telegram messages and retain provider acceptance.
+#
+# Usage:  tg-send <chat_id> [text]     text from stdin when omitted or "-"
+# Token:  TELEGRAM_BOT_TOKEN — real env wins, else ~/.claude/channels/telegram/.env
+# Output: set TG_SEND_RECEIPT_OUTPUT=1 for one JSON provider receipt; otherwise silent.
+# Exit 0 accepted, 1 definitively rejected, 3 uncertain after a possible send.
+set -u
+
+CHAT_ID="${1:?usage: tg-send <chat_id> [text|-]}"
+shift || true
+if [ $# -gt 0 ] && [ "${1}" != "-" ]; then TEXT="$1"; else TEXT="$(cat)"; fi
+
+TG_ENV="${TG_ENV:-$HOME/.claude/channels/telegram/.env}"
+if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && [ -f "$TG_ENV" ]; then
+  TELEGRAM_BOT_TOKEN="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$TG_ENV" | head -1)"
+fi
+[ -n "${TELEGRAM_BOT_TOKEN:-}" ] || { echo "tg-send: TELEGRAM_BOT_TOKEN not set and not in $TG_ENV" >&2; exit 1; }
+[ -n "$TEXT" ] || { echo "tg-send: empty message" >&2; exit 1; }
+
+classify_response() {
+  local http="$1" body="$2"
+  python3 - "$http" "$body" <<'PY'
+import json, math, sys
+
+try:
+    http = int(sys.argv[1])
+    body = json.loads(sys.argv[2])
+except (ValueError, TypeError, json.JSONDecodeError):
+    print("uncertain||")
+    raise SystemExit
+
+if 200 <= http < 300 and body.get("ok") is True:
+    message_id = body.get("result", {}).get("message_id")
+    if isinstance(message_id, int) and not isinstance(message_id, bool):
+        print(f"accepted|{message_id}|")
+    else:
+        print("uncertain||")
+    raise SystemExit
+
+code = body.get("error_code")
+retry = body.get("parameters", {}).get("retry_after")
+if code == 429 and isinstance(retry, (int, float)) and not isinstance(retry, bool):
+    if math.isfinite(retry) and retry >= 0:
+        print(f"rate_limited||{retry}")
+        raise SystemExit
+if isinstance(code, int) and code < 500:
+    print("rejected||")
+else:
+    print("uncertain||")
+PY
+}
+
+send_chunk() {
+  local chunk="$1" raw curl_rc http body parsed status message_id retry_after remaining
+  remaining=$((30 - (SECONDS - START_SECONDS)))
+  [ "$remaining" -gt 0 ] || return 1
+  raw="$(curl -sS -w $'\n%{http_code}' --max-time "$remaining" \
+    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    --data-urlencode "chat_id=${CHAT_ID}" \
+    --data-urlencode "text=${chunk}" \
+    --data-urlencode "disable_web_page_preview=true" 2>/dev/null)"
+  curl_rc=$?
+  if [ "$curl_rc" -ne 0 ]; then
+    echo "tg-send: delivery uncertain (network failure)" >&2
+    return 3
+  fi
+  http="${raw##*$'\n'}"
+  body="${raw%$'\n'*}"
+  parsed="$(classify_response "$http" "$body")"
+  IFS='|' read -r status message_id retry_after <<< "$parsed"
+  case "$status" in
+    accepted) printf '%s' "$message_id"; return 0 ;;
+    rejected)
+      echo "tg-send: sendMessage rejected by Telegram (HTTP $http)" >&2
+      return 1
+      ;;
+    rate_limited) printf 'RATE:%s' "$retry_after"; return 2 ;;
+    *)
+      echo "tg-send: delivery uncertain (HTTP ${http:-unknown} or invalid receipt)" >&2
+      return 3
+      ;;
+  esac
+}
+
+REST="$TEXT"
+START_SECONDS=$SECONDS
+MESSAGE_IDS=()
+while [ -n "$REST" ]; do
+  CHUNK="$REST"; REST=""
+  if [ "${#CHUNK}" -gt 4000 ]; then
+    HEAD="${CHUNK:0:4000}"
+    TAIL_AFTER_NL="${HEAD##*$'\n'}"
+    if [ "$TAIL_AFTER_NL" != "$HEAD" ]; then
+      HEAD="${HEAD%$'\n'*}"
+      REST="${CHUNK:$(( ${#HEAD} + 1 ))}"
+    else
+      REST="${CHUNK:4000}"
+    fi
+    CHUNK="$HEAD"
+  fi
+
+  RESULT="$(send_chunk "$CHUNK")"; RC=$?
+  if [ "$RC" -eq 2 ]; then
+    DELAY="${RESULT#RATE:}"
+    WAIT="$(python3 - "$DELAY" <<'PY'
+import math, sys
+print(max(2, math.ceil(float(sys.argv[1]))))
+PY
+)"
+    ELAPSED=$((SECONDS - START_SECONDS))
+    if [ $((ELAPSED + WAIT + 1)) -ge 30 ]; then
+      echo "tg-send: sendMessage rejected by Telegram (rate-limit exceeds request budget)" >&2
+      [ "${#MESSAGE_IDS[@]}" -eq 0 ] && exit 1 || exit 3
+    fi
+    sleep "$WAIT"
+    RESULT="$(send_chunk "$CHUNK")"; RC=$?
+  fi
+  [ "$RC" -ne 2 ] || RC=1
+  if [ "$RC" -ne 0 ]; then
+    if [ "${#MESSAGE_IDS[@]}" -gt 0 ]; then
+      echo "tg-send: partial delivery; earlier chunks were accepted; do not replay automatically" >&2
+      exit 3
+    fi
+    exit "$RC"
+  fi
+  MESSAGE_IDS+=("$RESULT")
+done
+
+if [ "${TG_SEND_RECEIPT_OUTPUT:-0}" = "1" ]; then
+python3 - "$CHAT_ID" "${MESSAGE_IDS[@]}" <<'PY'
+import json, sys
+chat = sys.argv[1]
+try:
+    chat = int(chat)
+except ValueError:
+    pass
+print(json.dumps({"ok": True, "status": "accepted", "chat_id": chat,
+                  "message_ids": [int(v) for v in sys.argv[2:]]}, separators=(",", ":")))
+PY
+fi

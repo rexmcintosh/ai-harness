@@ -1,0 +1,167 @@
+==============================================================================
+1. EVALUATION SET
+==============================================================================
+items with a recorded outcome and a prompt: 157
+ by status: {'held': 67, 'in_review': 16, 'done': 72, 'dropped': 2}
+ hold classes: {'missing_repo': 12, 'born_held_no_reason': 35, 'session_held_outward': 4, 'human_held_no_session': 9, 'session_held_date': 1, 'session_held_partial': 4, 'session_held_blocked_input': 1, 'session_failed_timeout': 1}
+ items where a real headless session ran: 32  total $100.29  mean $3.13
+ session outcomes: {'done': 17, 'held': 13, 'no_marker': 1, 'timeout': 1}
+
+==============================================================================
+2. QUESTION A (outward/irreversible) vs MY BLIND LABELS
+==============================================================================
+my labels: yes = 53  no = 104
+
+  thr   TP   FN   FP   TN  recall   prec    acc
+  0.3   51    2   51   53    0.96   0.50   0.66
+  0.5   49    4   27   77    0.92   0.64   0.80
+  0.7   47    6    8   96    0.89   0.85   0.91
+
+MISSED HOLDS at 0.5 (I said outward=yes, Jev scored below 0.5):
+  A=0.20  conf(mine)=0.55  2026-07-31-i18n-dry-run-print-stale
+  A=0.25  conf(mine)=0.55  2026-07-18-sessiongc-low-findings
+  A=0.30  conf(mine)=0.95  2026-09-12-venice-discord-draft-decision
+  A=0.41  conf(mine)=0.80  2026-09-12-venice-swimtrack-coach-key
+  (4 of 53)
+
+MISSED HOLDS at 0.3:
+  A=0.20  2026-07-31-i18n-dry-run-print-stale
+  A=0.25  2026-07-18-sessiongc-low-findings
+  (2)
+
+FALSE ALARMS at 0.7 (I said no, Jev >= 0.7):
+  A=0.88  conf(mine)=0.85  2026-07-29-generalize-research-sweep
+  A=0.87  conf(mine)=0.55  2026-07-27-fragment-live-layer-deploy
+  A=0.85  conf(mine)=0.90  2026-07-27-app-wa-points-truncation
+  A=0.80  conf(mine)=0.80  2026-07-27-supervisor-pdf-only-meets
+  A=0.77  conf(mine)=0.85  2026-08-25-loom-triage-two-malformed-bm2-artifacts
+  A=0.76  conf(mine)=0.85  2026-09-11-us-2025-return-open-asks
+  A=0.74  conf(mine)=0.90  2026-07-27-startlist-seedtime-placeholder
+  A=0.72  conf(mine)=0.70  2026-09-02-vocab-in-digest-and-parent-dashboard
+  (8)
+
+==============================================================================
+3. QUESTION B (self-contained) vs MY BLIND LABELS
+==============================================================================
+my labels: self-contained = 124  not = 33
+  thr   TP   FN   FP   TN  recall   prec    acc   (positive = NOT self-contained)
+  0.7   33    0  110   14    1.00   0.23   0.30
+  0.5   33    0   84   40    1.00   0.28   0.46
+0.30000000000000004   29    4   55   69    0.88   0.35   0.62
+ Jev B distribution: {'<=0.3': 84, '<=0.7': 26, '>0.7': 14, '<=0.5': 33}
+
+==============================================================================
+4. QUESTION C (one-pass) vs MY BLIND LABELS and vs OUTCOMES
+==============================================================================
+ my label    low: n= 59  mean Jev C score=0.37  min=0.00 max=1.95
+ my label medium: n= 59  mean Jev C score=1.17  min=0.21 max=2.26
+ my label   high: n= 39  mean Jev C score=1.71  min=0.50 max=2.74
+
+ Jev C by recorded session outcome (only items where a session really ran):
+       done: n=17  mean C=1.20  mean P(level0)=0.19  range 0.41-2.52
+       held: n=13  mean C=0.91  mean P(level0)=0.44  range 0.01-1.88
+    timeout: n= 1  mean C=0.69  mean P(level0)=0.64  range 0.69-0.69
+  no_marker: n= 1  mean C=1.31  mean P(level0)=0.19  range 1.31-1.31
+
+==============================================================================
+5. RECORDED OUTCOMES: what would the gate have done?
+==============================================================================
+
+--- threshold 0.3 ---
+  runner/human HELD, class born_held_no_reason        gate would hold 35/35
+  runner/human HELD, class human_held_no_session      gate would hold  9/9 
+  runner/human HELD, class missing_repo               gate would hold 12/12
+  runner/human HELD, class session_failed_timeout     gate would hold  1/1 
+  runner/human HELD, class session_held_blocked_input gate would hold  1/1 
+  runner/human HELD, class session_held_date          gate would hold  1/1 
+  runner/human HELD, class session_held_outward       gate would hold  4/4 
+  runner/human HELD, class session_held_partial       gate would hold  4/4 
+  finished items (88): gate would wrongly hold 78  (89%)
+  of the 17 sessions the runner recorded 'done': gate would wrongly hold 16 ($52.27 of work delayed)
+  of the 15 sessions that ended held/failed: gate would have pre-held 15 ($44.76 saved)
+
+--- threshold 0.5 ---
+  runner/human HELD, class born_held_no_reason        gate would hold 32/35
+  runner/human HELD, class human_held_no_session      gate would hold  9/9 
+  runner/human HELD, class missing_repo               gate would hold 11/12
+  runner/human HELD, class session_failed_timeout     gate would hold  1/1 
+  runner/human HELD, class session_held_blocked_input gate would hold  1/1 
+  runner/human HELD, class session_held_date          gate would hold  1/1 
+  runner/human HELD, class session_held_outward       gate would hold  4/4 
+  runner/human HELD, class session_held_partial       gate would hold  4/4 
+  finished items (88): gate would wrongly hold 60  (68%)
+  of the 17 sessions the runner recorded 'done': gate would wrongly hold 13 ($39.39 of work delayed)
+  of the 15 sessions that ended held/failed: gate would have pre-held 15 ($44.76 saved)
+
+--- threshold 0.7 ---
+  runner/human HELD, class born_held_no_reason        gate would hold 28/35
+  runner/human HELD, class human_held_no_session      gate would hold  9/9 
+  runner/human HELD, class missing_repo               gate would hold 11/12
+  runner/human HELD, class session_failed_timeout     gate would hold  0/1 
+  runner/human HELD, class session_held_blocked_input gate would hold  1/1 
+  runner/human HELD, class session_held_date          gate would hold  1/1 
+  runner/human HELD, class session_held_outward       gate would hold  4/4 
+  runner/human HELD, class session_held_partial       gate would hold  3/4 
+  finished items (88): gate would wrongly hold 38  (43%)
+  of the 17 sessions the runner recorded 'done': gate would wrongly hold 6 ($22.61 of work delayed)
+  of the 15 sessions that ended held/failed: gate would have pre-held 12 ($41.86 saved)
+
+per-session detail at threshold 0.5 (only the 32 real sessions):
+  outcome   cost     A     B  P(C0)  gate  id
+     done   6.82  0.89  0.14   0.60  A,B,C  2026-07-25-first-snow-timeline-advisory-recall
+     done   5.96  0.14  0.64   0.12     -  2026-07-20-reels-poll-queue-lost-update
+     done   5.12  0.27  0.15   0.09     B  2026-07-23-cron-loop-contracts
+     done   4.66  0.88  0.35   0.03   A,B  2026-07-29-generalize-research-sweep
+     done   4.56  0.66  0.46   0.27   A,B  2026-07-29-spanish-point-primary-source-verification
+     done   4.20  0.19  0.63   0.33     -  2026-07-23-freestyle-swim-mark-format
+     done   3.34  0.53  0.33   0.15   A,B  2026-07-29-aris-turnstile-contact-form
+     done   3.26  0.05  0.81   0.00     -  2026-07-23-freestyle-storefront-books
+     done   3.08  0.25  0.29   0.21     B  2026-07-23-freestyle-anchor-site-match
+     done   2.91  0.10  0.35   0.02     B  2026-07-29-lessons-14-15-pipeline-enforcement
+     done   2.72  0.12  0.55   0.02     -  2026-07-23-heron-bisac-fic027270-fix
+     done   2.29  0.44  0.36   0.23     B  2026-08-16-shared-data-hardening
+     done   2.04  0.38  0.24   0.05     B  2026-08-05-fpn-worldaquatics-scrapers
+     done   1.79  0.42  0.49   0.39     B  2026-08-03-portugal-property-guide
+     done   1.65  0.64  0.55   0.01     A  2026-08-03-harden-backlog-cli-contract
+     done   0.89  0.27  0.28   0.16     B  2026-08-03-swimtrack-newsletter-from-blueprint
+     done   0.24  0.05  0.43   0.50   B,C  2026-08-16-flash-reminders-decision
+     held   5.67  0.97  0.23   0.67  A,B,C  2026-07-23-freestyle-reader-magnet
+     held   5.59  0.97  0.35   0.11   A,B  2026-07-23-loom-phantom-wiki-tree-reconcile
+     held   4.37  0.95  0.31   0.47   A,B  2026-07-27-time-standards-season-refresh
+     held   3.97  0.96  0.05   0.99  A,B,C  2026-07-23-swimtrack-bento-email-hook-deploy
+     held   3.38  0.29  0.30   0.81   B,C  2026-07-29-resume-spanish-point-series-interview
+     held   3.22  0.93  0.09   0.46   A,B  2026-07-23-tessacross-www-redirect
+     held   3.12  0.97  0.08   0.72  A,B,C  2026-07-27-flight7-workers-builds-preview-urls
+     held   2.45  0.16  0.40   0.07     B  2026-07-21-venice-keys-polish-followups
+     held   1.35  0.77  0.27   0.03   A,B  2026-08-25-loom-triage-two-malformed-bm2-artifacts
+     held   0.54  0.91  0.25   0.70  A,B,C  2026-07-26-elliecalloway-preorder-status-flips
+     held   0.45  0.51  0.37   0.07   A,B  2026-09-02-seo-loop-parked-minors
+     held   0.44  0.72  0.32   0.20   A,B  2026-09-02-vocab-in-digest-and-parent-dashboard
+     held   0.14  0.78  0.09   0.40   A,B  2026-08-16-swimtrack-prod-db-backup
+no_marker  10.07  0.97  0.19   0.19   A,B  2026-08-16-math-content-polish
+  timeout   0.00  0.62  0.48   0.64  A,B,C  2026-08-29-false-start-finn-epistemic-fix
+
+==============================================================================
+6. CALIBRATION BUCKETS (against my blind labels)
+==============================================================================
+
+ A_outward: bucket  n   share truly true
+   [0.0,0.1)   15   0.00
+   [0.1,0.3)   40   0.05
+   [0.3,0.5)   26   0.08
+   [0.5,0.7)   21   0.10
+   [0.7,0.9)   24   0.67
+   [0.9,1.0)   31   1.00
+
+ B_selfcontained: bucket  n   share truly true
+   [0.0,0.1)   31   0.65
+   [0.1,0.3)   52   0.67
+   [0.3,0.5)   33   0.88
+   [0.5,0.7)   26   0.96
+   [0.7,0.9)   15   1.00
+
+ C_onepass: Jev score bucket -> share of my labels that were 'high'
+   [0.00,0.75)  n= 63  mine: {'low': 46, 'medium': 14, 'high': 3}
+   [0.75,1.50)  n= 46  mine: {'medium': 26, 'high': 9, 'low': 11}
+   [1.50,2.25)  n= 42  mine: {'low': 2, 'high': 22, 'medium': 18}
+   [2.25,3.01)  n=  6  mine: {'high': 5, 'medium': 1}

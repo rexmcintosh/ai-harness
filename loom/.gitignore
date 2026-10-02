@@ -1,5 +1,8 @@
 state.json
 weave_ledger.json
+weave_ledger.json.bak-*
+pending.json
+.hold
 spool/
 quarantine/
 learnings/
@@ -7,3 +10,4 @@ logs/
 promote-backups/
 *.lock
 *.err
+*.tmp

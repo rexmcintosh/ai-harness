@@ -1,0 +1,3244 @@
+{
+  "observed_at": "2026-09-12T18:26:05.131738+00:00",
+  "scope": "Read-only assessment evidence; derived source snapshots, not editable authority. No runtime/account changes.",
+  "ideal_states": [
+    {
+      "initiative": "attain-prep",
+      "page_id": "3d645d882ebb81db9d50e35698091788",
+      "source_url": "https://app.notion.com/p/3d645d882ebb81db9d50e35698091788",
+      "observed_at": "2026-09-12T18:26:02.707374+00:00",
+      "status": "read",
+      "last_edited_time": "2026-09-09T21:31:00.000Z",
+      "blocks": [
+        {
+          "block_id": "3d645d88-2ebb-816f-a38b-d6e092246023",
+          "type": "paragraph",
+          "text": "Version: 0.2 \u00b7 2026-09-09 \u00b7 Direction accepted by Rex; evidence and detailed checks continue to evolve.\nOwner: Rex. Canonical home: this Notion page. The repository's IDEAL_STATE.md points here.\nRex endorses the document and refines the central promise to make no additional team members an explicit constraint. This accepts the direction, not a claim that its outcomes are achieved. Population, observation periods and numerical success thresholds remain to be defined."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811b-b7c2-ecab603b512f",
+          "type": "heading_2",
+          "text": "Intent, in Rex's words"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fb-8f60-c19c9f405a62",
+          "type": "paragraph",
+          "text": "\u201ci think it's a missing piecce in helping guide the work we do together and i like the idea of crafting and refining an ideal state artifact for each project. Attain Prep will be the first to use this approach for me.\u201d"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bc-9635-c8259c43f290",
+          "type": "heading_2",
+          "text": "The desired experience"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ea-bfb7-ee0921507574",
+          "type": "paragraph",
+          "text": "Central promise: Students make independent, measurable progress toward their SAT goal, using the time they can realistically give. Parents understand that progress and know when their support would help. Rex can run a useful, sustainable product without personally directing every family's preparation or hiring additional team members."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a6-bfc9-f07d274f1abf",
+          "type": "paragraph",
+          "text": "From the student's perspective: \u201cI know what to work on and why. It fits the time I have. If I get stuck, I can get useful teaching and then try for myself. I can stop and return without losing my place. I can see what I am getting better at and what still needs work.\u201d"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f4-9d61-e0a4fdf355d0",
+          "type": "paragraph",
+          "text": "From the parent's perspective: \u201cI can tell whether preparation is helping, what remains uncertain, and whether there is something useful for me to do.\u201d"
+        },
+        {
+          "block_id": "3d645d88-2ebb-815d-9da7-ef5cbdf43d4b",
+          "type": "paragraph",
+          "text": "The product should feel like one continuous preparation journey. The exact set of pages, activity names, tutor model and tutorial format can change while these outcomes remain the aim."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8197-a3ec-eab03fe3a25b",
+          "type": "heading_2",
+          "text": "How this uses Miessler's idea"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8111-bdda-e73e0fee4184",
+          "type": "paragraph",
+          "text": "His articulation article proposes a living artifact that states the desired outcome, makes implicit expectations explicit, and connects claims to verification. We adopt that direction here: intent, current evidence, criteria and revisions have one home. Detailed technical documents support it and link back; they do not independently redefine success."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d8-b3cf-df37a47ec2f7",
+          "type": "paragraph",
+          "text": "The ARC article illustrates recording a belief, choosing an experiment that could refute it, and retaining the result even when the belief was wrong. Its reported benchmark performance does not establish effectiveness for this education product."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8175-8726-fe4692824cc0",
+          "type": "paragraph",
+          "text": "The Deutsch conversation explores making success criteria explicit while refining subjective preferences through human feedback. For this project, \u201cfeels coherent\u201d needs student observation and Rex's judgment as well as software checks. A passing test cannot establish that a student learned or understood the experience."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f3-a6ee-f8c5d6337694",
+          "type": "paragraph",
+          "text": "This is our adaptation, not an installation of PAI or a claim to implement Miessler's full system."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8171-9003-c311cdf2f48b",
+          "type": "heading_2",
+          "text": "Criteria and current evidence"
+        },
+        {
+          "block_id": "3d645d88-2ebb-815a-9edc-c987370c022a",
+          "type": "paragraph",
+          "text": "These criteria give the accepted direction stable IDs and a next check. Their detailed checks can be refined as evidence improves. Product-wide attainment is unverified until the relevant population, observation period and decision threshold are agreed. An individual successful observation only verifies that case. No overall completion percentage is calculated."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8118-a9fb-f13f6df21543",
+          "type": "heading_3",
+          "text": "IS-01 \u00b7 Learning lasts beyond the helped question"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c4-9aa6-d32387d1770c",
+          "type": "paragraph",
+          "text": "Desired state: After teaching, a student can apply the concept independently to a fresh question on a later occasion.\nCheck: Record the teaching exposure, a fresh independent check, and a later fresh check. Show successes and attempts, concept and elapsed interval. Assisted responses cannot pass an independent check. Repeated delayed failure challenges the teaching approach.\nCurrent evidence: The approved tutor direction calls for this. The percentage walkthrough is a proposal. Neither proves current learning gains.\nNext gap: Make the learning evidence testable in the tutor pilot. Sources: docs/tutor-direction.md and docs/superpowers/specs/2026-09-09-tutor-walkthrough-design.md."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8107-a595-c07a0ebf3d96",
+          "type": "heading_3",
+          "text": "IS-02 \u00b7 A student can begin without a guide beside them"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8147-8805-c0dad5395535",
+          "type": "paragraph",
+          "text": "Desired state: A new student can choose and start useful practice without help navigating the app.\nCheck: Observe a new student from login to the first learning action without coaching. Record where help or guessing was needed. Ask why they chose that action afterward.\nCurrent evidence: First-session confusion is reported in FB-002. Guidance and the progressive tutorial shipped; post-release student comprehension remains unverified.\nNext gap: Observe a real first session and the parent-to-student handoff. A shipped tooltip alone does not close this criterion."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-b2a1-ca2bac94e120",
+          "type": "heading_3",
+          "text": "IS-03 \u00b7 Practice fits the student's available time"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8111-8b43-d16938a7e8af",
+          "type": "paragraph",
+          "text": "Desired state: The student can stop when their available time ends and later continue from clearly saved progress.\nCheck: Start with a declared short time budget, stop partway through an activity, leave and return. Verify the saved answers and next action, and ask whether stopping felt legitimate. In an assessment, explain the effect of pausing on the interpretation of timing/results.\nCurrent evidence: FB-009 supports flexible time as valued. FB-010 reports a 40-question commitment without an obvious exit; existing persistence does not prove a usable pause journey.\nNext gap: Investigate the complete skill-check stop/resume experience before choosing a redesign."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8141-9d89-ef65738c9d14",
+          "type": "heading_3",
+          "text": "IS-04 \u00b7 Each learning activity has a clear purpose and continuation"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8153-b5ea-e5a9ea5055ee",
+          "type": "paragraph",
+          "text": "Desired state: After an activity, a student can identify the useful next step and how it relates to the work just completed.\nCheck: Walk through a skill gap, practice, a mistake, help/review and return to the daily plan. Ask the student what each transition is for. A dead end or unexplained detour challenges the journey.\nCurrent evidence: FB-011 describes useful concepts that feel buried and disconnected. A-002 and the tutorial proposal provide a partial journey map.\nNext gap: Use that map to investigate transitions and discovery across Today, Progress, skill checks, tutoring and review."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811f-a6c6-ede497e399e4",
+          "type": "heading_3",
+          "text": "IS-05 \u00b7 Challenge follows evidence about this learner"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8185-bac9-ca994a70847c",
+          "type": "paragraph",
+          "text": "Desired state: The next practice challenge is justified by evidence about the student's current needs.\nCheck: Compare learners with different recent independent results in the same skill. Inspect what is selected and why. Test the rationale against later performance; a difficulty label alone cannot establish suitability.\nCurrent evidence: FB-012 records authored easy/medium/hard labels and no learner-adaptive drill difficulty in the inspected implementation. Labels are not calibrated SAT module routes.\nNext gap: Investigate question coverage, selection and calibration before promising adaptive difficulty or equivalent SAT routing."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8127-bded-cacbbf4993d9",
+          "type": "heading_3",
+          "text": "IS-06 \u00b7 Progress claims match the evidence"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b6-b5d4-c343435644fe",
+          "type": "paragraph",
+          "text": "Desired state: Every displayed claim about readiness or improvement is supported by evidence appropriate to that claim.\nCheck: Trace selected claims back to the attempts or test results that support them. Probe sparse data, assisted answers, repeated exposed questions and stale observations. Record unknowns explicitly.\nCurrent evidence: FB-005 values content-gap and timing reports. FB-007 accepts missing predictions with too few attempts. That supports preserving honest uncertainty; it does not validate predictive accuracy.\nNext gap: Inspect the evidence behind timing, mastery and score displays as those areas change. Keep speed practice distinguishable from learning with help."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811b-8125-d82557878bc4",
+          "type": "heading_3",
+          "text": "IS-07 \u00b7 Parents can use the report to make a useful decision"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8142-9448-fc3baf6d4bb1",
+          "type": "paragraph",
+          "text": "Desired state: A parent can identify an appropriate next action, including choosing to give the student space, from the reported evidence.\nCheck: Give a parent the normal report without explanation. Ask what it tells them and what they would do. Compare their interpretation with the supporting records.\nCurrent evidence: Atanas values the reports, but we have not established which decisions they improve. Brian relays positive first-session feedback.\nNext gap: Ask about a concrete decision in a follow-up interview. Minutes, streaks and tutor usage remain activity measures."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8132-95d4-c347bc712931",
+          "type": "heading_3",
+          "text": "IS-08 \u00b7 Families can maintain access without losing learning history"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a6-8245-e4fb5d056e20",
+          "type": "paragraph",
+          "text": "Desired state: A family can correct a student's sign-in address while retaining the same student and learning record.\nCheck: Use a test family to correct the address, sign in again and verify record continuity. Check that another family cannot make the change.\nCurrent evidence: FB-001 documents the wrong-email problem; the implementation brief remains P1 and unshipped in the feedback log.\nNext gap: Execute the existing email-correction brief within the normal release process. This draft does not reorder that priority."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d6-8bd7-c6ceacf33e23",
+          "type": "heading_3",
+          "text": "IS-09 \u00b7 The product supports a sustainable business"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8179-a3ee-f25c14e16444",
+          "type": "paragraph",
+          "text": "Desired state: Attain Prep delivers continuing learning value and supports a sustainable business operated by Rex alone, augmented by AI, without hiring additional team members. Its service costs and Rex's workload stay within limits he accepts.\nCheck: For a defined cohort and period, examine continued use, payment/renewal, AI and infrastructure costs, and Rex's actual operating time. Include support, content quality checks, product development, billing issues, incident recovery, and supervising or repairing AI work. Track recurring manual interventions as family numbers change. Agree workload and cost thresholds before declaring success.\nWhat would count against feasibility: quality, service or learning outcomes deteriorate unless Rex adds team members or sustains more operating time than he is willing to give. Routine AI output that requires substantial human correction is operating work, not eliminated work.\nCurrent evidence: Rex explicitly states this is a test of a one-man operation augmented by AI and that he does not want to hire additional team members. Solo feasibility, retention, economics and acceptable workload are not yet demonstrated. Historical experiment pricing is not adopted as today's price.\nNext gap: Establish Rex's operating-time baseline and acceptable limit alongside a target customer scale. Learning value, commercial viability and solo operating feasibility each need evidence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8180-8c5d-c817077581ad",
+          "type": "heading_2",
+          "text": "Boundaries that shape success"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-bda1-fd062eeda3d8",
+          "type": "paragraph",
+          "text": "Preserve family data separation, learning records and honest billing/access behavior. Help must not silently become independent assessment evidence. Easy signup, flexible practice time and useful reporting are existing positives to preserve."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8194-9ade-c8087faa4d57",
+          "type": "paragraph",
+          "text": "Do not treat more questions, more tutor chat, longer screen time, a streak, or a shipped feature as proof of learning. Do not promise a particular SAT increase without supporting evidence. The original family deployment and market product remain distinct scopes."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c8-b78a-fb896e840bba",
+          "type": "paragraph",
+          "text": "The tutor is a proposed means to better learning. Whether it eventually directs the entire daily journey is still open. The current tutorial and 40-question skill-check format are also means that can change.\n\nOperating constraint, confirmed by Rex: one human operator, augmented by AI, with no additional team members. Plans must fit that model. If a proposal depends on adding staff, revise the scope or operating approach and make the conflict explicit. Growth alone is not success if it breaks the operating constraint."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8181-a956-fbcdb3c473da",
+          "type": "heading_2",
+          "text": "How this guides our work"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fd-ba30-da00f7bc8434",
+          "type": "paragraph",
+          "text": "Working rule: Before starting product work, name the relevant IS criterion, the observed gap and the evidence the work should produce. Include the expected ongoing work for Rex and what AI or the product will handle, where the change affects operations. Small changes need only a short reference, not another specification. This operational assessment follows Rex's explicit solo-business constraint."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811e-8864-c8371833e17b",
+          "type": "paragraph",
+          "text": "Use the existing flow: feedback provides evidence \u2192 this artifact explains why the gap matters \u2192 a queue task defines the next useful step \u2192 the result updates our evidence here."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c0-abdb-def1a58e09b8",
+          "type": "paragraph",
+          "text": "For each queue brief, include the Ideal State page/version, relevant criterion IDs, current gap, proposed change or investigation, what would count against the hypothesis, and the outcome check in Done when. A task outside existing criteria should explain the missing outcome; extend the artifact deliberately instead of forcing a weak match."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819e-bf17-c44147a7d817",
+          "type": "paragraph",
+          "text": "At completion, report separately: implementation/release status, verification evidence, and whether the desired student or parent outcome was observed. Include the date, app version or commit, cohort/conditions and limits where relevant. Failed checks remain visible and inform the next attempt."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8176-9c71-f138921c1e04",
+          "type": "paragraph",
+          "text": "Rex owns changes to the central promise, trade-offs and outcome thresholds. Agents can draft refinements and record evidence. Keep a dated reason for criterion changes; do not weaken a criterion to make completed work look successful."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819e-8a7f-f02f3826c492",
+          "type": "paragraph",
+          "text": "Current integration: This artifact is linked from the feedback hub and repository. The queue runner does not automatically load this page. Its automation is unchanged. The queue still starts only when a task is set to Ready; endorsing or refining this artifact does not launch product work. Automatic loading remains a separate integration step."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812f-a0a0-d961d17ac506",
+          "type": "heading_2",
+          "text": "Refinement decisions"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81aa-829a-c7b2165dc95b",
+          "type": "paragraph",
+          "text": "Resolved September 9, 2026: Rex endorses the Ideal State document and refines the central promise to exclude hiring additional team members. Attain Prep is explicitly a test of whether a one-person business augmented by AI is feasible. The independent-progress promise remains the working direction."
+        },
+        {
+          "block_id": "3d645d88-2ebb-815e-a590-d99906646176",
+          "type": "paragraph",
+          "text": "Then define the intended learner range and preparation horizon, what evidence would make Rex trust the learning claim, and the business scale and owner workload he wants. Current family feedback includes both short daily sessions far from the SAT and a student near test day; one family's horizon should not silently define everyone."
+        },
+        {
+          "block_id": "3d645d88-2ebb-815b-83ac-c9c7469f2f86",
+          "type": "heading_2",
+          "text": "Revision record"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8170-a401-c816f5a74d33",
+          "type": "paragraph",
+          "text": "2026-09-09, v0.1: Rex requests the Ideal State approach for Attain Prep as the first project. Initial articulation assembled from his feedback, the agreed tutor direction, existing strategy documents and the three linked Miessler articles. Product criteria and workflow integration are drafted for refinement. No criteria are declared achieved. No product tasks or deployments are started by this document.\n\n2026-09-09, v0.2: Rex endorses the document after directly adding \u2018or hiring additional team members\u2019 to the central promise. His clarification: \u2018i have no desire to hire additional team members. this is a test of whether or not running something like this is feasible with a one-man operation augmented by AI.\u2019 Preserved his edit and carried the constraint into IS-09, operating boundaries and work selection. Evidence checks now include the human effort to supervise and repair AI work. No workload limit or business scale is invented, and feasibility remains unverified."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81cd-9020-dcf880f1d124",
+          "type": "heading_2",
+          "text": "Sources and linked work"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8151-9d43-ce0cf9ed62e2",
+          "type": "paragraph",
+          "text": "Daniel Miessler, The Entire Game for AI Is Articulation of Ideal State: https://danielmiessler.com/blog/ai-ideal-state-articulation\nDaniel Miessler / Kai, I Played ARC-AGI-3 With My Own Method: https://danielmiessler.com/blog/i-played-arc-agi-3\nDaniel Miessler, A Conversation With Claude on Deutsch, Knowledge, and the PAI Algorithm: https://danielmiessler.com/blog/conversation-with-claude-on-deutsch-and-the-pai-algorithm\nFeedback hub: https://app.notion.com/p/3d445d882ebb811faaa3edbb35e155e9\nProduct work queue: https://app.notion.com/p/3d645d882ebb8106afdfd8c1d9f019b6\nJourney and tutorial record: https://app.notion.com/p/3d645d882ebb81e7a644ef93dd070e95\nLocal context: docs/feedback-log.md; docs/tutor-direction.md; docs/superpowers/specs/2026-09-09-tutor-walkthrough-design.md; docs/superpowers/specs/2026-08-19-market-v1-design.md; docs/superpowers/specs/2026-08-30-accountability-wedge-experiment.md.\n"
+        }
+      ],
+      "content_sha256": "17f3a24f56db70f7d484ddd1d13dee8cd6c7f919527ca28d6bd426f51e00f567"
+    },
+    {
+      "initiative": "ultimate-portugal",
+      "page_id": "3d645d882ebb81fc951fd6b4918dd767",
+      "source_url": "https://app.notion.com/p/3d645d882ebb81fc951fd6b4918dd767",
+      "observed_at": "2026-09-12T18:26:02.711785+00:00",
+      "status": "read",
+      "last_edited_time": "2026-09-10T23:42:00.000Z",
+      "blocks": [
+        {
+          "block_id": "3d645d88-2ebb-81df-b4c2-ccf267c26a92",
+          "type": "paragraph",
+          "text": "Version 0.2 \u00b7 9 September 2026 \u00b7 Owner: Rex"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8106-a653-d2624f58ab60",
+          "type": "paragraph",
+          "text": "Status: working draft for refinement. Rex has confirmed the one-human operating constraint and the ambition to achieve first-page search visibility and leading AI-result visibility relative to competitors. The proposed positioning, detailed measurement definitions and numerical success thresholds still need refinement. Desired outcomes are not claims of attainment."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8121-9431-fb618f2519da",
+          "type": "heading_2",
+          "text": "Central promise"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8178-8394-d2fe387db7e9",
+          "type": "paragraph",
+          "text": "People planning a move, a visit, or life in Portugal know what to do next and why. They can rely on clear, current, independent guidance that helps them make sound decisions. Ultimate Portugal becomes a leading independent English-language Portugal resource: its relevant pages earn first-page search positions and prominent citations or recommendations in AI answers for the reader questions we choose to own."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812f-8eb6-e291a137a764",
+          "type": "paragraph",
+          "text": "Ultimate Portugal earns sustainable affiliate income while running with one human operator supported by AI, with very little routine intervention and occasional specialist help when needed."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8188-a198-d78a77004056",
+          "type": "heading_2",
+          "text": "Rex's intent, preserved"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a6-b7e7-c533622a0cd6",
+          "type": "quote",
+          "text": "my ultimate goal is to get to a place that this entire operation runs autonomously with very little human interaction. but that means we have a MECE view of everything necessary to deliver Ultimate Portugal"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8155-8af1-ff4d5c73e82d",
+          "type": "quote",
+          "text": "Yes, use the same constraint, I'll allow occasional paid specialist if needed - but ideally we're talking a one human operator supported by AI."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811b-a40b-e6776b7d98de",
+          "type": "quote",
+          "text": "it's looking pretty decent - but we don't have anything in there as it relates to positioning in the marketplace vs. other competitors. i'd like it to be a front-page ranking, top-AI results ranking page ideally"
+        },
+        {
+          "block_id": "3d645d88-2ebb-815f-b98b-eef6a508fc02",
+          "type": "paragraph",
+          "text": "The target is a viable one-person operation. AI supervision, corrections, troubleshooting, approvals, account administration and managing specialists all count as human work. Moving hidden labor to a contractor or another inbox does not satisfy the constraint. An occasional specialist can resolve a bounded knowledge or judgment need; routine delivery must not depend on hiring a standing team. This allowance does not approve a specific purchase or engagement."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8165-9368-d51d8e6d2248",
+          "type": "heading_2",
+          "text": "Whose outcomes matter"
+        },
+        {
+          "block_id": "3d645d88-2ebb-813d-8ede-efd7262791a3",
+          "type": "bulleted_list_item",
+          "text": "Readers: understand their options, limits and next step; can find relevant information and judge its reliability without sorting through conflicting or stale advice."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-b811-fdfa5bb3400e",
+          "type": "bulleted_list_item",
+          "text": "Subscribers and correspondents: receive what the site promises, retain control over email and data, and receive appropriate handling of questions or corrections."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e1-8f2b-c1fe1e2d0251",
+          "type": "bulleted_list_item",
+          "text": "Rex: owns a useful, financially sustainable site whose routine work completes within standing rules. He can see real outcomes and unresolved decisions without supervising each job."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bb-8f8b-e94c1b7f3e29",
+          "type": "bulleted_list_item",
+          "text": "Partners and listed businesses: are represented accurately and evaluated on editorial merit. Affiliate income does not buy a recommendation or a directory place."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819e-8d59-de5356754ef2",
+          "type": "heading_2",
+          "text": "Confirmed direction and boundaries"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ab-ba84-d19cd9cf0a37",
+          "type": "bulleted_list_item",
+          "text": "One human operator supported by AI, with occasional specialist input if needed."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c5-a260-d0f79d0993dc",
+          "type": "bulleted_list_item",
+          "text": "Comprehensive ownership of necessary business outcomes, including capabilities that are missing today."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c8-979d-c5483d03002f",
+          "type": "bulleted_list_item",
+          "text": "Existing business scope: English-language guidance for moving to, visiting and living in Portugal; associated tools, directory and the promised weekly reader newsletter."
+        },
+        {
+          "block_id": "3d645d88-2ebb-815e-af77-c8048124c2a0",
+          "type": "bulleted_list_item",
+          "text": "Existing monetization scope: affiliate income. Ads, paid listings, lead generation and newsletter sponsorship are outside the current mandate."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a3-bde1-cdd955af0db8",
+          "type": "bulleted_list_item",
+          "text": "Editorial trust: no invented first-hand experience, credentials, sources, observations or results. Explain material uncertainty and ground consequential claims in appropriate evidence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bc-8bc4-c4dc7b10b728",
+          "type": "bulleted_list_item",
+          "text": "Consent remains purpose-specific. A contact or listing application does not give newsletter consent."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d9-8cea-cabefbae670e",
+          "type": "bulleted_list_item",
+          "text": "Existing publishing, topic blessing, external messaging, spending and release permissions remain in force. Any later reduction in routine approval must come from an explicit standing policy."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8109-9235-c019018ec8ef",
+          "type": "bulleted_list_item",
+          "text": "The topical map serves useful coverage and a defensible market position. Competitive search and AI visibility are explicit desired outcomes alongside reader value, trust, net economics and low owner workload. Article volume, traffic or a single ranking win cannot establish the whole Ideal State."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810f-b916-f570cb5c0b20",
+          "type": "heading_2",
+          "text": "Market position and competitive ambition"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8185-97c1-d90558abb84f",
+          "type": "paragraph",
+          "text": "Confirmed ambition: Ultimate Portugal should be a first-page search result and a prominent source or recommendation in leading AI answers for the Portugal topics that matter to its readers. This applies across relevant pages and selected reader journeys; it is not limited to ranking the homepage or the brand name."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8153-94de-d28075b5aa62",
+          "type": "paragraph",
+          "text": "Proposed positioning: the independent, practical Portugal decision resource that connects moving, visiting and living in one coherent journey. Its reason to be chosen is source-grounded, date-checked guidance, original useful evidence, maintained comparison tools and editorially vetted services that make the next action clear. AI-supported production is the operating method, not the reader-facing reason to trust us."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8109-89dd-d809fb86c80a",
+          "type": "paragraph",
+          "text": "Test that positioning against actual competing answers. A page should contribute a useful advantage the reader can name: clearer tradeoffs, better-supported or fresher facts, relevant original analysis, an actionable comparison, or a more complete next step. Do not claim that rivals lack these qualities without current evidence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a4-9f4a-c73d1f1e1511",
+          "type": "paragraph",
+          "text": "Use the existing 12-site competitor research as the starting peer set, grouped by reader task. Relocation and practical-life examples: Portugalist, Expatica Portugal, Anchorless, Nomad Gate and Global Citizen Solutions. Travel examples: Portugal.com, Earth Trekkers, Salt in Our Hair, A Dangerous Business and Julie Dawn Fox. Specialist examples include iSchoolAdvisor and Practice Portuguese. These are research peers, not a claimed current ranking order. Add newly observed competitors and official sources when they appear in the same results; distinguish publishers from government authorities rather than excluding strong results."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8194-9ccf-ebe8788ff5e3",
+          "type": "paragraph",
+          "text": "Define the contest before scoring it: a versioned set of important non-branded queries and natural-language questions mapped to topical tasks; named countries, language, devices and AI surfaces; a comparison cohort; an observation period; and a deadline. US and UK English are a proposed starting scope because existing keyword evidence covers them, with much greater depth in the US. Keep visitor, mover and resident topic results visible separately. Missing pages and hard queries stay visible; do not select only easy wins or change the basket without a revision record."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c4-a0ed-fba79ff31681",
+          "type": "paragraph",
+          "text": "Report observed top-10 and top-3 organic coverage, competitor coverage differences, AI citation rate, explicit recommendation rate, response prominence where meaningful, and each metric\u2019s measured sample and missing observations. Use the same queries, settings and period for competitors. Separate branded demand from non-branded discovery. Paid placements do not count as organic ranking wins. Better visibility must still bring relevant readers, useful answers and a viable business."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8162-8399-c0346f8eb60e",
+          "type": "paragraph",
+          "text": "Evidence today: the 9 September DataForSEO research validates demand and competitor coverage, not Ultimate Portugal\u2019s current leadership. The 12-question, five-engine visibility benchmark is implemented but the audited store contains no actual answer-engine observations. No current first-page coverage rate, AI leadership rate or competitor superiority is asserted. Source anchors: docs/research/topical-map-2026-09-09/README.md and engine/visibility/benchmark.json."
+        },
+        {
+          "block_id": "3d645d88-2ebb-817f-8801-f76e545bf799",
+          "type": "heading_2",
+          "text": "Ideal State criteria and current evidence"
+        },
+        {
+          "block_id": "3d645d88-2ebb-817f-a2cb-c99d4b6ac434",
+          "type": "paragraph",
+          "text": "There are fifteen criteria. None is declared achieved. Rex has confirmed the direction of competitive search and AI visibility; the detailed formulations and acceptance thresholds below remain proposed. UP-ISC-07 applies only if optional channels are selected. The 52 capabilities map exactly once to a primary criterion; shared dependencies do not duplicate ownership. Observation windows, samples and thresholds still need agreement. There is no overall percentage complete."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819c-b025-e93a39fdca3b",
+          "type": "heading_3",
+          "text": "UP-ISC-01 \u00b7 The business fits one human operator"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8186-9ea5-fb0ae83a1d98",
+          "type": "paragraph",
+          "text": "Desired state: Routine operation fits Rex's agreed time budget without depending on an ongoing team."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8151-a8ae-cc908821d548",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8155-bd9d-f6d6194b6c64",
+          "type": "paragraph",
+          "text": "Current evidence: Confirmed owner intent: one human supported by AI, occasional paid specialists if needed. Selected controls exist. Total owner time, interruption load, capacity and long-term solo feasibility are not measured. External account and privacy setup remain unverified."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f8-b0dc-dfa1830a5e8e",
+          "type": "paragraph",
+          "text": "Check the system: Run allowed and denied action fixtures for publication, paid calls, personal-data handling, and credential use. Check a current promise, decision, budget, access, vendor, and renewal register."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8112-9046-dcaeff18e912",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner confirms that normal weekly work fits the agreed time limit and that exceptions reach them with a decision-ready record. Owner reviews a sampled privacy request and account-recovery drill."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8169-bb5e-e734be84a236",
+          "type": "paragraph",
+          "text": "What would count against the claim: Routine delivery requires a standing team or exceeds Rex's agreed time budget across the agreed observation period. AI supervision, repair work or repeated specialist reliance is excluded from the reported workload."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810a-a5b8-fc6f228abd1b",
+          "type": "paragraph",
+          "text": "Next gap: No verified end-to-end rights request or account recovery; No operation-wide cost reservation and exhaustion control; No single capacity plan or service-promise register."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8159-b1b3-d8999ec63bc5",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs owner decision: maximum owner minutes per week, monthly operating budget, and acceptable exception load."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8130-98c4-f5b0f9f40f39",
+          "type": "paragraph",
+          "text": "Primary capability IDs: mandate, authority, spending, privacy, capacity, security, continuity."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8142-9437-c4e56c314892",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-12."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8108-8299-c0faf92f54ce",
+          "type": "heading_3",
+          "text": "UP-ISC-02 \u00b7 Readers can trust the evidence"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8154-87ec-efbbe709f8bd",
+          "type": "paragraph",
+          "text": "Desired state: Every material public claim and reusable content asset has dated, suitable evidence and rights that can be traced when it changes or is challenged."
+        },
+        {
+          "block_id": "3d645d88-2ebb-818a-9e47-c30674ac0574",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b2-954e-f27c448c81d9",
+          "type": "paragraph",
+          "text": "Current evidence: Partial. Source collection, protected refresh facts and rent checks exist. As of 10 September 2026, the search-evidence repair is merged as 574490f. Automatic A6/A7 shared-input assembly and hash checks pass offline tests on reviewed branch claude/refresh-input-guard (09e2f8f), awaiting merge. This proves input consistency, not factual quality. Several source adapters, a claim dependency register, an original-evidence plan and an asset-rights register remain missing. Execution evidence is in the Content machine closure queue."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d7-8098-c3d7ee521f4b",
+          "type": "paragraph",
+          "text": "Check the system: Sample claims, calculator inputs, images, and sourced passages for source, date, rights, expiry, and affected-page links. Simulate an authoritative fact change and confirm that dependent pages and tools enter review."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8179-b486-e199ba3c3dcf",
+          "type": "paragraph",
+          "text": "Check the actual experience: Editor or owner judges whether source quality and any original reporting support the reader-facing assertion. Rights owner confirms permissions for a sampled asset."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8179-a838-fac2ea13d1ac",
+          "type": "paragraph",
+          "text": "What would count against the claim: A published material claim cannot be sourced, dated, updated, or corrected An asset enters a release without known permitted use"
+        },
+        {
+          "block_id": "3d645d88-2ebb-812d-8e9a-dd878947cb89",
+          "type": "paragraph",
+          "text": "Next gap: Unconfigured source adapters; No full claim-to-output impact map; No asset provenance ledger."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8178-b934-c859034f3ba8",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Unset: define material-claim risk classes and review deadlines."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-a122-e46fe6a89bf7",
+          "type": "paragraph",
+          "text": "Primary capability IDs: sources, claims, original, datasets, rights."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b6-a5d4-f5061da29775",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-12."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b5-8598-f929324bac90",
+          "type": "heading_3",
+          "text": "UP-ISC-03 \u00b7 Readers know what to do next"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a0-a3f6-e96f1bc79366",
+          "type": "paragraph",
+          "text": "Desired state: A reader can identify a useful next step from an article or tool and explain why it fits their situation."
+        },
+        {
+          "block_id": "3d645d88-2ebb-818a-9e30-dd19c194ace3",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8109-9644-c1555ad981e1",
+          "type": "paragraph",
+          "text": "Current evidence: Partial. Draft checks, editorial contracts, citations and affiliate-link checks exist. The inactive v2 new-article contract and recoverable evidence tools merged as 4e45ea1; their runtime fixture is synthetic. The scheduled new-article route still uses the existing retired-guidance contract. Readiness remains 0/3 qualifying clean refreshes, followed by a real shadow article, coordinated activation and observed morning outcomes. Independent real v2 article quality remains unproven."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fd-a2b6-d88f8a1f451a",
+          "type": "paragraph",
+          "text": "Check the system: Run source, claim, citation, affiliate-link, metadata, asset, and internal-link checks against a bundle. Verify that a changed bundle component invalidates prior approval."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8156-b415-d5f7ab54977d",
+          "type": "paragraph",
+          "text": "Check the actual experience: Ask representative readers to use an article/tool for a realistic move, visit or living-in-Portugal task without coaching; record their next action, rationale and any material misunderstanding. An independent source-grounded review checks whether their interpretation is justified; a completed user journey does not override factual concerns."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810b-9099-d33a9a131ebd",
+          "type": "paragraph",
+          "text": "What would count against the claim: A release passes mechanical checks yet misleads, omits needed context, or fails its stated reader task"
+        },
+        {
+          "block_id": "3d645d88-2ebb-812a-a206-c63f2a3ffcc4",
+          "type": "paragraph",
+          "text": "Next gap: No single bound bundle manifest; No consistent current writer and voice route; No reader-task validation."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ac-81bc-c823ebbe7807",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: define the sampled reader-task pass rate and the material-error bar."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ef-be2d-f875c18cfb9d",
+          "type": "paragraph",
+          "text": "Primary capability IDs: drafting, voice-policy, article-qa, visuals, packaging."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81db-a917-d431f5734dc0",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-02, UP-ISC-08."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8169-b7f9-f68f17f40513",
+          "type": "heading_3",
+          "text": "UP-ISC-04 \u00b7 Authorized changes complete reliably"
+        },
+        {
+          "block_id": "3d645d88-2ebb-819e-8586-faa70b44a9dd",
+          "type": "paragraph",
+          "text": "Desired state: An approved public change reaches the intended live version once, and a failed or duplicated job can recover without a duplicate side effect."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8109-bc3e-f51977fd78d3",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8117-aefe-f128fdbf0de4",
+          "type": "paragraph",
+          "text": "Current evidence: Partial: approved publishing paths, preview tools, deploy checks, cron, and locks exist. Signed decision dispatch, cross-workflow idempotency, and restore drills are unverified."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8197-bade-e7ef4384749d",
+          "type": "paragraph",
+          "text": "Check the system: Exercise approval expiry, duplicate delivery, failed deploy, late event, retry exhaustion, rollback, and isolated restore fixtures. Check the public version and the relevant SSR routes after a controlled release."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810b-809e-e03c20ddd445",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner confirms the approved artifact and result record match their decision. Owner observes a restore drill with no duplicate mail, publication, or paid action."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a4-87b8-ff1c18c3510f",
+          "type": "paragraph",
+          "text": "What would count against the claim: One decision causes two external effects A failed job silently disappears The prior good state cannot be restored safely"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8159-a66f-f183e8cb2047",
+          "type": "paragraph",
+          "text": "Next gap: No proven dead-letter and reconciliation path; No verified external-state restoration; No complete approval-expiry service level."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8156-92de-c3aa30c11880",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Unset: owner must choose recovery-time and acceptable-data-loss limits."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bf-bf9b-f99cf30d2445",
+          "type": "paragraph",
+          "text": "Primary capability IDs: approval, release, deployment, orchestration, recovery."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812c-b764-e7670f232d71",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-03, UP-ISC-12."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819f-8b54-f5f8e62f1fc5",
+          "type": "heading_3",
+          "text": "UP-ISC-05 \u00b7 Known errors and stale facts are resolved"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ef-810d-f6e6df1b08b3",
+          "type": "paragraph",
+          "text": "Desired state: Known material errors and overdue facts are resolved within agreed risk-based deadlines, with affected outputs and notices handled."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8124-b833-eb7790a52ed7",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e2-917d-da0a0d03e0e8",
+          "type": "paragraph",
+          "text": "Current evidence: Partial: refresh, correction records, and diagnosis for consolidate/redirect/prune exist. Recent refresh attempts failed and full lifecycle execution is not proven."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81af-8d60-d1c4f1628e2b",
+          "type": "paragraph",
+          "text": "Check the system: Create stale, corrected, and consolidation fixtures; verify queueing, affected-page updates, redirects, links, map, and sitemap."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e5-ac84-eb6dbfdc5e5e",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner judges error severity and any needed reader notice. Sample readers confirm that a correction or redirect leaves them with a usable answer."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8180-a09c-c29d9dbf2f32",
+          "type": "paragraph",
+          "text": "What would count against the claim: A known high-risk claim remains live past its deadline A retirement breaks useful intent or leaves outdated discovery paths"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8162-bd02-d8c55f21f0b4",
+          "type": "paragraph",
+          "text": "Next gap: No all-content risk-based freshness coverage; No tested urgent correction-to-notice path; No complete retirement reconciliation."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8139-972c-c6acd09ff142",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: severity deadlines and maximum overdue high-risk pages."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e0-9ab2-d3ec1e4dff19",
+          "type": "paragraph",
+          "text": "Primary capability IDs: refresh, corrections, retirement."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8107-aede-ed2268d90244",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-02, UP-ISC-04, UP-ISC-09."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812b-a3a2-feb2c24f52db",
+          "type": "heading_3",
+          "text": "UP-ISC-06 \u00b7 Readers can find and use the answer"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8181-957b-f3240e23b582",
+          "type": "paragraph",
+          "text": "Desired state: A reader can find and use eligible public information through site navigation or search on the devices and assistive methods that matter."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f9-a8d3-df4a5c5cd969",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8123-a38b-ed9dd1e720a3",
+          "type": "paragraph",
+          "text": "Current evidence: Partial: catalog, search, topics, feeds, machine-readable twins, and SEO shadow execution are implemented. Recurring index and accessibility outcome evidence is incomplete."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8170-8a02-d1e69abadbf4",
+          "type": "paragraph",
+          "text": "Check the system: Check catalog, feeds, canonicals, robots, sitemap, structured data, index signals, broken links, keyboard paths, responsive layouts, and performance budgets."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fa-b1c3-cd874d641f27",
+          "type": "paragraph",
+          "text": "Check the actual experience: Representative readers find a selected answer from search and complete article, search, comparison, tool, and form journeys. Assistive-technology users or a qualified specialist sample the critical journeys."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8184-863c-c19aa643dda7",
+          "type": "paragraph",
+          "text": "What would count against the claim: Eligible content is missing or materially broken in a promised discovery surface A critical reader task fails on a representative device or keyboard journey"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8137-bc09-c58ccaf84a85",
+          "type": "paragraph",
+          "text": "Next gap: No proven indexing-loss incident loop; No recurring assistive-technology validation; Shadow SEO is not reader-discovery proof."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810e-8138-e1189ce0bcef",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: priority journeys, device set, and acceptable discovery failure rate."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811f-b3a7-c1dc5b4bf34e",
+          "type": "paragraph",
+          "text": "Primary capability IDs: findability, technical-search, experience-health."
+        },
+        {
+          "block_id": "3d645d88-2ebb-814c-a767-dfd3a5ac7cc9",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-04, UP-ISC-05, UP-ISC-12."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8199-9252-c2a0daf7b6fa",
+          "type": "heading_3",
+          "text": "UP-ISC-07 \u00b7 Optional channels earn their place"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c7-bdf8-fc19e2a623e9",
+          "type": "paragraph",
+          "text": "Desired state: Any chosen optional growth channel earns relevant attention within its agreed cost and owner-time limits."
+        },
+        {
+          "block_id": "3d645d88-2ebb-816c-8665-e73f7e3ba482",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: conditional: only if the owner chooses extra channels."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8142-8826-c36ad5f9d2ee",
+          "type": "paragraph",
+          "text": "Current evidence: Missing: RSS and JSON feeds exist, but no repeatable earned-reference or selected-channel operating loop is established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8147-8c51-c8eda255284b",
+          "type": "paragraph",
+          "text": "Check the system: Check each active channel and outreach record for audience, owner, cadence, permitted account, cost, measurement, and stop rule."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8134-b1e1-ea7f047e4ca4",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner reviews sampled outreach and references for relevance and editorial fit. Reader feedback identifies whether the channel brought the expected audience."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d7-92e8-cd474a9f361e",
+          "type": "paragraph",
+          "text": "What would count against the claim: Work becomes link spam, attracts the wrong audience, or continues after its stop rule"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8153-8856-c7ebedf71a5c",
+          "type": "paragraph",
+          "text": "Next gap: No approved external-channel portfolio; No qualified-reference or reader-fit evidence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c4-98a6-dc4a629e5894",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Unset: select channels only after the owner sets a time and cost cap."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8145-86bf-f711955a19d7",
+          "type": "paragraph",
+          "text": "Primary capability IDs: authority-growth, channels."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8166-bc91-d853444441bf",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-02, UP-ISC-06."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8125-9bdf-fbfe9576a1e3",
+          "type": "heading_3",
+          "text": "UP-ISC-08 \u00b7 Work follows real reader needs"
+        },
+        {
+          "block_id": "3d645d88-2ebb-811a-a9bc-f4a7d058c58a",
+          "type": "paragraph",
+          "text": "Desired state: Work is selected from evidenced reader needs and strategic gaps, with bounded capacity rather than publishing volume as the goal."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bf-a82b-fa68565c6863",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c7-bab1-d98b12562c34",
+          "type": "paragraph",
+          "text": "Current evidence: Partial: a topical map, blessed backlog, and dated competitor research exist. No recurring reader-need synthesis or shared allocation plan exists."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81dc-832d-e45578353d03",
+          "type": "paragraph",
+          "text": "Check the system: Check that proposals map to a topic, evidence source, owner decision, duplication check, and capacity allocation. Detect stale competitor inputs and repeated unresolved reader questions."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8134-8c04-fa1f032b6942",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner reviews tradeoffs among news, evergreen work, refreshes, revenue work, and reader promises. Reader research validates ambiguous needs before they become investment decisions."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8164-becc-fbf5881c3ff2",
+          "type": "paragraph",
+          "text": "What would count against the claim: Duplicate or low-evidence work displaces an overdue reader need The queue grows without a declared tradeoff or stop condition"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8121-a01d-dadeba190e0b",
+          "type": "paragraph",
+          "text": "Next gap: No consent-aware theme synthesis; No recurring competitor change detection; No outcome-led prioritization across queues."
+        },
+        {
+          "block_id": "3d645d88-2ebb-816c-9f67-ce9a6d2c07f5",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: queue age, freshness, and strategic-balance limits."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811b-aff4-e2ed4b18f052",
+          "type": "paragraph",
+          "text": "Primary capability IDs: portfolio, reader-demand."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8184-942a-ed868621723b",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-09, UP-ISC-11."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e4-b509-e7b9344fceee",
+          "type": "heading_3",
+          "text": "UP-ISC-09 \u00b7 Reader service promises are kept"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8113-9e77-ce8abf27d692",
+          "type": "paragraph",
+          "text": "Desired state: Readers receive the services the site promises, with their consent and control preserved."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819f-887c-fca0b96f754a",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c0-93a1-f77d58c2a142",
+          "type": "paragraph",
+          "text": "Current evidence: Unverified or partial: consent separation and form intake exist, but production reader sends, sender health, suppression propagation, support closure, and directory review ledgers are not proven."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fa-abe3-cd0706cdd04b",
+          "type": "paragraph",
+          "text": "Check the system: Use controlled accounts to test signup, unsubscribe, suppression, validation, issue selection, rendering, delivery events, inquiry routing, and listing review dates."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8112-a4fa-c1674b990cd4",
+          "type": "paragraph",
+          "text": "Check the actual experience: Controlled inboxes confirm delivery and unsubscribe behavior. Readers assess the newsletter's usefulness and support closure; owner judges disputed listings and sensitive replies."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a2-8c2b-d49d1fb553ba",
+          "type": "paragraph",
+          "text": "What would count against the claim: A non-consenting person is marketed to A subscribed reader cannot reliably stop mail An inaccurate or paid-influenced listing remains recommended"
+        },
+        {
+          "block_id": "3d645d88-2ebb-818b-a835-ee40dcb0ab5c",
+          "type": "paragraph",
+          "text": "Next gap: No verified reader newsletter flow; No bounce/complaint and delivery evidence; No full support and directory decision trail."
+        },
+        {
+          "block_id": "3d645d88-2ebb-818c-84e9-c19af747a822",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: newsletter cadence tolerance, support-response deadline, and listing-review cadence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8159-8827-da0dffd1bce4",
+          "type": "paragraph",
+          "text": "Primary capability IDs: subscribe, reader-newsletter, email-health, support, directory."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8184-9bc3-cc2e9116e826",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-04, UP-ISC-05."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8178-af02-f12ab3720dda",
+          "type": "heading_3",
+          "text": "UP-ISC-10 \u00b7 The business earns sustainable affiliate income"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8178-af45-e3a1e1b9fde5",
+          "type": "paragraph",
+          "text": "Desired state: Useful, independent affiliate recommendations generate sustainable net contribution for the one-person business."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a8-a87c-cfb303347791",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8191-a354-f0bd4555fa52",
+          "type": "paragraph",
+          "text": "Current evidence: Missing to partial: the partner registry and link checks exist, but all registry programs show none; conversions, reversals, cash reconciliation, and reader-value conversion tests are not established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8182-a668-f8aa8fc49ef7",
+          "type": "paragraph",
+          "text": "Check the system: Test partner status, tracking redirect, disclosure, relation attributes, unavailable-offer detection, click accounting, and payout reconciliation fixtures."
+        },
+        {
+          "block_id": "3d645d88-2ebb-816c-83b3-e498195412e2",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner reviews partner terms, applications, payouts, and any commercial experiment before commitment. Readers or independent editorial review assess recommendation usefulness and disclosure clarity."
+        },
+        {
+          "block_id": "3d645d88-2ebb-815a-8fc1-f2ca31a9914d",
+          "type": "paragraph",
+          "text": "What would count against the claim: Recurring costs or owner effort exceed the agreed sustainable limits for the observation period. A recommendation follows commission rather than reader merit. Cash receipt is claimed without evidence, accrued commission is confused with cash, or unavailable conversion data is treated as zero."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e8-8327-e51b114133c6",
+          "type": "paragraph",
+          "text": "Next gap: No active verified program and attributable conversion path; No commission-to-cash ledger; No trust-guarded recommendation experiments."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f3-aef1-e95741038080",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs decision: minimum net contribution and reader-trust guardrails before scaling a partner."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8189-9469-edf3824c6cfb",
+          "type": "paragraph",
+          "text": "Primary capability IDs: partners, commercial-links, attribution, cash, conversion."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-aa3b-d05c487bcd60",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-03, UP-ISC-09, UP-ISC-11."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8160-9808-cb2fda4279ab",
+          "type": "heading_3",
+          "text": "UP-ISC-11 \u00b7 Decisions improve from honest evidence"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8149-b8cd-d083c5c01a31",
+          "type": "paragraph",
+          "text": "Desired state: The business improves decisions from measured reader and search outcomes while preserving uncertainty when the evidence is weak."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8146-a353-fd1baa3ce038",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-816f-bd2d-e879335cf473",
+          "type": "paragraph",
+          "text": "Current evidence: Partial: Search Console analysis, SEO reporting, v2 refresh artifacts, and answer-engine benchmark machinery exist. Reader outcome baselines, cross-site experiment memory, actual visibility observations, and uniform model records do not."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c5-a5eb-f0a466859ddf",
+          "type": "paragraph",
+          "text": "Check the system: Check dated inputs, baselines, hypotheses, observation windows, model versions, costs, answer-engine outputs, and shadow/live labels."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e9-9d19-ee0d2d7d0a78",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner reviews whether a recommendation changes a real decision and whether confidence matches the evidence. Reader research validates selected task-success and retention measures."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b9-96c3-c4c51f51ccfa",
+          "type": "paragraph",
+          "text": "What would count against the claim: A decision claims causality without a baseline or adequate sample A missing measure is presented as a zero or a positive result"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8111-acb1-da9c2e2f2192",
+          "type": "paragraph",
+          "text": "Next gap: No privacy-appropriate reader-success baseline; No full experiment register; No actual answer-engine observations."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8140-ab28-c3c61b98d71f",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Unset: define minimum observation windows and no-decision conditions."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c0-a7e9-fc835424a933",
+          "type": "paragraph",
+          "text": "Primary capability IDs: reader-outcomes, experiments, model-evals."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81fc-bd4a-cafd3a06fd55",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-01, UP-ISC-06, UP-ISC-09, UP-ISC-10."
+        },
+        {
+          "block_id": "3d645d88-2ebb-817a-be8e-dcc0b0ff4e23",
+          "type": "heading_3",
+          "text": "UP-ISC-12 \u00b7 Rex knows what needs attention"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81be-9a94-d2d3c67b26ce",
+          "type": "paragraph",
+          "text": "Desired state: Rex can identify the decisions that need his attention and act on them without assembling routine status by hand."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ab-8d2c-f756a0dc0e9b",
+          "type": "paragraph",
+          "text": "Status: proposed criterion; outcome-level attainment not established. Applies: core."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8171-8a75-c109b9883c4a",
+          "type": "paragraph",
+          "text": "Current evidence: Missing to partial: local health checks, SEO reports, and a dated workflow atlas exist. No integrated owner-time, exception, reader-value, cost, cash, and high-risk-content scorecard exists."
+        },
+        {
+          "block_id": "3d645d88-2ebb-813e-9bed-f14eeac117fc",
+          "type": "paragraph",
+          "text": "Check the system: Generate a weekly scorecard from retained outcome signals; inject missed schedules, stale evidence, failed jobs, unknown traffic, and cost or cash gaps. Check that every capability has an owner, last outcome, next review, dependency, and explicit unknown state."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812a-9a5d-f94eb33d738e",
+          "type": "paragraph",
+          "text": "Check the actual experience: Owner uses a sampled scorecard to choose work without reconstructing status from source files. Owner confirms that exceptions, not routine successes, consume their attention."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f8-8831-e0cebad04078",
+          "type": "paragraph",
+          "text": "What would count against the claim: A material failure has no owner, deadline, next action, or closure evidence The scorecard treats unknown as zero The owner must manually assemble normal operational status"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81dd-b7cb-ca93e2f3dbf1",
+          "type": "paragraph",
+          "text": "Next gap: No durable assessment history and evidence expiry; No external success-signal inbox; No verified owner-time or net-contribution view."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8169-bc61-c202ad0a21f7",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Needs owner decision: weekly review length, exception response times, and acceptable owner intervention rate."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d5-bef5-c4a0de3f2d13",
+          "type": "paragraph",
+          "text": "Primary capability IDs: scorecard, promises-dashboard, observability."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81df-b62c-c6071b52dff5",
+          "type": "paragraph",
+          "text": "Related criteria: Evidence flows from the whole operation."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8168-a9ae-f187bf30eb42",
+          "type": "heading_3",
+          "text": "UP-ISC-13 \u00b7 Readers have a reason to choose us over alternatives"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81cd-ab1d-c187aee5e9d3",
+          "type": "paragraph",
+          "text": "Desired state: For priority reader tasks, Ultimate Portugal offers a distinct, useful advantage over the relevant competing answers."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8113-9cd7-e9549bf91923",
+          "type": "paragraph",
+          "text": "Status: the competitive-visibility direction is confirmed; this criterion\u2019s detailed formulation and thresholds remain proposed. Outcome attainment is not established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d3-8db4-fc43cc57cf7c",
+          "type": "paragraph",
+          "text": "Check: Compare the actual top competing pages and AI-cited answers for each selected task. Give representative readers the alternatives without coaching; record whether they can identify our advantage and whether it improves their decision. Use source review to check claimed advantages; preference alone cannot validate factual accuracy."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8131-a4f1-c9e32ad3b60d",
+          "type": "paragraph",
+          "text": "Current evidence: Competitor and keyword research exists. Reader preference, defensible differentiation and sustained competitive advantage have not been measured. The positioning statement is a proposal."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8105-ae40-da73d53df498",
+          "type": "paragraph",
+          "text": "What would count against the claim: Readers cannot distinguish our value, competitors solve the task better, or the advantage depends on unsupported claims or excessive ongoing human effort."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8159-a50e-fb7bda09997f",
+          "type": "paragraph",
+          "text": "Next gap: Select priority journeys and comparison peers; record the current answer quality and the proposed advantage before commissioning more content."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8159-b3c5-e0f9fb2f706d",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Agree the priority cohort, test population and sufficient evidence of preference. No superiority percentage is invented."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ff-974a-e6eb30a37195",
+          "type": "paragraph",
+          "text": "Primary capability IDs: competitive."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81ee-9c75-cebb9ae3fbc9",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-02, UP-ISC-03, UP-ISC-08, UP-ISC-14, UP-ISC-15."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81be-9a8c-e7e26ae9de65",
+          "type": "heading_3",
+          "text": "UP-ISC-14 \u00b7 Priority pages earn first-page organic search positions"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8139-bcbf-e4c4687394aa",
+          "type": "paragraph",
+          "text": "Desired state: Ultimate Portugal\u2019s relevant canonical pages consistently appear on the first page of organic search results for the non-branded queries we choose to compete for."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8170-a312-d477613fd463",
+          "type": "paragraph",
+          "text": "Status: the competitive-visibility direction is confirmed; this criterion\u2019s detailed formulation and thresholds remain proposed. Outcome attainment is not established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819d-b0d5-e81d5c5ede1a",
+          "type": "paragraph",
+          "text": "Check: Proposed operational definition: first-page means organic positions 1\u201310 in a named engine, country, language and device; record the observed SERP layout separately. Measure the share and count of tracked queries with a relevant Ultimate Portugal page in the top 10, plus top-3 coverage as a proposed stretch measure. Compare the same measures with the peer cohort by topic. Use retained dated SERP captures for point-in-time position and Search Console for observed search exposure and traffic. Average Search Console position alone does not prove a fixed query rank."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d4-85fa-d188bd1dd6af",
+          "type": "paragraph",
+          "text": "Current evidence: Search Console reporting and SEO shadow execution exist, and competitor research is dated. A locked target-query basket, current site/competitor position baseline and agreed sustained-success window are not established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-817a-84bf-e10db12ececb",
+          "type": "paragraph",
+          "text": "What would count against the claim: The agreed priority coverage target is missed across the agreed window; apparent success comes only from brand terms or trivial queries; the ranking page does not serve the intended task; or results cannot be reproduced under the recorded settings."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b1-8584-c31b27a17c01",
+          "type": "paragraph",
+          "text": "Next gap: Version the priority query basket from the topical map and existing keyword evidence; capture a budgeted baseline for Ultimate Portugal and matching peers. Report not-found-within-checked-depth separately from failed or missing measurement. A new paid rank-tracking run needs its normal budget authorization."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c1-9d69-c212f518f956",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: First-page ambition is confirmed. Agree the top-10 coverage target, stretch top-3 target, countries/devices, deadline and observation window before marking this achieved. One successful query or snapshot is insufficient."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d3-8a60-ef0ee0831199",
+          "type": "paragraph",
+          "text": "Primary capability IDs: search-improve, search-performance."
+        },
+        {
+          "block_id": "3d645d88-2ebb-815b-85c3-d839340a9095",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-05, UP-ISC-06, UP-ISC-08, UP-ISC-13."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810e-8571-f07cca3c99a2",
+          "type": "heading_3",
+          "text": "UP-ISC-15 \u00b7 AI answers prominently cite or recommend Ultimate Portugal"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b0-b97a-e04f6fefc070",
+          "type": "paragraph",
+          "text": "Desired state: For priority Portugal questions, major selected AI answer services consistently present Ultimate Portugal as a leading useful source or recommendation relative to the competing sources."
+        },
+        {
+          "block_id": "3d645d88-2ebb-812a-aa88-dfd1b5a5c2ce",
+          "type": "paragraph",
+          "text": "Status: the competitive-visibility direction is confirmed; this criterion\u2019s detailed formulation and thresholds remain proposed. Outcome attainment is not established."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c4-98aa-ebd9343196a7",
+          "type": "paragraph",
+          "text": "Check: Run the same neutral, unbranded questions in fresh sessions on the selected services, repeat across dates, and retain the full outputs, citations, query text, engine/model or mode, location and search settings where available. Reuse the existing benchmark first: ChatGPT, Perplexity, Google AI Overviews, Microsoft Copilot/Bing and Claude. Record a linked domain citation, a mere brand mention and an explicit recommendation separately. Count unsupported or negative mentions separately; never score them as useful recommendations. Compare competitor citation and recommendation rates on the identical observed answer set."
+        },
+        {
+          "block_id": "3d645d88-2ebb-817c-9951-d021eddc9ac7",
+          "type": "paragraph",
+          "text": "Current evidence: Benchmark machinery exists; the audited record has no actual answer-engine observations. Local crawlability tests, an llms.txt file or the ability to generate markdown do not demonstrate AI selection or recommendation."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8135-927a-c52793d3b8e2",
+          "type": "paragraph",
+          "text": "What would count against the claim: Relevant competitors repeatedly appear while Ultimate Portugal is absent, citations misrepresent our material, claimed wins require prompting the engine to use our brand, or the result disappears across repeated neutral observations."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e9-98a8-cab97fdf7119",
+          "type": "paragraph",
+          "text": "Next gap: Use the 12 fixed questions as an initial baseline and review topical coverage before extending it. Run only real authorized observations and retain them in engine/visibility/benchmark.json. Record failed runs, unsupported surfaces, unavailable search and no-AI-answer cases separately; do not treat them as zero mentions. Report valid-answer denominators and scheduled measurement completeness together."
+        },
+        {
+          "block_id": "3d645d88-2ebb-813b-a523-d58a8b243716",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: Leading AI visibility is a confirmed ambition. There is no single cross-platform AI rank. Agree citation/recommendation coverage, peer-relative leadership, prominence definition, eligible engines, repeated-run window and deadline. A top-three publisher position by benchmark citation rate is a possible comparison target, not an accepted threshold or a platform-assigned rank."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8163-8de2-c2150c55f786",
+          "type": "paragraph",
+          "text": "Primary capability IDs: ai-visibility."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8122-96d8-c02bc7d55016",
+          "type": "paragraph",
+          "text": "Related criteria: UP-ISC-02, UP-ISC-05, UP-ISC-06, UP-ISC-13."
+        },
+        {
+          "block_id": "3d645d88-2ebb-813e-899f-c7bcdc19d0da",
+          "type": "heading_2",
+          "text": "How this artifact guides work"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bd-9db8-cf86243b67f7",
+          "type": "paragraph",
+          "text": "The Ideal State defines the outcomes. The topical map owns reader problems and content scope. The operating map identifies capabilities, gaps and dependencies. Feedback and measurements provide evidence. Selected work changes the system and returns evidence to this artifact."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e0-911c-dbef0cf17a3a",
+          "type": "paragraph",
+          "text": "Before starting a work item, record:"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bb-993c-d75f0ffa9bc6",
+          "type": "numbered_list_item",
+          "text": "The primary Ideal State criterion and relevant capability IDs."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8103-844a-c67865134ce3",
+          "type": "numbered_list_item",
+          "text": "The observed gap, with dated evidence and what remains unknown."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c3-8ff8-f756b261bf7a",
+          "type": "numbered_list_item",
+          "text": "The smallest intervention or experiment likely to improve that outcome."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bb-997c-fcf9df655f28",
+          "type": "numbered_list_item",
+          "text": "What would show improvement, what would disprove the assumption, and any observation window."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8138-a838-d869d6ec9179",
+          "type": "numbered_list_item",
+          "text": "The expected one-time and recurring human effort, AI/vendor cost, and required authority."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8161-a63d-e563366cc922",
+          "type": "numbered_list_item",
+          "text": "The stop or rollback condition, plus evidence to return when done."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a9-abe6-f53a38c3a40c",
+          "type": "paragraph",
+          "text": "Completion has two separate meanings: the change is implemented and checked; the intended outcome has been observed. A deployment may complete the first without establishing the second. Investigations can succeed by ruling out a proposed feature."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c6-812f-f9d15c8aa18f",
+          "type": "paragraph",
+          "text": "This is a proposed working rule. No automatic loading, queue trigger, dashboard refresh or execution permission was installed by creating the page. Existing approved priorities, including the new-article upgrade, remain intact while we connect them to outcomes."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c1-aaf5-febf94913933",
+          "type": "heading_2",
+          "text": "Evidence and revision rules"
+        },
+        {
+          "block_id": "3d645d88-2ebb-811d-a988-e40399eb6c4d",
+          "type": "bulleted_list_item",
+          "text": "Every criterion has a stable ID, a claim, a verification approach, current evidence and a next check."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8142-8511-cdf3ea8003a2",
+          "type": "bulleted_list_item",
+          "text": "Keep criterion approval status separate from evidence status. A proposed criterion is not an owner decision; a well-tested script is not proof of reader or business success."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8108-99c9-c1488d566d39",
+          "type": "bulleted_list_item",
+          "text": "Use not measured, partial evidence, supported within scope, or contradicted. Record the sample, period and limits. Missing evidence is not a failed result."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e4-80eb-d9806cb97125",
+          "type": "bulleted_list_item",
+          "text": "Separate current-state observations from desired conditions. Do not mark broad claims verified because their underlying workflows are green."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8102-bbbd-fe4acaed2e1c",
+          "type": "bulleted_list_item",
+          "text": "Retain failed probes and conflicting observations. Reopen a supported claim when new evidence contradicts it or its evidence expires."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f9-9e41-e89a9769d832",
+          "type": "bulleted_list_item",
+          "text": "Set thresholds before judging outcomes. Where Rex has not set a target, record that decision as open. Do not manufacture revenue, workload or quality targets."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c8-a787-f67fda602e7b",
+          "type": "bulleted_list_item",
+          "text": "Read-only checks may gather evidence within existing authority. A probe that spends money, contacts people, changes accounts or publishes requires the relevant standing authorization."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a2-b3eb-fcfda29c379c",
+          "type": "bulleted_list_item",
+          "text": "Refine this artifact when owner intent changes, evidence challenges a belief, or a selected work item produces a meaningful result. Preserve version history and the reason for changes."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8126-baee-ee6fb562c9dd",
+          "type": "heading_2",
+          "text": "Open decisions to refine"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8115-85ad-fbfd0e150360",
+          "type": "numbered_list_item",
+          "text": "What counts as \u201cvery little\u201d routine work: an acceptable weekly time budget, an interruption limit, and any absence period the operation must support."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819d-aedd-cc4b3b090024",
+          "type": "numbered_list_item",
+          "text": "What sustainable means financially: recurring cost ceiling, contribution or cash target, and the time horizon for reaching it."
+        },
+        {
+          "block_id": "3d645d88-2ebb-814a-a679-f819e95030e5",
+          "type": "numbered_list_item",
+          "text": "Which reader group and high-value journeys lead the next phase when visitor and mover needs compete."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8196-8ade-e6dcd54acf7f",
+          "type": "numbered_list_item",
+          "text": "Which routine actions can eventually run under standing approval, and what quality evidence is required before that permission expands."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8147-a294-ec18592d6842",
+          "type": "numbered_list_item",
+          "text": "Which reader-outcome and freshness thresholds are meaningful for each risk level, rather than one universal standard."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e8-9cb9-edbcdd844fc9",
+          "type": "numbered_list_item",
+          "text": "Competitive ambition: which priority query/question basket, peer cohort, countries, devices and AI surfaces define the contest; what coverage and relative position count as success; and by when? First-page and leading-AI visibility are desired outcomes, not unmeasured accomplishments."
+        },
+        {
+          "block_id": "3d645d88-2ebb-810d-a209-d57d8de8df1f",
+          "type": "paragraph",
+          "text": "These detailed targets remain open in v0.2. The one-human constraint and the ambition for first-page search visibility and leading AI-result visibility are confirmed."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81b7-be8b-f68386874aee",
+          "type": "heading_2",
+          "text": "Known tensions to manage"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8194-a8a0-da749c613313",
+          "type": "bulleted_list_item",
+          "text": "More content can increase both coverage and the maintenance burden. Expand only when evidence, upkeep and usefulness can keep pace."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a9-8e4d-faf2ccb4b09c",
+          "type": "bulleted_list_item",
+          "text": "Revenue can conflict with impartial recommendations. Editorial merit remains the deciding rule."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f0-914f-ef8b12c5ffc2",
+          "type": "bulleted_list_item",
+          "text": "Fewer approvals can reduce owner effort while increasing unnoticed-error risk. Use bounded authority, independent checks and tested recovery."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d0-8bf1-d8cf67c64abf",
+          "type": "bulleted_list_item",
+          "text": "Original evidence can need real human input. Choose methods that deliver distinctive value within the one-person constraint; use occasional specialists only where needed."
+        },
+        {
+          "block_id": "3d645d88-2ebb-819d-b45b-e350c6a4bc36",
+          "type": "bulleted_list_item",
+          "text": "A system can run unattended while delivering little value. Judge autonomy alongside reader outcomes, trust and net economics."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81d9-a9f2-c90c90228280",
+          "type": "heading_2",
+          "text": "Starting point and next learning steps"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81a7-af7b-d625a289ffe2",
+          "type": "paragraph",
+          "text": "The dated operating model contains 52 capabilities across 10 functions, including two optional growth methods. Its 50 core capabilities comprise six covered, 31 partial, seven with no repeatable implementation identified, and six needing external verification. These are capability assessments, not verified Ideal State claims."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f7-8735-fb92e3b12b85",
+          "type": "paragraph",
+          "text": "Current evidence gives us useful foundations: topical ownership and competitor research, article and refresh workflows, publication gates, search reporting, discovery tools and affiliate-link infrastructure. It does not yet establish an autonomous, financially sustainable business or measured reader success."
+        },
+        {
+          "block_id": "3d645d88-2ebb-813e-b3cc-f68b21711ddf",
+          "type": "paragraph",
+          "text": "The first learning steps are to establish actual owner effort and service outcomes, verify uncertain external setups, and test the new-article route against current writing guidance. The maintained registry and exception handling should make gaps observable. Reader email, affiliate activation and commission-to-cash evidence close important unfinished business loops. No new work is auto-started by listing it here."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8120-8812-d24212192bcd",
+          "type": "heading_2",
+          "text": "Origin and reference material"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8170-8714-ff2cc1fe5a3e",
+          "type": "paragraph",
+          "text": "This follows the Attain Prep Ideal State approach developed in conversation 01a07d64-e5ca-7f30-9434-c55c5e6dadc8, including the distinction between desired outcomes, implementation and observed results. Attain Prep remains a separate project; its goals and domain-specific criteria are not copied into this one."
+        },
+        {
+          "block_id": "3d645d88-2ebb-811e-b2f2-d0015acf2c78",
+          "type": "bulleted_list_item",
+          "text": "Attain Prep Ideal State"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f1-aa24-ca5958a80a12",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: articulation of Ideal State. The useful idea is an evolving desired-state artifact with explicit, testable claims and retained evidence."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8187-bdac-d85f779eeb9c",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: ARC-AGI-3 experiment. The relevant method is testing beliefs and retaining the record of failures; its reported game results do not prove this business can run autonomously."
+        },
+        {
+          "block_id": "3d645d88-2ebb-813c-8f07-c3049dc1beed",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: conversation on Deutsch and the PAI algorithm. Used as conceptual background for criteria that distinguish genuine progress from activity."
+        },
+        {
+          "block_id": "3d645d88-2ebb-8105-a1cc-c476df09a07a",
+          "type": "paragraph",
+          "text": "Local evidence snapshots, not public URLs:"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81bc-9063-fe1870289efb",
+          "type": "bulleted_list_item",
+          "text": "/home/dev/projects/ultimate-portugal-visuals/operating-model-2026-09-09/operating-model.json"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8118-bf00-f5b5fa11cc03",
+          "type": "bulleted_list_item",
+          "text": "/home/dev/projects/ultimate-portugal-visuals/operating-model-2026-09-09/index.html"
+        },
+        {
+          "block_id": "3d645d88-2ebb-8184-aeb6-fecdc1324081",
+          "type": "bulleted_list_item",
+          "text": "/home/dev/projects/ultimate-portugal-visuals/workflow-atlas-2026-09-09/workflows.json"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81c2-840f-f4189c2d8b14",
+          "type": "bulleted_list_item",
+          "text": "/home/dev/projects/ultimate-portugal-visuals/workflow-atlas-2026-09-09/migration-brief.md"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81f9-a69a-efcfdb6cd07d",
+          "type": "bulleted_list_item",
+          "text": "/home/dev/projects/ultimate-portugal-visuals/2026-09-09/ah-writing-guidance/findings.md"
+        },
+        {
+          "block_id": "3d645d88-2ebb-81dd-8ef4-fef9386e76cc",
+          "type": "paragraph",
+          "text": "Search measurement reference: https://support.google.com/webmasters/answer/7042828?hl=en explains that Search Console position depends on the result and reporting context. Use observed query/market/device evidence instead of interpreting a sitewide average as a fixed rank."
+        },
+        {
+          "block_id": "3d645d88-2ebb-818a-af21-cc972f6318d8",
+          "type": "paragraph",
+          "text": "AI search reference: https://developers.google.com/search/docs/fundamentals/ai-optimization-guide emphasizes useful distinctive content and ordinary search foundations; it does not guarantee selection. The outcome criteria above are Ultimate Portugal\u2019s chosen ambitions, not Google-issued ranking promises."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81df-b9fe-f6056f7cb36c",
+          "type": "heading_2",
+          "text": "Revision history"
+        },
+        {
+          "block_id": "3d645d88-2ebb-819e-b6dd-f0f6c1a4e091",
+          "type": "bulleted_list_item",
+          "text": "v0.1, 9 September 2026: created the first working draft from Rex's stated intent, the Attain Prep reference and the Ultimate Portugal evidence maps. Recorded the confirmed one-human constraint with occasional specialist input. Central promise and detailed outcome criteria remain proposals for refinement."
+        },
+        {
+          "block_id": "3d645d88-2ebb-81e5-866d-d170527ebbac",
+          "type": "paragraph",
+          "text": "v0.2, 9 September 2026: Rex adds marketplace positioning, first-page search results and leading AI-result visibility to the Ideal State. Expanded the central promise and added UP-ISC-13 through UP-ISC-15 for differentiation, organic search leadership and AI citation/recommendation leadership. Preserved all earlier criteria and reassigned four existing capability IDs to their primary outcome owners. Detailed thresholds and deadline remain open; no new rankings, benchmark observations, paid calls or publication outcomes are claimed."
+        }
+      ],
+      "content_sha256": "f2d1e6cf09682f74210d389641ec1cdb25c8694ff8329cf20dc1270608a01a19"
+    },
+    {
+      "initiative": "swimtrack",
+      "page_id": "3d745d882ebb8162be7fe53e04539ce9",
+      "source_url": "https://app.notion.com/p/3d745d882ebb8162be7fe53e04539ce9",
+      "observed_at": "2026-09-12T18:26:02.715342+00:00",
+      "status": "read",
+      "last_edited_time": "2026-09-10T09:05:00.000Z",
+      "blocks": [
+        {
+          "block_id": "3d745d88-2ebb-81a7-934f-cdbc4375d568",
+          "type": "paragraph",
+          "text": "Version 0.1 \u00b7 10 September 2026 \u00b7 Owner: Rex"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8193-8225-cb192b792de9",
+          "type": "paragraph",
+          "text": "Status: working draft for refinement. Rex asked for this artifact on 10 September 2026, following the pattern set by Attain Prep and Ultimate Portugal. The product direction accepted on 5 September and the dated decisions since are recorded here as confirmed. The central promise, the twelve criteria, the operating constraint as applied to SwimTrack, and every threshold are proposals until Rex says otherwise. Desired outcomes are not claims of attainment. Creating this page launches no work, changes nothing that is live, and reorders no approved priority."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8151-bfa1-dd08f88ae9c3",
+          "type": "heading_2",
+          "text": "Rex's intent, preserved"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8119-b0be-e027ede75291",
+          "type": "paragraph",
+          "text": "The direction below is assembled from Rex's own words in the sessions of 5 to 10 September 2026, kept verbatim."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8186-89e0-c781dc8fccfa",
+          "type": "quote",
+          "text": "go through what we've built on the swimtrack-website with an eye towards the ultimate goal, and give me your honest assessment. if the goal is unclear, let's make that part really clear first. like ideal state."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8135-b4d8-e74ca729523f",
+          "type": "quote",
+          "text": "we're building a resource to help them understand swimming, and we push hard in the next couple months to become the GO-TO resource for Portuguese swim parents. I think we hyperfocus on Portugal for now, and pause on the other federations and countries."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8143-b141-d91822b16947",
+          "type": "quote",
+          "text": "push comes to shove, EEVERYONE is looking for info at the meet, only the hard-core are going to go down the path of the other tools (Race Ready and Swim Journal)"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e8-a316-e43c35cc5fe4",
+          "type": "quote",
+          "text": "the library though needs to be more than just the meet - because it touches the \"in-between\" space of the daily grind."
+        },
+        {
+          "block_id": "3d745d88-2ebb-816a-ba6b-e8b67d28da4a",
+          "type": "quote",
+          "text": "is there a dashboard we build in (for free) to the experience? plan your season type tool. everything else can hinge off that"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e3-bc0b-dee8f0124b3d",
+          "type": "quote",
+          "text": "Navigator will be mostly free, with one gated/paid feature - the personalized schedule component. i think for multi-day meets we always include day 1 free, but they can unlock all the other days for a one-time season charge (once unlocks the rest of the season), like 5 euros."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d0-837c-c262d504b475",
+          "type": "paragraph",
+          "text": "On 7 September Rex rejected a homepage built around \"your next meet\" because the site does not know which meet matters to a parent, and endorsed the story of the years, escal\u00e3o by escal\u00e3o: \"yes, this is hitting on it\". On 9 September he set the rule for the topical map: search volume in Portugal is light, so canvas the whole subject and use demand only to order the work; discovery is half the job. The same day he said of the articles, \"I don't love the voice of our articles right now\" and \"not trying to get parents to read a novel\"."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8199-8bbb-fc782d75e1a6",
+          "type": "heading_2",
+          "text": "Central promise"
+        },
+        {
+          "block_id": "3d745d88-2ebb-817f-831b-fabdda8d4086",
+          "type": "paragraph",
+          "text": "Proposed. A parent raising a competitive swimmer in Portugal can ask SwimTrack the question underneath every other one, \"what is happening to my kid, is it normal, and what is my job this year\", on any day of the season, in Portuguese or English, and get a clear, honest, hedged answer. On a meet day SwimTrack covers, they can see when their swimmer is in the water and what has changed. Season after season, SwimTrack becomes the resource Portuguese swim parents name first and pass to the next parent."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8140-973b-d15c318b887c",
+          "type": "paragraph",
+          "text": "The business behind it is one person supported by AI. It earns enough from the EUR 5 season pass, at a scale Rex accepts, to keep going without pressuring parents or swimmers, without hiring a team, and without pretending to know what it does not know."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c1-bb97-f564b50b4125",
+          "type": "heading_2",
+          "text": "Whose outcomes matter"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8143-91e2-dc57267e07fc",
+          "type": "bulleted_list_item",
+          "text": "Parents. The reader and the customer. They understand the sport, know their job this year, get through meet days, and never feel sold to or talked down to. They can trust a date, a time and a source on the site."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f8-bcc4-d6f1c707fc0e",
+          "type": "bulleted_list_item",
+          "text": "Swimmers. Never the user, always the point. The site's effect on them is indirect and must be protective: best times over placement, no comparison with other children, no pressure dressed up as support."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a7-ad3d-fd19bb71c2c1",
+          "type": "bulleted_list_item",
+          "text": "Coaches and clubs. Not the audience. The coach is the swimmer's coach, the club decides the meets, and the site says so. The club's parent group is where SwimTrack spreads, so nothing the site does may undercut a coach."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8126-b4bc-f5c40481231d",
+          "type": "bulleted_list_item",
+          "text": "Rex. Owns a useful, honest, financially sustainable resource whose routine work runs under standing rules, including on meet weekends when he may be at a pool himself. He sees real outcomes and the decisions that are his without assembling status by hand."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8183-a588-ef88c6aa68a9",
+          "type": "bulleted_list_item",
+          "text": "Sources. The federation, the thirteen territorial associations, meet organisers and the results hosts are credited and linked, never scraped against their rules, and never contacted for permission the site does not need."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81de-bf39-f4c3c61ae3a2",
+          "type": "heading_2",
+          "text": "Confirmed direction and boundaries"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8180-98ef-d09cafc4dad6",
+          "type": "paragraph",
+          "text": "Dated decisions. Each one stands until Rex changes it."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817f-9b6c-ddd89e61960b",
+          "type": "bulleted_list_item",
+          "text": "5 September 2026. Portugal only; expansion into other countries paused. The public library is independently useful and covers daily life between meets, not only meet days. My season is a free saved planning home. Meet Navigator is free for following swimmers, event lists, heats and results; only the combined personalized schedule is gated. The first calendar day of every meet is free, single-day meets are free throughout, and one EUR 5 payment per September to August season covers every remaining day at covered meets for every swimmer the account follows, with no auto-renewal. Race Ready and Swim Journal are deferred optional extensions. Never fabricate meets, saves, email delivery, paid access or dates."
+        },
+        {
+          "block_id": "3d745d88-2ebb-810d-a4e0-f46ae1b3f397",
+          "type": "bulleted_list_item",
+          "text": "6 September 2026. English and European Portuguese only. Spanish, German, French and Italian are retired: still built, out of the menu, never auto-selected, never translated or scored. The price stays off the homepage and the About card; the app makes the offer. Newsletter copy says \"when it starts\"."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b2-8ec3-cb83832ade72",
+          "type": "bulleted_list_item",
+          "text": "7 September 2026. The front door asks \"where is your swimmer\", not \"when is your next meet\". The site knows the escal\u00e3o from a birth year and must never pretend to know the club's calendar, the entries, the times or the coach's plans. The word \"journey\" stays banned in copy; \"unlock\" too."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a6-96ca-c1b0531ebbdb",
+          "type": "bulleted_list_item",
+          "text": "8 September 2026. Open sources only. No letters to the federation or the associations; a \"no\" would bind and the relationships would cost more than they return. The poller never touches fpnatacao.pt and never scrapes www.swimrankings.net. Blocked sites are checked by hand on the Notion schedule."
+        },
+        {
+          "block_id": "3d745d88-2ebb-813e-b30d-cac390fe1c1b",
+          "type": "bulleted_list_item",
+          "text": "9 and 10 September 2026. The article body is written by GPT-5.6 Sol at reasoning high through Venice; the Claude session briefs, assembles and gates, and fixes only what the gate flags. Length is a budget: body 400 to 600 words, the whole piece under 750. The topical map canvases the whole subject first and lets demand order the work."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8162-9416-ded79d210a5e",
+          "type": "bulleted_list_item",
+          "text": "Standing. Nothing publishes without Rex's one-click approval. The writing engine never edits anything that already exists. Every article passes the grade-8 readability gate in both languages. The brand voice is warm, specific and hedged; SwimTrack is not the coach, not a motivational app, not a data platform."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8191-be39-d60f4584235f",
+          "type": "heading_2",
+          "text": "Operating constraint"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c2-9af2-e4355dc3692a",
+          "type": "paragraph",
+          "text": "Proposed for SwimTrack, confirmed for Attain Prep and Ultimate Portugal: one human operator supported by AI, with no additional team members, and at most an occasional paid specialist for a bounded need such as a legal review. Supervising, correcting and repairing AI work, approving drafts, running hand checks, handling payments and answering parents all count as Rex's work. Moving work to another inbox does not satisfy the constraint."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d0-a6ad-fd62adac3eee",
+          "type": "paragraph",
+          "text": "SwimTrack adds an edge the other two projects do not have. The product matters most on meet weekends, and Rex is a swim parent who may be on a pool deck at exactly that moment. Meet-day service cannot depend on him being at a keyboard. That is why silence alerts and rehearsal weekends appear in the criteria below."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817e-8a80-cdff2b8b5e68",
+          "type": "heading_2",
+          "text": "Ideal State criteria and current evidence"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f5-bead-c00ce1585dd7",
+          "type": "paragraph",
+          "text": "Twelve criteria. None is declared achieved. Each has a stable ID, a desired state, current evidence with a date, two kinds of check, what would count against it, the next gap and the threshold Rex still has to set. Observation windows, samples and thresholds are open. There is no overall percentage complete."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b2-aa5f-e91e07f08cb4",
+          "type": "heading_3",
+          "text": "ST-IS-01 \u00b7 A parent gets a true answer for their swimmer's year"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ba-970c-d3aaced70273",
+          "type": "paragraph",
+          "text": "Desired state: For any escal\u00e3o, a parent can learn what this year is like, how it runs, what their job is and which moments to expect, then find the piece that fits the moment they are in, in either language, without an account."
+        },
+        {
+          "block_id": "3d745d88-2ebb-811a-90c7-e176e9932620",
+          "type": "paragraph",
+          "text": "Status: proposed. The story is accepted in principle; the front door is not built; attainment not established."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8186-abfe-f65990bcd180",
+          "type": "paragraph",
+          "text": "Current evidence: 27 articles are live in English and Portuguese and pass the readability gate. The core story maps them to four stages of the road and names thirteen gaps, starting with how Portuguese swimming is organised, a glossary of the deck, and how entries work. The door and the year card are proposals on the unshipped PR #31. The 2026/27 birth-year table is inferred from last season's bands, not checked against the FPN regulation. No parent has been observed using the site to answer the question."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ac-a4eb-dddf21517d96",
+          "type": "paragraph",
+          "text": "Check the system: every article carries a pillar and a year; the year card renders for every birth year from the escal\u00e3o predicates; the card's link to the standards page pre-sets escal\u00e3o and gender; both languages ship the same page set."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d5-ab55-dd928ea45ad0",
+          "type": "paragraph",
+          "text": "Check the actual experience: give five parents from different escal\u00f5es, one in their first season, the door without coaching. Ask what this year asks of them and what they would read next. A parent who cannot say fails the check, whatever the readability score says."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b7-aed1-f57cc7b1481a",
+          "type": "paragraph",
+          "text": "What would count against the claim: parents cannot find the piece for their moment; the year card contradicts the FPN regulation; the articles read as a novel or as advice a Portuguese parent cannot use."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8169-8304-eadb735616a6",
+          "type": "paragraph",
+          "text": "Next gap: Rex's word on section 8 of the core story; build the door; write \"How Portuguese swimming is organised\" first; add the 2026/27 FPN dataset through the extraction contract."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8179-b53c-d15bf6680f24",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: the sample and pass rate for the parent check, and which escal\u00f5es must be covered before the road is claimed."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8141-8cb6-dc90172cddb4",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-07, ST-IS-09."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c6-965d-c026d6081ada",
+          "type": "heading_3",
+          "text": "ST-IS-02 \u00b7 On a covered meet day, a parent knows when their swimmer swims and what changed"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8173-a808-dfb649bf46d6",
+          "type": "paragraph",
+          "text": "Desired state: At a meet Meet Navigator covers, a parent follows their swimmers' events, heats, lanes, published timings and results while the meet runs, sees where the data comes from and how fresh it is, and can open one schedule for the day for every swimmer they follow."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a9-b5e5-e518eb355590",
+          "type": "paragraph",
+          "text": "Status: proposed. Substantial implementation; live behaviour this season unproven."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81be-808b-f50bccfcc040",
+          "type": "paragraph",
+          "text": "Current evidence: The Navigator app from splash_poller is mounted at /navigator/ with a pinned, hash-checked build. It links 251 of 253 past meets. The season-readiness review of 28 July 2026 found \"a next-day results app that believes it is a live app\": 41 of 42 multi-day meets launched on their final day, seven Portuguese meets never ingested including both 2026 national championships, one meet ingested into the wrong year's row, and nothing alerts on silence. The discovery, supervise and ingest crons have been commented out since 15 August 2026. None of the 13 upcoming national meets is linked to the app. The first is on 24 October 2026 in Sines. The review estimates six to eight focused days plus two rehearsal weekends for the Tier 0 and Tier 1 fixes."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d9-9d05-e4a5b6364b7b",
+          "type": "paragraph",
+          "text": "Check the system: feeds classified by parsing what is published; the supervisor launches on the first start list, not on the final results file; per-record error handling; a silence alert on every scheduled job; a rehearsal against a real live meet with lag measured from heat finish to result shown."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818a-96ba-e73d0fef3d45",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent at the venue compares the app with the deck; how long a result takes to appear; whether a change to the programme is visible as a change."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81eb-874e-de108fcf0755",
+          "type": "paragraph",
+          "text": "What would count against the claim: the app shows the day after the meet; a stale page that does not say it is stale; estimated times shown as if the organiser published them."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8191-bed9-ed2841b3c822",
+          "type": "paragraph",
+          "text": "Next gap: decide whether to resume discovery now; do the Tier 0 work; hold a rehearsal weekend before 24 October."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8125-b102-e640d52d2142",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: acceptable lag; the share of upcoming Portuguese meets the app must cover; what the site may call \"covered\"."
+        },
+        {
+          "block_id": "3d745d88-2ebb-813c-9286-ceb0360bb7d8",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-03, ST-IS-04, ST-IS-06."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a3-8981-cd8941756520",
+          "type": "heading_3",
+          "text": "ST-IS-03 \u00b7 SwimTrack never pretends to know what it does not"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e8-b61d-d4585b053c30",
+          "type": "paragraph",
+          "text": "Desired state: Every page and every state says what it knows, where it came from and when it was checked. Empty, unavailable and switched-off states are honest. No screen implies a meet, a save, an email, a payment or a date that did not happen."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8149-a3c7-c22a9cb120c3",
+          "type": "paragraph",
+          "text": "Status: rule confirmed on 5 September; compliance partial."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b5-9b6a-c25da95c03f9",
+          "type": "paragraph",
+          "text": "Current evidence: On 10 September the live account endpoint returns account and checkout services as off. The site and the app still offer a pass nobody can buy, and the app's day-two gate says payments are not available with no button. The homepage form promises the next article by email while the dashboard says the newsletter is not active. Fixes for these are built and reviewed on PR #31, not shipped. National meet pages show the source and last-checked date. Some copy says \"every meet\" where it means covered meets."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817f-9fed-fe40d13c977c",
+          "type": "paragraph",
+          "text": "Check the system: a fixture walk of every promise on the site (save, sign-in, pass, email, \"covered\", \"next meet\") against the live service flags; the build fails when a copy variant contradicts a flag."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b0-9823-e0517ef1b5e9",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent reads the pass panel with checkout off and says what they expect to happen next; a parent following an uncovered meet can say why nothing shows."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ae-8b1f-f679b9abc096",
+          "type": "paragraph",
+          "text": "What would count against the claim: any screen implies a success that did not happen; a parent is asked to pay for a day with no confirmed schedule; a source link is dead with no fallback."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8175-9e02-f38a55d5a08b",
+          "type": "paragraph",
+          "text": "Next gap: ship PR #31 or choose the checkout-off variants; decide services on or off; decide whether hreflang keeps advertising the retired languages."
+        },
+        {
+          "block_id": "3d745d88-2ebb-811f-b355-c8be1623bf22",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: none to invent; each promise is honest or it is not. Agree the list of promises to walk."
+        },
+        {
+          "block_id": "3d745d88-2ebb-810e-90a9-f42f93e88f21",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-02, ST-IS-05, ST-IS-06, ST-IS-08."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81cd-97f9-d4671f7915b3",
+          "type": "heading_3",
+          "text": "ST-IS-04 \u00b7 Parents can find the meets that exist at their level, with sources they can trust"
+        },
+        {
+          "block_id": "3d745d88-2ebb-818b-a086-efd38c3cea93",
+          "type": "paragraph",
+          "text": "Desired state: The meets that exist for a swimmer's escal\u00e3o, national and regional, appear with dates, venue, documents, a source link and a last-checked date. Until regional coverage exists the site says the coach knows first, and it keeps saying so afterwards."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8195-ab78-de72a0122193",
+          "type": "paragraph",
+          "text": "Status: national calendar confirmed; regional coverage proposed; attainment not established."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817d-963c-e62644e54f27",
+          "type": "paragraph",
+          "text": "Current evidence: 13 national meets for 2026/27 are verified against the FPN calendar PDF; four have no age groups recorded. Regional and district calendars, which are most of every swimmer's season, are absent. The meets hub plan of 7 September proposes organiser, source, meet-edition and document tables with a sources poller in splash_poller, three times a day, open sources only. The Notion schedule of hand checks for blocked sites holds 20 checks, all due, none done. Regional calendars usually appear early to mid October. There are thirteen territorial associations; ANDS is the best regional source. The regional calendar decision is held in the backlog."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8113-83f9-f49d8c6f3629",
+          "type": "paragraph",
+          "text": "Check the system: every association has a source adapter or a dated hand-check record; duplicates across sources resolve to one meet; changes are detected and dated; the Notion source-check inbox is ingested."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8139-b58a-daf139d515dd",
+          "type": "paragraph",
+          "text": "Check the actual experience: three parents from different regions name their coach's next two meets; both appear with a page a parent can use."
+        },
+        {
+          "block_id": "3d745d88-2ebb-814f-a6d8-dfcf33165370",
+          "type": "paragraph",
+          "text": "What would count against the claim: a parent plans around a stale meet page; a meet the coach announced is absent weeks after it was public; a source Rex ruled out is scraped."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e6-bf51-c4f447ab0ff0",
+          "type": "paragraph",
+          "text": "Next gap: schedule hub phase 1; do and ingest the first October source checks; decide whether archived copies of deleted documents are served."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a0-a42e-cc55b551bc96",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: which regions first; acceptable time from a source publishing to the site showing; what share of a sampled club's season must be present."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8108-95d8-c8beea90ffac",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-02, ST-IS-03, ST-IS-11."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8154-bcb4-d5571f4d81d7",
+          "type": "heading_3",
+          "text": "ST-IS-05 \u00b7 A parent's season is saved and waiting when they return"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c2-835a-d9284aaf76b9",
+          "type": "paragraph",
+          "text": "Desired state: A parent saves their year and their meets, signs in with an email link when they want it on another device, and finds it all there next time, in the language they chose."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81da-813d-c3e29180d874",
+          "type": "paragraph",
+          "text": "Status: proposed. Built; production services off."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8194-9b29-f91c1559a557",
+          "type": "paragraph",
+          "text": "Current evidence: My season works from a local draft before sign-in and says where the draft is saved. Production reports the account service off, so no live account exists. The season tables are live in the SwimTrack Supabase project with row-level security, and the database harness passed. Supabase's built-in mailer allows two emails an hour, so magic links need custom SMTP, which is held. Returning parents are not measured; GA4 counts only after consent."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8139-a73a-c6ea37e6821b",
+          "type": "paragraph",
+          "text": "Check the system: the activation checklist in the services contract; two test accounts cannot see each other; a plan survives sign-out and sign-in; a Navigator follow update keeps the dashboard's fields."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8194-9a56-c6f021d8404a",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent saves on a phone, opens the site on a laptop a week later and finds the plan without asking anyone."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e1-9ba7-c9f619b84217",
+          "type": "paragraph",
+          "text": "What would count against the claim: a saved plan is lost; a magic link does not arrive; a parent has to answer the door again."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81cd-9189-c61bd59d5d37",
+          "type": "paragraph",
+          "text": "Next gap: decide on turning the account service on; SMTP; start measuring returns."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8137-89f9-fc90ccb94911",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: the share of parents who save and return within the season; magic-link delivery time."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f0-90b4-c579a4edf660",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-03, ST-IS-06, ST-IS-08."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8172-bcb2-fe4771b1b270",
+          "type": "heading_3",
+          "text": "ST-IS-06 \u00b7 The season pass is a fair purchase some parents choose"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a5-badd-e953219e05ee",
+          "type": "paragraph",
+          "text": "Desired state: The EUR 5 pass is understood before it is bought: first day free, single-day meets free, all followed swimmers, the named season with its expiry date, no renewal. It is bought by parents who use the schedule, and refunded cleanly when it was wrong for them."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8107-a075-c701e1ff9359",
+          "type": "paragraph",
+          "text": "Status: rules confirmed 5 September; checkout built and disabled; zero purchases; willingness to pay unmeasured."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a6-8d76-ecf400f4a070",
+          "type": "paragraph",
+          "text": "Current evidence: Checkout, webhook, refund handling, a payment ledger and tests exist; checkout is disabled and no Stripe key is set. The gate is live in the app with no way to pay (see ST-IS-03). Multibanco is excluded from the first release to avoid duplicate purchases. The price stays off the homepage; the app makes the offer."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ec-9f31-cf89bc2c0e8f",
+          "type": "paragraph",
+          "text": "Check the system: a test-mode purchase activates one pass with the 31 August expiry; a replayed event makes no second change; a refund revokes it; accounts are isolated."
+        },
+        {
+          "block_id": "3d745d88-2ebb-812c-93a2-ee4da78e4d35",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent explains the offer back correctly before paying; a parent who paid says what they got for it; refunds and their reasons are read."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8115-b9cb-de17594f51f0",
+          "type": "paragraph",
+          "text": "What would count against the claim: a parent feels tricked at the gate; the pass is bought for a meet the app cannot follow live; refunds exceed an agreed share; the price becomes the message instead of the help."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8117-b755-e63b91939ede",
+          "type": "paragraph",
+          "text": "Next gap: the Stripe account and key; the activation decision; the first real purchase."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f4-aa22-dce277a1395a",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: none set. Agree what a fair test looks like, how many families over which meets, before revenue is read as a verdict."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8170-b0ba-c5025897b524",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-02, ST-IS-03, ST-IS-05, ST-IS-10."
+        },
+        {
+          "block_id": "3d745d88-2ebb-819c-af47-cf47cdb28b89",
+          "type": "heading_3",
+          "text": "ST-IS-07 \u00b7 Portuguese swim parents name SwimTrack first and pass it on"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e1-9cd2-d06dab4bc6e2",
+          "type": "paragraph",
+          "text": "Desired state: In the clubs and regions SwimTrack serves, parents know it, return across the season and send it to another parent. For the questions the topical map owns, SwimTrack is a first-page answer in Portuguese search and a cited source in AI answers."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8149-8d65-f5b050b5b44e",
+          "type": "paragraph",
+          "text": "Status: ambition confirmed on 5 September; measures proposed; nothing measured."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81da-aadc-ca953c03c087",
+          "type": "paragraph",
+          "text": "Current evidence: Twenty Portuguese search checks on 9 September found no parent-facing content site ranking; the federation, associations, Facebook, Reddit, Instagram, YouTube and the IPDJ do. The road's own terms have near-zero search volume, so discovery through clubs and parent groups is half the job. No traffic, subscriber, referral or repeat-use baseline was reported for this draft. Hreflang still advertises the retired languages. Share links and OG images for meet pages are a held backlog item."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8154-9063-e289a883a304",
+          "type": "paragraph",
+          "text": "Check the system: a versioned basket of Portuguese questions from the topical map; dated search and AI-answer captures; share links and OG images work; consent-gated counts are retained."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f7-979b-d556e01a81cc",
+          "type": "paragraph",
+          "text": "Check the actual experience: families use the Navigator at a second meet and share it, the signal chosen on 5 September; parents in a sampled club say where they look things up; a parent forwards a meet page unprompted."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8133-9c40-f97fa9d91dcb",
+          "type": "paragraph",
+          "text": "What would count against the claim: traffic without returns; rankings on terms no parent types; growth that depends on Rex posting by hand every week."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8105-8c54-f8c32c32d2c3",
+          "type": "paragraph",
+          "text": "Next gap: pick the first clubs; baseline the basket; decide what the site needs for sharing."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8165-8493-c54d1724b763",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: which clubs and regions; repeat-use and referral targets; basket coverage and by when."
+        },
+        {
+          "block_id": "3d745d88-2ebb-814e-b1c4-e0db22d6524a",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-01, ST-IS-04, ST-IS-09, ST-IS-12."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818f-a9df-d6532cfeafcf",
+          "type": "heading_3",
+          "text": "ST-IS-08 \u00b7 Email arrives only when there is a reason, and only with consent"
+        },
+        {
+          "block_id": "3d745d88-2ebb-813b-8bd9-db19a82ae826",
+          "type": "paragraph",
+          "text": "Desired state: Meet updates and the parent newsletter have separate consent. The newsletter helps with life between meets. Meet emails carry confirmed details and the Navigator link. Nothing sends that a parent did not ask for, and unsubscribe always works."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d6-8749-d38ab6983778",
+          "type": "paragraph",
+          "text": "Status: proposed. Capture exists; nothing sends."
+        },
+        {
+          "block_id": "3d745d88-2ebb-816c-b8bc-ebab07ef8fa6",
+          "type": "paragraph",
+          "text": "Current evidence: The newsletter and waitlist forms post to the n8n webhook, which does not yet branch on type or honour the newsletter opt-in. The two preferences are saved as data only. Building the newsletter in Bento is held, as is SMTP for sign-in links. A newsletter spec from the 1-Minute Newsletter blueprint is open. The homepage promise contradicts the dashboard (see ST-IS-03)."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8110-8abd-cbfcb3754b05",
+          "type": "paragraph",
+          "text": "Check the system: controlled inboxes for sign-up, unsubscribe and suppression; the two consents kept apart; no overlapping sends about one weekend."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d0-b216-ec969e0f76ce",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent says the pre-meet email was useful and on time; unsubscribe takes one click."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f3-9d90-f9af9ca42a3a",
+          "type": "paragraph",
+          "text": "What would count against the claim: a newsletter subscriber gets meet mail they did not ask for; a promise on the site with no send behind it for months; bounces and complaints unknown."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8148-8148-eb08c624b2f5",
+          "type": "paragraph",
+          "text": "Next gap: decide whether the newsletter starts this season and on which tool; fix the n8n branch; a first send to a small seeded list."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8164-87f4-cea32630a0bd",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: cadence; the pre-meet send window; acceptable complaint rate."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ce-acc2-d35defbb6cf4",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-03, ST-IS-05, ST-IS-10."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8197-84d0-c2930da9bf44",
+          "type": "heading_3",
+          "text": "ST-IS-09 \u00b7 The library grows in road order, in the house voice, with one click from Rex"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8143-a255-fcca23bec7e8",
+          "type": "paragraph",
+          "text": "Desired state: On weekday mornings the engine proposes at most one draft, in the house voice and length budget, in road order from the topical map. Rex approves with one click and light edits. The Portuguese reads as European Portuguese. The engine never edits what is already published."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ee-928a-c68b9af4ae79",
+          "type": "paragraph",
+          "text": "Status: mechanism live; output not yet trusted by Rex."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81fb-b1d6-d8fea7b07778",
+          "type": "paragraph",
+          "text": "Current evidence: The engine cron is installed: the morning run on weekdays at 05:00 UTC and a poller every fifteen minutes. The last collection on 4 September found zero stories, with two of thirty sources failing; the federation and World Aquatics have no feed. Five drafts have sat in drafts/pending since 13 to 28 August, unapproved. On 9 September Rex judged the voice too long, and the length limits became standing edits with a gate that warns over 800 words and stops over 950. The writer is now GPT-5.6 Sol at reasoning high through Venice; the orchestrator model is still unpinned. The topical map plans 106 pages across nine pillars with phase 1 specs in the backlog, while the code still assumes three pillars."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c4-a0ed-c5cbbf77fada",
+          "type": "paragraph",
+          "text": "Check the system: the gate enforces length and readability; a draft names its topical-map page; the engine writes only engine/ and drafts/; the digest arrives; the model that wrote each draft is logged."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f0-aa0e-e4caec4d3a23",
+          "type": "paragraph",
+          "text": "Check the actual experience: Rex approves a draft within an agreed edit budget; a Portuguese parent reads the Portuguese version and nothing jars; the article answers the moment it was specified for."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f9-8988-d6edb321e2d2",
+          "type": "paragraph",
+          "text": "What would count against the claim: drafts pile up unapproved; Rex rewrites bodies; the engine finds no news for weeks; a draft touches a live page."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8109-adf9-eecc4cc7f86a",
+          "type": "paragraph",
+          "text": "Next gap: decide the five pending drafts; pin the orchestrator; wire the federation scraper; move the code to nine pillars with a years field."
+        },
+        {
+          "block_id": "3d745d88-2ebb-812c-8faf-f40fade0d709",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: the approval edit budget; articles per month Rex wants; how much of phase 1 by December."
+        },
+        {
+          "block_id": "3d745d88-2ebb-810b-96b3-ce25b182d6d9",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-01, ST-IS-07, ST-IS-11."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e5-a337-f3340b4db0da",
+          "type": "heading_3",
+          "text": "ST-IS-10 \u00b7 Swimmers' data is handled with care and within the law"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81dc-a574-e8bbf7f6948c",
+          "type": "paragraph",
+          "text": "Desired state: The site and the app hold the least data about minors the job needs, with a documented legal basis, a working rights-request path, and current privacy, terms and refund texts in both languages."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8170-9402-dc42e6b1c6aa",
+          "type": "paragraph",
+          "text": "Status: proposed. Partly built; not verified."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8190-ab86-cbbd5c7c3a44",
+          "type": "paragraph",
+          "text": "Current evidence: Navigator follows live in the browser only. The season tables hold the parent account, plan, follows and passes under row-level security, in the same Supabase project as the Navigator data. The May 2026 Launch Tasks list in Notion has GDPR, privacy, terms, refund, DPA and legal-review items, 104 of 105 not started and last edited on 21 May, written for the Race Ready PDFs. A backup of the paused production database is an open backlog item. Cookie consent gates analytics."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8146-b947-eb40c9171797",
+          "type": "paragraph",
+          "text": "Check the system: a data map of every table and browser store that touches a minor; a rights-request and erasure drill; published policies that describe the current product; processor agreements with Supabase, Stripe and the email vendor."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8118-ad3e-f84c588b08b6",
+          "type": "paragraph",
+          "text": "Check the actual experience: a parent finds the privacy text and can say what is kept; a deletion request completes and is confirmed."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8171-ac1f-db6fc558e186",
+          "type": "paragraph",
+          "text": "What would count against the claim: a swimmer can be identified across meets without a legal basis; a policy describes a product that no longer exists; a rights request has no path."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e3-b7bd-f5b44b7f6a19",
+          "type": "paragraph",
+          "text": "Next gap: rewrite the May list for the season product; publish the policies; take the backup."
+        },
+        {
+          "block_id": "3d745d88-2ebb-814e-9625-d3a7d57cbd8e",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: none to invent; the legal review decides. Agree who reviews and when."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8142-bb47-c41edeaf7218",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-05, ST-IS-06, ST-IS-08."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e5-9e39-eff15ca01558",
+          "type": "heading_3",
+          "text": "ST-IS-11 \u00b7 SwimTrack runs as one human supported by AI, including on meet weekends"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8170-8138-d4b7458f9907",
+          "type": "paragraph",
+          "text": "Desired state: Routine operation fits Rex's weekly time budget. The engine, the pollers, source checks, translation and approvals run under standing rules. Exceptions reach Rex decision-ready. Meet-day service does not depend on Rex at a keyboard."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8113-99b9-df2eb53dd698",
+          "type": "paragraph",
+          "text": "Status: constraint proposed for SwimTrack; nothing measured."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f9-b5cb-da31589aa3fc",
+          "type": "paragraph",
+          "text": "Current evidence: Automated today: the writing engine, its poller, translation, readability and CI reviews. By hand today: 20 due source checks, draft approvals, Worker secrets that only Rex can set, the Stripe account. Paused: the MeetTrack crons since 15 August, unnoticed for weeks because nothing alerts on silence. The readiness plan needs six to eight focused days and two rehearsal weekends before the season. The SwimTrack Coach repository and the older app and PWA repository are separate and idle since 20 August. Venice credit has run out during reviews before."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8119-a8da-cdfb2d392e76",
+          "type": "paragraph",
+          "text": "Check the system: allowed and denied fixtures for publishing, paying, contacting and scraping; a silence alert for every scheduled job; a register of promises and renewals across Cloudflare, Supabase, Stripe, Venice and the domain."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a9-86f1-f0c85849dbe3",
+          "type": "paragraph",
+          "text": "Check the actual experience: Rex confirms a normal week fits the budget; a meet weekend passes with no manual intervention, or with one decision-ready alert."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d3-b9af-f782843938b9",
+          "type": "paragraph",
+          "text": "What would count against the claim: a meet weekend needs Rex on a laptop; a stopped cron goes unnoticed; the work only moves when Rex carries messages between sessions."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817c-9451-dd9cee2b5168",
+          "type": "paragraph",
+          "text": "Next gap: a baseline of Rex's time; silence alerts; the scope boundary decision below."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818c-909c-d1b19f38fdcc",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: weekly minutes; monthly spend ceiling across Venice, Supabase, Cloudflare and DataForSEO; acceptable exception count."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8148-93e2-cc6df2f42cd3",
+          "type": "paragraph",
+          "text": "Related criteria: ST-IS-02, ST-IS-09, ST-IS-12."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8107-8ba7-c20205c4f887",
+          "type": "heading_3",
+          "text": "ST-IS-12 \u00b7 Rex knows what needs attention, from evidence rather than memory"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8135-97ad-c96f873b4daf",
+          "type": "paragraph",
+          "text": "Desired state: Rex can see, without assembling it by hand, what is live, what is stale, what parents are doing, what it costs and which decisions are his."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8145-ba56-cd3eb1a4e908",
+          "type": "paragraph",
+          "text": "Status: proposed; missing."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ae-8d65-c158e5224dc4",
+          "type": "paragraph",
+          "text": "Current evidence: Status lives in five places: session memory notes, documents on the unshipped PR #31, the shared backlog (13 SwimTrack items across four repositories, seven held), a Notion cockpit built for the May launch and stale since, and cron logs. Owner decisions are listed in four documents and now this one. No reader or business measure is reported anywhere."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81cb-8925-ffc786c9cbca",
+          "type": "paragraph",
+          "text": "Check the system: a weekly scorecard from retained signals: engine runs, poller health, meet coverage, saved seasons, passes, email health, cost. Unknown is shown as unknown."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8118-9ee3-c10888b2ecd8",
+          "type": "paragraph",
+          "text": "Check the actual experience: Rex chooses the next work from the scorecard without reopening source files; exceptions consume his attention, not routine successes."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8121-b5a3-f25b9106712d",
+          "type": "paragraph",
+          "text": "What would count against the claim: the same decision is asked twice; a material failure has no owner or date; unknown is shown as zero."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ce-a4d9-eba2480ee3e2",
+          "type": "paragraph",
+          "text": "Next gap: the consolidated decision list below; a first scorecard by hand; retire or rewrite the May cockpit."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8168-9e47-f08e77c9d26d",
+          "type": "paragraph",
+          "text": "Threshold or scope to agree: review cadence; what counts as material."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e9-a68b-e1cf5e98f6bd",
+          "type": "paragraph",
+          "text": "Related criteria: evidence flows from the whole operation."
+        },
+        {
+          "block_id": "3d745d88-2ebb-811d-8576-d8c2ed37fa35",
+          "type": "heading_2",
+          "text": "How this artifact guides work"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8152-99a6-dff232e7acc7",
+          "type": "paragraph",
+          "text": "The Ideal State defines the outcomes. The core story owns the front door and where each piece of the site sits. The topical map owns reader problems and content scope. The meets hub plan owns meet data and sources. The shared backlog holds selected actions. Session memory holds facts that are not in the code. Work changes the system and returns dated evidence to this page."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818f-a640-cb00dfb36439",
+          "type": "paragraph",
+          "text": "Before starting a work item, record:"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e8-924d-fd8385e0377e",
+          "type": "numbered_list_item",
+          "text": "The primary criterion and any related ones."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a0-ab92-f7501f92e502",
+          "type": "numbered_list_item",
+          "text": "The observed gap, with dated evidence and what remains unknown."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8187-98b8-e4bd21995859",
+          "type": "numbered_list_item",
+          "text": "The smallest intervention or experiment likely to move that outcome."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8173-b2e1-e87cd5d91746",
+          "type": "numbered_list_item",
+          "text": "What would show improvement, what would disprove the assumption, and the observation window."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8125-ae5c-ca266745937e",
+          "type": "numbered_list_item",
+          "text": "The one-time and recurring effort for Rex, the AI and vendor cost, and the authority needed."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81eb-bf98-cfc6229301da",
+          "type": "numbered_list_item",
+          "text": "The stop or rollback condition, and the evidence to return when done."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818e-89dd-dd3fb5e6c4be",
+          "type": "paragraph",
+          "text": "Completion has two meanings. The change is implemented and checked; the intended outcome has been observed. A deployment can complete the first without establishing the second. An investigation can succeed by ruling out a feature."
+        },
+        {
+          "block_id": "3d745d88-2ebb-816f-b117-e8ded7bd4051",
+          "type": "paragraph",
+          "text": "Proposed working rule for session close-out: a backlog item written for SwimTrack names the criterion it serves. No automatic loading, queue trigger, dashboard refresh or execution permission was installed by creating this page. Existing approved priorities stand while they are connected to outcomes."
+        },
+        {
+          "block_id": "3d745d88-2ebb-817d-b7f7-ef69678253cc",
+          "type": "heading_2",
+          "text": "Evidence and revision rules"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c7-b9fc-e8b4289edb0a",
+          "type": "bulleted_list_item",
+          "text": "Every criterion has a stable ID, a claim, a way to check it, current evidence and a next gap."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c6-9a1b-ccefb445b5f2",
+          "type": "bulleted_list_item",
+          "text": "Keep criterion approval separate from evidence status. A proposed criterion is not an owner decision; a green test is not proof of a parent's outcome."
+        },
+        {
+          "block_id": "3d745d88-2ebb-814e-b868-d2bfcec946e5",
+          "type": "bulleted_list_item",
+          "text": "Use not measured, partial evidence, supported within scope or contradicted. Record the sample, period and limits. Missing evidence is not a failed result."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8139-bdba-c576c6d201c9",
+          "type": "bulleted_list_item",
+          "text": "Separate what is observed from what is desired. A workflow being green does not verify the claim it serves."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8151-a692-e0640a941d88",
+          "type": "bulleted_list_item",
+          "text": "Retain failed checks and conflicting observations. Reopen a supported claim when new evidence contradicts it or its evidence expires."
+        },
+        {
+          "block_id": "3d745d88-2ebb-813c-8b45-c25ed7c69d98",
+          "type": "bulleted_list_item",
+          "text": "Set thresholds before judging outcomes. Where Rex has not set a target, record the decision as open. Do not invent revenue, workload or quality targets."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8135-a1ab-fda81e9f82ec",
+          "type": "bulleted_list_item",
+          "text": "Read-only checks may gather evidence under existing authority. A check that spends money, contacts people, changes accounts, scrapes a ruled-out source or publishes needs its standing authorization."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a4-8b4e-de60f4db13ec",
+          "type": "bulleted_list_item",
+          "text": "Refine this page when Rex's intent changes, when evidence challenges a belief, or when a work item produces a meaningful result. Keep the version history and the reason for each change. Most sessions should update evidence; few should change criteria; changes to the central promise are deliberate."
+        },
+        {
+          "block_id": "3d745d88-2ebb-810d-b02e-c4cd76328806",
+          "type": "heading_2",
+          "text": "Open decisions to refine"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d2-aa60-e45ceed2a029",
+          "type": "numbered_list_item",
+          "text": "The operating constraint. Confirm one human supported by AI, no team, occasional specialist, for SwimTrack as for the other two projects."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8131-8d9d-e5dd471e4a97",
+          "type": "numbered_list_item",
+          "text": "The scope boundary. This page covers the parent product: the website, the library, My season and Meet Navigator in splash_poller. Race Ready and Swim Journal are deferred. SwimTrack Coach and the older app and PWA repository are idle. Say whether they are out, paused or in."
+        },
+        {
+          "block_id": "3d745d88-2ebb-810a-a3f3-c5e7c238d7a3",
+          "type": "numbered_list_item",
+          "text": "Meet Navigator's place. The primary tool, as the project instructions and brand guide say, or the deck-day chapter of the year, as the core story proposes. The pass and its rules do not change either way. Core story, section 8."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81db-a5a3-c31fbe258503",
+          "type": "numbered_list_item",
+          "text": "Services on or off. Activate the account and checkout services through the checklist, or ship the checkout-off copy and sell nothing until then. A Stripe account and key are still needed. Journey audit, section 7."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c2-b79c-c9b223d2b4ab",
+          "type": "numbered_list_item",
+          "text": "The MeetTrack crons. Resume discovery now, do the Tier 0 work, and hold a rehearsal weekend before 24 October. Meets hub, section 9."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d8-bc6e-eb3d3e41bd3d",
+          "type": "numbered_list_item",
+          "text": "Regional calendars. Which regions first and when hub phase 1 is scheduled. Held in the backlog."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8105-9a71-d67a3e6ac6a2",
+          "type": "numbered_list_item",
+          "text": "The newsletter. Whether it starts this season, on which tool, and what the site may promise meanwhile."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8121-bf80-c5c3e8f6a8df",
+          "type": "numbered_list_item",
+          "text": "PR #31. Ship the messaging, story, hub plan and topical map work that this page cites, or say what is missing."
+        },
+        {
+          "block_id": "3d745d88-2ebb-816c-9e62-f8d96b85f3b0",
+          "type": "numbered_list_item",
+          "text": "Thresholds. What \"go-to\" means (clubs, repeat use, referrals, the search basket and by when); what \"sustainable\" means (passes, monthly cost ceiling); Rex's weekly minutes."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d4-bce3-eb220a3d4be5",
+          "type": "numbered_list_item",
+          "text": "The five pending drafts. Approve, rework or drop."
+        },
+        {
+          "block_id": "3d745d88-2ebb-814a-ade0-ebd5db198435",
+          "type": "numbered_list_item",
+          "text": "The topical map's seven decisions. Nine pillars in code, the meet-day page, year pages as articles, one glossary, series pages and the hub, the secondary-school statute, Portuguese terms in English text. Topical map, section 9."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818c-b9a2-e2c1ee0adc9c",
+          "type": "numbered_list_item",
+          "text": "Legal review. Who reviews the privacy, terms and refund texts for the season product, and when."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8123-af3d-c0520600a92a",
+          "type": "heading_2",
+          "text": "Known tensions to manage"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ba-ad50-f247353b3e22",
+          "type": "bulleted_list_item",
+          "text": "\"Covered\" depends on the organiser's software, not on the parent's region. Coverage will look random from the parent's side until the site explains it."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8120-93ea-d42aa615a3eb",
+          "type": "bulleted_list_item",
+          "text": "The coach owns the meet. The site's promise must never compete with the coach or imply an entry the coach did not make."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8172-9a2f-dde3a6a84a04",
+          "type": "bulleted_list_item",
+          "text": "More articles raise coverage and the approval load at once. Rex's dissatisfaction with the voice is the live editorial problem; volume does not fix it."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81dc-8b9e-d16f3f492c14",
+          "type": "bulleted_list_item",
+          "text": "Free first is the direction, and the pass is the only revenue. A fair test of the pass needs the live schedule to work first."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8124-a404-c038634668a8",
+          "type": "bulleted_list_item",
+          "text": "Portugal only, with frozen assets: four retired languages and four other federations' standards pages still build. They are not a target and must not become one by accident."
+        },
+        {
+          "block_id": "3d745d88-2ebb-819a-8178-d8e20b0c3fbb",
+          "type": "bulleted_list_item",
+          "text": "The operator is at the pool too. Meet-day reliability has to come from the system, not from Rex watching a log."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b9-83e9-c6777c67e7fd",
+          "type": "bulleted_list_item",
+          "text": "A system can run unattended and still deliver nothing. Judge autonomy alongside parent outcomes and honesty."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81af-9795-de19bc46017d",
+          "type": "heading_2",
+          "text": "Starting point and next learning steps"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81e7-9861-e4274120305d",
+          "type": "paragraph",
+          "text": "The foundations are real: a 27-article library in two languages with a readability gate, the Portuguese time standards and converter, the season pages and the saved plan, a working Navigator app with last season's meets, an account and payment service built to a written contract, a writing engine on cron, a topical map of 106 pages and a plan for every Portuguese meet source. What does not yet exist is the season itself: live meet coverage this year, a service a parent can sign in to, regional calendars, an email that sends, and any measure of what parents do."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8188-b002-cfc1cdebfd8b",
+          "type": "paragraph",
+          "text": "The first learning steps are the ones a parent would notice: confirm the constraint and the Navigator's place; make the live pages honest; get the Navigator live for a rehearsal meet before 24 October; build the door; and start counting saved seasons and returning parents. Listing them here starts none of them."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81f7-8e50-fec4c6a08da4",
+          "type": "heading_2",
+          "text": "Origin and reference material"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8180-86ce-c6b829a37d65",
+          "type": "paragraph",
+          "text": "This follows the Attain Prep Ideal State developed in Codex conversation 01a07d64-e5ca-7f30-9434-c55c5e6dadc8 and the Ultimate Portugal Ideal State from conversation 01a08139-bc21-7571-8c76-89ae1f8ba166. The SwimTrack direction was set in Codex conversation 01a0724a-568b-7041-b5cf-3e315268bd61 on 5 and 6 September 2026. This draft was assembled in Claude Code session 01TdVpff44WAT4hsbg8M2ZMq on 10 September 2026."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8125-a3f9-ea66782ef2f0",
+          "type": "bulleted_list_item",
+          "text": "Attain Prep: Ideal State"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81be-a436-cdd4f2f29c38",
+          "type": "bulleted_list_item",
+          "text": "Ultimate Portugal: Ideal State"
+        },
+        {
+          "block_id": "3d745d88-2ebb-8180-866b-dec3f133b60b",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: articulation of Ideal State. The useful idea is one evolving artifact that states the goal, makes implicit expectations explicit, and ties each claim to a check and its evidence."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81ba-b676-f1e78438a73f",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: ARC-AGI-3 experiment. The relevant method is testing a belief and keeping the record when it fails."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b3-b840-dc54625674d0",
+          "type": "bulleted_list_item",
+          "text": "Daniel Miessler: conversation on Deutsch and the PAI algorithm. Background for criteria that separate progress from activity."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8129-a2ba-fe029c7bfcb2",
+          "type": "paragraph",
+          "text": "Repository documents, all in swimtrack-website unless noted; those on PR #31 are not on main yet:"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81b2-a20e-e493ac1edf5f",
+          "type": "bulleted_list_item",
+          "text": "docs/portugal-season-build.md, the accepted direction of 5 September, and docs/season-services.md, the service contract."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81d2-a1e1-d14af46a6d9f",
+          "type": "bulleted_list_item",
+          "text": "docs/journey-audit-2026-09-06.md, docs/core-story.md, docs/portugal-meets-hub.md, docs/topical-map.md and docs/writing-bakeoff-2026-09-09.md on PR #31."
+        },
+        {
+          "block_id": "3d745d88-2ebb-8135-b401-c30f270ac857",
+          "type": "bulleted_list_item",
+          "text": "docs/writing-engine.md and engine/MORNING.md, the engine's operator and prose contracts."
+        },
+        {
+          "block_id": "3d745d88-2ebb-818e-a733-e90b8e8c2eeb",
+          "type": "bulleted_list_item",
+          "text": "splash_poller/docs/SEASON_READINESS.md, the Navigator season-readiness review of 28 July 2026."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81c5-9f04-c7e9122223b0",
+          "type": "bulleted_list_item",
+          "text": "The SwimTrack Notion hub: the launch cockpit, the Meet source checks schedule and its instructions page."
+        },
+        {
+          "block_id": "3d745d88-2ebb-81db-b158-ce9b0e05a2cb",
+          "type": "bulleted_list_item",
+          "text": "The shared backlog at ~/projects/backlog/backlog.yaml."
+        },
+        {
+          "block_id": "3d745d88-2ebb-813d-9458-f931185ebfc1",
+          "type": "heading_2",
+          "text": "Revision history"
+        },
+        {
+          "block_id": "3d745d88-2ebb-81a0-be7b-e4ca0a548c73",
+          "type": "bulleted_list_item",
+          "text": "v0.1, 10 September 2026. First working draft, assembled from Rex's stated intent in the sessions of 5 to 10 September, the accepted product direction, the dated decisions since, the live service and calendar state on 10 September, the Navigator readiness review, the engine's state and the two sibling Ideal State pages. The one-human constraint is carried over as a proposal. No criterion is declared achieved. No work, publication, payment or configuration change is started by this page."
+        }
+      ],
+      "content_sha256": "3b7a24c72b8bff5b9b4574342062cd3bc1c6a84b2ff5424a38490ade57d6e9fe"
+    }
+  ],
+  "resource_observations": {
+    "usage": {
+      "since": "2026-09-05T18:27:23.381793+00:00",
+      "by_project": [
+        {
+          "project": "council",
+          "calls": 513,
+          "tokens_in": 14089596,
+          "tokens_out": 1366893
+        },
+        {
+          "project": "loom",
+          "calls": 653,
+          "tokens_in": 13456621,
+          "tokens_out": 856209
+        },
+        {
+          "project": "romance",
+          "calls": 838,
+          "tokens_in": 5211258,
+          "tokens_out": 685651
+        },
+        {
+          "project": "swimtrack-website",
+          "calls": 327,
+          "tokens_in": 780381,
+          "tokens_out": 34956
+        },
+        {
+          "project": "ultimate-portugal",
+          "calls": 8,
+          "tokens_in": 561548,
+          "tokens_out": 78308
+        }
+      ],
+      "note": "Activity and token counts only. Stored USD estimates are not treated as cash invoices or current prices."
+    },
+    "diem_config": {
+      "daily_diem": 31.0,
+      "backfill_max_per_night": 60,
+      "backfill_chunk": 4,
+      "deadline": "23:50",
+      "reset": "00:00",
+      "repos": [
+        "/home/dev/projects/aris-management-website",
+        "/home/dev/projects/blkout-dice-roller",
+        "/home/dev/projects/bubblepop-art",
+        "/home/dev/projects/build-ai-automation-workflow",
+        "/home/dev/projects/caimcintosh-website",
+        "/home/dev/projects/combat-arms-transition",
+        "/home/dev/projects/crypto-portfolio",
+        "/home/dev/projects/dump",
+        "/home/dev/projects/finance-tracker",
+        "/home/dev/projects/flight-7-publishing",
+        "/home/dev/projects/liam_mobility",
+        "/home/dev/projects/macmcintosh",
+        "/home/dev/projects/MCP-Configuration-Assistant",
+        "/home/dev/projects/monthly-bidding",
+        "/home/dev/projects/romance-empire",
+        "/home/dev/projects/Santa_Amaro_Home_Renovation",
+        "/home/dev/projects/splash_poller",
+        "/home/dev/projects/swimtrack",
+        "/home/dev/projects/swimtrack-coach",
+        "/home/dev/projects/swimtrack-website",
+        "/home/dev/projects/ultimate-portugal"
+      ],
+      "checkpoints": [
+        {
+          "time": "08:00",
+          "floor": 0.65
+        },
+        {
+          "time": "21:00",
+          "floor": 0.4
+        },
+        {
+          "time": "23:00",
+          "floor": 0.15
+        },
+        {
+          "time": "23:40",
+          "floor": 0.0
+        }
+      ]
+    },
+    "diem_recent_summary": {
+      "since_date": "2026-09-05",
+      "rows": 130,
+      "counts": [
+        {
+          "type": "review",
+          "ok": true,
+          "noop": false,
+          "count": 67
+        },
+        {
+          "type": "backfill",
+          "ok": true,
+          "noop": false,
+          "count": 51
+        },
+        {
+          "type": "backfill",
+          "ok": true,
+          "noop": true,
+          "count": 11
+        },
+        {
+          "type": "backfill",
+          "ok": false,
+          "noop": false,
+          "count": 1
+        }
+      ],
+      "balance_delta_cost_by_type": {
+        "review": 27.92674093,
+        "backfill": 10.895696899999997
+      },
+      "cost_limit": "Concurrent account use may affect balance deltas; not exact attribution."
+    },
+    "queue_health": {
+      "checked_at": "2026-09-12T18:27:06.901822+00:00",
+      "status": "healthy"
+    }
+  },
+  "attain_market_activity": {
+    "observed_at": "2026-09-12T18:27:22.257726+00:00",
+    "since": "2026-09-05T18:27:22.257726+00:00",
+    "scope": "Market deployment, last seven days; includes testing activity, no cohort filter. Aggregates only; no learning or revenue conclusion.",
+    "app_events": {
+      "rows": 2762,
+      "potentially_truncated": false,
+      "counts": {
+        "page_view": 422,
+        "click": 1987,
+        "plan_block_completed_on_return": 6,
+        "question_submit": 265,
+        "sign_out": 4,
+        "welcome_shown": 19,
+        "welcome_done": 12,
+        "student_settings_saved": 4,
+        "day_budget_picked": 13,
+        "plan_block_toggle": 10,
+        "lesson_view": 7,
+        "khan_open": 6,
+        "khan_link": 3,
+        "sign_in_as_student": 2,
+        "tutor_ask": 1,
+        "feedback_open": 1
+      },
+      "latest_event": "2026-09-12T18:15:33.195213+00:00"
+    },
+    "feedback_reports": {
+      "rows": 0,
+      "potentially_truncated": false,
+      "counts": {},
+      "latest_event": null
+    }
+  },
+  "backlog_snapshot": {
+    "observed_at": "2026-09-12T18:28:15.037092+00:00",
+    "by_repo_status": [
+      {
+        "repo": "aris-management-website",
+        "status": "open",
+        "count": 1
+      },
+      {
+        "repo": "build-ai-automation-workflow",
+        "status": "held",
+        "count": 11
+      },
+      {
+        "repo": "build-ai-automation-workflow",
+        "status": "in_review",
+        "count": 1
+      },
+      {
+        "repo": "build-ai-automation-workflow",
+        "status": "open",
+        "count": 2
+      },
+      {
+        "repo": "flight-7-publishing",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "none",
+        "status": "held",
+        "count": 15
+      },
+      {
+        "repo": "romance-elliecalloway.com",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "romance-empire",
+        "status": "held",
+        "count": 9
+      },
+      {
+        "repo": "romance-empire",
+        "status": "in_review",
+        "count": 6
+      },
+      {
+        "repo": "romance-empire",
+        "status": "open",
+        "count": 22
+      },
+      {
+        "repo": "romance-tessacross.com",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "sat-prep",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "sat-prep",
+        "status": "in_review",
+        "count": 1
+      },
+      {
+        "repo": "sat-prep",
+        "status": "open",
+        "count": 6
+      },
+      {
+        "repo": "splash_poller",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "splash_poller",
+        "status": "open",
+        "count": 3
+      },
+      {
+        "repo": "swimtrack",
+        "status": "held",
+        "count": 1
+      },
+      {
+        "repo": "swimtrack-coach",
+        "status": "held",
+        "count": 2
+      },
+      {
+        "repo": "swimtrack-coach",
+        "status": "open",
+        "count": 1
+      },
+      {
+        "repo": "swimtrack-website",
+        "status": "held",
+        "count": 6
+      },
+      {
+        "repo": "swimtrack-website",
+        "status": "open",
+        "count": 1
+      },
+      {
+        "repo": "tax-advisor",
+        "status": "held",
+        "count": 7
+      },
+      {
+        "repo": "ultimate-portugal",
+        "status": "held",
+        "count": 9
+      },
+      {
+        "repo": "ultimate-portugal",
+        "status": "open",
+        "count": 8
+      }
+    ],
+    "total": 117,
+    "by_status": {
+      "held": 65,
+      "in_review": 8,
+      "open": 44
+    },
+    "interpretation": "Held is not automatically a defect; evaluate reasons and authority. No item content changed."
+  },
+  "attain_context_inheritance": {
+    "pointer_files_present": true,
+    "committed_pointers": [],
+    "queue_prompt_loads_ideal_state": false,
+    "limit": "Scoped source finding, not proof that no worker ever discovers direction by another route."
+  },
+  "commercial_path_checks": {
+    "observed_at": "2026-09-12T18:29:29.692509+00:00",
+    "swimtrack_service_probe": {
+      "url": "https://swimtrack.ai/api/season/account?seasonId=2026-2027",
+      "http_status": 200,
+      "services": {
+        "account": true,
+        "checkout": false
+      },
+      "anonymous": true
+    },
+    "up_partner_registry": {
+      "count": 15,
+      "statuses": {
+        "none": 15
+      },
+      "affiliate_url_count": 0,
+      "scope": "Current local source registry; remote affiliate account state unverified."
+    },
+    "up_visibility": {
+      "questions": 12,
+      "engines": 5,
+      "observations": 0,
+      "traffic_observations": 1
+    }
+  },
+  "shared_ci_run": {
+    "run_id": 34371617799,
+    "created_at": "2026-09-09T15:38:57Z",
+    "head": "37eb484b9a764a6ae96f4fdd910de11198f0cfc8",
+    "url": "https://github.com/rexmcintosh/build-ai-automation-workflow/actions/runs/34371617799",
+    "conclusion": "failure",
+    "failed_step": "Run Venice review council",
+    "selected_error_lines": [
+      "026-09-09T15:39:12.8628792Z ##[error]review council unavailable (code panel/chair failed) \u2014 failing closed",
+      "026-09-09T15:39:12.8832074Z ##[error]Process completed with exit code 1."
+    ],
+    "scope": "Historical observed failure at this SHA, not a new run of current main."
+  },
+  "offline_probes": {
+    "pin_probe": {
+      "pin": "4a01298dcce2734115ac57f02592146969d76f48",
+      "result": "AttributeError: pinned Settings has no max_completion_tokens",
+      "consumer": "scripts/venice_review.py:186"
+    },
+    "gate_probe": {
+      "paths": [
+        "scripts/venice_review.py",
+        ".github/workflows/venice-review.yml"
+      ],
+      "tier": "reduced",
+      "same_high_finding_blocks_reduced": 0,
+      "same_high_finding_blocks_full": 1,
+      "scope": "Synthetic pure-function probe, not a model quality result or live incident."
+    }
+  },
+  "swimtrack_editorial_runs": {
+    "observed_at": "2026-09-12T18:42:50.236343+00:00",
+    "runs": [
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-12T10:05:16Z",
+        "databaseId": 34687518796,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34687518796"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-11T10:35:45Z",
+        "databaseId": 34589985577,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34589985577"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-10T10:36:18Z",
+        "databaseId": 34466926987,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34466926987"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-09T10:45:15Z",
+        "databaseId": 34341909346,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34341909346"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-08T10:34:00Z",
+        "databaseId": 34216130224,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34216130224"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-07T11:34:22Z",
+        "databaseId": 34117303394,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34117303394"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-06T10:14:58Z",
+        "databaseId": 34026888116,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/34026888116"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-05T09:56:38Z",
+        "databaseId": 33959323203,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/33959323203"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-04T10:34:57Z",
+        "databaseId": 33863916103,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/33863916103"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-03T10:39:38Z",
+        "databaseId": 33745499965,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/33745499965"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-02T10:37:29Z",
+        "databaseId": 33620418872,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/33620418872"
+      },
+      {
+        "conclusion": "success",
+        "createdAt": "2026-09-01T11:05:17Z",
+        "databaseId": 33500678492,
+        "url": "https://github.com/rexmcintosh/swimtrack/actions/runs/33500678492"
+      }
+    ],
+    "interpretation": "Completion metadata only; not evidence of downstream use or cash benefit."
+  },
+  "source_provenance": {
+    "observed_at": "2026-09-12T18:42:50.236343+00:00",
+    "main_repository_head": "bbb2907831702eff741668e15fab8ca93395a03a",
+    "linked_file_hashes": [
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/automation-ideal-state.md",
+        "sha256": "48149f1df3a1072eec6071c14529c323ad08dbb01f23048c5accf53605cb8f20"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/operating-harness-map-2026-09-12.md",
+        "sha256": "be9056bcd0ba2f1dbb7eecf13a24c81e0d6a90349c3909c50783397db342df57"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/portfolio-gap-analysis-2026-09-12.md",
+        "sha256": "c4879e154df57e0bcfff186184b510e06d16337fe0953148c0ba76dc5d9c71a6"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/evidence/operating-harness-discovery-2026-09-12.json",
+        "sha256": "9063d1263461a55296c9cc8c75820914f549627684f918b4519d2d52af3e9631"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/evidence/portfolio-top-level-2026-09-12.json",
+        "sha256": "dc531bcb4d02e98f91e6ae355f4e6724d135b0ec55739b9b984e3117c7b34e11"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/src/ops/providers.py",
+        "sha256": "d1f7874fbf431d19e3e8274f2fde1f1e7ff6960394cc14f52ce5b9c6e1a3a9fe"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/config/ops.yaml",
+        "sha256": "95a940549c5bce270f4e69751e3c564babd148c83457dbeb6861cfad70f185ee"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/backlogrun/cli.py",
+        "sha256": "27203c9ac90063001055c51e1e018e8f5f5e3fa67200f8b04e61e018e5a41b1d"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/bebop/prompts/briefing-morning.md",
+        "sha256": "1f6a2ee2c3d532182e7f3b6f320cce54a118697abf841c1c24d1d36b8bf57dd2"
+      },
+      {
+        "path": "/home/dev/.local/share/codex-worktrees/notion-work-queue/workqueue/runner.py",
+        "sha256": "7db5543e77421e5ed01cbf6d2cf1f4329216c9c44c213278b7294e0ea196d166"
+      },
+      {
+        "path": "/home/dev/projects/sat-prep/IDEAL_STATE.md",
+        "sha256": "f84327ff6ae99bd1f50ac4bf34f71b6e923378143b37f104b6f6a34fac4fd9d9"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/loom/README.md",
+        "sha256": "930353575c43a07f780ba1bcc94cd008e2c874367bc322ffad995c8919e0d7d9"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/loom/prompts/distill.md",
+        "sha256": "2c184c1789d74079e015f5f363215e0441069cdfe7a904cd5b9c1e8535dbeea7"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/setup/claude-codex-mirror/README.md",
+        "sha256": "02fbe8de6214c17f90b5e80ae4c079b94848ebebe6c18f19475b9ad77ed96088"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/diem/queue.py",
+        "sha256": "1368492d911d7deaf713a35590a38c93e25bb279fb51abdb8dc4e65b37acb347"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/diem/drain.py",
+        "sha256": "3aa6f817f74b5691078e61e8e34b9c08f7ce1ac5bb6d1a3a10b5c7c82b0719db"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/.github/workflows/venice-review.yml",
+        "sha256": "f6a9e6f356b8ab2d5574a691f36fa97d191c9e0b1e46dd495f8587a2ece679d0"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/scripts/venice_review.py",
+        "sha256": "82007bf59c6188938b1394fa7b2bb1ef21ecf6fdb09d75217c3c3f55c91efa6e"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/ci-usage-rollout-2026-09-12.md",
+        "sha256": "66cd2d6114b20925e17e4885d52313b94ffe3fdefdbbba5d8fed7035279f4cad"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/council/gate.py",
+        "sha256": "9070b582d79d160e249325cb64795f188a7722c5c651a017048e41d2cc83c611"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/chair-bakeoff-results-2026-09-12.md",
+        "sha256": "7a2e45025dbdd1d2b3abf534fc6226906a84e40d52dc6dcc925f49ef3b775562"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/src/ops/actions.py",
+        "sha256": "f5dc0be43dbde57b9f20cdc9317ff30c1768f5b50c508be2bac3c4da0a3ba388"
+      },
+      {
+        "path": "/home/dev/projects/sat-prep/src/lib/feedbackBacklog.ts",
+        "sha256": "717e7766d3aa3ac9df3e168271b57c51465e2bbaa0502a0309918a0e5ed2b073"
+      },
+      {
+        "path": "/home/dev/.local/bin/agents",
+        "sha256": "6a91916f13f262389ef36b369b6dc06a6fe907df282e302a695eea2684430212"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/bin/tg-send",
+        "sha256": "ddbcc6d157455f5bf1e03252d9bba9d1fa97db7c3595a83e4776a54cf5a7f1a6"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/watchdog/run.py",
+        "sha256": "0dd15109c7ad68ba1d5ef3dd81c549838f8204769cdabfa458b3b36802123931"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/session-bridge/src/router.ts",
+        "sha256": "fce43996e458c4b7f8135429c8566016b79e3a00b69c7755674f83923a4c74ba"
+      },
+      {
+        "path": "/home/dev/projects/build-ai-automation-workflow/docs/alert-handoff-2026-09-06.md",
+        "sha256": "30f4ba5643508220015cab5764ed47e9afe01c819c308528edc64161737b6e29"
+      },
+      {
+        "path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+        "sha256": "74edf03ea6d24ef53db48677b93558d14a979bdf052ca3f57ecdca0c66791608"
+      },
+      {
+        "path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+        "sha256": "bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54"
+      },
+      {
+        "path": "/home/dev/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+        "sha256": "d71cc01ba56d2325cf8af5f7c11837819b63ecd57de0bfdb812f7f3ff7751df8"
+      },
+      {
+        "path": "/home/dev/.claude/CLAUDE.md",
+        "sha256": "fcb6875d3c8bb7342e436334e36d22487bd8782292280b8cab770fcbd6a649da"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/series/heron-creek/engage/engage-scorecard.md",
+        "sha256": "bbbbe5543da4a120c88f40637782c3739e8f854890d3da8905e9272aa1efcc81"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/src/social/engage_scan.py",
+        "sha256": "69576844c25491deac6c46d64ffc7751c108cdd998b13e299b004ce02a1078d3"
+      },
+      {
+        "path": "/home/dev/projects/romance-empire/series/heron-creek/social-scorecard.md",
+        "sha256": "160daf067f179125df3762892ecb39930c86587f8508f9b54b2671f97ede9ab9"
+      },
+      {
+        "path": "/home/dev/projects/ultimate-portugal/src/data/partners.json",
+        "sha256": "0f05a621af6ea74ddb941a1cc4aafe683844451545172bbc73423f647d98b3d1"
+      },
+      {
+        "path": "/home/dev/projects/swimtrack-website/docs/season-services.md",
+        "sha256": "f89b123e8e8c2ec1ef1f58e6ce30474e758536cdefca3408a35d5ee395500f9c"
+      },
+      {
+        "path": "/home/dev/projects/swimtrack/editorial/sources.yaml",
+        "sha256": "eac9153b2763523d6afd1a35c70d357236512891a415d9e6771e7e4712c96560"
+      },
+      {
+        "path": "/home/dev/projects/swimtrack/.github/workflows/editorial-scan.yml",
+        "sha256": "66e89d55d024d3b4f39e4fbc53898bb1c34b367e86bd3d5eaa26355f5d2be8ed"
+      },
+      {
+        "path": "/home/dev/projects/swimtrack-website/engine/MORNING.md",
+        "sha256": "1a6943d3faf5dc798350e0554be448796322ad9099a7995d7074b8acc5ac61dc"
+      },
+      {
+        "path": "/home/dev/projects/ultimate-portugal/engine/visibility/benchmark.json",
+        "sha256": "25789a12cf92ce638778059acea64a53b880746266b55af2b167f0288c6a7b15"
+      }
+    ],
+    "note": "Snapshot of linked local evidence at synthesis. Source may subsequently change; directories and external sources are not represented by these hashes."
+  },
+  "assessment_method": {
+    "helpers": [
+      {
+        "scope": "Council, skills, learning",
+        "model": "gpt-5.6-terra",
+        "effort": "high"
+      },
+      {
+        "scope": "Romance production and Ops",
+        "model": "gpt-5.6-terra",
+        "effort": "high"
+      },
+      {
+        "scope": "SwimTrack and Ultimate Portugal engines",
+        "model": "gpt-5.6-terra",
+        "effort": "high"
+      }
+    ],
+    "integration": "Parent independently checked material source findings, read scoped canonical Ideal States, inspected commercial paths, and adjudicated recommendations. Helper output is not independent corroboration of a shared source.",
+    "adjudications": [
+      "Do not impose blanket hard readiness gates; distinguish authority from advisory evidence.",
+      "Rex-reported Done is legitimate human attestation; do not require new external confirmation by default.",
+      "SwimTrack accounts currently enabled supersedes older account-off draft; checkout still disabled.",
+      "Romance pilot has not reached day 14; no premature failure or scaling conclusion.",
+      "SwimTrack editorial needs a consumer check before building an adapter.",
+      "Unknown revenue, learning, or remote coverage is not zero."
+    ]
+  }
+}

@@ -61,6 +61,21 @@ def classify_path(path: str) -> str:
     return "code"
 
 
+def changed_paths(diff: str) -> list[str]:
+    """Repo-relative path of each file section in a unified diff, in order. Used to
+    compute the change's blast-radius tier (see council.gate.risk_tier)."""
+    if not diff:
+        return []
+    matches = list(_FILE_HEADER.finditer(diff))
+    paths = []
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(diff)
+        p = _section_path(diff[m.start():end])
+        if p:
+            paths.append(p)
+    return paths
+
+
 def split_diff_by_type(diff: str) -> tuple[str, str]:
     """Split a unified diff into (code_diff, doc_diff). Sections are delimited by
     `diff --git` lines; each file's path is read from its +++/--- lines (robust to

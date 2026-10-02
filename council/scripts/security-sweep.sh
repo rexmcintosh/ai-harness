@@ -10,6 +10,10 @@
 # Needs VENICE_API_KEY (sourced from /home/dev/.env).
 set -uo pipefail
 
+# Cron's PATH has no ~/.local/bin, where pipx's `council` and the claude CLI live.
+# Without this the sweep silently falls back to the repo module. Same fix as loom.
+export PATH="$HOME/.local/bin:$PATH"
+
 [ -f /home/dev/.env ] && set -a && . /home/dev/.env && set +a
 : "${VENICE_API_KEY:?VENICE_API_KEY not set}"
 
@@ -38,11 +42,8 @@ echo "[$TS] rc=$RC target=$TARGET $(printf '%s' "$REPORT" | grep -c '^- ') findi
 SUMMARY="$(printf '%s\n' "$REPORT" | sed -n '/### Summary/,/### Findings/p' | sed '1d;$d')"
 [ -n "$SUMMARY" ] || SUMMARY="Sweep finished (rc=$RC). See $LOG."
 
-"$CLAUDE_BIN" -p "Send a Telegram message to chat_id $CHAT_ID, exactly this text:
-🛡️ Weekly security sweep — $(basename "$TARGET")
-$SUMMARY
-Output only SENT or FAILED." \
-  --model "$MODEL" --allowedTools mcp__plugin_telegram_telegram__reply \
-  --dangerously-skip-permissions --output-format text >/dev/null 2>&1 || true
+# Raw Bot API send (bin/tg-send) — no claude call, no telegram plugin/MCP needed.
+"$REPO_ROOT/bin/tg-send" "$CHAT_ID" "🛡️ Weekly security sweep — $(basename "$TARGET")
+$SUMMARY" >/dev/null 2>&1 || true
 
 echo "$REPORT"

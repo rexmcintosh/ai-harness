@@ -67,6 +67,15 @@ def test_compare_tolerates_member_error():
     assert len(errored) == 1 and errored[0].member == "Eng"
 
 
+def test_compare_counts_a_junk_but_valid_vote_as_an_errored_voter():
+    # The garbled forced-JSON reply seen from deepseek-v4-pro: it parses, and it picks nothing.
+    client = FakeClient(by_model={"m1": '{": ": ", "}', "m2": _vote("B", ["B", "A"]),
+                                  "c": _synth("B", ["B", "A"])})
+    res = run_compare("task", CANDIDATES, PANEL, client, chair_model="c")
+    errored = [v for v in res.votes if v.error]
+    assert [v.member for v in errored] == ["Eng"] and "no usable answer" in errored[0].error
+
+
 def test_compare_chair_error_is_surfaced_not_raised():
     client = FakeClient(by_model={"m1": _vote("A", ["A", "B"]),
                                   "m2": _vote("A", ["A", "B"])},
@@ -126,6 +135,20 @@ def test_cli_compare_picks_winner(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "Winner" in out and "graft from A" in out
+
+
+def test_cli_compare_uses_the_panels_own_chair(tmp_path, capsys):
+    from council import cli
+    settings, panels, client = _cli_env()
+    panels["code-review"] = Panel("code-review", "review", [Member("Eng", "m1", "eng")],
+                                  chair_model="pc")
+    client.by_model["pc"] = _synth("A", ["A", "B"])
+    a = tmp_path / "a.py"; a.write_text("def f(): return 1\n")
+    b = tmp_path / "b.py"; b.write_text("def f(): return 2\n")
+    rc = cli.main(["compare", "--task", "t", str(a), str(b)],
+                  _settings=settings, _panels=panels, _client=client)
+    assert rc == 0
+    assert [c["model"] for c in client.calls] == ["m1", "pc"]    # never the global chair "c"
 
 
 def test_cli_compare_requires_two_files(tmp_path, capsys):

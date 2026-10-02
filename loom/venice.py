@@ -20,9 +20,10 @@ class VeniceError(RuntimeError):
 class VeniceClient:
     def __init__(self, api_key: str, *, base_url: str = VENICE_API, timeout: int = 180,
                  retries: int = 2, backoff: float = 1.5, temperature: float = 0.2,
-                 post: Optional[Callable] = None) -> None:
+                 post: Optional[Callable] = None,
+                 transport_is_real: Optional[bool] = None) -> None:
         if not api_key:
-            raise VeniceError("VENICE_API_KEY is not set")
+            raise VeniceError("no Venice key set (tried VENICE_LOOM_KEY, VENICE_API_KEY)")
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout
@@ -30,13 +31,35 @@ class VeniceClient:
         self.backoff = backoff
         self.temperature = temperature
         self._post = post or requests.post
+        # See council/venice.py and venice_usage/guard.py: an injected transport
+        # means the call is not real, so its usage may not reach the production
+        # ledger. Pass transport_is_real=True for a wrapper that really calls out.
+        self._transport_is_real = (
+            (post is None or post is requests.post) if transport_is_real is None
+            else bool(transport_is_real))
 
     def _scrub(self, text: str) -> str:
         if text and self.api_key:
             return text.replace(self.api_key, "<redacted>")
         return text
 
-    def complete(self, model: str, system: str, user: str, *, json_mode: bool = False) -> str:
+    def _log_usage(self, data: dict, model: str, task: str = "weave") -> None:
+        # Usage logging must never break or slow the Venice call — swallow everything.
+        try:
+            import venice_usage
+            venice_usage.log_client_call(
+                data=data,
+                model=model,
+                project="loom",
+                task_type=task,
+                source="loom/venice",
+                transport_is_real=self._transport_is_real,
+            )
+        except Exception:
+            pass
+
+    def complete(self, model: str, system: str, user: str, *, json_mode: bool = False,
+                 task: str = "weave") -> str:
         payload = {
             "model": model,
             "messages": [
@@ -68,7 +91,10 @@ class VeniceClient:
             except Exception as e:
                 raise VeniceError(f"Venice HTTP {status} (not retryable): {e}") from e
             try:
-                return r.json()["choices"][0]["message"]["content"]
+                data = r.json()
+                content = data["choices"][0]["message"]["content"]
             except Exception as e:
                 raise VeniceError(f"Venice returned an unparseable response: {e}") from e
+            self._log_usage(data, model, task)
+            return content
         raise VeniceError(f"Venice call failed after {self.retries + 1} tries: {last}")

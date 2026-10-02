@@ -7,6 +7,10 @@ class Member:
     name: str
     model: str
     system: str
+    # Optional per-seat output ceiling. A seat whose model reasons long (today
+    # openai-gpt-53-codex, 17,142 completion tokens at its ledger maximum against
+    # grok-4-3's 2,187) can be given its own headroom without raising the panel's.
+    max_completion_tokens: int | None = None
 
 
 @dataclass
@@ -15,6 +19,12 @@ class Panel:
     description: str
     members: list[Member]
     default_rigor: str = "daily"  # "daily" | "deep"
+    max_completion_tokens: int | None = None
+    chair_max_completion_tokens: int | None = None
+    # {"daily": {...}, "deep": {...}} — per-rigor overrides of the two above.
+    rigor: dict = field(default_factory=dict)
+    # This panel's own chair. None = use [settings] chair_model (config.chair_for).
+    chair_model: str | None = None
 
 
 @dataclass
@@ -61,6 +71,8 @@ class SweepReport:
     dropped: int = 0  # files beyond max_chunks (surfaced, never silent)
     summary: str = ""
     error: str | None = None
+    # Display-only note from council.signals.collect_sweep; None when Jev did not run.
+    jev_shadow: dict | None = None
 
 
 @dataclass
@@ -85,10 +97,24 @@ class ComparisonResult:
 
 
 @dataclass
+class ConfirmedBlock:
+    """A finding the chair has verified against context and judged worth blocking
+    the merge. The gate counts these — not raw panelist findings (see audit F1/F2/F4)."""
+    point: str
+    severity: str = ""
+    why: str = ""
+
+
+@dataclass
 class Synthesis:
     recommendation: str
     confidence: int
     consensus: list[str] = field(default_factory=list)
     disagreements: list[Disagreement] = field(default_factory=list)
     cross_panel_themes: list[str] = field(default_factory=list)
+    blocking_findings: list[ConfirmedBlock] = field(default_factory=list)
     error: str | None = None
+    # Optional explicit verdict used by backlog-run; prose never implies readiness.
+    review_status: str = "unknown"
+    required_changes: list[str] | None = None
+    raw_response: str = ""

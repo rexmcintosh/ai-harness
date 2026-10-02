@@ -1,6 +1,12 @@
-# build-ai-automation-workflow
+# ai-harness
+
+Formerly `build-ai-automation-workflow` (renamed 2026-09-18). Older docs use the old name.
 
 Home of the VPS + Venice AI multi-agent PR review setup, plus the automation workflow built on top of it.
+
+For current automation work, start with the [outcome-led assessment](docs/automation-ops-2026-09-05.md)
+and [scheduled-job contracts](docs/contracts/README.md). They distinguish observed
+runtime behavior from the historical architecture below.
 
 > **New here? Start with [`docs/OVERVIEW.md`](docs/OVERVIEW.md)** — a plain-English,
 > non-technical explanation of what this project is and the thinking behind it
@@ -34,6 +40,9 @@ The dev infrastructure model: **Claude Code runs on a Hetzner VPS → opens PRs 
 - [`bebop/`](bebop/README.md) — personal assistant: twice-daily Gmail+Calendar briefing.
 - [`loom/`](loom/README.md) — session-learning pipeline: distills transcripts into woven
   learnings.
+- [`backlogrun/`](backlogrun/README.md) — the 3am backlog runner: works `~/projects/backlog`
+  items unattended on isolated branches, council-reviews them, and leaves a morning
+  report; `approve`/`drop` are the human half.
 
 > watchdog, `council compare`/`sweep`, and fixit were distilled from Naval's
 > *AI Industrial Revolution* podcast — see

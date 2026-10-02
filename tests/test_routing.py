@@ -1,4 +1,15 @@
-from council.routing import classify_path, split_diff_by_type
+from council.routing import classify_path, split_diff_by_type, changed_paths
+
+
+def test_changed_paths_lists_each_files_new_side_path():
+    diff = ("diff --git a/tools/i18n/translate.mjs b/tools/i18n/translate.mjs\n"
+            "--- a/tools/i18n/translate.mjs\n+++ b/tools/i18n/translate.mjs\n@@ -1 +1 @@\n-a\n+b\n"
+            "diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ b/src/app.py\n@@ -1 +1 @@\n-a\n+b\n")
+    assert changed_paths(diff) == ["tools/i18n/translate.mjs", "src/app.py"]
+
+
+def test_changed_paths_empty_for_empty_diff():
+    assert changed_paths("") == []
 
 
 def test_classify_by_extension():
