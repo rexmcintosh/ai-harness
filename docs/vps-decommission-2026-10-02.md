@@ -87,10 +87,10 @@ same physical mini as the VM. It protects against some file errors, not loss of
 that machine. No Hetzner snapshot is retained, by owner choice. Do not buy or
 configure a new backup provider without the owner's selection.
 
-The mini currently reports `autorestart 0` (restart after power failure disabled),
-which differs from the old inventory. Passwordless sudo is unavailable on macOS.
-On the mini, run `sudo pmset -a autorestart 1`, then verify with `pmset -g`.
-Sleep/autostart settings alone do not enable restart after power loss.
+DONE: Rex ran `sudo pmset -a autorestart 1` on the mini over SSH and supplied the
+`pmset -g` output confirming `autorestart 1`. Restart after power failure is now
+enabled. Sleep remains disabled and network wake remains enabled. A physical
+power-loss recovery test was not performed.
 
 When the offline iPad, iPhone or Cai's laptop is next used, confirm any saved
 server connection uses `bebop-vm` or `100.99.202.95`, user `dev`. The iPad's August
