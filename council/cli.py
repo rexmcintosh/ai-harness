@@ -1,9 +1,10 @@
 from __future__ import annotations
 import argparse
 import sys
-from importlib.metadata import version as _pkg_version
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
+from . import __version__
 from .config import load_panels, get_api_key, Settings, truncate
 from .venice import VeniceClient
 from .engine import run_panel
@@ -92,7 +93,11 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt):
 
 def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -> int:
     p = argparse.ArgumentParser(prog="council")
-    p.add_argument("--version", action="version", version=f"%(prog)s {_pkg_version('council')}")
+    try:
+        package_version = _pkg_version("council")
+    except PackageNotFoundError:
+        package_version = __version__
+    p.add_argument("--version", action="version", version=f"%(prog)s {package_version}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("ask", help="ask the council a question")
