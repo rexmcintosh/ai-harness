@@ -225,3 +225,43 @@ def test_review_explicit_panel_overrides_autopick(tmp_path, member_json):
              _settings=settings, _panels=panels, _client=client)
     models = {c["model"] for c in client.calls}
     assert "code1" in models and "doc1" not in models
+
+
+def test_version_flag_prints_installed_version(capsys, monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(cli, "_pkg_version", lambda name: "9.8.7")
+    monkeypatch.delenv("VENICE_API_KEY", raising=False)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out == "council 9.8.7\n"
+
+
+def test_version_flag_without_distribution_uses_package_version(capsys, monkeypatch):
+    import pytest
+    from importlib.metadata import PackageNotFoundError
+    from council import __version__
+
+    def missing_distribution(name):
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(cli, "_pkg_version", missing_distribution)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out == f"council {__version__}\n"
+
+
+def test_help_works_without_distribution(capsys, monkeypatch):
+    import pytest
+    from importlib.metadata import PackageNotFoundError
+
+    def missing_distribution(name):
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(cli, "_pkg_version", missing_distribution)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--help"])
+    assert exc.value.code == 0
+    assert "usage: council" in capsys.readouterr().out
