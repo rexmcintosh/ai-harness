@@ -5,6 +5,11 @@ Started 2026-09-21. Owner decision: retire the Hetzner VPS and run all VPS work 
 
 Status legend: DONE, NEXT, OWNER (needs Rex), OPEN (undecided).
 
+> **Closed 2026-10-02:** Rex deleted the Hetzner server, removed its Tailscale node,
+> and chose no retained Hetzner snapshot. This is a historical cutover log.
+> [Current runtime and retirement record](vps-decommission-2026-10-02.md) supersedes
+> the remaining phases, snapshot decision, old addressing and rollback below.
+
 ## 1. Goal and end state
 
 - Hetzner server cancelled and removed from the tailnet.
@@ -275,7 +280,7 @@ MacWhisper, WhatsApp, Discord, VS Code). A full wipe is not needed.
   same physical disk as the data. Code is safe on GitHub; `~/.env`, finance data, romance-empire
   assets (7 GB) and `.claude` history are not. Needs an off-site target chosen by Rex, preferably a
   service he already pays for.
-- OPEN Whether to keep the Hetzner snapshot after cancellation, and for how long.
+- DONE 2026-10-02 Owner chose no Hetzner snapshot; server deleted.
 - OPEN Cai's access: same shared `dev` user on the VM (no change) is assumed.
 
 ## 7. Rollback

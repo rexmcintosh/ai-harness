@@ -1,5 +1,11 @@
 # Architecture — Personal Compute Mesh
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 > **Status:** This is the design of record for **Phase 2** of the build.
 > Phase 1 (Claude Code on a VPS + the Venice review council) is documented in
 > [`../setup/PLAYBOOK.md`](../setup/PLAYBOOK.md). Phase 2 wraps that single VPS

@@ -1,5 +1,11 @@
 # Building a One-Person AI Software Team — Project Overview
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 > A plain-English overview of what this project is and the thinking behind it.
 > Written for a non-technical audience — concepts over technical specifics.
 > For the how-to, see [`../setup/PLAYBOOK.md`](../setup/PLAYBOOK.md) (the build)

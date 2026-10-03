@@ -1,5 +1,11 @@
 # Daily Loop — the operating manual
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 > **Where this fits:** This is the day-to-day of *living* in the mesh from
 > [ARCHITECTURE.md](ARCHITECTURE.md): reach the always-on host from whatever
 > device is in your hand, work inside a `tmux` session that never dies, push to

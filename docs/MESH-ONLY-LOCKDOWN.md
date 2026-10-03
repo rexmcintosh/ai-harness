@@ -1,5 +1,11 @@
 # Mesh-only lockdown — close the VPS to everything but the tailnet
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 > **Status: DONE on the live VPS — 2026-06-05.** This runbook records the change,
 > why it's safe, how to reproduce it on a rebuild, and how to roll it back.
 >

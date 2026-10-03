@@ -1,5 +1,11 @@
 # VPS + Multi-Agent PR Review: Implementation Playbook
 
+> **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
+> Work now runs on `bebop-vm`, inside the Mac mini. Use the
+> [current runtime record](../docs/vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
+> The old VPS setup, public-IP fallback and mini-independent uptime claims below are superseded.
+
+
 A concrete, executable plan for the @levelsio × Naval hybrid:
 **Claude Code lives on a VPS → opens PRs → a Venice-powered council of AI reviewers critiques every PR → you merge → CI deploys to the same VPS.**
 
