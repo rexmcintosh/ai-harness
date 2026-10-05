@@ -1,0 +1,192 @@
+# Backblaze B2 + restic off-site backup
+
+Daily encrypted backup of `/home/dev` on `bebop-vm`, the Linux VM hosted by the
+Mac mini. The first B2 upload and remote recovery check are required before
+activation. Installing the files does not start or enable the timer.
+
+## Scope
+
+Includes projects, assets, `.git` and worktrees, Claude/Codex histories and settings,
+secrets, SSH keys, the wiki, local scripts, and preserved migration archives.
+Online SQLite databases are copied through Python's SQLite backup API and checked
+with `PRAGMA quick_check`. Originals and their WAL/SHM/journal files are excluded;
+the consistent copies appear at `.local/state/restic-offsite/sqlite/<relative-path>`
+in each snapshot, with a `manifest.json` list. Frozen `.codex/recovery-backups`
+and `migration-archive` are included directly and are not duplicated into staging.
+
+Excludes `node_modules`, `.venv`, `venv`, `__pycache__`, `.cache`, `.npm`, `.rustup`,
+`.local/share/pipx/venvs`, and `.cargo/registry`. Check these exclusions before
+placing unique files inside those directories. Backups preserve links but do not
+follow them. Data outside `/home/dev`, remote Supabase/Postgres databases, macOS
+files, Lima's disk image, and system configuration require separate recovery.
+This is a data backup, not a bootable image. Recreate the Linux VM and install
+its tools before restoring. Other files are copied while services run, so this
+is not one atomic filesystem snapshot.
+
+The timer runs daily at 03:30 Europe/Lisbon, with up to ten minutes of jitter.
+`Persistent=true` catches a missed run after startup. Keep 30 daily snapshots and
+six monthly snapshots, grouped by the stable machine-specific host and tag. Configuration is bound to
+the Linux machine ID to prevent reuse from mixing different machines. These count days and
+months with successful snapshots, not exact calendar-age limits. Each complete
+backup must pass repository metadata checks and an exact-snapshot recovery-probe
+restore before retention runs. Failed or partial uploads never run retention.
+Prune runs after successful Sunday backups to reclaim unused data. An exclusive
+local lock prevents overlapping staging work. Only online database copies are
+staged locally; the runner uses `--no-cache` to limit local disk usage.
+
+## B2 account setup
+
+1. Enable B2 on the Backblaze account. For a new account, choose the EU region.
+2. Create a dedicated **private** bucket, for example `rex-bebop-offsite-<unique>`.
+   Record the bucket's S3 endpoint, such as `s3.eu-central-003.backblazeb2.com`.
+3. Set Lifecycle Settings to **Keep only the last version of the file**. Restic
+   handles snapshot retention; this rule removes hidden superseded B2 versions
+   after one day. Do not set an upload-age rule that hides current objects.
+4. Leave Object Lock/default retention disabled for this setup, so restic can
+   remove expired snapshots and prune unused data.
+5. Under Application Keys, create `bebop-restic`, scoped to this bucket with
+   **Read and Write** access. Select **Allow List All Bucket Names** for S3
+   compatibility. Leave the filename prefix empty. Use an application key,
+   not the master account key.
+6. Save the endpoint, bucket, keyID, applicationKey and a new random restic
+   password of at least 20 characters in Bitwarden. The applicationKey is shown
+   only once. This password is separate from the Mac login password. Keep this
+   recovery record accessible if the mini and VM are lost.
+
+References: [Backblaze restic setup](https://www.backblaze.com/docs/cloud-storage-integrate-restic-with-backblaze-b2),
+[Backblaze lifecycle rules](https://www.backblaze.com/docs/cloud-storage-lifecycle-rules),
+[restic retention](https://restic.readthedocs.io/en/stable/060_forget.html).
+
+## Install and configure
+
+Restic is installed from Ubuntu's package repository. From this directory:
+
+```sh
+./install.sh
+```
+
+From the Mac terminal, enter the secrets through hidden prompts. They are saved
+in a mode-600 file within a mode-700 directory and are not put in shell history:
+
+```sh
+ssh -t dev@bebop-vm '~/.local/bin/restic-offsite configure'
+```
+
+Do not paste secrets into chat. This command only saves configuration. After it
+finishes, the agent can initialize the repository, upload and test the first
+backup without another secret handoff. The configuration is deliberately not
+replaced if it already exists.
+
+## First backup and activation
+
+Run on `bebop-vm` as `dev`. The initial upload can take time. Use systemd for the
+upload so it survives an SSH disconnect. First initialize the new repository:
+
+```sh
+~/.local/bin/restic-offsite init
+systemctl --user start --no-block restic-offsite.service
+journalctl --user -u restic-offsite.service -f
+```
+
+When the service has finished, confirm `restic-offsite status` reports `ok` and
+`verified: true`, and the service exited with status 0. Then run the initial
+remote data check and a database restore test before enabling the timer:
+
+```sh
+~/.local/bin/restic-offsite restic check --read-data-subset=1%
+```
+
+For a database restore, obtain the successful snapshot ID from `status`, dump
+`/home/dev/.local/state/restic-offsite/sqlite/manifest.json`, choose a listed DB,
+and dump its staged path into a private temporary file. Open the restored file
+with Python sqlite3 and run `PRAGMA quick_check`; expect `ok`. Remove that
+scratch copy after the test. Never restore over a running database.
+
+Only after those checks succeed:
+
+```sh
+systemctl --user enable --now restic-offsite.timer
+systemctl --user list-timers restic-offsite.timer --no-pager
+```
+
+## Check and repair
+
+```sh
+~/.local/bin/restic-offsite status
+systemctl --user status restic-offsite.service --no-pager
+journalctl --user -u restic-offsite.service -n 60 --no-pager
+~/.local/bin/restic-offsite restic snapshots --tag bebop-offsite
+```
+
+A status of `failed`, a failed unit, or no new successful snapshot for 36 hours
+means protection needs attention. Status records backup ID, times, database
+count and verification result. `last-success.json` separately preserves the last
+verified snapshot and probe across failed later runs. No notification channel is added by this setup;
+use these checks to verify health. Repository structure and a recovery-probe
+restore are tested on each run; this does not read every stored data pack.
+Run periodic `restic check --read-data` when a full integrity audit is needed.
+The private config permits `sqlite_timeout` (seconds per DB, default 600) and
+`restic_timeout` (seconds per command, default 36000). If increasing those, also
+increase the service `TimeoutStartSec` beyond the total expected run time.
+
+If a partial snapshot exists, diagnose unreadable/changing files and rerun.
+Never bypass the failed-backup check or remove a repository lock while a backup
+is running. A failed backup leaves the timer's service visibly failed and cleans
+only its own SQLite staging directory. The runner needs free space for roughly
+twice the active SQLite file and WAL sizes plus a 512 MiB reserve. The recovery record
+must live outside this machine. A bucket-scoped read/write key can also delete
+backups if the `dev` account is compromised. This setup protects against machine
+loss; it does not promise immutable recovery after an account compromise. Encrypted backups of local secrets do not replace
+that record.
+
+## Recover on a replacement VM
+
+Install restic and this runner; configure it from Bitwarden against the **same**
+repository. Do not run `init` on an existing repository. Restore into an empty
+scratch directory first:
+
+```sh
+~/.local/bin/restic-offsite restic snapshots --tag bebop-offsite
+~/.local/bin/restic-offsite restic restore SNAPSHOT_ID --target /path/with/enough/space --exclude /home/dev/.config/restic-offsite
+```
+
+Preserve the replacement machine's newly configured `.config/restic-offsite`
+directory when copying the restored home. Do not replace it with the old machine's
+configuration; its machine-ID binding will reject the replacement VM.
+
+Restored home files are under `<target>/home/dev`. Stop each database's consumer.
+For every relative path listed in the restored SQLite `manifest.json`, copy
+`<target>/home/dev/.local/state/restic-offsite/sqlite/<relative-path>` to the same
+path under the restored home, remove only that database's `-wal`, `-shm` and
+`-journal` companions, and verify SQLite integrity before starting its consumer.
+Check file ownership and permissions, recreate excluded dependencies, and test
+service behavior before replacing the working home. Use the snapshot's database
+copies rather than any earlier raw database archive.
+
+## Verification
+
+```sh
+python3 -m unittest discover -s offsite-backup -v  # from repo root
+```
+
+The tests use a temporary encrypted restic repository and a live WAL database.
+They verify actual recovery of settings, unpushed Git work, assets and committed
+SQLite data; exclusion of dependencies and raw active DB files; overlap refusal;
+and failure without retention for restic's partial-backup exit code 3. They use
+no cloud credentials or live source data.
+
+## Setup evidence, 2026-10-05
+
+Restic 0.16.4 from Ubuntu was installed on the arm64 VM. Eight focused tests pass.
+A read-only online-copy rehearsal against the real home copied and checked 74
+SQLite databases in 31 seconds, using 433,470,791 bytes of staging. The copies
+were removed afterward. No production files were restored or changed.
+
+The full repository suite reported 2,152 passes, one skip, and three existing
+failures, also reproduced on unchanged main: `test_backfill_reads_recent_outputs_once`
+and both real-ledger price coverage tests in `tests/venice_usage/test_price_coverage.py`.
+The system Python test invocation lacked Flask; the complete run used the existing
+repository virtual environment. These failures do not involve backup code.
+
+B2 credentials, the first remote upload, remote data check/database restore, and
+timer activation are pending. Do not treat local test success as cloud protection.
