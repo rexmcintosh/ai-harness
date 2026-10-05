@@ -47,6 +47,14 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT text FROM notes').fetchall(),
                              [('survives live WAL',)])
 
+    def test_excluded_dependency_database_is_not_staged(self):
+        db = self.home / '.local/share/pipx/venvs/tool/data.sqlite'
+        db.parent.mkdir(parents=True)
+        with sqlite3.connect(db) as conn:
+            conn.execute('CREATE TABLE derived (value TEXT)')
+        self.assertEqual(backup.snapshot_databases(self.home, self.state / 'sqlite'), [])
+        self.assertFalse((self.state / 'sqlite/.local/share/pipx').exists())
+
     def test_database_timeout_stops_incomplete_copy(self):
         self.make_db()
         with self.assertRaises(TimeoutError):
@@ -115,6 +123,8 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((self.state / 'last-success.json').read_bytes(), previous)
         self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'failed')
         self.assertFalse((self.state / 'sqlite').exists())
+        with self.assertRaisesRegex(RuntimeError, 'No complete backup'):
+            backup.verify(self.config)
 
     def test_retention_failure_preserves_verified_backup(self):
         backup.restic(self.config, ['init'])

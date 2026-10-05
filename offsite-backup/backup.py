@@ -17,9 +17,11 @@ import subprocess
 import sys
 import time
 import tempfile
+from zoneinfo import ZoneInfo
 import socket
 
 SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.cache', '.npm', '.rustup'}
+EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry')
 CONFIG = Path.home() / '.config/restic-offsite/config.json'
 
 
@@ -46,7 +48,7 @@ def atomic_json(path, value):
 @contextmanager
 def run_lock(state):
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state / 'run.lock').open('w') as lock:
+    with (state / 'run.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         yield
 
@@ -68,11 +70,13 @@ def snapshot_databases(home, stage, timeout=600):
     """Inspect regular files; SQLite backup API includes committed WAL transactions."""
     databases = []
     def walk_error(error):
-        raise error
+        if not isinstance(error, FileNotFoundError):
+            raise error
     for base, dirs, files in os.walk(home, onerror=walk_error):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != '.git'
                    and not (Path(base) / d).is_symlink()
-                   and Path(base) / d not in (stage, home / '.codex/recovery-backups', home / 'migration-archive')]
+                   and Path(base) / d not in (stage, home / '.codex/recovery-backups', home / 'migration-archive')
+                   and Path(base) / d not in {home / relative for relative in EXCLUDED_RELATIVE}]
         for name in files:
             path = Path(base) / name
             if path.is_symlink() or not path.is_file():
@@ -134,8 +138,8 @@ def run_backup(config):
                     path = str(home / relative) + suffix
                     pattern = ''.join('\\' + c if c in '\\*?[]' else c for c in path)
                     args += ['--exclude', pattern]
-            args += ['--exclude', str(home / '.local/share/pipx/venvs'),
-                     '--exclude', str(home / '.cargo/registry')]
+            for relative in EXCLUDED_RELATIVE:
+                args += ['--exclude', str(home / relative)]
             status['stage'] = 'backup'
             atomic_json(state / 'status.json', status)
             result = restic(config, args, capture=True)
@@ -154,7 +158,7 @@ def run_backup(config):
             retention = ['forget', '--host', config['host'], '--tag', 'bebop-offsite',
                          '--group-by', 'host,tags', '--keep-daily', '30', '--keep-monthly', '6']
             # Weekly pruning frees old data; retention itself runs after each good backup.
-            if datetime.now(timezone.utc).weekday() == 6:
+            if datetime.now(ZoneInfo('Europe/Lisbon')).weekday() == 6:
                 retention += ['--prune']
             restic(config, retention)
             status.update(status='ok', stage='complete')
@@ -194,6 +198,9 @@ def _verify_locked(config):
 
 
 def configure():
+    restic_binary = shutil.which('restic')
+    if not restic_binary:
+        raise RuntimeError('Install restic before configuring the backup')
     if CONFIG.exists():
         raise RuntimeError('Configuration already exists; refusing to overwrite recovery credentials')
     print('Create a PRIVATE B2 bucket. Use a bucket-scoped Read and Write application key.')
@@ -216,7 +223,7 @@ def configure():
                         'state': str(Path.home() / '.local/state/restic-offsite'),
                         'machine_id': Path('/etc/machine-id').read_text().strip(),
                         'host': socket.gethostname() + '-' + Path('/etc/machine-id').read_text().strip()[:12],
-                        'restic': shutil.which('restic'),
+                        'restic': restic_binary,
                         'sqlite_timeout': 600, 'restic_timeout': 36000,
                         'repository': f's3:https://{endpoint}/{bucket}',
                         'password': password, 'access_key': key_id, 'secret_key': app_key})

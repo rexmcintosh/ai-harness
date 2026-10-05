@@ -177,12 +177,12 @@ no cloud credentials or live source data.
 
 ## Setup evidence, 2026-10-05
 
-Restic 0.16.4 from Ubuntu was installed on the arm64 VM. Eight focused tests pass.
+Restic 0.16.4 from Ubuntu was installed on the arm64 VM. Nine focused tests pass.
 A read-only online-copy rehearsal against the real home copied and checked 74
 SQLite databases in 31 seconds, using 433,470,791 bytes of staging. The copies
 were removed afterward. No production files were restored or changed.
 
-The full repository suite reported 2,152 passes, one skip, and three existing
+The full repository suite reported 2,153 passes, one skip, and three existing
 failures, also reproduced on unchanged main: `test_backfill_reads_recent_outputs_once`
 and both real-ledger price coverage tests in `tests/venice_usage/test_price_coverage.py`.
 The system Python test invocation lacked Flask; the complete run used the existing
