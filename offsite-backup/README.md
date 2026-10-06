@@ -96,7 +96,11 @@ When the service has finished, confirm `restic-offsite status` reports `ok` and
 remote data check and a database restore test before enabling the timer:
 
 ```sh
-~/.local/bin/restic-offsite restic check --read-data-subset=1%
+(
+  restic_check_cache=$(mktemp -d) || exit 1
+  trap 'rm -rf "$restic_check_cache"' EXIT
+  ~/.local/bin/restic-offsite restic check --no-cache=false --cache-dir "$restic_check_cache" --with-cache --read-data-subset=1%
+)
 ```
 
 For a database restore, obtain the successful snapshot ID from `status`, dump
@@ -207,21 +211,42 @@ An extra bucket created by mistakenly supplying the intended bucket's ID was
 removed along with the two newly created repository objects.
 
 The first upload transferred about 21.3 GB, then B2 rejected further uploads
-with `storage cap exceeded`. No complete snapshot exists; the daily timer
-remains disabled. In the B2 console, use Caps & Alerts → Edit Caps, set
-Daily Storage Cap to $0.05, and click Update Caps. Add a payment method if
-required. This is at most about $1.50 of storage charges per 30 days before
-tax, not a guaranteed bill or a limit on other charge categories. Account cap
-changes can take up to ten minutes. Existing uploaded data is preserved.
-
-After the cap is updated: check repository indexes and recover any unindexed
-packs if necessary, then retry the first backup through the service. Capture
-fresh hashes of the new staged database copy before it is removed. Perform
-the remote data check and file/SQLite recovery checks before enabling the
-timer. The private setup-state record contains exact continuation steps.
+with `storage cap exceeded`. The Daily Storage Cap was increased to $0.05.
+This is at most about $1.50 of storage charges per 30 days before tax, not a
+limit on other charge categories or a guaranteed bill. Existing uploaded packs
+were indexed and reused. A later service interruption preceded global memory
+exhaustion; the user service manager was restarted, Cockpit and the session
+bridge were checked active, and the backup was retried without discarding data.
 
 [Backblaze cap instructions](https://www.backblaze.com/docs/en/cloud-storage-create-and-manage-caps-and-alerts).
 
-On 2026-10-06, ten focused tests passed after adding private, credential-redacted
-error records. The uploaded repository has 223 indexed packs; index repair is
-needed before the retry to retain deduplication of remaining uploaded packs.
+## Active backup and recovery evidence, 2026-10-06
+
+The first complete snapshot is `8cf9f7d8d7f0fda1956f722826249b60d56f613c1ca5ffdf288ec73c5bb2a7ec`.
+It contains 75 consistent SQLite copies. The backup service completed with exit
+status 0 after repository metadata verification, an exact-snapshot probe restore,
+and retention. The separate cloud audit checked 1% of stored data packs (20 packs)
+and found no errors. Four files totaling about 282.6 MiB were restored into a
+private scratch directory: settings, the installed runner, the repository's
+working agreement, and a staged Codex history database. Every SHA-256 matched
+the pre-upload source. The restored database passed `PRAGMA quick_check`.
+Scratch files and the temporary audit cache were removed.
+
+A no-cache repository metadata check took about twelve minutes. The same check
+with a fresh temporary metadata cache completed in about one second. Automated
+verification now uses that private per-check cache and removes it on normal
+success or failure. SIGKILL or power loss can leave temporary files behind.
+Backups and probe restores continue without a persistent cache.
+
+Thirteen focused backup tests pass, including cache cleanup after verification
+success and failure. The full suite reports 2,157 passes, one skip, and the same
+three unrelated failures listed above. Council approved the production changes;
+its requested cache flag test coverage was added and the focused suite rerun.
+
+The daily timer is enabled and active. At activation, its next run was
+2026-10-07 03:36:21 Europe/Lisbon, within the configured 03:30 plus ten-minute
+jitter window. An additional incremental backup was already running at activation.
+The verified snapshot remains recoverable independently of that later run.
+Private commissioning evidence is in `~/.local/state/restic-offsite/`, including
+`last-success.json`, `cloud-recovery-test.json`, test logs and review records.
+Use the health checks above for current status rather than this dated record.
