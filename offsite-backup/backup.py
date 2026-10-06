@@ -62,8 +62,23 @@ def restic(config, args, capture=False):
             env.pop(key)
     env.update(RESTIC_REPOSITORY=config['repository'], RESTIC_PASSWORD=config['password'],
                AWS_ACCESS_KEY_ID=config['access_key'], AWS_SECRET_ACCESS_KEY=config['secret_key'])
-    return subprocess.run([config.get('restic', '/usr/bin/restic'), '--no-cache', *args],
-                          env=env, check=True, capture_output=capture, timeout=config.get('restic_timeout', 10 * 60 * 60))
+    try:
+        return subprocess.run([config.get('restic', '/usr/bin/restic'), '--no-cache', *args],
+                              env=env, check=True, capture_output=capture,
+                              timeout=config.get('restic_timeout', 10 * 60 * 60))
+    except subprocess.CalledProcessError as error:
+        if capture:
+            # Keep diagnostics, never dump restored stdout or credentials.
+            detail = (error.stderr or b'').decode('utf-8', errors='replace')
+            for field in ('password', 'secret_key', 'access_key'):
+                if config.get(field):
+                    detail = detail.replace(config[field], '[redacted]')
+            atomic_json(Path(config['state']) / 'last-error.json', {
+                'operation': args[0], 'exit_code': error.returncode,
+                'stderr': detail[-32768:],
+                'at': datetime.now(timezone.utc).isoformat()})
+        raise
+
 
 
 def snapshot_databases(home, stage, timeout=600):

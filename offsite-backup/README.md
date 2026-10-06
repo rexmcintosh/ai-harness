@@ -119,7 +119,8 @@ journalctl --user -u restic-offsite.service -n 60 --no-pager
 ```
 
 A status of `failed`, a failed unit, or no new successful snapshot for 36 hours
-means protection needs attention. Status records backup ID, times, database
+means protection needs attention. `last-error.json` preserves failed captured commands' stderr with configured
+credentials removed, without recording restored file contents. Status records backup ID, times, database
 count and verification result. `last-success.json` separately preserves the last
 verified snapshot and probe across failed later runs. No notification channel is added by this setup;
 use these checks to verify health. Repository structure and a recovery-probe
@@ -177,7 +178,7 @@ no cloud credentials or live source data.
 
 ## Setup evidence, 2026-10-05
 
-Restic 0.16.4 from Ubuntu was installed on the arm64 VM. Nine focused tests pass.
+Restic 0.16.4 from Ubuntu was installed on the arm64 VM. Nine focused tests passed during initial preparation.
 A read-only online-copy rehearsal against the real home copied and checked 74
 SQLite databases in 31 seconds, using 433,470,791 bytes of staging. The copies
 were removed afterward. No production files were restored or changed.
@@ -190,3 +191,32 @@ repository virtual environment. These failures do not involve backup code.
 
 B2 credentials, the first remote upload, remote data check/database restore, and
 timer activation are pending. Do not treat local test success as cloud protection.
+
+## Account setup, 2026-10-06
+
+B2 credentials are configured. The destination is the private bucket
+`rex-bebop-offsite` in `us-east-005`. Its lifecycle removes hidden old versions
+after one day; Object Lock is disabled. The service credential was narrowed to
+this bucket. The account-wide recovery credential in Bitwarden remains valid.
+An extra bucket created by mistakenly supplying the intended bucket's ID was
+removed along with the two newly created repository objects.
+
+The first upload transferred about 21.3 GB, then B2 rejected further uploads
+with `storage cap exceeded`. No complete snapshot exists; the daily timer
+remains disabled. In the B2 console, use Caps & Alerts → Edit Caps, set
+Daily Storage Cap to $0.05, and click Update Caps. Add a payment method if
+required. This is at most about $1.50 of storage charges per 30 days before
+tax, not a guaranteed bill or a limit on other charge categories. Account cap
+changes can take up to ten minutes. Existing uploaded data is preserved.
+
+After the cap is updated: check repository indexes and recover any unindexed
+packs if necessary, then retry the first backup through the service. Capture
+fresh hashes of the new staged database copy before it is removed. Perform
+the remote data check and file/SQLite recovery checks before enabling the
+timer. The private setup-state record contains exact continuation steps.
+
+[Backblaze cap instructions](https://www.backblaze.com/docs/en/cloud-storage-create-and-manage-caps-and-alerts).
+
+On 2026-10-06, ten focused tests passed after adding private, credential-redacted
+error records. The uploaded repository has 223 indexed packs; index repair is
+needed before the retry to retain deduplication of remaining uploaded packs.

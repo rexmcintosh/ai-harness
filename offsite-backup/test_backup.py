@@ -47,6 +47,21 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT text FROM notes').fetchall(),
                              [('survives live WAL',)])
 
+    def test_failed_cloud_command_keeps_error_without_credentials(self):
+        executable = self.base / 'cloud-error'
+        executable.write_text('#!/bin/sh\nprintf "storage cap exceeded: %s %s\\n" "$AWS_SECRET_ACCESS_KEY" "$RESTIC_PASSWORD" >&2\nexit 1\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        self.config['secret_key'] = 'test-cloud-secret'
+        with self.assertRaises(subprocess.CalledProcessError):
+            backup.restic(self.config, ['backup', str(self.home)], capture=True)
+        error = json.loads((self.state / 'last-error.json').read_text())
+        self.assertIn('storage cap exceeded', error['stderr'])
+        self.assertNotIn('test-cloud-secret', error['stderr'])
+        self.assertNotIn('test-only-secret', error['stderr'])
+        self.assertEqual(error['exit_code'], 1)
+        self.assertEqual((self.state / 'last-error.json').stat().st_mode & 0o777, 0o600)
+
     def test_excluded_dependency_database_is_not_staged(self):
         db = self.home / '.local/share/pipx/venvs/tool/data.sqlite'
         db.parent.mkdir(parents=True)
