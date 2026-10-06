@@ -166,6 +166,31 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(caught.exception.returncode, 3)
         self.assertEqual(json.loads((self.state / 'status.json').read_text())['restic_exit_code'], 3)
 
+    def test_verification_metadata_cache_is_removed_after_success_or_failure(self):
+        executable = self.base / 'cache-observer'
+        record = self.base / 'observed-cache'
+        fail = self.base / 'fail-check'
+        executable.write_text('#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nargs=sys.argv[1:]\n'
+            + f"record=Path({str(record)!r});fail=Path({str(fail)!r})\n"
+            + "if 'check' in args:\n"
+            + " if '--cache-dir' not in args:sys.exit(82)\n"
+            + " flags=[a for a in args if a=='--no-cache' or a.startswith('--no-cache=')]\n"
+            + " if flags[-1]!='--no-cache=false' or '--with-cache' not in args:sys.exit(82)\n"
+            + " cache=Path(args[args.index('--cache-dir')+1]);record.write_text(str(cache))\n"
+            + " (cache/'scratch-metadata').write_text('temporary')\n"
+            + " if fail.exists():sys.exit(19)\n"
+            + "os.execv('/usr/bin/restic',['restic',*args])\n")
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        backup.restic(self.config, ['init'])
+        backup.run_backup(self.config)
+        self.assertFalse(Path(record.read_text()).exists())
+        fail.touch()
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            backup.run_backup(self.config)
+        self.assertEqual(caught.exception.returncode, 19)
+        self.assertFalse(Path(record.read_text()).exists())
+
     def test_retention_failure_preserves_verified_backup(self):
         backup.restic(self.config, ['init'])
         executable = self.base / 'retention-failure'

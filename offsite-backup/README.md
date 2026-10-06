@@ -32,7 +32,10 @@ backup must pass repository metadata checks and an exact-snapshot recovery-probe
 restore before retention runs. Failed or partial uploads never run retention.
 Prune runs after successful Sunday backups to reclaim unused data. An exclusive
 local lock prevents overlapping staging work. Only online database copies are
-staged locally; the runner uses `--no-cache` to limit local disk usage.
+staged locally. Backups and probe restores use `--no-cache` to limit local disk
+usage. Repository checks use a fresh private temporary metadata cache, then
+remove it, so repeated trees do not download the same pack repeatedly. No cache
+is retained between checks. Allow space for that temporary metadata as well.
 
 ## B2 account setup
 

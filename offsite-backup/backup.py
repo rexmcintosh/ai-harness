@@ -212,7 +212,10 @@ def _verify_locked(config):
     if status['status'] not in ('backed_up', 'ok'):
         raise RuntimeError('No complete backup available to verify')
     # Every run checks repository structure and restores an exact snapshot's probe.
-    restic(config, ['check'])
+    # A fresh, temporary cache avoids fetching the same remote metadata pack
+    # for every tree. It never carries previously cached data into the check.
+    with tempfile.TemporaryDirectory(prefix='verify-cache-', dir=state) as cache:
+        restic(config, ['check', '--no-cache=false', '--cache-dir', cache, '--with-cache'])
     probe_path = str(state / 'sqlite/recovery-probe.txt')
     actual = restic(config, ['dump', status['snapshot_id'], probe_path], capture=True).stdout.decode()
     if actual != status['probe']:
