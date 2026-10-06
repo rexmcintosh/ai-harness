@@ -73,10 +73,14 @@ def restic(config, args, capture=False):
             for field in ('password', 'secret_key', 'access_key'):
                 if config.get(field):
                     detail = detail.replace(config[field], '[redacted]')
-            atomic_json(Path(config['state']) / 'last-error.json', {
-                'operation': args[0], 'exit_code': error.returncode,
-                'stderr': detail[-32768:],
-                'at': datetime.now(timezone.utc).isoformat()})
+            try:
+                atomic_json(Path(config['state']) / 'last-error.json', {
+                    'operation': args[0] if args else 'unknown', 'exit_code': error.returncode,
+                    'stderr': detail[-32768:],
+                    'at': datetime.now(timezone.utc).isoformat()})
+            except Exception:
+                # Diagnostics are best effort; preserve the actual command failure.
+                print('Could not save private command diagnostics.', file=sys.stderr)
         raise
 
 
@@ -188,7 +192,13 @@ def run_backup(config):
             raise
         finally:
             if stage.exists():
-                shutil.rmtree(stage)
+                already_failed = sys.exc_info()[0] is not None
+                try:
+                    shutil.rmtree(stage)
+                except OSError:
+                    if not already_failed:
+                        raise
+                    print('Could not remove database staging; original failure preserved.', file=sys.stderr)
 
 
 def verify(config):

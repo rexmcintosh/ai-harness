@@ -62,6 +62,20 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(error['exit_code'], 1)
         self.assertEqual((self.state / 'last-error.json').stat().st_mode & 0o777, 0o600)
 
+    def test_diagnostic_write_failure_preserves_original_command_error(self):
+        executable = self.base / 'command-error'
+        executable.write_text('#!/bin/sh\nprintf "original failure\\n" >&2\nexit 17\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        # A real filesystem failure during atomic replacement.
+        (self.state / 'last-error.json').mkdir()
+        for args in (['backup'], []):
+            with self.subTest(args=args):
+                with self.assertRaises(subprocess.CalledProcessError) as caught:
+                    backup.restic(self.config, args, capture=True)
+                self.assertEqual(caught.exception.returncode, 17)
+                self.assertIn(b'original failure', caught.exception.stderr)
+
     def test_excluded_dependency_database_is_not_staged(self):
         db = self.home / '.local/share/pipx/venvs/tool/data.sqlite'
         db.parent.mkdir(parents=True)
@@ -140,6 +154,17 @@ class BackupTests(unittest.TestCase):
         self.assertFalse((self.state / 'sqlite').exists())
         with self.assertRaisesRegex(RuntimeError, 'No complete backup'):
             backup.verify(self.config)
+
+    def test_cleanup_failure_preserves_original_backup_error(self):
+        executable = self.base / 'backup-error'
+        executable.write_text('#!/bin/sh\nexit 3\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        with patch.object(backup.shutil, 'rmtree', side_effect=PermissionError('cleanup blocked')):
+            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                backup.run_backup(self.config)
+        self.assertEqual(caught.exception.returncode, 3)
+        self.assertEqual(json.loads((self.state / 'status.json').read_text())['restic_exit_code'], 3)
 
     def test_retention_failure_preserves_verified_backup(self):
         backup.restic(self.config, ['init'])

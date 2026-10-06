@@ -119,8 +119,10 @@ journalctl --user -u restic-offsite.service -n 60 --no-pager
 ```
 
 A status of `failed`, a failed unit, or no new successful snapshot for 36 hours
-means protection needs attention. `last-error.json` preserves failed captured commands' stderr with configured
-credentials removed, without recording restored file contents. Status records backup ID, times, database
+means protection needs attention. `last-error.json` preserves historical stderr from captured commands with nonzero exits,
+with configured credentials removed and without recording restored file contents.
+Its presence does not indicate current failure; use status and timestamps. Timeouts
+and diagnostic write failures still fail the operation visibly. Status records backup ID, times, database
 count and verification result. `last-success.json` separately preserves the last
 verified snapshot and probe across failed later runs. No notification channel is added by this setup;
 use these checks to verify health. Repository structure and a recovery-probe
@@ -190,7 +192,7 @@ The system Python test invocation lacked Flask; the complete run used the existi
 repository virtual environment. These failures do not involve backup code.
 
 B2 credentials, the first remote upload, remote data check/database restore, and
-timer activation are pending. Do not treat local test success as cloud protection.
+timer activation were pending at initial preparation. See the current setup evidence below.
 
 ## Account setup, 2026-10-06
 
