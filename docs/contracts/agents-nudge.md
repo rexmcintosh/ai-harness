@@ -18,6 +18,6 @@ The intended success is one delivered nudge per newly needy unattached session, 
 
 There is no durable failure record or independent escalation channel. Keep this
 loop as a **repair candidate**. Its measurable delivery goal is clear; missing
-delivery evidence is not itself a reason to retire it. Consider retirement only
-if the session-bridge overlap audit proves the same useful coverage exists (moot since 2026-10-07: session-bridge was retired)
-elsewhere. Do not retire it from this document.
+delivery evidence is not itself a reason to retire it. session-bridge, the only
+overlapping tool, was retired on 2026-10-07, so assess this nudge on its own
+merits. Do not retire it from this document.

@@ -5,8 +5,12 @@ set -euo pipefail
 H=~/migration-holding
 CRON=$(ls -1 "$H"/crontab.vps*.txt | sort | tail -1)
 
-# 1. systemd user units (the retired telegram-orphan-reaper stays out)
+# 1. systemd user units (the retired telegram-orphan-reaper and session-bridge stay out)
 mkdir -p ~/.config/systemd/user
+# session-bridge (Wall-E) was retired 2026-10-07. Converge hosts that still have it: stop, disable
+# and drop the unit file. Every step tolerates a unit that is already gone.
+systemctl --user disable --now session-bridge.service >/dev/null 2>&1 || true
+rm -f ~/.config/systemd/user/session-bridge.service
 for u in portfolio-cockpit.service attain-work-queue.service attain-work-queue.timer home-dev-mnt-mini.mount home-dev-mnt-mini.automount; do
   cp "$H/systemd/user/$u" ~/.config/systemd/user/
 done
@@ -23,6 +27,10 @@ sudo tailscale serve --bg --https=443 http://127.0.0.1:8790 >/dev/null
 
 sleep 3
 echo "--- units"; systemctl --user --no-pager --no-legend list-units portfolio-cockpit.service attain-work-queue.timer
+if systemctl --user is-active --quiet session-bridge.service || systemctl --user is-enabled --quiet session-bridge.service 2>/dev/null; then
+  echo "FAIL: retired session-bridge.service is still active or enabled" >&2; exit 1
+fi
+echo "--- session-bridge: retired (inactive, not enabled)"
 echo "--- cron lines: $(crontab -l | grep -cvE '^\s*(#|$)')"
 echo "--- serve"; tailscale serve status | head -3
 echo "--- cockpit"; curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8790/
