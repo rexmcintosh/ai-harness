@@ -1,3 +1,5 @@
+> Retired 2026-10-07: `apply.py` and `tests/loom/test_bm2_triage_apply.py` ran once on 2026-09-18 and were removed; git history holds them at commit 739c33a.
+
 # Triage: two malformed bm2-* quarantine artifacts (2026-09-18)
 
 Backlog item: 2026-08-25-loom-triage-two-malformed-bm2-artifacts.

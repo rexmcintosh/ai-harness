@@ -192,3 +192,15 @@ def test_resolve_refuses_non_quarantined_entries(monkeypatch, tmp_path, capsys):
     led2 = WeaveLedger(cfg.ledger_path)
     assert led2.status_of("sid#1") == "committed"       # untouched
     assert led2.entry("sid#1")["reason"] == "woven"
+
+
+def test_retired_reconcile_phantom_is_gone(capsys):
+    """The one-off phantom-tree reconcile ran on 2026-09-18 and was retired on 2026-10-07."""
+    import importlib.util
+    import pytest
+    assert "reconcile-phantom" not in (cli.__doc__ or "")
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["reconcile-phantom"])
+    assert exc.value.code == 2                   # argparse: invalid choice
+    assert "invalid choice" in capsys.readouterr().err
+    assert importlib.util.find_spec("loom.phantom") is None
