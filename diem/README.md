@@ -2,34 +2,38 @@
 
 ## What it is
 
-Nightly Venice DIEM drain: converts unspent daily allowance into standing workload automatically and deterministically. At 21:00, 23:00, and 00:15 local time, cron fires `diem drain --checkpoint`, which pops jobs from a queue and runs them until the balance drops to the floor or the deadline (00:50) approaches. The drain never implements workloads itself — it shells out to trusted tooling: `council review`, `council ask`, `loom backfill`, and repo-provided image pipelines. See [design doc](../docs/superpowers/specs/2026-07-03-diem-drain-engine-design.md).
+Nightly Venice DIEM drain: converts unspent daily allowance into standing workload automatically and deterministically. At 08:00, 21:00, 23:00, and 23:40 UTC, cron fires `diem drain --checkpoint`, which pops jobs from a queue and runs them until the balance drops to the floor or the deadline (23:50 UTC) approaches. The Venice DIEM epoch resets at 00:00 UTC. All diem times are UTC, whatever the host timezone. The drain never implements workloads itself — it shells out to trusted tooling: `council review`, `council ask`, `loom backfill`, and repo-provided image pipelines. See [design doc](../docs/superpowers/specs/2026-07-03-diem-drain-engine-design.md).
 
 Diem owns the queue, the clock, and the budget only. Every output sits behind human gates: reviews land as staging files, images append to candidate dirs, loom writes to its own store. It never commits, pushes, merges, publishes, or touches KDP. The operator banks items during the day (or Claude sessions write them as JSON files), and the drain executes them at night, always yielding to live interactive use.
 
 ## Config
 
-Create `~/.config/diem/config.toml`. Required key: `daily_diem` (your daily DIEM allowance in units). All others optional; defaults shown.
+Create `~/.config/diem/config.toml`. Required key: `daily_diem` (your daily DIEM allowance in units). All others are optional. The example below uses the live schedule (all times UTC). Keys you leave out fall back to the defaults in `diem/config.py`, and those defaults still carry the original schedule (checkpoints 21:00/23:00/00:15, deadline 00:50, reset 01:00), which does not match the 00:00 UTC epoch. Set `deadline`, `reset` and `[[checkpoints]]` explicitly.
 
 ```toml
 daily_diem = 50  # REQUIRED — your daily DIEM allowance
 repos = ["/path/to/repo1", "/path/to/repo2"]
-deadline = "00:50"  # Must fall between last checkpoint and reset
-reset = "01:00"
+deadline = "23:50"  # Must fall between last checkpoint and reset
+reset = "00:00"    # Venice DIEM epoch, 00:00 UTC
 state_dir = "~/.local/state/diem"
 outputs_dir = "~/.local/state/diem/outputs"
 backfill_max_per_night = 4
 backfill_chunk = 2
 
 [[checkpoints]]
+time = "08:00"
+floor = 0.65  # Drain if balance exceeds 65% of daily_diem
+
+[[checkpoints]]
 time = "21:00"
-floor = 0.40  # Drain if balance exceeds 40% of daily_diem
+floor = 0.40
 
 [[checkpoints]]
 time = "23:00"
 floor = 0.15
 
 [[checkpoints]]
-time = "00:15"
+time = "23:40"
 floor = 0.0
 
 [seeds]
@@ -48,7 +52,7 @@ repo = "/home/dev/projects/romance-empire"
 argv = ["python", "scripts/make_teasers.py"]
 ```
 
-Config contract: `deadline` must fall between the last checkpoint time and `reset` on the clock (e.g., 00:50 < 01:00). `daily_diem` is required; all others inherit sensible defaults.
+Config contract: `deadline` must fall between the last checkpoint time and `reset` on the clock, shortly before the reset (e.g., 23:50 before 00:00, across midnight). `daily_diem` is required; all others inherit sensible defaults.
 
 ## Queue-file banking
 
@@ -73,7 +77,7 @@ Banked items always outrank discovered items. Deduped by type-specific key: one 
 ## Leftovers-only work: `not_before`
 
 An item may carry `"not_before": "HH:MM"`, a time of the DIEM day (anchored to the day start
-like the checkpoints, so `23:00` is still due at 00:20 under a 01:00 reset). Before that time
+like the checkpoints, so `23:00` stays due until the 00:00 UTC reset). Before that time
 the drain does not see the item at all: it cannot take the morning allowance, it is not
 reported as skipped, and it does not stop the loom filler from seeding (the filler needs an
 empty queue). Use it for work that is worth doing only with DIEM that would expire anyway:
@@ -105,12 +109,16 @@ carries `"reserve"` (the largest seen in that slot) and `"reserve_probe"`
 
 ## Crontab installation
 
-Three checkpoints run `diem drain --checkpoint` and log to `~/.local/state/diem/drain.log`. Append to your crontab:
+Four checkpoints run `diem drain --checkpoint` and log to `~/.local/state/diem/drain.log`.
+Debian cron ignores `CRON_TZ` and fires on the system clock (Europe/Lisbon, UTC+1 in summer),
+so each slot fires at both possible local hours and a guard lets through only the run at the
+right UTC hour. No retime is needed when the clocks change. Append to your crontab:
 
 ```cron
-0 21 * * *  /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
-0 23 * * *  /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
-15 0 * * *  /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
+0 8,9 * * *    [ "$(date -u +\%H)" = "08" ] && /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
+0 21,22 * * *  [ "$(date -u +\%H)" = "21" ] && /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
+0 23,0 * * *   [ "$(date -u +\%H)" = "23" ] && /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
+40 23,0 * * *  [ "$(date -u +\%H)" = "23" ] && /home/dev/.local/bin/diem drain --checkpoint >> /home/dev/.local/state/diem/drain.log 2>&1
 ```
 
 (Install via `crontab -e` after explicit operator approval only.)
@@ -187,13 +195,16 @@ models change; refresh the price table first if the tolerance warning fires.
 
 ## Scheduling & semantics
 
-| Time  | Floor | Meaning |
-|-------|-------|---------|
-| 21:00 | 40%   | Drain surplus; operator may still be working |
-| 23:00 | 15%   | Probably done; drain most of it |
-| 00:15 | 0%    | Use-it-or-lose-it endgame |
+| Time (UTC) | Floor | Meaning |
+|------------|-------|---------|
+| 08:00      | 65%   | Loom gets first claim on the fresh balance; ~35% drained, the rest left for the day |
+| 21:00      | 40%   | Drain surplus; operator may still be working |
+| 23:00      | 15%   | Probably done; drain most of it |
+| 23:40      | 0%    | Use-it-or-lose-it endgame (600 s runway to the deadline) |
 
-Drain loop: read live balance; if ≤ floor, stop. Pop job; skip if estimated cost would breach floor or if `now + duration > 00:50` (deadline). Run job (hard timeout at deadline), archive, loop. Diem does not itself retry or back off on Venice 429/5xx — `council` and `loom` own their own request-level retry/backoff. Diem's retry granularity is one checkpoint: a failed job is requeued and tried again at the next checkpoint (once; second failure archives it as failed). Never drains blind: if the balance endpoint is unreachable, the whole checkpoint aborts (`balance_unavailable`) rather than guessing. Aborts with `past_deadline` if `now > 00:50`. Aborts with `no_checkpoint_fired` on off-schedule runs (enforces 21:00/23:00/00:15 only). One review per repo per night. Backfill capped at `backfill_max_per_night` jobs; `backfill_chunk` controls targets per job. Balance re-read between jobs — live operator use automatically throttles the drain; `diem pause` quiets it explicitly.
+Deadline 23:50 UTC; reset 00:00 UTC.
+
+Drain loop: read live balance; if ≤ floor, stop. Pop job; skip if estimated cost would breach floor or if `now + duration > 23:50` (deadline). Run job (hard timeout at deadline), archive, loop. Diem does not itself retry or back off on Venice 429/5xx — `council` and `loom` own their own request-level retry/backoff. Diem's retry granularity is one checkpoint: a failed job is requeued and tried again at the next checkpoint (once; second failure archives it as failed). Never drains blind: if the balance endpoint is unreachable, the whole checkpoint aborts (`balance_unavailable`) rather than guessing. Aborts with `past_deadline` if `now > 23:50`. Aborts with `no_checkpoint_fired` on off-schedule runs (enforces the configured checkpoints only: 08:00/21:00/23:00/23:40). One review per repo per night. Backfill capped at `backfill_max_per_night` jobs; `backfill_chunk` controls targets per job. Balance re-read between jobs — live operator use automatically throttles the drain; `diem pause` quiets it explicitly.
 
 ## Safety gates
 
