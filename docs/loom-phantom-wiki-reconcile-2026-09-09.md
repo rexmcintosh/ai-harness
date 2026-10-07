@@ -1,3 +1,5 @@
+> Retired 2026-10-07: `loom reconcile-phantom` (`loom/phantom.py`, `tests/loom/test_phantom.py`, `docs/loom-phantom-wiki-folds/`) ran on 2026-09-18 and was removed; git history holds it at commit 739c33a.
+
 # Phantom `~/wiki/wiki/` tree — reconcile runbook (2026-09-09)
 
 Backlog item `2026-07-23-loom-phantom-wiki-tree-reconcile`. Prepared by an

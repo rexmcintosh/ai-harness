@@ -11,8 +11,12 @@ its home (wiki article, `~/wiki/decisions/`, per-project `memory/`, `~/.claude/s
     .venv/bin/python -m loom.cli promote           # apply staged .claude + merge loom-shadow -> master
     .venv/bin/python -m loom.cli requeue <sid>     # return a quarantined/stuck session to pending
     .venv/bin/python -m loom.cli rollback --ts <stamp>     # undo a promote from its backup
-    .venv/bin/python -m loom.cli reconcile-phantom [--apply]  # one-time: fold + delete the phantom ~/wiki/wiki/ tree (docs/loom-phantom-wiki-reconcile-2026-09-09.md)
     ./loom/run-absorb.sh                            # cron entry: absorb --live + Telegram summary
+
+Retired one-off tools (2026-10-07): `reconcile-phantom` (`loom/phantom.py`) and the bm2
+quarantine `apply.py` both ran on 2026-09-18 and were removed. The write-ups stay in `docs/`
+(`loom-phantom-wiki-reconcile-2026-09-09.md`, `loom-bm2-quarantine-triage/`); the code is in git
+history at commit 739c33a.
 
 ## How it stays safe
 - **Idempotent (structural):** every loom-shadow commit carries a `Loom-Woven:` trailer + each file an

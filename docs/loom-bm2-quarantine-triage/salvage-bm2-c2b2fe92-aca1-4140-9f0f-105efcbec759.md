@@ -1,3 +1,4 @@
+# Retired 2026-10-07: the apply.py that consumed this salvage file ran on 2026-09-18 and was removed; git history holds it at commit 739c33a.
 - type: decision
   subject: heron-creek-drm-free
   learning: "All Heron Creek books will be published without DRM, a permanent per-book choice on KDP."
