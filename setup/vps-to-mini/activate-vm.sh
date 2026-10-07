@@ -27,12 +27,15 @@ sudo tailscale serve --bg --https=443 http://127.0.0.1:8790 >/dev/null
 
 sleep 3
 echo "--- units"; systemctl --user --no-pager --no-legend list-units portfolio-cockpit.service attain-work-queue.timer
-# Retired-unit check: read the exact states; anything other than gone/off (including a query error) fails.
-sb_active=$(systemctl --user is-active session-bridge.service 2>&1 || true)
-sb_enabled=$(systemctl --user is-enabled session-bridge.service 2>&1 || true)
-case "$sb_active" in inactive|failed|unknown) ;; *) echo "FAIL: session-bridge.service is-active=$sb_active" >&2; exit 1 ;; esac
-case "$sb_enabled" in disabled|not-found|"Failed to get unit file state for session-bridge.service: No such file or directory") ;; *) echo "FAIL: session-bridge.service is-enabled=$sb_enabled" >&2; exit 1 ;; esac
-echo "--- session-bridge: retired (is-active=$sb_active, is-enabled=$sb_enabled)"
+# Retired-unit check, from stable systemd properties. Pass only if the unit is not loadable at all,
+# or is inactive and disabled. A failed query fails the script.
+sb=$(systemctl --user show session-bridge.service -p LoadState -p ActiveState -p UnitFileState) \
+  || { echo "FAIL: could not query session-bridge.service" >&2; exit 1; }
+sb_load=$(sed -n 's/^LoadState=//p' <<<"$sb"); sb_active=$(sed -n 's/^ActiveState=//p' <<<"$sb"); sb_file=$(sed -n 's/^UnitFileState=//p' <<<"$sb")
+if [[ "$sb_load" != "not-found" ]] && ! [[ "$sb_active" == "inactive" && "$sb_file" == "disabled" ]]; then
+  echo "FAIL: session-bridge.service LoadState=$sb_load ActiveState=$sb_active UnitFileState=$sb_file" >&2; exit 1
+fi
+echo "--- session-bridge: retired (LoadState=$sb_load ActiveState=$sb_active UnitFileState=$sb_file)"
 echo "--- cron lines: $(crontab -l | grep -cvE '^\s*(#|$)')"
 echo "--- serve"; tailscale serve status | head -3
 echo "--- cockpit"; curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8790/
