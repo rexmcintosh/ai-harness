@@ -32,7 +32,7 @@ Local evidence resolves the scheduler timezone: cron `3.0pl1-184ubuntu2` schedul
 | dormant | every 10 min when enabled; `disabled` and absent from the 2026-09-18 timer listing; last elapsed 2026-08-26 10:16 UTC | `~/.config/systemd/user/telegram-orphan-reaper.timer` → `telegram-orphan-reaper.service` → `~/.local/bin/telegram-orphan-reaper.sh` | Telegram MCP orphan reaper | [telegram-orphan-reaper.md](telegram-orphan-reaper.md); owner decision: re-enable or remove |
 | dormant | daily when enabled; no enablement link on disk | `/usr/lib/systemd/user/systemd-tmpfiles-clean.timer` | OS-owned temp cleanup | Unit file shipped by systemd, not linked from any `timers.target.wants`, and absent from the 2026-09-05 timer listing. Not a project loop; no action. |
 
-Not loops, listed so nobody re-discovers them: `~/.config/systemd/user/session-bridge.service` is a persistent service (restart-always, wanted by `default.target`), and `home-dev-mnt-mini.mount` / `.automount` are mount units. They have no schedule and are outside this index.
+Not loops, listed so nobody re-discovers them: `home-dev-mnt-mini.mount` / `.automount` are mount units with no schedule, outside this index. The former `session-bridge.service` (Wall-E per-session Telegram topics) was retired on 2026-10-07: unit stopped, disabled and archived under `~/.local/state/retired/session-bridge-2026-10-07/`, its Stop hook removed from `~/.claude/settings.json`, and its code deleted from this repo (git history keeps it). The archive keeps the unit, config.json and state for reference; the bot token file was deleted (the bot is being revoked). `setup/vps-to-mini/activate-vm.sh` now stops and disables the unit, removes its file from `~/.config/systemd/user`, and fails unless the unit reads as inactive and disabled or not found. It does not search other unit paths; on this host the only unit file was the one in `~/.config/systemd/user`.
 
 ## Inventory totals
 
@@ -53,7 +53,7 @@ The July assessment's Correction A: a loop that cannot state a measurable succes
 | Automation watchdog | watchdog.md v1.0 | Yes: a parseable `WATCHDOG_JSON` result and `runs.log` line per poll, plus `SENT` on escalation. | No. |
 | Council security sweep | council-security-sweep.md v1.0 | Yes: `rc=0` with a logged finding count and coverage. | No. Repair: the Telegram send failure is ignored. |
 | DIEM checkpoint drain | diem-drain.md v1.0 | Yes: a checkpoint summary appended with each run item `ok`. | No. |
-| Agent-attention nudge | agents-nudge.md v1.0 | Yes: one delivered nudge per newly needy unattached session. Delivery is not evidenced. | No. Repair candidate; reconsider only after the session-bridge overlap audit. |
+| Agent-attention nudge | agents-nudge.md v1.0 | Yes: one delivered nudge per newly needy unattached session. Delivery is not evidenced. | No. Repair candidate. The session-bridge overlap question is moot: session-bridge was retired 2026-10-07. |
 | Loom session learning | loom-absorb.md v1.0 | Yes: `absorb rc=0`, an atomically written `pending.json`, and a reviewable shadow-branch diff. | No. |
 | Session worktree hygiene | session-gc.md v1.0 | Yes: a snapshot ref for every dirty eligible worktree; a fresh weekly report that deletes nothing. | No. |
 | Superpowers preamble reapply | superpowers-preamble.md v1.0 | Yes: `applied` or `already applied`, valid hook JSON, zero exit in the log. | No. Note the dependency on an unversioned plugin cache path. |
