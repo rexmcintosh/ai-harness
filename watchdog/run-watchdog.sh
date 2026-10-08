@@ -93,11 +93,16 @@ record_delivery() {
 }
 
 # timeout(1) is coreutils; KILL 30 s after TERM so a TERM-ignoring child cannot
-# hold run.lock. Without it there is no bounded runner, and the investigator
-# never runs at all: every alert takes the direct path below instead.
+# hold run.lock. The probe runs the exact options used below, so a timeout
+# that is missing, or present but without --kill-after, counts the same: no
+# bounded runner, the investigator never runs, and every alert takes the
+# direct path below instead.
 TIMEOUT_CMD=()
-command -v timeout >/dev/null 2>&1 && \
-  TIMEOUT_CMD=(timeout --kill-after="${WATCHDOG_CLAUDE_KILL_AFTER:-30}" "$CLAUDE_TIMEOUT")
+KILL_AFTER="${WATCHDOG_CLAUDE_KILL_AFTER:-30}"
+if command -v timeout >/dev/null 2>&1 && \
+   timeout --kill-after="$KILL_AFTER" "$CLAUDE_TIMEOUT" true >/dev/null 2>&1; then
+  TIMEOUT_CMD=(timeout --kill-after="$KILL_AFTER" "$CLAUDE_TIMEOUT")
+fi
 
 # Called only when TIMEOUT_CMD is set. The model process gets neither lock
 # descriptor (8: narrative.lock, 9: run.lock), so nothing it leaves behind
@@ -130,7 +135,7 @@ fi
 if [ "$DIRECT" = 0 ] && [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
   # No bounded runner: an uncapped investigator could hold run.lock forever.
   # Skip it and page the plain report directly instead.
-  echo "[$TS] investigator=skipped no timeout(1); sending direct" >> "$LOG"
+  echo "[$TS] investigator=skipped no usable timeout(1); sending direct" >> "$LOG"
   DIRECT=1
 fi
 
@@ -169,7 +174,7 @@ $DIRECT_NOTE"
 
   if [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
     # No bounded runner: skip the narrative rather than run it uncapped.
-    echo "[$TS] narrative=unavailable no timeout(1)" >> "$LOG"
+    echo "[$TS] narrative=unavailable no usable timeout(1)" >> "$LOG"
     echo "escalated + provider accepted direct notification."
     exit 0
   fi

@@ -114,9 +114,11 @@ while one still runs), capped by `WATCHDOG_CLAUDE_TIMEOUT` (default 600 s) plus 
 Every other alert keeps the investigator-first path. (On 3-5 Oct 2026 every
 investigator run hit the weekly usage limit, so no alert left the box all weekend.)
 
-The investigator only runs under coreutils `timeout(1)`. When `timeout` is not on
-`PATH` it never runs: every alert, MeetTrack or not, goes out on the direct path
-(`investigator=skipped no timeout(1)` in `logs/runs.log`), with no narrative.
+The investigator only runs under coreutils `timeout(1)` with `--kill-after`; the
+wrapper test-runs exactly that invocation first. When `timeout` is missing or does not
+support it, the investigator never runs: every alert, MeetTrack or not, goes out on
+the direct path (`investigator=skipped no usable timeout(1)` in `logs/runs.log`), with
+no narrative.
 
 ## Architecture
 

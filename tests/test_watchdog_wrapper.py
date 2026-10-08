@@ -3,6 +3,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "watchdog" / "run-watchdog.sh"
@@ -235,8 +237,10 @@ def test_without_timeout_the_narrative_is_skipped_not_run_uncapped(tmp_path):
         tmp_path, extra_env={"PATH": str(bindir)})
     assert result.returncode == 0
     assert len(messages) == 1 and not pending.exists()
-    assert "narrative=unavailable no timeout(1)" in log
+    assert "narrative=unavailable no usable timeout(1)" in log
     assert not calls.exists()
+    # The accepted direct delivery committed its cooldown before the skip.
+    assert json.loads((tmp_path / "state.json").read_text())["meets.liveness"]["level"] == "crit"
 
 
 def _no_timeout_path(tmp_path: Path) -> str:
@@ -260,7 +264,24 @@ def test_a_non_meet_alert_without_timeout_skips_the_investigator_and_pages(tmp_p
     assert len(messages) == 1 and "Watchdog alert" in messages[0]
     assert "a diagnosis may follow" not in messages[0]
     assert not calls.exists() and not pending.exists()
-    assert "investigator=skipped no timeout(1)" in log and "direct=1" in log
+    assert "investigator=skipped no usable timeout(1)" in log and "direct=1" in log
+    assert json.loads((tmp_path / "state.json").read_text())["disk"]["level"] == "crit"
+
+
+def test_a_timeout_without_kill_after_counts_as_no_bounded_runner(tmp_path):
+    # Present but incompatible (rejects --kill-after, like a minimal busybox
+    # build): treated exactly like a missing timeout(1).
+    bindir = Path(_no_timeout_path(tmp_path))
+    executable(bindir / "timeout", (
+        "#!/usr/bin/env bash\n"
+        'case "$1" in --kill-after=*) echo "unrecognized option" >&2; exit 125;; esac\n'
+        'shift; exec "$@"\n'))
+    result, pending, messages, log, calls = run_meet_wrapper(
+        tmp_path, fired_name="disk", extra_env={"PATH": str(bindir)})
+    assert result.returncode == 0
+    assert len(messages) == 1 and "Watchdog alert" in messages[0]
+    assert not calls.exists() and not pending.exists()
+    assert "investigator=skipped no usable timeout(1)" in log
 
 
 def test_the_narrative_runs_after_run_lock_is_released(tmp_path):
@@ -278,6 +299,7 @@ def test_the_narrative_runs_after_run_lock_is_released(tmp_path):
     assert "narrative=sent" in log
 
 
+@pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="needs procfs")
 def test_the_investigator_never_inherits_a_lock_descriptor(tmp_path):
     # A model process that outlives a timeout kill must not keep any lock.
     fds = tmp_path / "fds"
