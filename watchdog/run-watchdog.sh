@@ -45,7 +45,14 @@ if [ -z "$JSON_LINE" ]; then
 else
   ESCALATE="$(printf '%s' "$JSON_LINE" | python3 -c "import json,sys
 try: print('1' if json.load(sys.stdin).get('escalate') else '0')
-except Exception: print('0')" 2>/dev/null)"
+except Exception: print('bad')" 2>/dev/null)"
+  if [ "$ESCALATE" != 0 ] && [ "$ESCALATE" != 1 ]; then
+    # A result nobody can read is a blind watchdog, not a healthy one.
+    REPORT="[CRIT] watchdog: pre-check result unreadable (bad WATCHDOG_JSON). See $LOG.err.
+$REPORT"
+    JSON_LINE=""
+    ESCALATE=1
+  fi
 fi
 
 if [ "$ESCALATE" != 1 ]; then
@@ -85,8 +92,14 @@ record_delivery() {
   PYTHONPATH="$BASE" python3 -m watchdog.run --record-delivery "$status" "$ATTEMPT_ID" ${receipt:+"$receipt"}
 }
 
+# timeout(1) is coreutils; KILL 30 s after TERM so a TERM-ignoring child cannot
+# hold run.lock. Without it the investigator runs uncapped, as before.
+TIMEOUT_CMD=()
+command -v timeout >/dev/null 2>&1 && \
+  TIMEOUT_CMD=(timeout --kill-after="${WATCHDOG_CLAUDE_KILL_AFTER:-30}" "$CLAUDE_TIMEOUT")
+
 investigate() {
-  timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
+  "${TIMEOUT_CMD[@]}" "$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
     --dangerously-skip-permissions --output-format json 2>>"$LOG.err" \
     | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('result','').strip())
@@ -96,8 +109,9 @@ except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null
 # --- MeetTrack: the alert itself never waits on a model --------------------
 # 3-5 Oct 2026 (the Plovdiv rehearsal): every investigator run hit the weekly
 # usage limit, so nothing reached Telegram all weekend. When a meets.* check
-# fired, or the pre-check itself failed (then the meet checks are blind too),
-# the plain report goes straight to Telegram and that receipt is the delivery
+# fired, or the pre-check failed or emitted JSON that cannot be read (then the
+# meet checks may be blind too: fail towards the direct path), the plain
+# report goes straight to Telegram and that receipt is the delivery
 # record. The investigator's narrative follows as a best-effort second message:
 # its failure is logged, never retried, and never un-sends the alert.
 DIRECT=0
@@ -106,7 +120,8 @@ if [ -z "$JSON_LINE" ]; then
 else
   DIRECT="$(printf '%s' "$JSON_LINE" | python3 -c "import json,sys
 try: print('1' if any(str(f.get('name','')).startswith('meets.') for f in json.load(sys.stdin).get('fired') or []) else '0')
-except Exception: print('0')" 2>/dev/null)"
+except Exception: print('1')" 2>/dev/null)"
+  [ "$DIRECT" = 0 ] || DIRECT=1     # empty (python itself failed) -> direct
 fi
 
 if [ "$DIRECT" = 1 ]; then

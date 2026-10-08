@@ -100,6 +100,7 @@ def run_meet_wrapper(tmp_path: Path, *, fired_name="meets.liveness", send_rc=0,
         "WATCHDOG_DELIVERY_LAST": str(tmp_path / "last.json"),
         "WATCHDOG_METRICS": str(tmp_path / "metrics.json"),
         "WATCHDOG_CLAUDE_TIMEOUT": "5",
+        "WATCHDOG_CLAUDE_KILL_AFTER": "2",
     })
     result = subprocess.run([str(SCRIPT)], env=env, text=True, capture_output=True)
     messages = [p.read_text() for p in sorted(sent.iterdir())]
@@ -166,3 +167,41 @@ def test_non_meet_alerts_keep_the_investigator_path(tmp_path):
     assert result.returncode == 0
     assert messages == ["diagnosis"]
     assert "direct=1" not in log and not pending.exists()
+
+
+def test_unreadable_precheck_json_fails_towards_the_direct_path(tmp_path):
+    pending = tmp_path / "pending.json"
+    precheck = executable(tmp_path / "precheck",
+                          "#!/usr/bin/env bash\nprintf 'x\\nWATCHDOG_JSON:{not json\\n'\n")
+    claude = executable(tmp_path / "claude", LIMIT_HIT)
+    sent = tmp_path / "sent"
+    sent.mkdir()
+    receipt = '{"ok":true,"status":"accepted","chat_id":1,"message_ids":[9]}'
+    sender = executable(tmp_path / "tg-send", (
+        "#!/usr/bin/env bash\n"
+        f"n=$(ls {sent} | wc -l); cat > {sent}/$n.txt\nprintf '{receipt}\\n'\n"))
+    env = os.environ.copy()
+    env.update({
+        "WATCHDOG_PRECHECK_CMD": str(precheck), "WATCHDOG_CLAUDE_BIN": str(claude),
+        "WATCHDOG_TG_SEND": str(sender), "WATCHDOG_LOG_DIR": str(tmp_path / "logs"),
+        "WATCHDOG_ENV_FILE": str(tmp_path / "missing-env"),
+        "WATCHDOG_STATE": str(tmp_path / "state.json"), "WATCHDOG_PENDING": str(pending),
+        "WATCHDOG_DELIVERY_LAST": str(tmp_path / "last.json"),
+        "WATCHDOG_METRICS": str(tmp_path / "metrics.json"),
+        "WATCHDOG_CLAUDE_TIMEOUT": "5",
+    })
+    # A result nobody can read is a blind watchdog: alert, and directly.
+    result = subprocess.run([str(SCRIPT)], env=env, text=True, capture_output=True)
+    assert result.returncode == 0
+    messages = [p.read_text() for p in sorted(sent.iterdir())]
+    assert len(messages) == 1 and "result unreadable" in messages[0]
+    assert "direct=1" in (tmp_path / "logs" / "runs.log").read_text()
+
+
+def test_a_term_ignoring_investigator_is_killed(tmp_path):
+    stubborn = "#!/usr/bin/env bash\ntrap '' TERM\nsleep 60\n"
+    import time
+    t0 = time.monotonic()
+    result, pending, messages, log, _ = run_meet_wrapper(tmp_path, claude_script=stubborn)
+    assert result.returncode == 0 and len(messages) == 1 and not pending.exists()
+    assert time.monotonic() - t0 < 20          # 5 s timeout + 2 s kill grace
