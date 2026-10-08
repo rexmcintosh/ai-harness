@@ -486,6 +486,7 @@ def _no_lisbon(monkeypatch):
     from . import triage
     monkeypatch.setattr(triage, "_lisbon_zone",
                         lambda: (None, "ZoneInfoNotFoundError: no tzdata"))
+    monkeypatch.setattr(triage, "_lisbon_logged", set())
 
 
 def test_a_missing_lisbon_zone_alerts_on_its_own_check(monkeypatch):
@@ -502,7 +503,9 @@ def test_the_utc_fallback_is_logged_and_the_meet_rules_still_run(monkeypatch, ca
     now = _now(10)
     row = _pdf_writer(now, last_min=40, tick_min=31)
     assert check_meet_liveness([row], now).level == "crit"
-    assert "Europe/Lisbon unavailable" in capsys.readouterr().err
+    check_meet_freshness([row], now)
+    err = capsys.readouterr().err
+    assert err.count("Europe/Lisbon unavailable") == 1     # once per run
 
 
 def test_collect_metrics_reports_the_clock_check(monkeypatch):
@@ -516,3 +519,35 @@ def test_collect_metrics_reports_the_clock_check(monkeypatch):
     out, _ = run.collect_metrics(int(now), {})
     by_name = {s.name: s for s in out}
     assert by_name["meets.clock"].level == "warn"
+
+
+def test_the_clock_check_reports_even_when_the_registry_read_fails(monkeypatch):
+    now = _now(10)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setattr(run, "_supabase_count", lambda *a, **k: None)
+    monkeypatch.setattr(run, "_meet_registry_rows", lambda *a, **k: None)
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    _no_lisbon(monkeypatch)
+    out, _ = run.collect_metrics(int(now), {})
+    by_name = {s.name: s for s in out}
+    assert by_name["meets.clock"].level == "warn"
+    assert "meets.liveness" not in by_name
+
+
+def test_evidence_minutes_are_floored_below_the_crit_boundary():
+    now = _now(15)
+    row = _pdf_writer(now, last_min=5, tick_min=29.9)
+    s = check_meet_liveness([row], now)
+    assert s.level == "warn" and "last tick 29m ago" in s.evidence
+
+
+def test_a_future_stamp_on_the_only_ticking_row_and_an_unstamped_dead_row():
+    # Liveness can only warn about the bad stamp; the dead row without a
+    # coverage_at keeps the ungated freshness floor, which goes crit.
+    now = _now(15)
+    skewed = _pdf_writer(now, last_min=5, tick_min=-30)
+    dead = _live_row(now, "polling", last_min=80, events_published=36,
+                     events_with_results=36, last_tick_errors=0, coverage_at=None)
+    skewed["sr_meet_id"], dead["sr_meet_id"] = "2", "1"
+    assert check_meet_liveness([skewed, dead], now).level == "warn"
+    assert check_meet_freshness([skewed, dead], now, **RETUNED).level == "crit"

@@ -250,9 +250,9 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
                     rows, now_epoch,
                     tick_warn_min=mf.get("tick_warn_min", 10),
                     tick_crit_min=mf.get("tick_crit_min", 30)))
-                # Both rules above fall back to UTC without Europe/Lisbon;
-                # that fallback alerts instead of passing silently.
-                out.append(check_meet_clock())
+            # The meet rules fall back to UTC without Europe/Lisbon; that
+            # alerts instead of passing silently, registry read or not.
+            out.append(check_meet_clock())
 
     return out, new_metrics
 

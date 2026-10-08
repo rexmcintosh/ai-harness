@@ -267,16 +267,24 @@ def _lisbon_zone():
         return None, f"{type(e).__name__}: {e}"
 
 
+# Fallback reasons already logged by this process (one watchdog run), so the
+# freshness and liveness rules together write one stderr line, not two.
+_lisbon_logged: set = set()
+
+
 def _lisbon(now_epoch):
     """Wall-clock time in Europe/Lisbon (the registry is POR-scoped).
 
     Without the zone the meet rules still run, on UTC (racing hours shift by
-    one hour in summer), and say so: a line on stderr (the wrapper keeps it in
-    runs.log.err) here, and a 'meets.clock' alert from check_meet_clock."""
+    one hour in summer), and say so: one line on stderr per run (the wrapper
+    keeps it in runs.log.err) here, and a 'meets.clock' alert from
+    check_meet_clock."""
     zone, err = _lisbon_zone()
     if zone is None:
-        print(f"watchdog: Europe/Lisbon unavailable ({err}); "
-              f"meet checks use UTC", file=sys.stderr)
+        if err not in _lisbon_logged:
+            _lisbon_logged.add(err)
+            print(f"watchdog: Europe/Lisbon unavailable ({err}); "
+                  f"meet checks use UTC", file=sys.stderr)
         return datetime.fromtimestamp(now_epoch, tz=timezone.utc)
     return datetime.fromtimestamp(now_epoch, tz=zone)
 
@@ -373,12 +381,13 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
         ahead = _future_min(measured, now_epoch)
         if ahead is not None:
             future.append((ahead, f"{r.get('sr_meet_id')} {name} last tick "
-                                  f"stamped {ahead:.0f}m in the future"))
+                                  f"stamped {int(ahead)}m in the future"))
             continue
         age_min = (now_epoch - measured) / 60
         if age_min >= tick_warn_min:
+            # Whole minutes, floored: never "30m" while still under a 30 crit.
             late.append((age_min, f"{r.get('sr_meet_id')} {name} "
-                                  f"last tick {age_min:.0f}m ago"))
+                                  f"last tick {int(age_min)}m ago"))
     if not late and not future:
         return CheckStatus("meets.liveness", "ok", "live meet writers ticking (or none live)")
     late.sort(reverse=True)                 # worst first, so truncation keeps it
