@@ -58,9 +58,22 @@ tables        = ["results", "splits", "swimmers"]
 # PDF writer reports them — and while their coverage_at is older than
 # stale_warn_min, so last weekend's snapshot can never raise this weekend's
 # alarm. Add coverage_max_age_min here to give that bound its own value.
+#
+# Retuned from the sr-10976 Plovdiv rehearsal (splash_poller
+# docs/SEASON_READINESS.md, "Rehearsal findings", follow-up 6). Two rules:
+# - "still running": the PDF writer stamps coverage_at on every tick (~65 s),
+#   so its age is liveness. tick_warn_min / tick_crit_min = 10 / 30.
+# - "results fresh": last_ingest_at moves only when a result changes. It now
+#   alerts only while a published event has no results yet (or the counters
+#   are unmeasured or stale), at 30 / 75: above the 26-min longest in-session
+#   gap, and quiet over lunch, evenings and the final afternoon.
+# Do not raise the plain stale numbers to cover lunch: a dead Lenex/fragment
+# writer would then go unseen for hours.
 [meet_freshness]
-stale_warn_min     = 20
+stale_warn_min     = 30
 stale_crit_min     = 75
+tick_warn_min      = 10
+tick_crit_min      = 30
 launch_overdue_min = 30
 coverage_gap_warn  = 3
 coverage_gap_pct   = 15

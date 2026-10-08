@@ -274,3 +274,130 @@ def test_a_failure_is_recorded_only_as_far_as_it_is_visible():
     blind = {}
     run._note_failure(blind, RuntimeError("connection timed out"))
     assert blind["status"] is None and blind["body"] == ""
+
+
+# --- sr-10976 replay: "still running" vs "results fresh" (follow-up 6) --------
+# The Plovdiv rehearsal's real gaps. The plain rule raised three false crits
+# (lunch, the evening after session 2, the final afternoon) and could not see
+# the 4 Oct Supabase outage because it was already in crit.
+from .triage import check_meet_liveness
+
+RETUNED = dict(stale_warn_min=30, stale_crit_min=75)
+
+
+def _pdf_writer(now, *, last_min, tick_min, published=36, covered=36):
+    """A live PDF meet: last result `last_min` ago, last tick `tick_min` ago."""
+    return _live_row(now, "polling", last_min=last_min,
+                     events_published=published, events_with_results=covered,
+                     last_tick_errors=0, coverage_at=_iso(now, tick_min))
+
+
+def test_lunch_228_minutes_with_nothing_outstanding_stays_quiet():
+    now = _now(13)
+    row = _pdf_writer(now, last_min=228, tick_min=1)
+    assert check_meet_freshness([row], now, **RETUNED).level == "ok"
+    assert check_meet_liveness([row], now).level == "ok"
+
+
+def test_the_final_afternoon_772_minutes_stays_quiet():
+    now = _now(21)
+    row = _pdf_writer(now, last_min=772, tick_min=1)
+    assert check_meet_freshness([row], now, **RETUNED).level == "ok"
+
+
+def test_a_26_minute_in_session_gap_does_not_warn():
+    # S2's longest gap between result changes, with the next ResultList listed.
+    now = _now(15)
+    row = _pdf_writer(now, last_min=26, tick_min=1, covered=20, published=21)
+    assert check_meet_freshness([row], now, **RETUNED).level == "ok"
+
+
+def test_a_published_list_without_results_still_goes_warn_then_crit():
+    now = _now(15)
+    warn = _pdf_writer(now, last_min=35, tick_min=1, covered=20, published=21)
+    crit = _pdf_writer(now, last_min=80, tick_min=1, covered=20, published=21)
+    assert check_meet_freshness([warn], now, **RETUNED).level == "warn"
+    assert check_meet_freshness([crit], now, **RETUNED).level == "crit"
+
+
+def test_the_outage_goes_crit_on_liveness_at_31_minutes():
+    # 4 Oct 08:37 UTC: every tick timed out, so coverage_at stopped moving.
+    now = _now(10)
+    row = _pdf_writer(now, last_min=40, tick_min=31)
+    s = check_meet_liveness([row], now)
+    assert s.level == "crit" and "stopped ticking" in s.summary
+    assert "last tick 31m ago" in s.evidence
+
+
+def test_liveness_warns_at_10_minutes_and_is_quiet_below():
+    now = _now(10)
+    assert check_meet_liveness([_pdf_writer(now, last_min=5, tick_min=12)], now).level == "warn"
+    assert check_meet_liveness([_pdf_writer(now, last_min=5, tick_min=2)], now).level == "ok"
+
+
+def test_a_dead_writer_makes_its_counters_stale_so_freshness_fires_too():
+    # Counters older than their bound are not evidence that nothing is pending.
+    now = _now(15)
+    row = _pdf_writer(now, last_min=90, tick_min=90)
+    assert check_meet_freshness([row], now, **RETUNED).level == "crit"
+
+
+def test_unmeasured_writers_keep_the_plain_freshness_floor():
+    # Lenex/fragment writers have NULL event counters: no gate, 30/75 applies.
+    now = _now(15)
+    assert check_meet_freshness([_live_row(now, "polling", last_min=35)], now,
+                                **RETUNED).level == "warn"
+    assert check_meet_freshness([_live_row(now, "polling", last_min=80)], now,
+                                **RETUNED).level == "crit"
+    assert check_meet_freshness([_live_row(now, "polling", last_min=25)], now,
+                                **RETUNED).level == "ok"
+
+
+def test_liveness_ignores_writers_that_do_not_tick_into_coverage_at():
+    now = _now(15)
+    lenex = _live_row(now, "polling", last_min=5, events_published=None,
+                      events_with_results=None, last_tick_errors=0,
+                      coverage_at=_iso(now, 120))
+    no_stamp = _live_row(now, "polling", last_min=5)
+    assert check_meet_liveness([lenex, no_stamp], now).level == "ok"
+
+
+def test_liveness_is_quiet_at_night_and_for_rows_without_a_writer():
+    night = _now(3)
+    assert check_meet_liveness([_pdf_writer(night, last_min=5, tick_min=90)],
+                               night).level == "ok"
+    now = _now(15)
+    queued = _pdf_writer(now, last_min=5, tick_min=90)
+    queued["ingest_status"] = "queued"
+    ended = _pdf_writer(now, last_min=5, tick_min=90)
+    ended["start_date"] = ended["end_date"] = "2026-01-01"
+    assert check_meet_liveness([queued, ended], now).level == "ok"
+
+
+def test_the_liveness_thresholds_are_configurable():
+    now = _now(15)
+    row = _pdf_writer(now, last_min=5, tick_min=20)
+    assert check_meet_liveness([row], now, tick_warn_min=25).level == "ok"
+    assert check_meet_liveness([row], now, tick_crit_min=15).level == "crit"
+
+
+def test_monitors_toml_carries_the_retuned_numbers():
+    import tomllib
+    from pathlib import Path
+    cfg = tomllib.loads((Path(__file__).parent / "monitors.toml").read_text())
+    mf = cfg["meet_freshness"]
+    assert (mf["tick_warn_min"], mf["tick_crit_min"]) == (10, 30)
+    assert (mf["stale_warn_min"], mf["stale_crit_min"]) == (30, 75)
+
+
+def test_collect_metrics_reports_liveness_as_its_own_check(monkeypatch):
+    now = _now(10)
+    row = _pdf_writer(now, last_min=40, tick_min=31)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setattr(run, "_supabase_count", lambda *a, **k: None)
+    monkeypatch.setattr(run, "_meet_registry_rows", lambda *a, **k: [row])
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    out, _ = run.collect_metrics(int(now), {})
+    by_name = {s.name: s for s in out}
+    assert by_name["meets.liveness"].level == "crit"
+    assert "meets.freshness" in by_name

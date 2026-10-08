@@ -257,6 +257,85 @@ def _coverage_complaint(row, label, gap_warn, gap_pct, now_epoch, max_age_min):
     return None
 
 
+def _lisbon(now_epoch):
+    """Wall-clock time in Europe/Lisbon (the registry is POR-scoped)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.fromtimestamp(now_epoch, tz=ZoneInfo("Europe/Lisbon"))
+    except Exception:
+        return datetime.fromtimestamp(now_epoch, tz=timezone.utc)
+
+
+def _live_today(row, today):
+    start, end = row.get("start_date"), row.get("end_date")
+    return bool(start) and start <= today and (not end or today <= end)
+
+
+def _results_outstanding(row, now_epoch, max_age_min):
+    """Does this meet have a published event still without results?
+
+    True when the writer's counters say so, and ALSO when they cannot say:
+    NULL counters (the Lenex and fragment writers do not count published
+    events) or counters older than `max_age_min` (a snapshot from a writer that
+    has since stopped is not evidence that nothing is pending). Only a fresh
+    reading of "every published event has results" is False: that is a lunch
+    break, an evening, or the afternoon after the last session, and silence
+    then is normal (sr-10976: 228, 272 and 772 quiet minutes, nothing pending).
+    """
+    published, covered = row.get("events_published"), row.get("events_with_results")
+    if published is None or covered is None:
+        return True
+    measured = _iso_epoch(row.get("coverage_at"))
+    if measured is None or (now_epoch - measured) / 60 > max_age_min:
+        return True
+    return published > covered
+
+
+def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
+                        tick_crit_min: int = 30, racing_start: int = 8,
+                        racing_end: int = 22) -> CheckStatus:
+    """'Is the writer still running?', asked of the tick, not of the results.
+
+    The PDF writer stamps coverage_at on EVERY completed tick, results or none
+    (about every 65 s; every ~4 min even while the database times out), so its
+    age says whether the writer is alive. last_ingest_at moves only when a
+    result changes, which is why it cannot tell a lunch break from a dead
+    writer. On 4 Oct 2026 this rule would have gone crit 30 minutes into the
+    Supabase outage, which the freshness rule could not see because it was
+    already in crit for the quiet afternoon.
+
+    Only rows whose writer measures per tick count: 'polling', live by date,
+    with events_published and coverage_at set. The Lenex and fragment writers
+    stamp coverage_at only when results change, so for them the freshness rule
+    stays the floor. Racing hours only (Europe/Lisbon), like the other meet
+    rules.
+    """
+    local = _lisbon(now_epoch)
+    if not racing_start <= local.hour < racing_end:
+        return CheckStatus("meets.liveness", "ok", "outside racing hours")
+    today = local.date().isoformat()
+    late, worst = [], 0.0
+    for r in rows:
+        if r.get("ingest_status") != "polling" or not _live_today(r, today):
+            continue
+        if r.get("events_published") is None:
+            continue
+        measured = _iso_epoch(r.get("coverage_at"))
+        if measured is None:
+            continue
+        age_min = (now_epoch - measured) / 60
+        if age_min >= tick_warn_min:
+            name = r.get("name") or r.get("sr_meet_id")
+            late.append(f"{r.get('sr_meet_id')} {name} last tick {age_min:.0f}m ago")
+            worst = max(worst, age_min)
+    if not late:
+        return CheckStatus("meets.liveness", "ok", "live meet writers ticking (or none live)")
+    level = "crit" if worst >= tick_crit_min else "warn"
+    return CheckStatus("meets.liveness", level,
+                       f"{len(late)} live meet writer(s) stopped ticking",
+                       evidence="\n".join(late[:5]))
+
+
 def check_meet_freshness(rows, now_epoch, *,
                          stale_warn_min: int = 20, stale_crit_min: int = 75,
                          launch_overdue_min: int = 30,
@@ -272,9 +351,12 @@ def check_meet_freshness(rows, now_epoch, *,
     - during racing hours (Europe/Lisbon — the registry is POR-scoped):
       warn/crit — a live-by-date meet with a writer ('polling'/'backfilling')
               whose last_ingest_at (falling back to the status-change time,
-              covering the never-ingested case) is older than the floor.
-              A long lunch break can trip this; one 6h-cooldown ping during a
-              national championship beats silence — tune from rehearsals.
+              covering the never-ingested case) is older than the floor,
+              while a published event still has no results (see
+              _results_outstanding: unmeasured or stale counters count as
+              outstanding). Lunch, evenings and the afternoon after the last
+              session have nothing outstanding and stay quiet; whether the
+              writer itself is still running is check_meet_liveness's job.
       warn  — a live meet with a writer whose last tick reported errors, or
               whose published events outrun the ones holding results by
               `coverage_gap_warn` (or `coverage_gap_pct` of them). The
@@ -288,11 +370,7 @@ def check_meet_freshness(rows, now_epoch, *,
               movement for `launch_overdue_min` (the supervisor should have
               dispatched it within one 5-minute tick).
     """
-    try:
-        from zoneinfo import ZoneInfo
-        local = datetime.fromtimestamp(now_epoch, tz=ZoneInfo("Europe/Lisbon"))
-    except Exception:
-        local = datetime.fromtimestamp(now_epoch, tz=timezone.utc)
+    local = _lisbon(now_epoch)
     today = local.date().isoformat()
     racing = racing_start <= local.hour < racing_end
     if coverage_max_age_min is None:
@@ -310,14 +388,13 @@ def check_meet_freshness(rows, now_epoch, *,
             continue
         if not racing:
             continue
-        start, end = r.get("start_date"), r.get("end_date")
-        live = bool(start) and start <= today and (not end or today <= end)
-        if not live:
+        if not _live_today(r, today):
             continue
         ref = _iso_epoch(r.get("last_ingest_at")) or _iso_epoch(r.get("updated_at"))
         age_min = (now_epoch - ref) / 60 if ref is not None else None
         if status in ("polling", "backfilling"):
-            if age_min is not None and age_min >= stale_warn_min:
+            if (age_min is not None and age_min >= stale_warn_min
+                    and _results_outstanding(r, now_epoch, coverage_max_age_min)):
                 stale.append(f"{r.get('sr_meet_id')} {name} quiet {age_min:.0f}m")
                 worst_stale_min = max(worst_stale_min, age_min)
             # Only a meet with a writer can have reported coverage at all.

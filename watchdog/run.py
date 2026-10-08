@@ -26,6 +26,7 @@ from .triage import (
     check_disk,
     check_log_coverage,
     check_meet_freshness,
+    check_meet_liveness,
     check_orphan_processes,
     check_service_active,
     triage,
@@ -242,6 +243,12 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
                     coverage_gap_pct=mf.get("coverage_gap_pct", 15),
                     # Unset -> the counters inherit stale_warn_min.
                     coverage_max_age_min=mf.get("coverage_max_age_min")))
+                # Its own check name, so its alert and cooldown never hide
+                # behind a freshness alert that is already in crit.
+                out.append(check_meet_liveness(
+                    rows, now_epoch,
+                    tick_warn_min=mf.get("tick_warn_min", 10),
+                    tick_crit_min=mf.get("tick_crit_min", 30)))
 
     return out, new_metrics
 
