@@ -305,7 +305,10 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
     already in crit for the quiet afternoon.
 
     Only rows whose writer measures per tick count: 'polling', live by date,
-    with events_published and coverage_at set. The Lenex and fragment writers
+    with events_published and coverage_at set. 'backfilling' is left out on
+    purpose: it is the reconcile one-shot (reconcile_meet.py), which the
+    supervisor dispatches only once a meet is past its end_date, so it is
+    never live by date, and it does not tick. The Lenex and fragment writers
     stamp coverage_at only when results change, so for them the freshness rule
     stays the floor. Racing hours only (Europe/Lisbon), like the other meet
     rules.

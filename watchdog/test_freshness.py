@@ -401,3 +401,13 @@ def test_collect_metrics_reports_liveness_as_its_own_check(monkeypatch):
     by_name = {s.name: s for s in out}
     assert by_name["meets.liveness"].level == "crit"
     assert "meets.freshness" in by_name
+
+
+def test_a_backfilling_row_is_not_a_ticking_writer():
+    # Invariant: 'backfilling' is the reconcile one-shot, dispatched only past
+    # end_date and never ticking. If that ever changes, this test should fail
+    # first and the liveness rule should be widened on purpose.
+    now = _now(15)
+    row = _pdf_writer(now, last_min=5, tick_min=90)
+    row["ingest_status"] = "backfilling"
+    assert check_meet_liveness([row], now).level == "ok"
