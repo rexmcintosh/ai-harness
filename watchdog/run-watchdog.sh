@@ -11,6 +11,8 @@ LOG="$LOG_DIR/runs.log"
 CHAT_ID="7735693897"
 MODEL="haiku"
 CLAUDE_BIN="${WATCHDOG_CLAUDE_BIN:-$(command -v claude || echo /usr/bin/claude)}"
+# A hung investigator would hold run.lock and silence every later run.
+CLAUDE_TIMEOUT="${WATCHDOG_CLAUDE_TIMEOUT:-600}"
 TG_SEND="${WATCHDOG_TG_SEND:-$BASE/bin/tg-send}"
 ENV_FILE="${WATCHDOG_ENV_FILE:-/home/dev/projects/splash_poller/.env}"
 DRY_RUN=0
@@ -43,7 +45,14 @@ if [ -z "$JSON_LINE" ]; then
 else
   ESCALATE="$(printf '%s' "$JSON_LINE" | python3 -c "import json,sys
 try: print('1' if json.load(sys.stdin).get('escalate') else '0')
-except Exception: print('0')" 2>/dev/null)"
+except Exception: print('bad')" 2>/dev/null)"
+  if [ "$ESCALATE" != 0 ] && [ "$ESCALATE" != 1 ]; then
+    # A result nobody can read is a blind watchdog, not a healthy one.
+    REPORT="[CRIT] watchdog: pre-check result unreadable (bad WATCHDOG_JSON). See $LOG.err.
+$REPORT"
+    JSON_LINE=""
+    ESCALATE=1
+  fi
 fi
 
 if [ "$ESCALATE" != 1 ]; then
@@ -83,18 +92,143 @@ record_delivery() {
   PYTHONPATH="$BASE" python3 -m watchdog.run --record-delivery "$status" "$ATTEMPT_ID" ${receipt:+"$receipt"}
 }
 
-RESULT=$("$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
-  --dangerously-skip-permissions --output-format json 2>>"$LOG.err" \
-  | python3 -c "import json,sys
+# timeout(1) is coreutils; KILL 30 s after TERM so a TERM-ignoring child cannot
+# hold run.lock. The probe runs the exact options used below, so a timeout
+# that is missing, or present but without --kill-after, counts the same: no
+# bounded runner, the investigator never runs, and every alert takes the
+# direct path below instead.
+TIMEOUT_CMD=()
+KILL_AFTER="${WATCHDOG_CLAUDE_KILL_AFTER:-30}"
+if command -v timeout >/dev/null 2>&1 && \
+   timeout --kill-after="$KILL_AFTER" "$CLAUDE_TIMEOUT" true >/dev/null 2>&1; then
+  TIMEOUT_CMD=(timeout --kill-after="$KILL_AFTER" "$CLAUDE_TIMEOUT")
+fi
+
+# tg-send bounds itself to a 30 s request budget; this outer cap is a second
+# guard, so a hung sender cannot hold run.lock either. A capped send may
+# already have been accepted, so it counts as uncertain (never replayed),
+# like tg-send's own rc 3.
+SEND_TIMEOUT="${WATCHDOG_SEND_TIMEOUT:-60}"
+send_alert() {
+  if [ ${#TIMEOUT_CMD[@]} -gt 0 ]; then
+    TG_SEND_RECEIPT_OUTPUT=1 timeout --kill-after=5 "$SEND_TIMEOUT" \
+      "$TG_SEND" "$CHAT_ID" - 9>&-
+  else
+    TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 9>&-
+  fi
+}
+send_status() {
+  case "$1" in 3|124|137) echo uncertain ;; *) echo failed ;; esac
+}
+
+# Called only when TIMEOUT_CMD is set. The model process gets neither lock
+# descriptor (8: narrative.lock, 9: run.lock), so nothing it leaves behind
+# after a timeout kill can keep holding either lock.
+investigate() {
+  "${TIMEOUT_CMD[@]}" "$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
+    --dangerously-skip-permissions --output-format json 2>>"$LOG.err" 8>&- 9>&- \
+    | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('result','').strip())
-except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null)
+except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null 8>&- 9>&-
+}
+
+# --- MeetTrack: the alert itself never waits on a model --------------------
+# 3-5 Oct 2026 (the Plovdiv rehearsal): every investigator run hit the weekly
+# usage limit, so nothing reached Telegram all weekend. When a meets.* check
+# fired, or the pre-check failed or emitted JSON that cannot be read (then the
+# meet checks may be blind too: fail towards the direct path), the plain
+# report goes straight to Telegram and that receipt is the delivery
+# record. The investigator's narrative follows as a best-effort second message:
+# its failure is logged, never retried, and never un-sends the alert.
+DIRECT=0
+if [ -z "$JSON_LINE" ]; then
+  DIRECT=1
+else
+  DIRECT="$(printf '%s' "$JSON_LINE" | python3 -c "import json,sys
+try: print('1' if any(str(f.get('name','')).startswith('meets.') for f in json.load(sys.stdin).get('fired') or []) else '0')
+except Exception: print('1')" 2>/dev/null)"
+  [ "$DIRECT" = 0 ] || DIRECT=1     # empty (python itself failed) -> direct
+fi
+if [ "$DIRECT" = 0 ] && [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
+  # No bounded runner: an uncapped investigator could hold run.lock forever.
+  # Skip it and page the plain report directly instead.
+  echo "[$TS] investigator=skipped no usable timeout(1); sending direct" >> "$LOG"
+  DIRECT=1
+fi
+
+if [ "$DIRECT" = 1 ]; then
+  # Bookkeeping must not cost the page: if the pending record cannot be
+  # updated, send anyway, unrecorded. With no accepted record there is no
+  # cooldown, so the next run pages again: loud, never silent.
+  RECORDED=1
+  if ! record_delivery attempting 2>>"$LOG.err"; then
+    RECORDED=0
+    echo "[$TS] direct=1 delivery record unavailable; sending unrecorded" >> "$LOG"
+  fi
+  if [ ${#TIMEOUT_CMD[@]} -gt 0 ]; then
+    DIRECT_NOTE="(sent without the AI investigator; a diagnosis may follow)"
+  else
+    DIRECT_NOTE="(sent without the AI investigator)"
+  fi
+  DIRECT_TEXT="Watchdog alert ($NOW_HUMAN)
+$REPORT
+
+$DIRECT_NOTE"
+  RECEIPT="$(printf '%s' "$DIRECT_TEXT" | send_alert 2>>"$LOG.err")"
+  SEND_RC=$?
+  if [ "$SEND_RC" -ne 0 ]; then
+    DELIVERY_STATUS="$(send_status "$SEND_RC")"
+    [ "$RECORDED" = 1 ] && { record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true; }
+    echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct send $DELIVERY_STATUS (tg-send rc=$SEND_RC)\"" >> "$LOG"
+    echo "FAILED to deliver direct watchdog alert (tg-send rc=$SEND_RC)" >&2
+    exit 1
+  fi
+  if [ "$RECORDED" = 1 ] && ! record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
+    echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct alert sent; receipt not recorded\"" >> "$LOG"
+    exit 1
+  fi
+  echo "[$TS] rc=0 escalate=1 direct=1 result=\"SENT direct $(printf '%s' "$REPORT" | head -1 | cut -c1-60)\"" >> "$LOG"
+
+  if [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
+    # No bounded runner: skip the narrative rather than run it uncapped.
+    echo "[$TS] narrative=unavailable no usable timeout(1)" >> "$LOG"
+    echo "escalated + provider accepted direct notification."
+    exit 0
+  fi
+  # The alert is sent and its delivery recorded: run.lock has nothing left to
+  # protect. Release it now, so the narrative (up to CLAUDE_TIMEOUT plus the
+  # kill grace) never delays the next watchdog run. The narrative takes its
+  # own lock instead; if an earlier narrative still runs, this one is skipped.
+  exec 9>&-
+  exec 8>"$LOG_DIR/narrative.lock"
+  if ! flock -n 8; then
+    echo "[$TS] narrative=skipped previous narrative still running" >> "$LOG"
+    echo "escalated + provider accepted direct notification."
+    exit 0
+  fi
+  RESULT="$(investigate)"
+  IRC=$?
+  if [ "$IRC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -qE '^(FAILED|PARSE_ERROR)'; then
+    if printf '%s' "$RESULT" | "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG.err" 8>&-; then
+      echo "[$TS] narrative=sent" >> "$LOG"
+    else
+      echo "[$TS] narrative=send-failed" >> "$LOG"
+    fi
+  else
+    echo "[$TS] narrative=unavailable rc=$IRC :: $(printf '%s' "$RESULT" | tr '\n' ' ' | cut -c1-80)" >> "$LOG"
+  fi
+  echo "escalated + provider accepted direct notification."
+  exit 0
+fi
+
+RESULT="$(investigate)"
 RC=$?
 RESULT_1LINE="$(printf '%s' "$RESULT" | tr '\n' ' ')"
 
 if [ "$RC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAILED'; then
   # Persist possible delivery before contacting Telegram. A killed sender is never replayed.
   record_delivery attempting 2>>"$LOG.err" || exit 1
-  RECEIPT="$(printf '%s' "$RESULT" | TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 2>>"$LOG.err")"
+  RECEIPT="$(printf '%s' "$RESULT" | send_alert 2>>"$LOG.err")"
   SEND_RC=$?
   if [ "$SEND_RC" -eq 0 ]; then
     if record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
@@ -103,7 +237,7 @@ if [ "$RC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FA
       exit 0
     fi
   else
-    [ "$SEND_RC" -eq 3 ] && DELIVERY_STATUS=uncertain || DELIVERY_STATUS=failed
+    DELIVERY_STATUS="$(send_status "$SEND_RC")"
     record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true
   fi
   RC=1
