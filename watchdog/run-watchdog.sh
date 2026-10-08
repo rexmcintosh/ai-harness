@@ -125,7 +125,14 @@ except Exception: print('1')" 2>/dev/null)"
 fi
 
 if [ "$DIRECT" = 1 ]; then
-  record_delivery attempting 2>>"$LOG.err" || exit 1
+  # Bookkeeping must not cost the page: if the pending record cannot be
+  # updated, send anyway, unrecorded. With no accepted record there is no
+  # cooldown, so the next run pages again: loud, never silent.
+  RECORDED=1
+  if ! record_delivery attempting 2>>"$LOG.err"; then
+    RECORDED=0
+    echo "[$TS] direct=1 delivery record unavailable; sending unrecorded" >> "$LOG"
+  fi
   DIRECT_TEXT="Watchdog alert ($NOW_HUMAN)
 $REPORT
 
@@ -134,17 +141,23 @@ $REPORT
   SEND_RC=$?
   if [ "$SEND_RC" -ne 0 ]; then
     [ "$SEND_RC" -eq 3 ] && DELIVERY_STATUS=uncertain || DELIVERY_STATUS=failed
-    record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true
+    [ "$RECORDED" = 1 ] && { record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true; }
     echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct send $DELIVERY_STATUS (tg-send rc=$SEND_RC)\"" >> "$LOG"
     echo "FAILED to deliver direct watchdog alert (tg-send rc=$SEND_RC)" >&2
     exit 1
   fi
-  if ! record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
+  if [ "$RECORDED" = 1 ] && ! record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
     echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct alert sent; receipt not recorded\"" >> "$LOG"
     exit 1
   fi
   echo "[$TS] rc=0 escalate=1 direct=1 result=\"SENT direct $(printf '%s' "$REPORT" | head -1 | cut -c1-60)\"" >> "$LOG"
 
+  if [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
+    # No bounded runner: skip the narrative rather than hold run.lock.
+    echo "[$TS] narrative=unavailable no timeout(1)" >> "$LOG"
+    echo "escalated + provider accepted direct notification."
+    exit 0
+  fi
   RESULT="$(investigate)"
   IRC=$?
   if [ "$IRC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -qE '^(FAILED|PARSE_ERROR)'; then

@@ -60,7 +60,7 @@ def test_wrapper_retains_failed_delivery_without_suppression(tmp_path):
 # --- MeetTrack alerts go to Telegram without waiting on the investigator ----
 
 def run_meet_wrapper(tmp_path: Path, *, fired_name="meets.liveness", send_rc=0,
-                     claude_script=None, json_line=True):
+                     claude_script=None, json_line=True, extra_env=None):
     pending = tmp_path / "pending.json"
     fired = [{"name": fired_name, "level": "crit",
               "summary": "1 live meet writer(s) stopped ticking", "evidence": ""}]
@@ -102,6 +102,7 @@ def run_meet_wrapper(tmp_path: Path, *, fired_name="meets.liveness", send_rc=0,
         "WATCHDOG_CLAUDE_TIMEOUT": "5",
         "WATCHDOG_CLAUDE_KILL_AFTER": "2",
     })
+    env.update(extra_env or {})
     result = subprocess.run([str(SCRIPT)], env=env, text=True, capture_output=True)
     messages = [p.read_text() for p in sorted(sent.iterdir())]
     log = (tmp_path / "logs" / "runs.log").read_text()
@@ -205,3 +206,34 @@ def test_a_term_ignoring_investigator_is_killed(tmp_path):
     result, pending, messages, log, _ = run_meet_wrapper(tmp_path, claude_script=stubborn)
     assert result.returncode == 0 and len(messages) == 1 and not pending.exists()
     assert time.monotonic() - t0 < 20          # 5 s timeout + 2 s kill grace
+
+
+def test_a_broken_delivery_record_still_pages(tmp_path):
+    # The pending record cannot be written (its directory is missing): the
+    # alert still goes out, unrecorded, so the next run pages again.
+    result, _, messages, log, _ = run_meet_wrapper(
+        tmp_path, claude_script=LIMIT_HIT,
+        extra_env={"WATCHDOG_PENDING": str(tmp_path / "missing" / "pending.json")})
+    assert result.returncode == 0
+    assert len(messages) == 1 and "meets.liveness" in messages[0]
+    assert "sending unrecorded" in log
+    assert not (tmp_path / "state.json").exists()     # no cooldown committed
+
+
+def test_without_timeout_the_narrative_is_skipped_not_run_uncapped(tmp_path):
+    # PATH without coreutils timeout(1): keep the tools the wrapper needs.
+    import shutil
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in ("bash", "python3", "flock", "grep", "sed", "head", "cut", "tr",
+                 "date", "find", "sort", "cat", "mkdir", "ls", "wc", "dirname"):
+        found = shutil.which(tool)
+        if found:
+            (bindir / tool).symlink_to(found)
+    calls = tmp_path / "claude-calls"
+    result, pending, messages, log, _ = run_meet_wrapper(
+        tmp_path, extra_env={"PATH": str(bindir)})
+    assert result.returncode == 0
+    assert len(messages) == 1 and not pending.exists()
+    assert "narrative=unavailable no timeout(1)" in log
+    assert not calls.exists()
