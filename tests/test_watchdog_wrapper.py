@@ -6,6 +6,20 @@ from pathlib import Path
 import pytest
 
 
+def _gnu_timeout() -> bool:
+    try:
+        return subprocess.run(["timeout", "--kill-after=1", "5", "true"],
+                              capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+# Tests that need the investigator to run: without a usable timeout(1) the
+# wrapper correctly takes the direct-only path, so they would not apply.
+needs_timeout = pytest.mark.skipif(not _gnu_timeout(),
+                                   reason="needs timeout(1) with --kill-after")
+
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "watchdog" / "run-watchdog.sh"
 
@@ -115,6 +129,7 @@ LIMIT_HIT = ("#!/usr/bin/env bash\n"
              "printf '{\"result\":\"You have hit your weekly limit\"}\\n'\nexit 1\n")
 
 
+@needs_timeout
 def test_a_meet_alert_reaches_telegram_when_the_model_is_out_of_capacity(tmp_path):
     result, pending, messages, log, _ = run_meet_wrapper(tmp_path, claude_script=LIMIT_HIT)
     assert result.returncode == 0
@@ -125,6 +140,7 @@ def test_a_meet_alert_reaches_telegram_when_the_model_is_out_of_capacity(tmp_pat
     assert "direct=1" in log and "narrative=unavailable rc=1" in log
 
 
+@needs_timeout
 def test_the_meet_alert_goes_first_and_the_narrative_follows(tmp_path):
     result, _, messages, log, calls = run_meet_wrapper(tmp_path)
     assert result.returncode == 0
@@ -134,6 +150,7 @@ def test_the_meet_alert_goes_first_and_the_narrative_follows(tmp_path):
     assert "narrative=sent" in log
 
 
+@needs_timeout
 def test_a_hung_investigator_cannot_hold_the_alert(tmp_path):
     hang = "#!/usr/bin/env bash\nsleep 30\n"
     env_timeout = run_meet_wrapper(tmp_path, claude_script=hang)
@@ -165,6 +182,7 @@ def test_a_failed_precheck_also_goes_direct(tmp_path):
     assert len(messages) == 1 and "pre-check failed" in messages[0]
 
 
+@needs_timeout
 def test_non_meet_alerts_keep_the_investigator_path(tmp_path):
     result, pending, messages, log, calls = run_meet_wrapper(tmp_path, fired_name="disk")
     assert result.returncode == 0
@@ -201,6 +219,7 @@ def test_unreadable_precheck_json_fails_towards_the_direct_path(tmp_path):
     assert "direct=1" in (tmp_path / "logs" / "runs.log").read_text()
 
 
+@needs_timeout
 def test_a_term_ignoring_investigator_is_killed(tmp_path):
     stubborn = "#!/usr/bin/env bash\ntrap '' TERM\nsleep 60\n"
     import time
@@ -284,6 +303,7 @@ def test_a_timeout_without_kill_after_counts_as_no_bounded_runner(tmp_path):
     assert "investigator=skipped no usable timeout(1)" in log
 
 
+@needs_timeout
 def test_the_narrative_runs_after_run_lock_is_released(tmp_path):
     # While the narrative runs, a new watchdog pass must be able to take
     # run.lock: the fake investigator tries exactly that.
@@ -300,6 +320,7 @@ def test_the_narrative_runs_after_run_lock_is_released(tmp_path):
 
 
 @pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="needs procfs")
+@needs_timeout
 def test_the_investigator_never_inherits_a_lock_descriptor(tmp_path):
     # A model process that outlives a timeout kill must not keep any lock.
     fds = tmp_path / "fds"
@@ -315,6 +336,7 @@ def test_the_investigator_never_inherits_a_lock_descriptor(tmp_path):
         assert not {"8", "9"} & open_fds, (name, open_fds)
 
 
+@needs_timeout
 def test_a_second_narrative_is_skipped_while_one_still_runs(tmp_path):
     import fcntl
     (tmp_path / "logs").mkdir()
@@ -325,3 +347,41 @@ def test_a_second_narrative_is_skipped_while_one_still_runs(tmp_path):
     assert len(messages) == 1 and not pending.exists()   # the alert still went
     assert not calls.exists()
     assert "narrative=skipped previous narrative still running" in log
+
+
+@needs_timeout
+@pytest.mark.parametrize("fired_name", ["meets.liveness", "disk"])
+def test_a_hung_sender_is_capped_and_counts_as_uncertain(tmp_path, fired_name):
+    # tg-send normally caps itself at 30 s; if it ever hangs anyway, the
+    # wrapper's own cap releases run.lock, and the alert (which may already
+    # have been accepted) is recorded uncertain: never replayed.
+    import time
+    pending = tmp_path / "pending.json"
+    fired = [{"name": fired_name, "level": "crit", "summary": "x", "evidence": ""}]
+    pending.write_text(json.dumps({
+        "version": 1, "attempt_id": "attempt-1", "detected_at": 1, "fired": fired,
+        "candidate_suppression_state": {fired_name: {"level": "crit", "ts": 1}},
+        "delivery": {"status": "pending"},
+    }))
+    payload = json.dumps({"escalate": True, "attempt_id": "attempt-1", "fired": fired})
+    precheck = executable(tmp_path / "precheck",
+                          f"#!/usr/bin/env bash\nprintf '%s\\n' x {json.dumps('WATCHDOG_JSON:' + payload)}\n")
+    claude = executable(tmp_path / "claude",
+                        "#!/usr/bin/env bash\nprintf '{\"result\":\"diagnosis\"}\\n'\n")
+    sender = executable(tmp_path / "tg-send", "#!/usr/bin/env bash\ncat >/dev/null\nsleep 60\n")
+    env = os.environ.copy()
+    env.update({
+        "WATCHDOG_PRECHECK_CMD": str(precheck), "WATCHDOG_CLAUDE_BIN": str(claude),
+        "WATCHDOG_TG_SEND": str(sender), "WATCHDOG_LOG_DIR": str(tmp_path / "logs"),
+        "WATCHDOG_ENV_FILE": str(tmp_path / "missing-env"),
+        "WATCHDOG_STATE": str(tmp_path / "state.json"), "WATCHDOG_PENDING": str(pending),
+        "WATCHDOG_DELIVERY_LAST": str(tmp_path / "last.json"),
+        "WATCHDOG_METRICS": str(tmp_path / "metrics.json"),
+        "WATCHDOG_CLAUDE_TIMEOUT": "5", "WATCHDOG_SEND_TIMEOUT": "2",
+    })
+    t0 = time.monotonic()
+    result = subprocess.run([str(SCRIPT)], env=env, text=True, capture_output=True)
+    assert time.monotonic() - t0 < 20
+    assert result.returncode == 1
+    assert json.loads(pending.read_text())["delivery"]["status"] == "uncertain"
+    assert not (tmp_path / "state.json").exists()

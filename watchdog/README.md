@@ -120,6 +120,10 @@ support it, the investigator never runs: every alert, MeetTrack or not, goes out
 the direct path (`investigator=skipped no usable timeout(1)` in `logs/runs.log`), with
 no narrative.
 
+Every alert send is capped too: `bin/tg-send` keeps its own 30 s request budget, and
+the wrapper wraps it in `timeout` (`WATCHDOG_SEND_TIMEOUT`, default 60 s). A capped
+send may already have been accepted, so it is recorded `uncertain` and never replayed.
+
 ## Architecture
 
 - `triage.py` — failure checks: pure functions over collected text → `CheckStatus`.

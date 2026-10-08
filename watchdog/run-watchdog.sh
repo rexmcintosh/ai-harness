@@ -104,6 +104,23 @@ if command -v timeout >/dev/null 2>&1 && \
   TIMEOUT_CMD=(timeout --kill-after="$KILL_AFTER" "$CLAUDE_TIMEOUT")
 fi
 
+# tg-send bounds itself to a 30 s request budget; this outer cap is a second
+# guard, so a hung sender cannot hold run.lock either. A capped send may
+# already have been accepted, so it counts as uncertain (never replayed),
+# like tg-send's own rc 3.
+SEND_TIMEOUT="${WATCHDOG_SEND_TIMEOUT:-60}"
+send_alert() {
+  if [ ${#TIMEOUT_CMD[@]} -gt 0 ]; then
+    TG_SEND_RECEIPT_OUTPUT=1 timeout --kill-after=5 "$SEND_TIMEOUT" \
+      "$TG_SEND" "$CHAT_ID" - 9>&-
+  else
+    TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 9>&-
+  fi
+}
+send_status() {
+  case "$1" in 3|124|137) echo uncertain ;; *) echo failed ;; esac
+}
+
 # Called only when TIMEOUT_CMD is set. The model process gets neither lock
 # descriptor (8: narrative.lock, 9: run.lock), so nothing it leaves behind
 # after a timeout kill can keep holding either lock.
@@ -157,10 +174,10 @@ if [ "$DIRECT" = 1 ]; then
 $REPORT
 
 $DIRECT_NOTE"
-  RECEIPT="$(printf '%s' "$DIRECT_TEXT" | TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 2>>"$LOG.err")"
+  RECEIPT="$(printf '%s' "$DIRECT_TEXT" | send_alert 2>>"$LOG.err")"
   SEND_RC=$?
   if [ "$SEND_RC" -ne 0 ]; then
-    [ "$SEND_RC" -eq 3 ] && DELIVERY_STATUS=uncertain || DELIVERY_STATUS=failed
+    DELIVERY_STATUS="$(send_status "$SEND_RC")"
     [ "$RECORDED" = 1 ] && { record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true; }
     echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct send $DELIVERY_STATUS (tg-send rc=$SEND_RC)\"" >> "$LOG"
     echo "FAILED to deliver direct watchdog alert (tg-send rc=$SEND_RC)" >&2
@@ -211,7 +228,7 @@ RESULT_1LINE="$(printf '%s' "$RESULT" | tr '\n' ' ')"
 if [ "$RC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FAILED'; then
   # Persist possible delivery before contacting Telegram. A killed sender is never replayed.
   record_delivery attempting 2>>"$LOG.err" || exit 1
-  RECEIPT="$(printf '%s' "$RESULT" | TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 2>>"$LOG.err")"
+  RECEIPT="$(printf '%s' "$RESULT" | send_alert 2>>"$LOG.err")"
   SEND_RC=$?
   if [ "$SEND_RC" -eq 0 ]; then
     if record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
@@ -220,7 +237,7 @@ if [ "$RC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -q '^FA
       exit 0
     fi
   else
-    [ "$SEND_RC" -eq 3 ] && DELIVERY_STATUS=uncertain || DELIVERY_STATUS=failed
+    DELIVERY_STATUS="$(send_status "$SEND_RC")"
     record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true
   fi
   RC=1
