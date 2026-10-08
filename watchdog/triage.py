@@ -317,7 +317,7 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
     if not racing_start <= local.hour < racing_end:
         return CheckStatus("meets.liveness", "ok", "outside racing hours")
     today = local.date().isoformat()
-    late, worst = [], 0.0
+    late = []
     for r in rows:
         if r.get("ingest_status") != "polling" or not _live_today(r, today):
             continue
@@ -329,18 +329,19 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
         age_min = (now_epoch - measured) / 60
         if age_min >= tick_warn_min:
             name = r.get("name") or r.get("sr_meet_id")
-            late.append(f"{r.get('sr_meet_id')} {name} last tick {age_min:.0f}m ago")
-            worst = max(worst, age_min)
+            late.append((age_min, f"{r.get('sr_meet_id')} {name} "
+                                  f"last tick {age_min:.0f}m ago"))
     if not late:
         return CheckStatus("meets.liveness", "ok", "live meet writers ticking (or none live)")
-    level = "crit" if worst >= tick_crit_min else "warn"
+    late.sort(reverse=True)                 # worst first, so truncation keeps it
+    level = "crit" if late[0][0] >= tick_crit_min else "warn"
     return CheckStatus("meets.liveness", level,
                        f"{len(late)} live meet writer(s) stopped ticking",
-                       evidence="\n".join(late[:5]))
+                       evidence="\n".join(line for _age, line in late[:5]))
 
 
 def check_meet_freshness(rows, now_epoch, *,
-                         stale_warn_min: int = 20, stale_crit_min: int = 75,
+                         stale_warn_min: int = 30, stale_crit_min: int = 75,
                          launch_overdue_min: int = 30,
                          coverage_gap_warn: int = 3, coverage_gap_pct: int = 15,
                          coverage_max_age_min: int | None = None,

@@ -411,3 +411,31 @@ def test_a_backfilling_row_is_not_a_ticking_writer():
     row = _pdf_writer(now, last_min=5, tick_min=90)
     row["ingest_status"] = "backfilling"
     assert check_meet_liveness([row], now).level == "ok"
+
+
+def test_a_writer_with_counters_but_no_tick_stamp_keeps_the_freshness_floor():
+    # Liveness skips a row it cannot time; such a row is NOT healthy by
+    # default: with no coverage_at its counters are no evidence, so the
+    # ungated freshness rule still applies.
+    now = _now(15)
+    row = _live_row(now, "polling", last_min=80, events_published=36,
+                    events_with_results=36, last_tick_errors=0, coverage_at=None)
+    assert check_meet_liveness([row], now).level == "ok"
+    assert check_meet_freshness([row], now).level == "crit"
+
+
+def test_liveness_evidence_lists_the_worst_writer_first():
+    now = _now(15)
+    rows = []
+    for i, age in enumerate([12, 45, 15, 11, 13, 14]):
+        r = _pdf_writer(now, last_min=5, tick_min=age)
+        r["sr_meet_id"], r["name"] = str(i), f"M{i}"
+        rows.append(r)
+    s = check_meet_liveness(rows, now)
+    assert s.level == "crit"
+    assert s.evidence.splitlines()[0].startswith("1 M1 last tick 45m")
+
+
+def test_the_function_defaults_match_the_retuned_config():
+    now = _now(15)
+    assert check_meet_freshness([_live_row(now, "polling", last_min=25)], now).level == "ok"

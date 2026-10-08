@@ -236,7 +236,7 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
             if rows is not None:
                 out.append(check_meet_freshness(
                     rows, now_epoch,
-                    stale_warn_min=mf.get("stale_warn_min", 20),
+                    stale_warn_min=mf.get("stale_warn_min", 30),
                     stale_crit_min=mf.get("stale_crit_min", 75),
                     launch_overdue_min=mf.get("launch_overdue_min", 30),
                     coverage_gap_warn=mf.get("coverage_gap_warn", 3),
