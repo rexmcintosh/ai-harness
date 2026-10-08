@@ -25,6 +25,7 @@ from .triage import (
     check_cron_log,
     check_disk,
     check_log_coverage,
+    check_meet_clock,
     check_meet_freshness,
     check_meet_liveness,
     check_orphan_processes,
@@ -249,6 +250,9 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
                     rows, now_epoch,
                     tick_warn_min=mf.get("tick_warn_min", 10),
                     tick_crit_min=mf.get("tick_crit_min", 30)))
+                # Both rules above fall back to UTC without Europe/Lisbon;
+                # that fallback alerts instead of passing silently.
+                out.append(check_meet_clock())
 
     return out, new_metrics
 

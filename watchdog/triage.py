@@ -9,6 +9,7 @@ data and free of the environment.
 from __future__ import annotations
 
 import re
+import sys
 
 from jev.redact import strip_json_data_lists
 from dataclasses import dataclass, field
@@ -257,13 +258,51 @@ def _coverage_complaint(row, label, gap_warn, gap_pct, now_epoch, max_age_min):
     return None
 
 
-def _lisbon(now_epoch):
-    """Wall-clock time in Europe/Lisbon (the registry is POR-scoped)."""
+def _lisbon_zone():
+    """(ZoneInfo('Europe/Lisbon'), None), or (None, why it failed)."""
     try:
         from zoneinfo import ZoneInfo
-        return datetime.fromtimestamp(now_epoch, tz=ZoneInfo("Europe/Lisbon"))
-    except Exception:
+        return ZoneInfo("Europe/Lisbon"), None
+    except Exception as e:      # no tzdata, broken install, ...
+        return None, f"{type(e).__name__}: {e}"
+
+
+def _lisbon(now_epoch):
+    """Wall-clock time in Europe/Lisbon (the registry is POR-scoped).
+
+    Without the zone the meet rules still run, on UTC (racing hours shift by
+    one hour in summer), and say so: a line on stderr (the wrapper keeps it in
+    runs.log.err) here, and a 'meets.clock' alert from check_meet_clock."""
+    zone, err = _lisbon_zone()
+    if zone is None:
+        print(f"watchdog: Europe/Lisbon unavailable ({err}); "
+              f"meet checks use UTC", file=sys.stderr)
         return datetime.fromtimestamp(now_epoch, tz=timezone.utc)
+    return datetime.fromtimestamp(now_epoch, tz=zone)
+
+
+def check_meet_clock() -> CheckStatus:
+    """warn when Europe/Lisbon cannot be resolved: every meet rule then reads
+    racing hours and 'today' in UTC instead, which must not be silent."""
+    zone, err = _lisbon_zone()
+    if zone is None:
+        return CheckStatus("meets.clock", "warn",
+                           "Europe/Lisbon timezone unavailable: meet checks "
+                           "read racing hours and dates as UTC",
+                           evidence=err or "")
+    return CheckStatus("meets.clock", "ok", "Europe/Lisbon resolved")
+
+
+# A coverage_at further ahead of the watchdog's clock than this is not a
+# fresh tick: it is a clock or data fault, and taking it as fresh would hide a
+# dead writer until the bad stamp falls into the past. Small skew is normal.
+FUTURE_SKEW_MIN = 5
+
+
+def _future_min(measured, now_epoch):
+    """Minutes `measured` lies ahead of now, if beyond FUTURE_SKEW_MIN; else None."""
+    ahead = (measured - now_epoch) / 60
+    return ahead if ahead > FUTURE_SKEW_MIN else None
 
 
 def _live_today(row, today):
@@ -288,6 +327,8 @@ def _results_outstanding(row, now_epoch, max_age_min):
     measured = _iso_epoch(row.get("coverage_at"))
     if measured is None or (now_epoch - measured) / 60 > max_age_min:
         return True
+    if _future_min(measured, now_epoch) is not None:
+        return True             # a stamp from the future is not a fresh reading
     return published > covered
 
 
@@ -311,13 +352,15 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
     never live by date, and it does not tick. The Lenex and fragment writers
     stamp coverage_at only when results change, so for them the freshness rule
     stays the floor. Racing hours only (Europe/Lisbon), like the other meet
-    rules.
+    rules. A coverage_at more than FUTURE_SKEW_MIN minutes ahead of now is a
+    clock or data fault, not a fresh tick: it warns (crit if a stopped writer
+    is also listed), since it would otherwise hide a dead writer.
     """
     local = _lisbon(now_epoch)
     if not racing_start <= local.hour < racing_end:
         return CheckStatus("meets.liveness", "ok", "outside racing hours")
     today = local.date().isoformat()
-    late = []
+    late, future = [], []
     for r in rows:
         if r.get("ingest_status") != "polling" or not _live_today(r, today):
             continue
@@ -326,18 +369,30 @@ def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
         measured = _iso_epoch(r.get("coverage_at"))
         if measured is None:
             continue
+        name = r.get("name") or r.get("sr_meet_id")
+        ahead = _future_min(measured, now_epoch)
+        if ahead is not None:
+            future.append((ahead, f"{r.get('sr_meet_id')} {name} last tick "
+                                  f"stamped {ahead:.0f}m in the future"))
+            continue
         age_min = (now_epoch - measured) / 60
         if age_min >= tick_warn_min:
-            name = r.get("name") or r.get("sr_meet_id")
             late.append((age_min, f"{r.get('sr_meet_id')} {name} "
                                   f"last tick {age_min:.0f}m ago"))
-    if not late:
+    if not late and not future:
         return CheckStatus("meets.liveness", "ok", "live meet writers ticking (or none live)")
     late.sort(reverse=True)                 # worst first, so truncation keeps it
-    level = "crit" if late[0][0] >= tick_crit_min else "warn"
-    return CheckStatus("meets.liveness", level,
-                       f"{len(late)} live meet writer(s) stopped ticking",
-                       evidence="\n".join(line for _age, line in late[:5]))
+    future.sort(reverse=True)
+    level = "crit" if late and late[0][0] >= tick_crit_min else "warn"
+    parts = []
+    if late:
+        parts.append(f"{len(late)} live meet writer(s) stopped ticking")
+    if future:
+        parts.append(f"{len(future)} with a tick stamp in the future "
+                     f"(clock or data fault)")
+    lines = [line for _age, line in late] + [line for _a, line in future]
+    return CheckStatus("meets.liveness", level, "; ".join(parts),
+                       evidence="\n".join(lines[:5]))
 
 
 def check_meet_freshness(rows, now_epoch, *,

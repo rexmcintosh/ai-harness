@@ -439,3 +439,80 @@ def test_liveness_evidence_lists_the_worst_writer_first():
 def test_the_function_defaults_match_the_retuned_config():
     now = _now(15)
     assert check_meet_freshness([_live_row(now, "polling", last_min=25)], now).level == "ok"
+
+
+# --- a tick stamp from the future is a fault, not a fresh tick ---------------
+
+def test_a_tick_stamp_far_in_the_future_warns_instead_of_reading_fresh():
+    now = _now(15)
+    row = _pdf_writer(now, last_min=5, tick_min=-20)     # 20 min ahead
+    s = check_meet_liveness([row], now)
+    assert s.level == "warn"
+    assert "in the future" in s.summary
+    assert "1 Meet A last tick stamped 20m in the future" in s.evidence
+
+
+def test_small_clock_skew_into_the_future_is_still_fresh():
+    now = _now(15)
+    row = _pdf_writer(now, last_min=5, tick_min=-2)
+    assert check_meet_liveness([row], now).level == "ok"
+
+
+def test_a_future_stamp_does_not_soften_a_stopped_writer():
+    now = _now(15)
+    dead = _pdf_writer(now, last_min=5, tick_min=40)
+    skewed = _pdf_writer(now, last_min=5, tick_min=-30)
+    dead["sr_meet_id"], skewed["sr_meet_id"] = "1", "2"
+    s = check_meet_liveness([skewed, dead], now)
+    assert s.level == "crit"
+    assert "1 live meet writer(s) stopped ticking" in s.summary
+    assert s.evidence.splitlines()[0].startswith("1 Meet A last tick 40m ago")
+    assert "2 Meet A last tick stamped 30m in the future" in s.evidence
+
+
+def test_future_counters_do_not_quiet_the_freshness_rule():
+    # "Every published event has results", stamped from the future, is not
+    # a fresh reading: the plain 30 / 75 floor applies again.
+    now = _now(15)
+    row = _pdf_writer(now, last_min=35, tick_min=-60)
+    assert check_meet_freshness([row], now, **RETUNED).level == "warn"
+    ok = _pdf_writer(now, last_min=35, tick_min=-2)
+    assert check_meet_freshness([ok], now, **RETUNED).level == "ok"
+
+
+# --- a missing Europe/Lisbon zone is visible, never a silent UTC ------------
+
+def _no_lisbon(monkeypatch):
+    from . import triage
+    monkeypatch.setattr(triage, "_lisbon_zone",
+                        lambda: (None, "ZoneInfoNotFoundError: no tzdata"))
+
+
+def test_a_missing_lisbon_zone_alerts_on_its_own_check(monkeypatch):
+    from .triage import check_meet_clock
+    assert check_meet_clock().level == "ok"
+    _no_lisbon(monkeypatch)
+    s = check_meet_clock()
+    assert s.name == "meets.clock" and s.level == "warn"
+    assert "UTC" in s.summary and "no tzdata" in s.evidence
+
+
+def test_the_utc_fallback_is_logged_and_the_meet_rules_still_run(monkeypatch, capsys):
+    _no_lisbon(monkeypatch)
+    now = _now(10)
+    row = _pdf_writer(now, last_min=40, tick_min=31)
+    assert check_meet_liveness([row], now).level == "crit"
+    assert "Europe/Lisbon unavailable" in capsys.readouterr().err
+
+
+def test_collect_metrics_reports_the_clock_check(monkeypatch):
+    now = _now(10)
+    row = _pdf_writer(now, last_min=5, tick_min=1)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setattr(run, "_supabase_count", lambda *a, **k: None)
+    monkeypatch.setattr(run, "_meet_registry_rows", lambda *a, **k: [row])
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    _no_lisbon(monkeypatch)
+    out, _ = run.collect_metrics(int(now), {})
+    by_name = {s.name: s for s in out}
+    assert by_name["meets.clock"].level == "warn"
