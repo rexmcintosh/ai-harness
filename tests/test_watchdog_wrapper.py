@@ -237,3 +237,69 @@ def test_without_timeout_the_narrative_is_skipped_not_run_uncapped(tmp_path):
     assert len(messages) == 1 and not pending.exists()
     assert "narrative=unavailable no timeout(1)" in log
     assert not calls.exists()
+
+
+def _no_timeout_path(tmp_path: Path) -> str:
+    import shutil
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    for tool in ("bash", "python3", "flock", "grep", "sed", "head", "cut", "tr",
+                 "date", "find", "sort", "cat", "mkdir", "ls", "wc", "dirname"):
+        found = shutil.which(tool)
+        if found and not (bindir / tool).exists():
+            (bindir / tool).symlink_to(found)
+    return str(bindir)
+
+
+def test_a_non_meet_alert_without_timeout_skips_the_investigator_and_pages(tmp_path):
+    # No bounded runner: the investigator would run uncapped while holding
+    # run.lock, so it does not run at all; the plain report goes direct.
+    result, pending, messages, log, calls = run_meet_wrapper(
+        tmp_path, fired_name="disk", extra_env={"PATH": _no_timeout_path(tmp_path)})
+    assert result.returncode == 0
+    assert len(messages) == 1 and "Watchdog alert" in messages[0]
+    assert "a diagnosis may follow" not in messages[0]
+    assert not calls.exists() and not pending.exists()
+    assert "investigator=skipped no timeout(1)" in log and "direct=1" in log
+
+
+def test_the_narrative_runs_after_run_lock_is_released(tmp_path):
+    # While the narrative runs, a new watchdog pass must be able to take
+    # run.lock: the fake investigator tries exactly that.
+    probe = tmp_path / "lock-probe"
+    lock = tmp_path / "logs" / "run.lock"
+    script = ("#!/usr/bin/env bash\n"
+              f"if flock -n {lock} true; then echo free > {probe}; "
+              f"else echo held > {probe}; fi\n"
+              "printf '{\"result\":\"diagnosis\"}\\n'\n")
+    result, _, messages, log, _ = run_meet_wrapper(tmp_path, claude_script=script)
+    assert result.returncode == 0 and len(messages) == 2
+    assert probe.read_text().strip() == "free"
+    assert "narrative=sent" in log
+
+
+def test_the_investigator_never_inherits_a_lock_descriptor(tmp_path):
+    # A model process that outlives a timeout kill must not keep any lock.
+    fds = tmp_path / "fds"
+    script = ("#!/usr/bin/env bash\n"
+              f"ls /proc/$$/fd > {fds}\n"
+              "printf '{\"result\":\"diagnosis\"}\\n'\n")
+    for name in ("meets.liveness", "disk"):
+        sub = tmp_path / name
+        sub.mkdir()
+        result, *_ = run_meet_wrapper(sub, fired_name=name, claude_script=script)
+        assert result.returncode == 0
+        open_fds = set(fds.read_text().split())
+        assert not {"8", "9"} & open_fds, (name, open_fds)
+
+
+def test_a_second_narrative_is_skipped_while_one_still_runs(tmp_path):
+    import fcntl
+    (tmp_path / "logs").mkdir()
+    with open(tmp_path / "logs" / "narrative.lock", "w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result, pending, messages, log, calls = run_meet_wrapper(tmp_path)
+    assert result.returncode == 0
+    assert len(messages) == 1 and not pending.exists()   # the alert still went
+    assert not calls.exists()
+    assert "narrative=skipped previous narrative still running" in log

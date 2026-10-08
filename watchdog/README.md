@@ -105,11 +105,18 @@ its result through `bin/tg-send`; the agent has no send tool.
 
 **MeetTrack alerts do not wait on the model.** When a `meets.*` check fires, or the
 pre-check itself fails, the wrapper sends the plain report straight through
-`bin/tg-send` and records that receipt as the delivery. The investigator then runs
-(capped by `WATCHDOG_CLAUDE_TIMEOUT`, default 600 s) and its narrative follows as a
-second message, best effort: `narrative=sent|send-failed|unavailable` in `logs/runs.log`.
+`bin/tg-send` and records that receipt as the delivery. The wrapper then releases
+`logs/run.lock`, so the next watchdog run is never held up by the narrative. The
+investigator runs under its own `logs/narrative.lock` (a second narrative is skipped
+while one still runs), capped by `WATCHDOG_CLAUDE_TIMEOUT` (default 600 s) plus a
+30 s kill grace, and its narrative follows as a second message, best effort:
+`narrative=sent|send-failed|unavailable|skipped` in `logs/runs.log`.
 Every other alert keeps the investigator-first path. (On 3-5 Oct 2026 every
 investigator run hit the weekly usage limit, so no alert left the box all weekend.)
+
+The investigator only runs under coreutils `timeout(1)`. When `timeout` is not on
+`PATH` it never runs: every alert, MeetTrack or not, goes out on the direct path
+(`investigator=skipped no timeout(1)` in `logs/runs.log`), with no narrative.
 
 ## Architecture
 

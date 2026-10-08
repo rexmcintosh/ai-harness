@@ -93,17 +93,21 @@ record_delivery() {
 }
 
 # timeout(1) is coreutils; KILL 30 s after TERM so a TERM-ignoring child cannot
-# hold run.lock. Without it the investigator runs uncapped, as before.
+# hold run.lock. Without it there is no bounded runner, and the investigator
+# never runs at all: every alert takes the direct path below instead.
 TIMEOUT_CMD=()
 command -v timeout >/dev/null 2>&1 && \
   TIMEOUT_CMD=(timeout --kill-after="${WATCHDOG_CLAUDE_KILL_AFTER:-30}" "$CLAUDE_TIMEOUT")
 
+# Called only when TIMEOUT_CMD is set. The model process gets neither lock
+# descriptor (8: narrative.lock, 9: run.lock), so nothing it leaves behind
+# after a timeout kill can keep holding either lock.
 investigate() {
   "${TIMEOUT_CMD[@]}" "$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
-    --dangerously-skip-permissions --output-format json 2>>"$LOG.err" \
+    --dangerously-skip-permissions --output-format json 2>>"$LOG.err" 8>&- 9>&- \
     | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('result','').strip())
-except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null
+except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null 8>&- 9>&-
 }
 
 # --- MeetTrack: the alert itself never waits on a model --------------------
@@ -123,6 +127,12 @@ try: print('1' if any(str(f.get('name','')).startswith('meets.') for f in json.l
 except Exception: print('1')" 2>/dev/null)"
   [ "$DIRECT" = 0 ] || DIRECT=1     # empty (python itself failed) -> direct
 fi
+if [ "$DIRECT" = 0 ] && [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
+  # No bounded runner: an uncapped investigator could hold run.lock forever.
+  # Skip it and page the plain report directly instead.
+  echo "[$TS] investigator=skipped no timeout(1); sending direct" >> "$LOG"
+  DIRECT=1
+fi
 
 if [ "$DIRECT" = 1 ]; then
   # Bookkeeping must not cost the page: if the pending record cannot be
@@ -133,10 +143,15 @@ if [ "$DIRECT" = 1 ]; then
     RECORDED=0
     echo "[$TS] direct=1 delivery record unavailable; sending unrecorded" >> "$LOG"
   fi
+  if [ ${#TIMEOUT_CMD[@]} -gt 0 ]; then
+    DIRECT_NOTE="(sent without the AI investigator; a diagnosis may follow)"
+  else
+    DIRECT_NOTE="(sent without the AI investigator)"
+  fi
   DIRECT_TEXT="Watchdog alert ($NOW_HUMAN)
 $REPORT
 
-(sent without the AI investigator; a diagnosis may follow)"
+$DIRECT_NOTE"
   RECEIPT="$(printf '%s' "$DIRECT_TEXT" | TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 2>>"$LOG.err")"
   SEND_RC=$?
   if [ "$SEND_RC" -ne 0 ]; then
@@ -153,15 +168,26 @@ $REPORT
   echo "[$TS] rc=0 escalate=1 direct=1 result=\"SENT direct $(printf '%s' "$REPORT" | head -1 | cut -c1-60)\"" >> "$LOG"
 
   if [ ${#TIMEOUT_CMD[@]} -eq 0 ]; then
-    # No bounded runner: skip the narrative rather than hold run.lock.
+    # No bounded runner: skip the narrative rather than run it uncapped.
     echo "[$TS] narrative=unavailable no timeout(1)" >> "$LOG"
+    echo "escalated + provider accepted direct notification."
+    exit 0
+  fi
+  # The alert is sent and its delivery recorded: run.lock has nothing left to
+  # protect. Release it now, so the narrative (up to CLAUDE_TIMEOUT plus the
+  # kill grace) never delays the next watchdog run. The narrative takes its
+  # own lock instead; if an earlier narrative still runs, this one is skipped.
+  exec 9>&-
+  exec 8>"$LOG_DIR/narrative.lock"
+  if ! flock -n 8; then
+    echo "[$TS] narrative=skipped previous narrative still running" >> "$LOG"
     echo "escalated + provider accepted direct notification."
     exit 0
   fi
   RESULT="$(investigate)"
   IRC=$?
   if [ "$IRC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -qE '^(FAILED|PARSE_ERROR)'; then
-    if printf '%s' "$RESULT" | "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG.err"; then
+    if printf '%s' "$RESULT" | "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG.err" 8>&-; then
       echo "[$TS] narrative=sent" >> "$LOG"
     else
       echo "[$TS] narrative=send-failed" >> "$LOG"
