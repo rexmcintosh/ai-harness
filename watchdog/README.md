@@ -103,6 +103,14 @@ automatically. The last accepted provider receipt is retained in
 The investigator agent runs with `--allowedTools Read` only. The wrapper sends
 its result through `bin/tg-send`; the agent has no send tool.
 
+**MeetTrack alerts do not wait on the model.** When a `meets.*` check fires, or the
+pre-check itself fails, the wrapper sends the plain report straight through
+`bin/tg-send` and records that receipt as the delivery. The investigator then runs
+(capped by `WATCHDOG_CLAUDE_TIMEOUT`, default 600 s) and its narrative follows as a
+second message, best effort: `narrative=sent|send-failed|unavailable` in `logs/runs.log`.
+Every other alert keeps the investigator-first path. (On 3-5 Oct 2026 every
+investigator run hit the weekly usage limit, so no alert left the box all weekend.)
+
 ## Architecture
 
 - `triage.py` — failure checks: pure functions over collected text → `CheckStatus`.

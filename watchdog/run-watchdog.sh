@@ -11,6 +11,8 @@ LOG="$LOG_DIR/runs.log"
 CHAT_ID="7735693897"
 MODEL="haiku"
 CLAUDE_BIN="${WATCHDOG_CLAUDE_BIN:-$(command -v claude || echo /usr/bin/claude)}"
+# A hung investigator would hold run.lock and silence every later run.
+CLAUDE_TIMEOUT="${WATCHDOG_CLAUDE_TIMEOUT:-600}"
 TG_SEND="${WATCHDOG_TG_SEND:-$BASE/bin/tg-send}"
 ENV_FILE="${WATCHDOG_ENV_FILE:-/home/dev/projects/splash_poller/.env}"
 DRY_RUN=0
@@ -83,11 +85,67 @@ record_delivery() {
   PYTHONPATH="$BASE" python3 -m watchdog.run --record-delivery "$status" "$ATTEMPT_ID" ${receipt:+"$receipt"}
 }
 
-RESULT=$("$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
-  --dangerously-skip-permissions --output-format json 2>>"$LOG.err" \
-  | python3 -c "import json,sys
+investigate() {
+  timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT" --model "$MODEL" --allowedTools Read \
+    --dangerously-skip-permissions --output-format json 2>>"$LOG.err" \
+    | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('result','').strip())
-except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null)
+except Exception as e: print('PARSE_ERROR:'+str(e))" 2>/dev/null
+}
+
+# --- MeetTrack: the alert itself never waits on a model --------------------
+# 3-5 Oct 2026 (the Plovdiv rehearsal): every investigator run hit the weekly
+# usage limit, so nothing reached Telegram all weekend. When a meets.* check
+# fired, or the pre-check itself failed (then the meet checks are blind too),
+# the plain report goes straight to Telegram and that receipt is the delivery
+# record. The investigator's narrative follows as a best-effort second message:
+# its failure is logged, never retried, and never un-sends the alert.
+DIRECT=0
+if [ -z "$JSON_LINE" ]; then
+  DIRECT=1
+else
+  DIRECT="$(printf '%s' "$JSON_LINE" | python3 -c "import json,sys
+try: print('1' if any(str(f.get('name','')).startswith('meets.') for f in json.load(sys.stdin).get('fired') or []) else '0')
+except Exception: print('0')" 2>/dev/null)"
+fi
+
+if [ "$DIRECT" = 1 ]; then
+  record_delivery attempting 2>>"$LOG.err" || exit 1
+  DIRECT_TEXT="Watchdog alert ($NOW_HUMAN)
+$REPORT
+
+(sent without the AI investigator; a diagnosis may follow)"
+  RECEIPT="$(printf '%s' "$DIRECT_TEXT" | TG_SEND_RECEIPT_OUTPUT=1 "$TG_SEND" "$CHAT_ID" - 2>>"$LOG.err")"
+  SEND_RC=$?
+  if [ "$SEND_RC" -ne 0 ]; then
+    [ "$SEND_RC" -eq 3 ] && DELIVERY_STATUS=uncertain || DELIVERY_STATUS=failed
+    record_delivery "$DELIVERY_STATUS" 2>>"$LOG.err" || true
+    echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct send $DELIVERY_STATUS (tg-send rc=$SEND_RC)\"" >> "$LOG"
+    echo "FAILED to deliver direct watchdog alert (tg-send rc=$SEND_RC)" >&2
+    exit 1
+  fi
+  if ! record_delivery accepted "$RECEIPT" 2>>"$LOG.err"; then
+    echo "[$TS] rc=1 escalate=1 direct=1 result=\"direct alert sent; receipt not recorded\"" >> "$LOG"
+    exit 1
+  fi
+  echo "[$TS] rc=0 escalate=1 direct=1 result=\"SENT direct $(printf '%s' "$REPORT" | head -1 | cut -c1-60)\"" >> "$LOG"
+
+  RESULT="$(investigate)"
+  IRC=$?
+  if [ "$IRC" -eq 0 ] && [ -n "$RESULT" ] && ! printf '%s' "$RESULT" | grep -qE '^(FAILED|PARSE_ERROR)'; then
+    if printf '%s' "$RESULT" | "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG.err"; then
+      echo "[$TS] narrative=sent" >> "$LOG"
+    else
+      echo "[$TS] narrative=send-failed" >> "$LOG"
+    fi
+  else
+    echo "[$TS] narrative=unavailable rc=$IRC :: $(printf '%s' "$RESULT" | tr '\n' ' ' | cut -c1-80)" >> "$LOG"
+  fi
+  echo "escalated + provider accepted direct notification."
+  exit 0
+fi
+
+RESULT="$(investigate)"
 RC=$?
 RESULT_1LINE="$(printf '%s' "$RESULT" | tr '\n' ' ')"
 

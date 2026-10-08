@@ -55,3 +55,114 @@ def test_wrapper_retains_failed_delivery_without_suppression(tmp_path):
     assert result.returncode == 1
     assert not (tmp_path / "state.json").exists()
     assert json.loads(pending.read_text())["delivery"]["status"] == "failed"
+
+
+# --- MeetTrack alerts go to Telegram without waiting on the investigator ----
+
+def run_meet_wrapper(tmp_path: Path, *, fired_name="meets.liveness", send_rc=0,
+                     claude_script=None, json_line=True):
+    pending = tmp_path / "pending.json"
+    fired = [{"name": fired_name, "level": "crit",
+              "summary": "1 live meet writer(s) stopped ticking", "evidence": ""}]
+    pending.write_text(json.dumps({
+        "version": 1, "attempt_id": "attempt-1", "detected_at": 1,
+        "fired": fired,
+        "candidate_suppression_state": {fired_name: {"level": "crit", "ts": 1}},
+        "delivery": {"status": "pending"},
+    }))
+    payload = json.dumps({"escalate": True, "attempt_id": "attempt-1", "fired": fired})
+    report = "[CRIT] meets.liveness: 1 live meet writer(s) stopped ticking"
+    if json_line:
+        body = f"printf '%s\\n' {json.dumps(report)} {json.dumps('WATCHDOG_JSON:' + payload)}"
+    else:
+        body = "echo boom >&2; exit 1"
+    precheck = executable(tmp_path / "precheck", f"#!/usr/bin/env bash\n{body}\n")
+    calls = tmp_path / "claude-calls"
+    claude = executable(tmp_path / "claude", claude_script or (
+        f"#!/usr/bin/env bash\necho x >> {calls}\n"
+        "printf '{\"result\":\"diagnosis\"}\\n'\n"))
+    sent = tmp_path / "sent"
+    sent.mkdir()
+    receipt = '{"ok":true,"status":"accepted","chat_id":1,"message_ids":[9]}'
+    sender = executable(tmp_path / "tg-send", (
+        "#!/usr/bin/env bash\n"
+        f"n=$(ls {sent} | wc -l); cat > {sent}/$n.txt\n"
+        f"printf '{receipt}\\n'\nexit {send_rc}\n"))
+    env = os.environ.copy()
+    env.update({
+        "WATCHDOG_PRECHECK_CMD": str(precheck),
+        "WATCHDOG_CLAUDE_BIN": str(claude),
+        "WATCHDOG_TG_SEND": str(sender),
+        "WATCHDOG_LOG_DIR": str(tmp_path / "logs"),
+        "WATCHDOG_ENV_FILE": str(tmp_path / "missing-env"),
+        "WATCHDOG_STATE": str(tmp_path / "state.json"),
+        "WATCHDOG_PENDING": str(pending),
+        "WATCHDOG_DELIVERY_LAST": str(tmp_path / "last.json"),
+        "WATCHDOG_METRICS": str(tmp_path / "metrics.json"),
+        "WATCHDOG_CLAUDE_TIMEOUT": "5",
+    })
+    result = subprocess.run([str(SCRIPT)], env=env, text=True, capture_output=True)
+    messages = [p.read_text() for p in sorted(sent.iterdir())]
+    log = (tmp_path / "logs" / "runs.log").read_text()
+    return result, pending, messages, log, calls
+
+
+LIMIT_HIT = ("#!/usr/bin/env bash\n"
+             "printf '{\"result\":\"You have hit your weekly limit\"}\\n'\nexit 1\n")
+
+
+def test_a_meet_alert_reaches_telegram_when_the_model_is_out_of_capacity(tmp_path):
+    result, pending, messages, log, _ = run_meet_wrapper(tmp_path, claude_script=LIMIT_HIT)
+    assert result.returncode == 0
+    assert len(messages) == 1
+    assert "meets.liveness" in messages[0] and "without the AI investigator" in messages[0]
+    assert not pending.exists()                       # delivery recorded as accepted
+    assert json.loads((tmp_path / "state.json").read_text())["meets.liveness"]["level"] == "crit"
+    assert "direct=1" in log and "narrative=unavailable rc=1" in log
+
+
+def test_the_meet_alert_goes_first_and_the_narrative_follows(tmp_path):
+    result, _, messages, log, calls = run_meet_wrapper(tmp_path)
+    assert result.returncode == 0
+    assert len(messages) == 2
+    assert "meets.liveness" in messages[0]
+    assert messages[1].strip() == "diagnosis"
+    assert "narrative=sent" in log
+
+
+def test_a_hung_investigator_cannot_hold_the_alert(tmp_path):
+    hang = "#!/usr/bin/env bash\nsleep 30\n"
+    env_timeout = run_meet_wrapper(tmp_path, claude_script=hang)
+    result, pending, messages, log, _ = env_timeout
+    assert result.returncode == 0
+    assert len(messages) == 1 and not pending.exists()
+    assert "narrative=unavailable rc=124" in log
+
+
+def test_a_failed_direct_send_is_recorded_and_skips_the_investigator(tmp_path):
+    result, pending, messages, log, calls = run_meet_wrapper(tmp_path, send_rc=1)
+    assert result.returncode == 1
+    assert json.loads(pending.read_text())["delivery"]["status"] == "failed"
+    assert not (tmp_path / "state.json").exists()
+    assert not calls.exists()
+    assert "direct send failed" in log
+
+
+def test_an_uncertain_direct_send_is_never_replayed(tmp_path):
+    result, pending, _, _, _ = run_meet_wrapper(tmp_path, send_rc=3)
+    assert result.returncode == 1
+    assert json.loads(pending.read_text())["delivery"]["status"] == "uncertain"
+
+
+def test_a_failed_precheck_also_goes_direct(tmp_path):
+    result, _, messages, log, _ = run_meet_wrapper(tmp_path, json_line=False,
+                                                   claude_script=LIMIT_HIT)
+    assert result.returncode == 0
+    assert len(messages) == 1 and "pre-check failed" in messages[0]
+
+
+def test_non_meet_alerts_keep_the_investigator_path(tmp_path):
+    result, pending, messages, log, calls = run_meet_wrapper(tmp_path, fired_name="disk")
+    assert result.returncode == 0
+    assert messages == ["diagnosis"]
+    assert "direct=1" not in log and not pending.exists()
