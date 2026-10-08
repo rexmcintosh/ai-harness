@@ -25,7 +25,9 @@ from .triage import (
     check_cron_log,
     check_disk,
     check_log_coverage,
+    check_meet_clock,
     check_meet_freshness,
+    check_meet_liveness,
     check_orphan_processes,
     check_service_active,
     triage,
@@ -235,13 +237,22 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
             if rows is not None:
                 out.append(check_meet_freshness(
                     rows, now_epoch,
-                    stale_warn_min=mf.get("stale_warn_min", 20),
+                    stale_warn_min=mf.get("stale_warn_min", 30),
                     stale_crit_min=mf.get("stale_crit_min", 75),
                     launch_overdue_min=mf.get("launch_overdue_min", 30),
                     coverage_gap_warn=mf.get("coverage_gap_warn", 3),
                     coverage_gap_pct=mf.get("coverage_gap_pct", 15),
                     # Unset -> the counters inherit stale_warn_min.
                     coverage_max_age_min=mf.get("coverage_max_age_min")))
+                # Its own check name, so its alert and cooldown never hide
+                # behind a freshness alert that is already in crit.
+                out.append(check_meet_liveness(
+                    rows, now_epoch,
+                    tick_warn_min=mf.get("tick_warn_min", 10),
+                    tick_crit_min=mf.get("tick_crit_min", 30)))
+            # The meet rules fall back to UTC without Europe/Lisbon; that
+            # alerts instead of passing silently, registry read or not.
+            out.append(check_meet_clock())
 
     return out, new_metrics
 
