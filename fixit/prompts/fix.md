@@ -13,7 +13,7 @@ You are already checked out on that branch. The repo root is `{{BASE}}`.
    Do not refactor unrelated code, reformat files, or "improve" things nearby.
 2. **Test it.** If the codebase has tests, follow its TDD convention: add or adjust
    a test that fails before your fix and passes after. Run the relevant tests with
-   `python3 -m pytest tests/ -q --ignore=tests/loom` (this repo's suite) and make
+   `python3 -m pytest tests/ -q` (this repo's suite) and make
    sure they pass. If you cannot make tests pass, stop and report failure.
 3. **Match the surrounding code.** Follow existing patterns, naming, and style.
 4. **Commit your work** with a clear message describing the fix. One commit is fine.

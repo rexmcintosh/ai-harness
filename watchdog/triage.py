@@ -175,7 +175,7 @@ def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
 # lookahead excludes the `=` case while still matching "FAILED rc=1", "error:", etc.
 _ERROR_MARKERS = re.compile(
     r"traceback|exception|\b(?:error|failed|critical)\b(?!=)", re.IGNORECASE)
-# Same idea for JSON summaries (loom, diem): `"failed": 0`, `"error": null`, `"errors": []`
+# Same idea for JSON summaries (diem; loom until its 2026-10-09 retirement): `"failed": 0`, `"error": null`, `"errors": []`
 # are empty counters. Blank them before matching; a non-empty value still fires.
 _JSON_EMPTY_COUNTER = re.compile(
     r'"(?:errors?|failed|failures?|critical|exceptions?)"\s*:\s*(?:0|null|false|\[\]|\{\}|"")(?![\w.])',

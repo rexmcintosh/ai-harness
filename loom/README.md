@@ -1,40 +1,39 @@
-# Loom — session-learning pipeline (v1: live weave)
+# Loom (retired 2026-10-09)
 
-Distills Claude Code session transcripts into sanitized, classified learnings, then weaves each into
-its home (wiki article, `~/wiki/decisions/`, per-project `memory/`, `~/.claude/skills/`) on the wiki's
-`loom-shadow` branch. You review one diff, then `loom promote`.
+Loom was the session-learning pipeline. Every night at 02:00 UTC it read Claude Code session
+transcripts, distilled them into sanitized learnings, and wove each one into its home (wiki
+article, `~/wiki/decisions/`, per-project `memory/`, `~/.claude/skills/`) on the wiki's
+`loom-shadow` branch, then promoted the result. A Venice/DIEM `backfill` job, fed by the
+`diem drain` filler, worked through the backlog.
 
-## Commands
-    .venv/bin/python -m loom.cli absorb            # shadow: distill only (no weave)
-    .venv/bin/python -m loom.cli absorb --live     # nightly: distill + weave (Max session)
-    .venv/bin/python -m loom.cli backfill --max-targets 3   # backlog weave on Venice/DIEM
-    .venv/bin/python -m loom.cli promote           # apply staged .claude + merge loom-shadow -> master
-    .venv/bin/python -m loom.cli requeue <sid>     # return a quarantined/stuck session to pending
-    .venv/bin/python -m loom.cli rollback --ts <stamp>     # undo a promote from its backup
-    ./loom/run-absorb.sh                            # cron entry: absorb --live + Telegram summary
+## Why it was retired
 
-Retired one-off tools (2026-10-07): `reconcile-phantom` (`loom/phantom.py`) and the bm2
-quarantine `apply.py` both ran on 2026-09-18 and were removed. The write-ups stay in `docs/`
-(`loom-phantom-wiki-reconcile-2026-09-09.md`, `loom-bm2-quarantine-triage/`); the code is in git
-history at commit 739c33a.
+The 2026-10-09 audit (`~/projects/hq/loom-audit-2026-10-09.md`) found that almost nothing
+read the woven output, the Bebop briefing line never arrived, wiki quality was getting worse,
+and Loom used about a sixth of fresh Claude input tokens plus about 33 fix sessions since
+June. Claude memory already covered the useful part. Rex approved the shutdown on 2026-10-09. The code and tests were removed
+on branch `claude/retire-loom`; the design docs stay in `docs/` (see
+`docs/contracts/loom-absorb.md` and `docs/superpowers/specs/*loom*`).
 
-## How it stays safe
-- **Idempotent (structural):** every loom-shadow commit carries a `Loom-Woven:` trailer + each file an
-  `<!-- loom-woven -->` marker (script-written). Lost ledger rebuilds from git.
-- **Two shape lints** (trailing-append, excessive-rewrite) on wiki/memory facts; a **sentinel** scan on
-  every route. Lint failure bisects the bundle, rejecting only the offender.
-- **Transactional promote:** preflight -> backup ~/.claude -> atomic-swap -> merge, rollback on failure.
-- **Bounded:** per-run target cap (oldest-first) + a global run deadline; the rest deferred and reported.
-- **No silent drops:** `deferred` (retried) vs `rejected` (surfaced every summary until `requeue`).
+This folder now holds only this note and `.gitignore`. The `.gitignore` keeps any leftover
+runtime data (state, logs, spool, quarantine, ledgers) out of git until it is archived.
 
-## Backends
-`absorb` = `claude` (Max session). `backfill` = `venice` (DIEM): route `gemini-3-5-flash`, weave
-`claude-opus-4-8`. Needs `VENICE_API_KEY` (sourced from `/home/dev/.env`).
+## Where the archives live
 
-## One-time setup (rollout)
-`./loom/setup-wiki.sh` — makes `~/wiki` a local git repo (no remote), installs the detect-secrets
-pre-commit hook, creates the `loom-shadow` branch + the `~/wiki-loom-shadow` worktree.
+- Runtime data and spool: `~/projects/_archive/loom-2026-10/`.
+- Wiki: git tags `loom-final-master` and `loom-final-shadow` mark the last woven state.
+- Code: git history before the `claude/retire-loom` merge.
 
-## Spec & plan
-- `docs/superpowers/specs/2026-06-07-loom-v1-live-weave-design.md`
-- `docs/superpowers/plans/2026-06-08-loom-v1-live-weave.md`
+## How to restore
+
+1. Revert the retirement in this repo. If `claude/retire-loom` landed as a merge commit, use
+   `git revert -m 1 <merge commit>`. If it was squashed, use `git revert <squash commit>`
+   (no `-m`). If it was fast-forwarded, revert each branch commit, newest first. Any of these
+   brings back the deleted code and tests, including `loom/setup-runtime.sh`.
+2. Run `bash loom/setup-runtime.sh` from the reverted tree to rebuild `~/loom-runtime`.
+3. Untar the data archives from `~/projects/_archive/loom-2026-10/` into this repo.
+4. Re-enable the cron line: uncomment the `# LOOM-OFF` line in `crontab -l`.
+5. Restore `backfill_max_per_night` in `~/.config/diem/config.toml` from its
+   `config.toml.bak.*` copy.
+
+The audit's "Full undo, in one place" section has the complete list, including the wiki.

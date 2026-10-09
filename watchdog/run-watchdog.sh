@@ -61,7 +61,7 @@ if [ "$ESCALATE" != 1 ]; then
   exit 0
 fi
 
-ALL_FILES="$(find "$BASE/bebop/logs" "$BASE/loom/logs" "$BASE/watchdog/logs" \
+ALL_FILES="$(find "$BASE/bebop/logs" "$BASE/watchdog/logs" \
                   /home/dev/projects/splash_poller/logs -maxdepth 1 -type f \
                   -printf '%T@ %TY-%Tm-%Td %TH:%TM  %9s  %p\n' 2>/dev/null | sort -rn)"
 FILES="$(printf '%s\n' "$ALL_FILES" | head -40 | cut -d' ' -f2-)"

@@ -111,7 +111,7 @@ if [ -z "$(git log "origin/$BASE_BRANCH..$BRANCH" --oneline 2>/dev/null || git l
 fi
 
 # --- gate: tests must pass ---
-if ! python3 -m pytest tests/ -q --ignore=tests/loom >>"$LOG.err" 2>&1; then
+if ! python3 -m pytest tests/ -q >>"$LOG.err" 2>&1; then
   _fail "tests failed after fix; leaving branch $BRANCH for inspection (no PR opened)"
 fi
 

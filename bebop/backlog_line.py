@@ -6,7 +6,8 @@
 approve; anything needing a human decision or an outward action is parked `held`. Neither
 state pings him, so items sat for weeks. This builds the reminder.
 
-Two design rules, both learned from the loom line above it in `run-briefing.sh`:
+Two design rules, both learned from the retired loom line that once sat above it in
+`run-briefing.sh`:
 
   * **Code, not the model.** These are counts Rex acts on. `run-briefing.sh` appends the
     finished string to the composed briefing, after the agent has answered, so the model

@@ -41,7 +41,6 @@ BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
 
 # Cron logs to scan for error markers: (label, path).
 CRON_LOGS = [
-    ("loom", BASE / "loom" / "logs" / "runs.log"),   # what loom/run-absorb.sh writes
     ("meettrack-ingest", Path("/home/dev/projects/splash_poller/logs/ingest_entries.cron.log")),
     ("meettrack-supervise", Path("/home/dev/projects/splash_poller/logs/supervise.cron.log")),
 ]

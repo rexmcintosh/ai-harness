@@ -102,12 +102,12 @@ def _records(tmp_path):
 
 
 def test_shadow_pass_writes_one_record_with_both_opinions(tmp_path):
-    n = _pass(tmp_path, [("loom", "absorb start\nexit rc=2\n", "ok")],
+    n = _pass(tmp_path, [("nightly", "job start\nexit rc=2\n", "ok")],
               judge=lambda tail, key: {"needs_human": 0.95, "latest_run_failed": 0.9,
                                        "model": "jev-1.13.0", "input_tokens": 40, "seconds": 0.6})
     assert n == 1
     (rec,) = _records(tmp_path)
-    assert rec["log"] == "loom" and rec["regex_level"] == "ok"
+    assert rec["log"] == "nightly" and rec["regex_level"] == "ok"
     assert rec["jev_needs_human"] == 0.95 and rec["jev_band"] == "alert"
     assert rec["agree"] is False             # rule said ok, Jev says alert: the interesting case
     assert "exit rc=2" in rec["tail"]
@@ -130,7 +130,7 @@ def test_shadow_pass_sends_the_redacted_tail_not_the_raw_one(tmp_path):
 def test_shadow_pass_skips_a_tail_that_has_not_changed(tmp_path):
     calls = []
     judge = lambda tail, key: calls.append(1) or {"needs_human": 0.1, "latest_run_failed": 0.1}
-    logs = [("loom", "absorb done rc=0\n", "ok")]
+    logs = [("nightly", "job done rc=0\n", "ok")]
     _pass(tmp_path, logs, judge)
     _pass(tmp_path, logs, judge)
     assert len(calls) == 1 and len(_records(tmp_path)) == 1
@@ -138,25 +138,25 @@ def test_shadow_pass_skips_a_tail_that_has_not_changed(tmp_path):
 
 def test_shadow_pass_judges_again_when_the_tail_changes(tmp_path):
     judge = lambda tail, key: {"needs_human": 0.1, "latest_run_failed": 0.1}
-    _pass(tmp_path, [("loom", "run 1 rc=0\n", "ok")], judge)
-    _pass(tmp_path, [("loom", "run 1 rc=0\nrun 2 rc=0\n", "ok")], judge)
+    _pass(tmp_path, [("nightly", "run 1 rc=0\n", "ok")], judge)
+    _pass(tmp_path, [("nightly", "run 1 rc=0\nrun 2 rc=0\n", "ok")], judge)
     assert len(_records(tmp_path)) == 2
 
 
 def test_shadow_pass_does_nothing_without_a_key(tmp_path):
     calls = []
-    n = _pass(tmp_path, [("loom", "x\n", "ok")], judge=lambda t, k: calls.append(1), key=None)
+    n = _pass(tmp_path, [("nightly", "x\n", "ok")], judge=lambda t, k: calls.append(1), key=None)
     assert n == 0 and not calls and _records(tmp_path) == []
 
 
 def test_shadow_pass_survives_a_judge_that_raises(tmp_path):
     def boom(tail, key):
         raise RuntimeError("anything")
-    assert _pass(tmp_path, [("loom", "x\n", "ok")], judge=boom) == 0
+    assert _pass(tmp_path, [("nightly", "x\n", "ok")], judge=boom) == 0
 
 
 def test_shadow_pass_retries_next_poll_when_the_judge_had_no_answer(tmp_path):
-    logs = [("loom", "x\n", "ok")]
+    logs = [("nightly", "x\n", "ok")]
     _pass(tmp_path, logs, judge=lambda t, k: None)             # outage: nothing recorded
     _pass(tmp_path, logs, judge=lambda t, k: {"needs_human": 0.1, "latest_run_failed": 0.1})
     assert len(_records(tmp_path)) == 1
@@ -224,6 +224,7 @@ def test_shipped_config_shadows_operations_logs_only():
     assert paths and all(p.startswith("/") for p in paths)
     assert len({item["name"] for item in cfg["logs"]}) == len(cfg["logs"])
     assert all(js.in_scope(p) for p in paths)
+    assert not any("/loom/" in p for p in paths)     # Loom retired 2026-10-09
 
 
 def test_redact_removes_nested_item_lists_whole():

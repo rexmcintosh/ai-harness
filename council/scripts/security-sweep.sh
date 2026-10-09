@@ -11,7 +11,7 @@
 set -uo pipefail
 
 # Cron's PATH has no ~/.local/bin, where pipx's `council` and the claude CLI live.
-# Without this the sweep silently falls back to the repo module. Same fix as loom.
+# Without this the sweep silently falls back to the repo module. Same fix the (retired) loom runner used.
 export PATH="$HOME/.local/bin:$PATH"
 
 [ -f /home/dev/.env ] && set -a && . /home/dev/.env && set +a

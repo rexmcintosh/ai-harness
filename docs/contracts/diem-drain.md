@@ -6,7 +6,7 @@
 
 **Default mode:** bounded change-producing work. At four UTC checkpoints, select eligible queued DIEM work within the configured allowance and deadline, run it, append a checkpoint summary, and send the configured evening or completion notice. Local cron documentation and host configuration confirm UTC scheduling. Canonical queue, pause, estimates, review, and summary state are under the configured DIEM state directory, selected by `~/.config/diem/config.toml`.
 
-It may execute queued work under DIEM’s own queue policy. When the queue is truly empty, the observed implementation may seed a bounded configured Loom `backfill` item, then subjects it to the same budget and deadline checks. It must not bypass a pause, exceed the configured allowance, or merge or deploy unless the selected item’s own authority allows it.
+It may execute queued work under DIEM’s own queue policy. When the queue is truly empty, the observed implementation may seed a bounded configured Loom `backfill` item, then subjects it to the same budget and deadline checks. Since Loom’s 2026-10-09 retirement this is a disabled legacy path: host config sets `backfill_max_per_night = 0`, so no backfill item is seeded. It must not bypass a pause, exceed the configured allowance, or merge or deploy unless the selected item’s own authority allows it.
 
 **Secrets, names only:** `VENICE_API_KEY` or `VENICE_KEY`, `VENICE_ADMIN_KEY`, `TELEGRAM_BOT_TOKEN`, plus configured per-project `VENICE_*` keys.
 
