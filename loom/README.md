@@ -27,8 +27,9 @@ runtime data (state, logs, spool, quarantine, ledgers) out of git until it is ar
 ## How to restore
 
 1. Revert the retirement in this repo. If `claude/retire-loom` landed as a merge commit, use
-   `git revert -m 1 <merge commit>`. If it was squashed or fast-forwarded, use
-   `git revert <retirement commit>` (no `-m`). Either way the deleted code and tests return.
+   `git revert -m 1 <merge commit>`. If it was squashed, use `git revert <squash commit>`
+   (no `-m`). If it was fast-forwarded, revert each branch commit, newest first. Any of these
+   brings back the deleted code and tests, including `loom/setup-runtime.sh`.
 2. Run `bash loom/setup-runtime.sh` from the reverted tree to rebuild `~/loom-runtime`.
 3. Untar the data archives from `~/projects/_archive/loom-2026-10/` into this repo.
 4. Re-enable the cron line: uncomment the `# LOOM-OFF` line in `crontab -l`.
