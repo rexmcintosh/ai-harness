@@ -58,8 +58,7 @@ BODY = {"choices": [{"message": {"content": "hi"}}],
         "usage": {"prompt_tokens": 11, "completion_tokens": 22}}
 
 
-@pytest.mark.parametrize("module,project", [("council.venice", "council"),
-                                            ("loom.venice", "loom")])
+@pytest.mark.parametrize("module,project", [("council.venice", "council")])
 def test_a_client_with_a_fake_transport_cannot_write_the_production_ledger(
         module, project, fake_production, capsys):
     mod = __import__(module, fromlist=["VeniceClient"])
@@ -69,7 +68,7 @@ def test_a_client_with_a_fake_transport_cannot_write_the_production_ledger(
     assert "production ledger" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("module", ["council.venice", "loom.venice"])
+@pytest.mark.parametrize("module", ["council.venice"])
 def test_the_real_transport_still_logs_normally(module, fake_production, monkeypatch):
     mod = __import__(module, fromlist=["VeniceClient"])
     monkeypatch.setattr(mod.requests, "post", lambda *a, **k: _reply(BODY))
@@ -77,7 +76,7 @@ def test_the_real_transport_still_logs_normally(module, fake_production, monkeyp
     assert _count(fake_production) == 1
 
 
-@pytest.mark.parametrize("module", ["council.venice", "loom.venice"])
+@pytest.mark.parametrize("module", ["council.venice"])
 def test_a_wrapped_live_transport_can_say_so_and_is_logged(module, fake_production):
     """The budget-capped wrapper injects `post` and really does call Venice.
     It opts in explicitly — one visible, auditable word at the call site."""
@@ -87,7 +86,7 @@ def test_a_wrapped_live_transport_can_say_so_and_is_logged(module, fake_producti
     assert _count(fake_production) == 1
 
 
-@pytest.mark.parametrize("module", ["council.venice", "loom.venice"])
+@pytest.mark.parametrize("module", ["council.venice"])
 def test_a_fake_transport_still_logs_to_a_throwaway_ledger(module, tmp_path,
                                                            monkeypatch):
     """Only the production path is refused. A test or demo that has already

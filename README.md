@@ -42,8 +42,8 @@ original Hetzner setup and are retained as history.
 - [`fixit/`](fixit/README.md) — feedback → fix → ship: an issue becomes a PR into the
   council CI gate; you merge.
 - [`bebop/`](bebop/README.md) — personal assistant: twice-daily Gmail+Calendar briefing.
-- [`loom/`](loom/README.md) — session-learning pipeline: distills transcripts into woven
-  learnings.
+- [`loom/`](loom/README.md) — retired 2026-10-09. Was the session-learning pipeline; the
+  folder now holds only the retirement note and restore steps.
 - [`backlogrun/`](backlogrun/README.md) — the 3am backlog runner: works `~/projects/backlog`
   items unattended on isolated branches, council-reviews them, and leaves a morning
   report; `approve`/`drop` are the human half.

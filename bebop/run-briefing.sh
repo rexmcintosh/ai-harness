@@ -12,7 +12,6 @@ set -uo pipefail
 # Cron's PATH has no ~/.local/bin, where the claude CLI lives since the 2026-07-25
 # installer migration. Without this every run dies rc=127 before doing anything —
 # the 2026-08-05..08-08 silent outage (the failure ping needed claude too, then).
-# Same fix loom's runner has carried since its 07-26..08-01 outage.
 export PATH="$HOME/.local/bin:$PATH"
 
 MODE="${1:-morning}"
@@ -44,28 +43,6 @@ PROMPT="${PROMPT//\{\{NOW\}\}/$NOW_HUMAN}"
 PROMPT="${PROMPT//\{\{SINCE\}\}/$SINCE_HUMAN}"
 PROMPT="${PROMPT//\{\{SINCE_EPOCH\}\}/$SINCE_EPOCH}"
 PROMPT="${PROMPT//\{\{CHAT_ID\}\}/$CHAT_ID}"
-
-# --- loom line -----------------------------------------------------------------
-# Composed HERE, in code, not by the briefing model: these are counts Rex acts on,
-# and a paraphrase ("a bunch of articles") would be worse than no line at all. The
-# model receives finished text and is told to pass it through verbatim.
-# Empty when nothing needs him — the silence is deliberate, and is what keeps the
-# line meaningful on the mornings it does appear.
-LOOM_LINE=""
-LOOM_PENDING="/home/dev/projects/ai-harness/loom/pending.json"
-LOOM_PY="/home/dev/projects/ai-harness/.venv/bin/python"
-if [ -r "$LOOM_PENDING" ] && [ -x "$LOOM_PY" ]; then
-  LOOM_LINE=$("$LOOM_PY" - "$LOOM_PENDING" <<'PY' 2>/dev/null || true
-import json, sys
-from loom.pending import briefing_line
-try:
-    print(briefing_line(json.load(open(sys.argv[1]))), end="")
-except Exception:
-    pass                      # a broken loom must never cost Rex his email briefing
-PY
-)
-fi
-PROMPT="${PROMPT//\{\{LOOM\}\}/$LOOM_LINE}"
 
 ALLOWED=(
   mcp__claude_ai_Gmail__search_threads
@@ -132,8 +109,8 @@ done
 
 # --- backlog line, morning only ---------------------------------------------------
 # backlog-run leaves finished work `in_review` and parks the rest `held`; nothing pinged
-# Rex, so items sat for weeks. This is that reminder. Unlike the loom line above it is
-# NOT handed to the model through the prompt — it is appended to the finished text below,
+# Rex, so items sat for weeks. This is that reminder. It is NOT handed to the model
+# through the prompt — it is appended to the finished text below,
 # after the agent has answered, so the briefing model can neither drop it nor reword it.
 # Empty output means nothing is waiting, and then no line is added at all.
 # Fail open: a missing helper, a missing backlog, a crash or a hang all cost the line and

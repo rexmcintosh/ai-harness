@@ -6,7 +6,7 @@
 
 **Default mode:** change-producing communication. At 07:00 and 18:00 UTC, compose a Gmail and Calendar delta briefing and send it to the configured owner Telegram chat. The runner formats briefing content in Europe/Lisbon. Canonical cursor state is `bebop/state.json`; it advances only after a successful send.
 
-It may read the fixed briefing prompt, Gmail and Calendar through the allowed MCP tools, and Loom’s `pending.json`. It may send one briefing or one failure notice. It does not reply to email, edit calendar data, change source repositories, or send to another recipient.
+It may read the fixed briefing prompt, and Gmail and Calendar through the allowed MCP tools. (Until Loom’s 2026-10-09 retirement it also read Loom’s `pending.json`; that read is gone.) It may send one briefing or one failure notice. It does not reply to email, edit calendar data, change source repositories, or send to another recipient.
 
 **Secrets, names only:** `TELEGRAM_BOT_TOKEN`; Gmail and Google Calendar connector credentials are resolved by the configured MCP. The chat identifier is configuration, not a secret.
 

@@ -1,5 +1,9 @@
 # Loom session learning
 
+> **Retired 2026-10-09.** The 02:00 UTC cron line is commented out (`# LOOM-OFF`), the DIEM
+> backfill cap is 0, and the code was removed on branch `claude/retire-loom`. This contract is
+> kept as a historical record only. See `loom/README.md` for archives and restore steps.
+
 **Contract:** v1.0 · **Date:** 2026-09-05 · **Observed entrypoint:** `loom/run-absorb.sh`
 
 ## Purpose and authority

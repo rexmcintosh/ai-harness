@@ -94,10 +94,6 @@ coverage_gap_pct   = 15
 enabled = true
 
 [[jev_shadow.logs]]
-name = "loom-err"
-log  = "/home/dev/projects/ai-harness/loom/logs/runs.log.err"
-
-[[jev_shadow.logs]]
 name = "watchdog-cron"
 log  = "/home/dev/projects/ai-harness/watchdog/logs/cron.log"
 

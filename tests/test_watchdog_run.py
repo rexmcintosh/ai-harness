@@ -42,11 +42,12 @@ def test_format_report_orders_crit_before_warn():
     assert report.index("crit-thing") < report.index("warn-thing")
 
 
-def test_loom_cron_log_points_at_the_file_loom_writes():
-    # run-absorb.sh writes loom/logs/runs.log; "absorb.log" never existed, so the check read nothing.
+def test_retired_loom_log_is_no_longer_watched():
+    # Loom was retired 2026-10-09; its runs.log is a static file now, so it is not a cron log.
     from watchdog.run import CRON_LOGS
-    paths = {label: str(path) for label, path in CRON_LOGS}
-    assert paths["loom"].endswith("loom/logs/runs.log")
+    labels = {label for label, _ in CRON_LOGS}
+    assert "loom" not in labels
+    assert not any("/loom/" in str(path) for _, path in CRON_LOGS)
 
 
 def test_collect_reports_log_coverage(monkeypatch, tmp_path):

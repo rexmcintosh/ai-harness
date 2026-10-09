@@ -15,7 +15,7 @@ Local evidence resolves the scheduler timezone: cron `3.0pl1-184ubuntu2` schedul
 | active | Monday 04:00 UTC; declared `CRON_TZ=Europe/Lisbon` not scheduler-effective | `/home/dev/projects/ai-harness/council/scripts/security-sweep.sh` | Council security sweep | [council-security-sweep.md](council-security-sweep.md) |
 | active | 08:00, 21:00, 23:00, 23:40 UTC | `/home/dev/.local/bin/diem drain --checkpoint` | DIEM checkpoint drain | [diem-drain.md](diem-drain.md) |
 | active | every minute | `/home/dev/.local/bin/agents once` | Agent-attention nudge | [agents-nudge.md](agents-nudge.md) |
-| active | 02:00 UTC | `/home/dev/loom-runtime/loom/run-absorb.sh` | Loom session learning | [loom-absorb.md](loom-absorb.md) |
+| retired 2026-10-09 | (was 02:00 UTC; line commented `# LOOM-OFF`) | `/home/dev/loom-runtime/loom/run-absorb.sh` | Loom session learning | [loom-absorb.md](loom-absorb.md) |
 | active | every 10 min snapshot; Monday 08:00 UTC sweep | `/home/dev/.local/bin/session-gc snapshot`; `/home/dev/.local/bin/session-gc sweep` | Session worktree hygiene | [session-gc.md](session-gc.md) |
 | active | Monday 07:30 UTC; declared `CRON_TZ=Europe/Lisbon` not scheduler-effective | `/home/dev/projects/ai-harness/setup/superpowers-slim-preamble/reapply.sh` | Superpowers preamble reapply | [superpowers-preamble.md](superpowers-preamble.md) |
 | active | Tuesday 07:15 UTC; declared `CRON_TZ=Europe/Lisbon` not scheduler-effective | `/home/dev/projects/ultimate-portugal/scripts/verify-rents.mjs` | Ultimate Portugal rent verification | [ultimate-portugal-rent-verification.md](ultimate-portugal-rent-verification.md) |

@@ -74,11 +74,10 @@ CRON_TZ=Europe/Lisbon
   subscription use or is metered separately was unresolved at build time. Watch `logs/runs.log`
   cost + the Max usage dashboard over the first week.
 
-## Roadmap (the other 3 slices)
+## Roadmap (the other slices)
 
 2. **Proactive alerts** — same scan, event-triggered pings instead of fixed schedule.
-3. **Tends the knowledge base** — route worth-keeping items into the RexBrain wiki (`~/wiki/`) + memory.
-4. **Takes actions** — draft replies / schedule / update Notion, gated by approve-via-Telegram.
+3. **Takes actions** — draft replies / schedule / update Notion, gated by approve-via-Telegram.
    (Needs a persistent Telegram listener for true two-way — a follow-up to the send-only briefing.)
 
 ## Slow connector start and the single retry
@@ -109,8 +108,6 @@ Backlog: 3 wait for your review (oldest 18 days: review-complaint-sweep). 1 new 
 - **Built in code, not by the model.** `backlog_line.py` prints the finished string;
   `run-briefing.sh` appends it to the composed briefing *after* the agent has answered and
   before the send. The model never sees it, so it cannot drop it, shorten it or reword it.
-  (The loom line is different: it goes in through the prompt and is asked to pass it
-  through verbatim.)
 - **Silent when nothing is waiting.** No `in_review` items and no new hold means an empty
   string and no line at all. A line that appears every morning stops being read.
 - **Evening is untouched.**

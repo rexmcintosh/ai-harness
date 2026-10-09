@@ -1,6 +1,6 @@
 # watchdog — autonomous SRE for the mesh
 
-Watches the automation system's *own* moving parts (bebop, loom, MeetTrack, disk,
+Watches the automation system's *own* moving parts (bebop, MeetTrack, disk,
 key services). When a signal is anomalous, a read-only agent investigates and posts
 a **diagnosis + proposed fix** to Telegram. It never fixes production — it puts a fix
 on a silver platter and lets Rex decide. (Maps to the "autonomous SRE" idea from
@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | loom (`loom/logs/runs.log`) + MeetTrack logs | error markers in the recent tail (warn) |
+| `cron:*` | MeetTrack logs | error markers in the recent tail (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
