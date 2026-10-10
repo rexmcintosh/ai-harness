@@ -318,6 +318,20 @@ def eval_startlist(row: dict, snap: Snapshot, cfg: dict, tz) -> list[Expectation
     if start is None:
         start = at_local(first_day, nation_value(cfg, row.get("nation"), "default_session_start"), tz)
     expected = f"the start list is in MeetTrack {int(lead)}h before racing"
+    if scope == "all" and requested is None:
+        # Mirror splash_poller ingest_entries auto mode: only listed, unpaused,
+        # non-Lenex meets get their start list fetched without a request.
+        skip = None
+        if row.get("listed") is False:
+            skip = "the meet is unlisted"
+        elif row.get("dispatch_paused"):
+            skip = "dispatch is paused for this meet"
+        elif row.get("feed_type") == "lenex":
+            skip = "a Lenex feed carries its own entries"
+        if skip:
+            return [Expectation(eid, "startlist", label(row), expected, None, "n/a", "info",
+                                f"not expected: {skip}, so ingest_entries.py does not fetch "
+                                "its start list unasked", window="always", sr_meet_id=sid)]
     if scope == "requested" and requested is None:
         return [Expectation(eid, "startlist", label(row), expected, None, "n/a", "info",
                             "not expected: nobody has asked for this meet's entries in the app, "
