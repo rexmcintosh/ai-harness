@@ -861,3 +861,21 @@ def test_wrapper_dry_run_never_sends(tmp_path):
     r = _wrap(env, "--dry-run")
     assert r.returncode == 0 and "dry-run" in r.stdout
     assert not (tmp_path / "sent.txt").exists()
+
+
+def test_startlist_scope_all_skips_meets_auto_ingest_does_not_fetch():
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    from watchdog import expectations as ex
+    tz = ZoneInfo("Europe/Lisbon")
+    now = _dt.datetime(2026, 10, 10, 18, 0, tzinfo=tz).timestamp()
+    cfg = dict(ex.DEFAULTS); cfg["startlist_scope"] = "all"
+    snap = ex.Snapshot(now=now, db_ok=True, db_latency_s=0.1, registry=[])
+    base = {"sr_meet_id": "1", "name": "M", "nation": "POR", "start_date": "2026-10-11",
+            "end_date": "2026-10-11", "ingest_status": "discovered"}
+    for extra, word in (({"listed": False}, "unlisted"), ({"dispatch_paused": True}, "paused"),
+                        ({"feed_type": "lenex"}, "Lenex")):
+        out = ex.eval_startlist({**base, **extra}, snap, cfg, tz)
+        assert out[0].status == "n/a" and word in out[0].evidence
+    out = ex.eval_startlist({**base, "listed": True, "feed_type": "pdf"}, snap, cfg, tz)
+    assert out[0].status in ("missed", "pending")

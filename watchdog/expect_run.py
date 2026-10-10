@@ -59,7 +59,7 @@ RUN_DEFAULTS = {
 _REGISTRY_COLS = ("sr_meet_id,name,city,nation,start_date,end_date,feed_type,ingest_status,"
                   "last_ingest_at,updated_at,events_published,events_with_results,"
                   "last_tick_errors,coverage_at,entries_requested_at,entries_ingested_at,"
-                  "dispatch_paused")
+                  "dispatch_paused,listed")
 
 
 # ---------------------------------------------------------------------------
