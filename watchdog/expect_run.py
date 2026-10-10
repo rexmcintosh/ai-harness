@@ -39,7 +39,8 @@ from .expect_alerts import POLICY_DEFAULTS, plan, render
 from .expect_investigate import Probes, investigate, write_investigation
 
 BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
-CHAT_ID = "7735693897"
+# One destination for every alert; run-expect.sh reads the same variable.
+CHAT_ID = os.environ.get("WATCHDOG_CHAT_ID", "7735693897")
 SPLASH_LOGS = Path(os.environ.get("WATCHDOG_SPLASH_LOGS", "/home/dev/projects/splash_poller/logs"))
 LIVE_PAGE = "https://live.swimrankings.net/{sid}/"
 

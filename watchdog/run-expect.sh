@@ -12,7 +12,9 @@ BASE="$(cd "$DIR/.." && pwd)"
 LOG_DIR="${WATCHDOG_LOG_DIR:-$DIR/logs}"
 ENV_FILE="${WATCHDOG_ENV_FILE:-/home/dev/projects/splash_poller/.env}"
 TG_SEND="${WATCHDOG_TG_SEND:-$BASE/bin/tg-send}"
-CHAT_ID="7735693897"
+# Same default as expect_run.py; override both with WATCHDOG_CHAT_ID.
+CHAT_ID="${WATCHDOG_CHAT_ID:-7735693897}"
+export WATCHDOG_CHAT_ID="$CHAT_ID"
 mkdir -p "$LOG_DIR"
 
 # The Supabase key is loaded inside this subshell only. The python run lock

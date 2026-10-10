@@ -819,6 +819,34 @@ def test_log_tail_refuses_ids_that_are_not_meet_ids(tmp_path, monkeypatch):
         probes.read_log_tail("../secret")
 
 
+def test_partial_read_failures_do_not_freeze_closing():
+    t = at("16:00")
+    _, s = plan(_missed_results(t), {}, t, POLICY, True)
+    from watchdog.expectations import Expectation
+    reads = Expectation("db:reads", "db", None, "e", None, "missed", "crit", "events: HTTP 500",
+                        window="always")
+    probe = Expectation("db:reachable", "db", None, "e", None, "met", "crit", "ok", window="always")
+    notices, s = plan([probe, reads], s, t + 300, POLICY, True)
+    kinds = {(n.kind, n.id) for n in notices}
+    assert ("closed", "results:11113:2026-10-10") in kinds and ("new", "db:reads") in kinds
+
+
+def test_only_met_resolves_pending_keeps_and_n_a_closes():
+    from watchdog.expectations import Expectation
+    t = at("16:00")
+    missed = Expectation("startlist:1", "startlist", "M", "e", None, "missed", "warn", "x",
+                         window="always")
+    _, s = plan([missed], {}, t, POLICY, True)
+    pending = Expectation("startlist:1", "startlist", "M", "e", None, "pending", "warn", "y",
+                          window="always")
+    notices, s = plan([pending], s, t + 300, POLICY, True)
+    assert notices == [] and "startlist:1" in s["open"]
+    na = Expectation("startlist:1", "startlist", "M", "e", None, "n/a", "info", "z",
+                     window="always")
+    notices, s = plan([na], s, t + 600, POLICY, True)
+    assert [n.kind for n in notices] == ["closed"] and s["open"] == {}
+
+
 def test_the_ai_narrative_is_off_by_default():
     assert er.RUN_DEFAULTS["ai_narrative"] is False
     _, run_cfg = er.load_config(er.Path(__file__).resolve().parents[1] / "watchdog" / "monitors.toml")

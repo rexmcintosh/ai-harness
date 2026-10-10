@@ -67,9 +67,12 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
     open_ = {k: dict(v) for k, v in ((state or {}).get("open") or {}).items()}
     notices: list[Notice] = []
     seen = set()
-    # Any database check not met (one failed probe, or an unreadable registry)
-    # means the meet expectations were not evaluated this run.
-    db_blind = any(e.kind == "db" and e.status != "met" for e in expectations)
+    # The probe failed (even once) or the registry is unreadable: the meet
+    # expectations were not evaluated this run, so nothing may be closed for
+    # being absent. Partial read failures (db:reads) do not count: those meets
+    # are still produced, as "unknown".
+    db_blind = any(e.id in ("db:reachable", "db:registry") and e.status != "met"
+                   for e in expectations)
 
     for e in expectations:
         seen.add(e.id)
@@ -104,16 +107,17 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
             continue
         if not rec:
             continue
-        if e.status == "unknown":
-            continue                                    # blind: keep it open, say nothing
-        if e.status == "closed":
-            notices.append(Notice("closed", e.id, e.meet, e.expected, e.evidence, e.severity,
-                                  e.deadline, rec.get("first_missed"), rec.get("sends", 1),
-                                  reason=e.evidence))
-        else:                                           # met / pending / n/a / info
+        if e.status in ("unknown", "pending"):
+            continue                                    # not judged / not due: keep it open
+        if e.status == "met":
             notices.append(Notice("resolved", e.id, e.meet, e.expected, e.evidence,
                                   rec.get("severity", e.severity), e.deadline,
                                   rec.get("first_missed"), rec.get("sends", 1)))
+        else:                                           # closed / n/a / downgraded to info
+            reason = e.evidence if e.status == "closed" else "no longer expected"
+            notices.append(Notice("closed", e.id, e.meet, e.expected, e.evidence, e.severity,
+                                  e.deadline, rec.get("first_missed"), rec.get("sends", 1),
+                                  reason=reason))
         del open_[e.id]
 
     if not db_blind:
