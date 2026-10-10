@@ -101,6 +101,22 @@ A timeout or other uncertain send remains visible and is not sent again
 automatically. The last accepted provider receipt is retained in
 `watchdog/delivery-last.json`. Provider acceptance is not human receipt.
 
+## MeetTrack "expected but missing" monitor
+
+`run-expect.sh` (cron, every 5 min) runs `expect_run.py`: it states what should
+have happened on each live Portugal meet (start list by T-24h, writer ticking,
+results flowing, every published event in MeetTrack within 20 min, the database
+answering) and alerts directly on Telegram when it did not, with reminders every
+30/60 min, a RESOLVED line, and a deterministic investigation written to
+`logs/investigations/`. `./watchdog/run-expect.sh --dry-run` prints today's
+expectations read-only. Design, alert policy and how to add an expectation:
+[`docs/meettrack-expectations.md`](../docs/meettrack-expectations.md).
+
+While it runs, this watchdog's own meet rules stand down (`defer_to_expect`);
+if it stops for 15 minutes they take over and `meets.expect-heartbeat` warns.
+Meet alerts here repeat after 1 hour, not 6. An unreadable registry is a crit
+(`meets.registry`), never a silent skip.
+
 ## Boundary
 
 The investigator agent runs with `--allowedTools Read` only. The wrapper sends

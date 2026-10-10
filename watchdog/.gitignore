@@ -3,3 +3,5 @@ logs/
 metrics-history.json
 delivery-pending.json
 delivery-last.json
+expect-state.json
+expect-state.json.tmp

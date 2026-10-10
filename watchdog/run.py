@@ -93,14 +93,21 @@ def _load_monitors() -> dict:
 
 
 def _supabase_count(url: str, key: str, table: str) -> int | None:
-    """Read-only row count via PostgREST (Prefer: count=exact). None on any failure —
-    a count we can't read must not crash or fake an alert."""
+    """Read-only row-count ESTIMATE via PostgREST (Prefer: count=planned): the
+    planner's figure from pg_class, no table scan. None on any failure — a
+    count we can't read must not crash or fake an alert.
+
+    Until 10 Oct 2026 this was count=exact: a full scan of results, splits and
+    swimmers every 30 minutes, the top two database users by total time on a
+    0.5 GB machine (hq/swimtrack-db-outage-rca-2026-10-10.md). The estimate
+    moves when autovacuum/analyze runs, which a real spike (thousands of rows)
+    triggers within minutes, so rows/hour stays a usable spike budget."""
     try:
         import requests
         r = requests.head(f"{url}/rest/v1/{table}?select=*",
                           headers={"apikey": key, "Authorization": f"Bearer {key}",
-                                   "Prefer": "count=exact", "Range": "0-0"},
-                          timeout=15)
+                                   "Prefer": "count=planned", "Range": "0-0"},
+                          timeout=10)
         return parse_count_header(r.headers.get("Content-Range"))
     except Exception:  # noqa: BLE001 — network/parse error -> skip this metric
         return None
@@ -138,7 +145,7 @@ def _supabase_rows(url: str, key: str, path: str, error: dict | None = None) -> 
 # arrive with an owner-applied MeetTrack migration (splash_poller
 # migrations/2026-09-18_meet_registry_tick_coverage.sql), so production may not
 # have them yet.
-_MEET_COLS = ("sr_meet_id,name,ingest_status,last_ingest_at,updated_at,"
+_MEET_COLS = ("sr_meet_id,name,nation,feed_type,ingest_status,last_ingest_at,updated_at,"
               "start_date,end_date")
 _MEET_COVERAGE_COLS = ("events_published,events_with_results,last_tick_errors,"
                        "coverage_at")
@@ -148,15 +155,22 @@ _MEET_COVERAGE_COLS = ("events_published,events_with_results,last_tick_errors,"
 _MISSING_COLUMN_CODES = ("42703", "PGRST204")
 
 
-def _meet_registry_rows(url: str, key: str, since: str) -> list | None:
+def _meet_registry_rows(url: str, key: str, since: str,
+                        nations: tuple | list | None = ("POR",)) -> list | None:
     """Rows for check_meet_freshness, with the coverage columns when they exist.
+
+    Portugal only by default (``nations``): the meet rules read racing hours
+    in Europe/Lisbon, and a leftover Bulgarian meet once raised a Lisbon-hours
+    alert. None/empty = every nation.
 
     A 400 on a not-yet-applied migration must cost the coverage RULE, never the
     whole check — without the retry, a missing column would silently take the
     absence alert itself off the air."""
+    scope = f"&nation=in.({','.join(nations)})" if nations else ""
+
     def fetch(cols, error=None):
         return _supabase_rows(url, key,
-                              f"meet_registry?select={cols}&updated_at=gt.{since}",
+                              f"meet_registry?select={cols}&updated_at=gt.{since}{scope}",
                               error=error)
 
     failure: dict = {}
@@ -173,6 +187,34 @@ def _meet_registry_rows(url: str, key: str, since: str) -> list | None:
             print("meet_registry coverage select failed; using the plain "
                   "freshness rule this run")
     return rows
+
+
+def _expect_cover(mf: dict, now_epoch: int) -> tuple[list[CheckStatus], bool]:
+    """(statuses to add, whether this watchdog still runs its own meet rules).
+
+    - ``defer_to_expect`` off, or the expect monitor never ran on this host
+      (no state file): no status, the meet rules run here as before.
+    - its last run is at most ``expect_fresh_min`` old: one ok status, and the
+      meet rules are left to it (no double alerts, no double registry reads).
+    - older: a direct-path warning that the monitor has stopped, and the meet
+      rules run here as the fallback.
+    """
+    if not mf.get("defer_to_expect", False):
+        return [], True
+    path = Path(os.environ.get("WATCHDOG_EXPECT_STATE",
+                               str(BASE / "watchdog" / "expect-state.json")))
+    last = load_state(path).get("last_run")
+    if not isinstance(last, (int, float)):
+        return [], True
+    age = (now_epoch - float(last)) / 60
+    if age <= float(mf.get("expect_fresh_min", 15)):
+        return [CheckStatus("meets.expect-heartbeat", "ok",
+                            f"live-meet checks run by the expect monitor ({age:.0f}m ago)")], False
+    return [CheckStatus(
+        "meets.expect-heartbeat", "warn",
+        f"the MeetTrack expect monitor last ran {age:.0f}m ago; the watchdog's own "
+        f"meet rules are covering for it",
+        evidence=f"check the crontab line for watchdog/run-expect.sh and {path.name}")], True
 
 
 def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStatus], dict]:
@@ -225,6 +267,13 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
     # awaiting launch too long, or a recent terminal failure. Every other
     # check here is a spike budget; this is the floor (see check_meet_freshness).
     mf = cfg.get("meet_freshness")
+    if mf:
+        cover, run_rules = _expect_cover(mf, now_epoch)
+        out.extend(cover)
+        if not run_rules:
+            # The expect monitor (watchdog/expect_run.py, every 5 min) owns
+            # the live-meet checks while it runs: one alert per problem.
+            mf = None
     if mf and sb:
         key = os.environ.get(sb.get("key_env", "SUPABASE_SERVICE_ROLE_KEY"), "")
         if key:
@@ -232,8 +281,17 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
             # 'Z' suffix, never '+00:00' — a '+' in a query string is a space.
             since = (datetime.now(_tz.utc) - timedelta(days=14)).strftime(
                 "%Y-%m-%dT%H:%M:%SZ")
-            rows = _meet_registry_rows(sb["url"], key, since)
-            if rows is not None:
+            rows = _meet_registry_rows(sb["url"], key, since,
+                                       nations=mf.get("nations", ["POR"]))
+            if rows is None:
+                # Never "nothing to report": on 10 Oct 2026 an unreadable
+                # registry silently skipped every meet rule for two hours.
+                out.append(CheckStatus(
+                    "meets.registry", "crit",
+                    "cannot read meet_registry: the database is unreachable or failing, "
+                    "so live meets are NOT being checked",
+                    evidence="see the meettrack cron logs for ReadTimeout / 5xx lines"))
+            else:
                 out.append(check_meet_freshness(
                     rows, now_epoch,
                     stale_warn_min=mf.get("stale_warn_min", 30),
@@ -242,7 +300,8 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
                     coverage_gap_warn=mf.get("coverage_gap_warn", 3),
                     coverage_gap_pct=mf.get("coverage_gap_pct", 15),
                     # Unset -> the counters inherit stale_warn_min.
-                    coverage_max_age_min=mf.get("coverage_max_age_min")))
+                    coverage_max_age_min=mf.get("coverage_max_age_min"),
+                    morning_grace_until=mf.get("morning_grace_until", 13)))
                 # Its own check name, so its alert and cooldown never hide
                 # behind a freshness alert that is already in crit.
                 out.append(check_meet_liveness(

@@ -19,6 +19,9 @@ def _no_live_jev_shadow(tmp_path, monkeypatch):
     jev_shadow.shadow_pass / load_key."""
     monkeypatch.setenv("WATCHDOG_JEV_SHADOW", "0")
     monkeypatch.setenv("WATCHDOG_LOG_DIR", str(tmp_path / "watchdog-logs"))
+    # The live expect monitor's state file would make the watchdog's meet rules
+    # stand down (defer_to_expect) on a host where it runs: never read it here.
+    monkeypatch.setenv("WATCHDOG_EXPECT_STATE", str(tmp_path / "expect-state.json"))
     # The same rule for every caller of the shared client: JEV_DISABLED makes jev.ask refuse
     # before any transport, and the usage ledger goes to a temp file. A test of the enabled
     # path deletes JEV_DISABLED itself and passes a fake `transport=`.
