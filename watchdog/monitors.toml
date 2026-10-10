@@ -101,7 +101,7 @@ racing_start            = "08:00"
 racing_end              = "22:00"
 db_timeout_s            = 8      # tiny probe; 2 failed runs in a row = CRIT
 db_fail_runs            = 2
-startlist_scope         = "requested"   # or "all": every listed POR meet
+startlist_scope         = "all"         # 2026-10-10 Rex: every listed POR meet (needs splash_poller all-Portugal start lists); "requested" = only meets asked for in the app
 startlist_lead_hours    = 24
 default_session_start   = "09:00"
 first_results_by        = "17:00"       # morning grace when no start time is known
