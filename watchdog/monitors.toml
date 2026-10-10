@@ -39,6 +39,8 @@ warn    = 10
 crit    = 16
 
 # --- Layer 2: Supabase row-growth budgets (rows/hour per table) ------------
+# Counts are planner ESTIMATES (Prefer: count=planned), not full scans: the
+# exact counts were the database's two most expensive queries (RCA 10 Oct 2026).
 [supabase]
 url           = "https://moaagxigxjyuuqygoqfg.supabase.co"
 key_env       = "SUPABASE_SERVICE_ROLE_KEY"
@@ -77,6 +79,55 @@ tick_crit_min      = 30
 launch_overdue_min = 30
 coverage_gap_warn  = 3
 coverage_gap_pct   = 15
+# Portugal only: the rules read racing hours in Europe/Lisbon.
+nations            = ["POR"]
+# Before 13:00 Lisbon a meet with no result yet today has not started racing,
+# so it is not "gone quiet" (afternoon-only meets). A measured gap still alerts.
+morning_grace_until = 13
+# While the expect monitor (below) has run in the last 15 min, it owns the
+# live-meet checks and these rules stand down; if it stops, they take over and
+# meets.expect-heartbeat says so.
+defer_to_expect    = true
+expect_fresh_min   = 15
+
+# --- Layer 4: MeetTrack "expected but missing" monitor ----------------------
+# watchdog/expect_run.py via watchdog/run-expect.sh, every 5 minutes.
+# Design, alert policy and how to add an expectation:
+# docs/meettrack-expectations.md. Times are Lisbon local.
+[expect]
+enabled                 = true
+nations                 = ["POR"]
+racing_start            = "08:00"
+racing_end              = "22:00"
+db_timeout_s            = 8      # tiny probe; 2 failed runs in a row = CRIT
+db_fail_runs            = 2
+startlist_scope         = "requested"   # or "all": every listed POR meet
+startlist_lead_hours    = 24
+default_session_start   = "09:00"
+first_results_by        = "17:00"       # morning grace when no start time is known
+first_results_grace_min = 60
+launch_grace_min        = 30
+tick_crit_min           = 30
+results_lag_min         = 20
+thin_pct                = 50     # an event with results for under half its start list is "thin"
+slot_lag_min            = 45
+source_gap_min          = 60
+repeat_crit_min         = 30
+repeat_warn_min         = 60
+repeat_startlist_min    = 360
+max_investigations      = 3
+# The AI narrative (Claude, Read tool) stays off until it runs under an
+# OS-enforced file boundary: poller logs are untrusted text. When on, it is
+# detached, capped at ai_timeout_s and outside the run lock.
+ai_narrative            = false
+ai_timeout_s            = 300
+
+# Stated session starts, when known from the meet programme (Lisbon time).
+# Without one, results are expected by first_results_by.
+# [[expect.start_times]]
+# sr_meet_id = "11113"
+# date       = "2026-10-11"
+# start      = "09:30"
 
 # --- Jev shadow mode (SHADOW ONLY) ------------------------------------------
 # A second opinion on cron-log tails from Jev (TypeSafe), written to

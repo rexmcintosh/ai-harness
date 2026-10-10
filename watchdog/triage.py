@@ -340,6 +340,15 @@ def _results_outstanding(row, now_epoch, max_age_min):
     return published > covered
 
 
+def _results_outstanding_unmeasured(row, now_epoch, max_age_min):
+    """True when the coverage counters are missing, stale or from the future,
+    so they say nothing about this tick."""
+    measured = _iso_epoch(row.get("coverage_at"))
+    if measured is None or (now_epoch - measured) / 60 > max_age_min:
+        return True
+    return _future_min(measured, now_epoch) is not None
+
+
 def check_meet_liveness(rows, now_epoch, *, tick_warn_min: int = 10,
                         tick_crit_min: int = 30, racing_start: int = 8,
                         racing_end: int = 22) -> CheckStatus:
@@ -409,7 +418,8 @@ def check_meet_freshness(rows, now_epoch, *,
                          launch_overdue_min: int = 30,
                          coverage_gap_warn: int = 3, coverage_gap_pct: int = 15,
                          coverage_max_age_min: int | None = None,
-                         racing_start: int = 8, racing_end: int = 22) -> CheckStatus:
+                         racing_start: int = 8, racing_end: int = 22,
+                         morning_grace_until: int = 13) -> CheckStatus:
     """The ABSENCE alert MeetTrack never had: every other check fires on 'too
     much'; a dead poller, a wedged writer, and an idle Saturday all used to
     look identical to healthy. `rows` is a recent slice of meet_registry.
@@ -436,7 +446,14 @@ def check_meet_freshness(rows, now_epoch, *,
               covers both unless an operator deliberately splits them.
       warn  — a live-by-date meet still 'discovered'/'queued' with no status
               movement for `launch_overdue_min` (the supervisor should have
-              dispatched it within one 5-minute tick).
+              dispatched it within one 5-minute tick). A meet whose probe
+              found no live feed (feed_type 'none') has nothing to launch and
+              is skipped: Castro Daire, 10 Oct 2026, raised two false WARNs.
+    Morning grace: before `morning_grace_until` (local hour), a meet with no
+    result yet TODAY has not started racing; it is not "gone quiet". Many
+    Portuguese meets race only in the afternoon (Benedita and Silves, 10 Oct
+    2026, started about 15:00-15:30). Whether racing really started is the
+    expect monitor's first-results check (watchdog/expectations.py).
     """
     local = _lisbon(now_epoch)
     today = local.date().isoformat()
@@ -461,7 +478,18 @@ def check_meet_freshness(rows, now_epoch, *,
         ref = _iso_epoch(r.get("last_ingest_at")) or _iso_epoch(r.get("updated_at"))
         age_min = (now_epoch - ref) / 60 if ref is not None else None
         if status in ("polling", "backfilling"):
-            if (age_min is not None and age_min >= stale_warn_min
+            last = _iso_epoch(r.get("last_ingest_at"))
+            started_today = (last is not None and
+                             _lisbon(last).date().isoformat() == today)
+            # A measured gap (published events without results) is never
+            # graced: that is a parser or writer fault, whatever the hour.
+            pub, cov = r.get("events_published"), r.get("events_with_results")
+            measured_gap = (pub is not None and cov is not None and pub > cov
+                            and not _results_outstanding_unmeasured(r, now_epoch,
+                                                                    coverage_max_age_min))
+            pre_race = (not started_today and local.hour < morning_grace_until
+                        and not measured_gap)
+            if (not pre_race and age_min is not None and age_min >= stale_warn_min
                     and _results_outstanding(r, now_epoch, coverage_max_age_min)):
                 stale.append(f"{r.get('sr_meet_id')} {name} quiet {age_min:.0f}m")
                 worst_stale_min = max(worst_stale_min, age_min)
@@ -470,7 +498,7 @@ def check_meet_freshness(rows, now_epoch, *,
                                       now_epoch, coverage_max_age_min)
             if gap:
                 blind.append(gap)
-        elif status in ("discovered", "queued"):
+        elif status in ("discovered", "queued") and r.get("feed_type") != "none":
             if age_min is not None and age_min >= launch_overdue_min:
                 unlaunched.append(f"{r.get('sr_meet_id')} {name} unlaunched {age_min:.0f}m")
 
@@ -499,7 +527,8 @@ def check_meet_freshness(rows, now_epoch, *,
 
 # --- triage (escalation + flap suppression) ---------------------------------
 
-def triage(statuses, prior_state, now_epoch, *, cooldown_hours: int = 6) -> dict:
+def triage(statuses, prior_state, now_epoch, *, cooldown_hours: int = 6,
+           fast_prefixes: tuple = ("meets.",), fast_cooldown_hours: float = 1) -> dict:
     """Decide what to escalate.
 
     A non-ok status *fires* (escalates) when it is new, when it has worsened
@@ -507,14 +536,19 @@ def triage(statuses, prior_state, now_epoch, *, cooldown_hours: int = 6) -> dict
     alert. Repeats at the same level within the window are suppressed (flap
     control). Recovered checks (now ok) are dropped from state.
 
+    Live-meet checks (``fast_prefixes``) repeat after ``fast_cooldown_hours``:
+    a problem during racing must not hide behind a 6-hour mute, as the 10 Oct
+    2026 database outage did.
+
     Returns ``{"escalate": bool, "fired": [CheckStatus], "state": new_state}``.
     """
-    cooldown = cooldown_hours * 3600
     fired = []
     new_state = {}
     for s in statuses:
         if s.level == "ok":
             continue  # recovered or healthy -> not carried in state
+        hours = fast_cooldown_hours if s.name.startswith(fast_prefixes) else cooldown_hours
+        cooldown = hours * 3600
         prior = prior_state.get(s.name)
         if prior is None:
             should_fire = True
