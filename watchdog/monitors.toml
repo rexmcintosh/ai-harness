@@ -116,7 +116,10 @@ repeat_crit_min         = 30
 repeat_warn_min         = 60
 repeat_startlist_min    = 360
 max_investigations      = 3
-ai_narrative            = true   # detached, capped at ai_timeout_s, outside the run lock
+# The AI narrative (Claude, Read tool) stays off until it runs under an
+# OS-enforced file boundary: poller logs are untrusted text. When on, it is
+# detached, capped at ai_timeout_s and outside the run lock.
+ai_narrative            = false
 ai_timeout_s            = 300
 
 # Stated session starts, when known from the meet programme (Lisbon time).

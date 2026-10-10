@@ -31,9 +31,13 @@ printf '%s\n' "$OUT"
 if [ "$RC" -ne 0 ] && [ "$RC" -ne 3 ] && [ "${1:-}" != "--dry-run" ]; then
   MARK="$LOG_DIR/expect-crash.marker"
   if [ ! -f "$MARK" ] || [ -n "$(find "$MARK" -mmin +60 2>/dev/null)" ]; then
-    touch "$MARK"
-    printf 'MeetTrack monitor could not run (rc=%s). Live meets are NOT being checked.\nSee %s\n' \
-      "$RC" "$LOG_DIR/expect.err" | timeout --kill-after=5 60 "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG_DIR/expect.err"
+    # The marker moves only after Telegram accepted the page, so a failed
+    # send is retried by the next 5-minute run, not an hour later.
+    if printf 'MeetTrack monitor could not run (rc=%s). Live meets are NOT being checked.\nSee %s\n' \
+         "$RC" "$LOG_DIR/expect.err" \
+       | timeout --kill-after=5 60 "$TG_SEND" "$CHAT_ID" - >/dev/null 2>>"$LOG_DIR/expect.err"; then
+      touch "$MARK"
+    fi
   fi
 fi
 exit "$RC"

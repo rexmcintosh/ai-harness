@@ -34,8 +34,7 @@ from pathlib import Path
 import tomllib
 
 from .expectations import (Snapshot, _thin, evaluate, hm_day, in_racing_window, iso_epoch,
-                           make_config,
-                           meet_zone, _zone)
+                           make_config, meet_zone, valid_sid, writer_lines, _zone)
 from .expect_alerts import POLICY_DEFAULTS, plan, render
 from .expect_investigate import Probes, investigate, write_investigation
 
@@ -50,7 +49,7 @@ RUN_DEFAULTS = {
     "read_timeout_s": 15,
     "max_investigations": 3,
     "investigation_budget_s": 40,
-    "ai_narrative": True,
+    "ai_narrative": False,
     "ai_timeout_s": 300,
     "ai_model": "haiku",
     "send_timeout_s": 60,
@@ -151,18 +150,8 @@ def _ps() -> str:
         return ""
 
 
-_WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
-
-
 def processes_by_meet(ps_text: str, ids) -> dict:
-    out = {sid: [] for sid in ids}
-    for ln in ps_text.splitlines():
-        if not any(w in ln for w in _WRITERS):
-            continue
-        for sid in ids:
-            if f"/{sid}/" in ln or f"sr-{sid}" in ln:
-                out[sid].append(ln.strip())
-    return out
+    return {sid: writer_lines(ps_text, sid) for sid in ids}
 
 
 def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> Snapshot:
@@ -186,36 +175,49 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
     snap.registry = rows
     live = []
     for r in rows:
+        if not valid_sid(r.get("sr_meet_id")):
+            continue                     # evaluate() reports it; never used in a URL or path
         mtz = meet_zone(cfg, r.get("nation"))
         day = datetime.fromtimestamp(now, tz=mtz).date().isoformat()
         if (r.get("start_date") or "") <= day <= (r.get("end_date") or r.get("start_date") or ""):
             if r.get("feed_type") in ("pdf", "fragment", "lenex"):
                 live.append((str(r["sr_meet_id"]), mtz, day))
+    t_read = run_cfg["read_timeout_s"]
+
+    def failed(sid, what, err):
+        snap.read_errors.setdefault(sid, []).append(f"{what}: {err}")
+
     if live:
         ids = ",".join(f"sr-{sid}" for sid, _, _ in live)
-        meets, _ = rest.get(f"meets?select=id,live_rankings_id,status,start_date,end_date,nation"
-                            f"&live_rankings_id=in.({ids})", timeout=run_cfg["read_timeout_s"])
+        meets, err = rest.get(f"meets?select=id,live_rankings_id,status,start_date,end_date,nation"
+                              f"&live_rankings_id=in.({ids})", timeout=t_read)
+        if meets is None:
+            for sid, _, _ in live:
+                failed(sid, "meets", err)
         by_lr = {m.get("live_rankings_id"): m for m in (meets or [])}
         for sid, mtz, day in live:
             m = by_lr.get(f"sr-{sid}")
             if not m:
-                continue
+                continue                 # no meets row yet: nothing seeded, nothing written
             snap.meets[sid] = m
-            evs, _ = rest.get(f"events?select=id,event_number,session_number,day_time,relay_count,"
-                              f"results(count),heats(count)&meet_id=eq.{m['id']}&order=event_number",
-                              timeout=run_cfg["read_timeout_s"])
+            evs, err = rest.get(f"events?select=id,event_number,session_number,day_time,relay_count,"
+                                f"results(count),heats(count)&meet_id=eq.{m['id']}&order=event_number",
+                                timeout=t_read)
+            if evs is None:
+                failed(sid, "events", err)
             snap.events[sid] = [_event(e) for e in (evs or [])]
             midnight = datetime.fromisoformat(day).replace(tzinfo=mtz).timestamp()
-            n, _ = rest.get(f"results?select=id&meet_id=eq.{m['id']}&created_at=gte.{_utc(midnight)}",
-                            timeout=run_cfg["read_timeout_s"], count=True)
+            n, err = rest.get(f"results?select=id&meet_id=eq.{m['id']}&created_at=gte.{_utc(midnight)}",
+                              timeout=t_read, count=True)
+            if n is None:
+                failed(sid, "results today", err or "no count")
             snap.results_today[sid] = n or 0
             thin = _thin(snap.events[sid], cfg)
             if thin and all(e.get("id") for e in thin):
                 ids_in = ",".join(e["id"] for e in thin)
                 newest, _ = rest.get(f"results?select=created_at&event_id=in.({ids_in})"
-                                     f"&order=created_at.desc&limit=1",
-                                     timeout=run_cfg["read_timeout_s"])
-                if newest:
+                                     f"&order=created_at.desc&limit=1", timeout=t_read)
+                if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
         snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live])
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
@@ -238,7 +240,11 @@ def _event(e: dict) -> dict:
 
 def real_probes() -> Probes:
     def tail(sid: str):
-        p = SPLASH_LOGS / f"poller-{sid}.log"
+        if not valid_sid(sid):
+            raise ValueError(f"not a meet id: {sid!r}")
+        p = (SPLASH_LOGS / f"poller-{sid}.log").resolve()
+        if not p.is_relative_to(SPLASH_LOGS.resolve()):
+            raise ValueError("log path outside the splash_poller logs")
         try:
             with p.open("rb") as fh:
                 fh.seek(0, os.SEEK_END)
@@ -256,6 +262,8 @@ def real_probes() -> Probes:
             return None
 
     def page(sid: str):
+        if not valid_sid(sid):
+            raise ValueError(f"not a meet id: {sid!r}")
         import requests
         r = requests.get(LIVE_PAGE.format(sid=sid), timeout=10,
                          headers={"User-Agent": "Mozilla/5.0 (MeetTrack monitor)"})
@@ -484,7 +492,7 @@ def main(argv=None) -> int:
     finally:
         lock.release()
     if (result["delivery"] in ("accepted", "uncertain") and result["investigations"]
-            and run_cfg.get("ai_narrative", True)):
+            and run_cfg.get("ai_narrative", False)):
         spawn_narrative(result["investigations"][0], run_cfg, log_dir)
     return 3 if result["delivery"] == "failed" else 0   # 3: send failed, retried next run
 

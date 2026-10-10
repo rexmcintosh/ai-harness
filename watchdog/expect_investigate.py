@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from .expectations import Expectation, Snapshot, _zone
+from .expectations import Expectation, Snapshot, _zone, writer_lines
 
 _ERROR_TYPES = [
     ("ReadTimeout", re.compile(r"ReadTimeout|read timed out", re.I)),
@@ -120,12 +120,7 @@ def investigate(exp: Expectation, snap: Snapshot, probes: Probes, *,
 
     # 2. writer process
     def _proc():
-        text = probes.ps()
-        mine = [ln.strip() for ln in text.splitlines()
-                if f"/{sid}/" in ln or f"sr-{sid}" in ln or f"--meet {sid}" in ln]
-        mine = [ln for ln in mine if any(w in ln for w in (
-            "track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet"))]
-        return mine
+        return writer_lines(probes.ps(), sid)
     procs = run("Writer process", _proc)
     if procs is not None:
         sections.append(("Writer process", procs or ["none running"]))

@@ -724,6 +724,107 @@ def test_wrapper_without_a_key_counts_db_failures_and_pages_on_the_second(tmp_pa
     assert "database not answering" in sent and "SUPABASE_SERVICE_ROLE_KEY not set" in sent
 
 
+def test_wrapper_retries_a_failed_crash_page_on_the_next_run(tmp_path):
+    env = _wrapper_env(tmp_path)
+    flaky = tmp_path / "flaky-tg-send"
+    flaky.write_text('#!/usr/bin/env bash\nd="$(dirname "$0")"\n'
+                     'if [ ! -f "$d/failed-once" ]; then touch "$d/failed-once"; exit 1; fi\n'
+                     'cat >> "$d/sent.txt"\n')
+    flaky.chmod(0o755)
+    env["WATCHDOG_TG_SEND"] = str(flaky)
+    bad = tmp_path / "dir-state"
+    bad.mkdir()
+    env["WATCHDOG_EXPECT_STATE"] = str(bad)
+    _wrap(env)
+    assert not (tmp_path / "sent.txt").exists()
+    _wrap(env)
+    assert "could not run" in (tmp_path / "sent.txt").read_text()
+
+
+# --- review round 1: partial blindness, ids, one process matcher -------------
+
+from watchdog.expectations import valid_sid, writer_lines
+
+PS = """\
+ 351232 01:00 /usr/bin/python3 track_pdf_meet.py --meet-url https://live.swimrankings.net/11185/ --live
+ 351300 01:00 /usr/bin/python3 lastheat_ingest.py --meet-url https://live.swimrankings.net/10987/ --live --ingest
+ 351301 01:00 /usr/bin/python3 reconcile_meet.py --sr-meet-id 10976
+ 351302 01:00 /usr/bin/python3 poller.py --feed lenex --meet-url https://live.swimrankings.net/111850/ --live
+ 351303 01:00 vim notes-11185.txt
+"""
+
+
+def test_one_writer_matcher_knows_every_supervisor_form():
+    assert len(writer_lines(PS, "11185")) == 1                 # not 111850, not vim
+    assert "lastheat_ingest" in writer_lines(PS, "10987")[0]
+    assert "reconcile_meet" in writer_lines(PS, "10976")[0]
+    assert writer_lines(PS, "../etc") == []
+
+
+def test_meet_ids_are_validated():
+    assert valid_sid("11113") and valid_sid(11113)
+    assert not any(valid_sid(x) for x in ("", "11113/../x", "../", "12a", None, True, "1" * 12))
+
+
+def test_an_invalid_registry_id_is_reported_not_used():
+    now = at("15:00")
+    rows = [reg(), reg("../../etc", "Bad")]
+    exps, _ = evaluate(snap(now, rows), CFG, {})
+    e = by_id(exps)["db:reads"]
+    assert e.status == "missed" and "not meet ids" in e.evidence
+    assert not any(x.sr_meet_id == "../../etc" for x in exps)
+
+
+def test_failed_per_meet_reads_are_unknown_not_a_false_miss():
+    now = at("17:30")
+    s = snap(now, [reg(coverage_at=iso(now - 30))])
+    s.read_errors = {"11113": ["results today: ReadTimeout"]}
+    exps, mem = evaluate(s, CFG, {})
+    e = by_id(exps)
+    assert e["first:11113:2026-10-10"].status == "unknown"
+    assert e["db:reads"].status == "pending"
+    exps, mem = evaluate(s, CFG, mem)
+    reads = by_id(exps)["db:reads"]
+    assert reads.status == "missed" and "ReadTimeout" in reads.evidence
+    notices, _ = plan(exps, {}, now, POLICY, True)
+    assert [n.id for n in notices] == ["db:reads"]
+    assert "some database reads failing" in render(notices, now)
+
+
+def test_snapshot_records_read_failures():
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(), reg("x/../y")], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1", "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return None, "HTTP 500"
+            if path.startswith("results"):
+                return None, "ReadTimeout"
+            return [], None
+    s = er.build_snapshot(at("17:00"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+    assert s.read_errors["11113"] == ["events: HTTP 500", "results today: ReadTimeout"]
+    assert set(s.processes) == {"11113"}
+
+
+def test_log_tail_refuses_ids_that_are_not_meet_ids(tmp_path, monkeypatch):
+    monkeypatch.setattr(er, "SPLASH_LOGS", tmp_path)
+    (tmp_path / "poller-11113.log").write_text("hello\n")
+    probes = er.real_probes()
+    assert probes.read_log_tail("11113") == "hello\n"
+    with pytest.raises(ValueError):
+        probes.read_log_tail("../secret")
+
+
+def test_the_ai_narrative_is_off_by_default():
+    assert er.RUN_DEFAULTS["ai_narrative"] is False
+    _, run_cfg = er.load_config(er.Path(__file__).resolve().parents[1] / "watchdog" / "monitors.toml")
+    assert run_cfg["ai_narrative"] is False
+
+
 def test_wrapper_dry_run_never_sends(tmp_path):
     env = _wrapper_env(tmp_path)
     bad = tmp_path / "d"

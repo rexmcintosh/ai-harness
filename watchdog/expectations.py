@@ -27,6 +27,7 @@ dict so the runner can persist it as JSON.
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time as dtime, timedelta, timezone
 
@@ -60,6 +61,26 @@ DEFAULTS = {
 }
 
 LIVE_FEEDS = ("pdf", "fragment", "lenex")
+WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
+
+
+def valid_sid(sid) -> bool:
+    """A swimrankings meet id is a short run of digits. Checked once, before an
+    id from the database goes into a URL, a query, a file path or a ps match."""
+    s = str(sid) if isinstance(sid, (str, int)) and not isinstance(sid, bool) else ""
+    return s.isdigit() and 0 < len(s) <= 9
+
+
+def writer_lines(ps_text: str, sid: str) -> list[str]:
+    """`ps` lines of writer processes for this meet: every form the supervisor
+    starts (splash_poller supervise_meets._poller_argv): the live URL
+    .../<id>/ for the pdf, fragment and Lenex writers, and --sr-meet-id <id>
+    for the reconcile one-shot. One matcher for the check and the investigation."""
+    if not valid_sid(sid):
+        return []
+    rx = re.compile(rf"(?:live\.swimrankings\.net/{sid}/|--sr-meet-id[ =]{sid}\b|\bsr-{sid}\b)")
+    return [ln.strip() for ln in (ps_text or "").splitlines()
+            if any(w in ln for w in WRITERS) and rx.search(ln)]
 
 
 def make_config(raw: dict | None) -> dict:
@@ -116,6 +137,7 @@ class Snapshot:
     processes: dict | None = None                      # "11113" -> [ps lines]; None = unknown
     thin_last_write: dict = field(default_factory=dict)  # "11113" -> epoch of the newest
                                                          # result on its thin events
+    read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
 
 
 # ---------------------------------------------------------------------------
@@ -540,6 +562,26 @@ def eval_hygiene(snap: Snapshot, cfg: dict) -> Expectation | None:
         f"ignored by the monitor, still ACTIVE in meets: {items}", window="always")
 
 
+def eval_reads(snap: Snapshot, cfg: dict, mem: dict, bad_ids: list) -> Expectation:
+    """Partial blindness: the database answers but some per-meet reads fail, or
+    the registry holds ids we refuse to use. Two runs in a row, like the probe."""
+    expected = "every per-meet read succeeds and every registry id is a meet id"
+    problems = [f"{sid}: {'; '.join(e)}" for sid, e in sorted(snap.read_errors.items())]
+    if bad_ids:
+        problems.append(f"registry ids that are not meet ids (skipped): {', '.join(bad_ids[:5])}")
+    if not problems:
+        mem["read_fail_runs"] = 0
+        return Expectation("db:reads", "db", None, expected, None, "met", "crit", "all reads ok",
+                           window="always")
+    runs = int(mem.get("read_fail_runs", 0)) + 1
+    mem["read_fail_runs"] = runs
+    status = "missed" if runs >= int(cfg["db_fail_runs"]) or bad_ids else "pending"
+    return Expectation("db:reads", "db", None, expected, None, status,
+                       "warn" if bad_ids and not snap.read_errors else "crit",
+                       f"{runs} run(s) in a row with failed reads; those meets are not judged: "
+                       f"{' | '.join(problems)}", window="always")
+
+
 def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expectation], dict]:
     mem = copy.deepcopy(memory or {})
     out = eval_db(snap, cfg, mem)
@@ -552,9 +594,12 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
         return out, mem
 
     nations = set(cfg["nations"])
-    live_names, seen_ids = [], set()
+    live_names, bad_ids = [], []
     for row in snap.registry:
         if row.get("nation") not in nations:
+            continue
+        if not valid_sid(row.get("sr_meet_id")):
+            bad_ids.append(repr(row.get("sr_meet_id"))[:40])
             continue
         tz = meet_zone(cfg, row.get("nation"))
         day = local(snap.now, tz).date().isoformat()
@@ -582,10 +627,16 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
                       eval_results(row, snap, cfg, tz, day, mem),
                       eval_schedule(row, snap, cfg, tz, day),
                       eval_source(row, snap, cfg, tz, day)]
+        errs = snap.read_errors.get(str(row.get("sr_meet_id")))
         for d in downstream:
             if d is None:
                 continue
-            if writer.status == "missed" and d.status == "missed":
+            if errs and d.status in ("missed", "met", "pending"):
+                # A failed read is not evidence either way: never page on it,
+                # never resolve on it. db:reads says the meet is partly blind.
+                d.status = "unknown"
+                d.evidence = f"not judged: {'; '.join(errs)}"
+            elif writer.status == "missed" and d.status == "missed":
                 # One root cause, one alert: a stopped writer explains missing
                 # results. Kept open (not resolved) until the writer is back.
                 d.status = "unknown"
@@ -594,6 +645,7 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
     hyg = eval_hygiene(snap, cfg)
     if hyg:
         out.append(hyg)
+    out.append(eval_reads(snap, cfg, mem, bad_ids))
 
     seen_ids = {e.id for e in out}
     mem["gap_since"] = {k: v for k, v in (mem.get("gap_since") or {}).items() if k in seen_ids}

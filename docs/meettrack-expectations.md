@@ -31,6 +31,7 @@ Each expectation has an id, a deadline, a status (`met`, `missed`, `pending`,
 |---|---|---|---|
 | `db:reachable` | the database answers a tiny query (`meet_registry?select=sr_meet_id&limit=1`, 8 s timeout) | 2 failed runs in a row (about 5-10 min) | crit, always |
 | `db:registry` | the meet registry can be read | at once | crit, always |
+| `db:reads` | every per-meet read succeeds, every registry id is a meet id | 2 runs with failed reads; a bad id at once | crit (warn for bad ids only), always |
 | `startlist:<id>` | a Portugal meet someone requested in the app has its start list (`entries_ingested_at`) | 24 h before racing starts; a late request gets 60 min | warn, always |
 | `writer:<id>:<day>` | the live writer runs and ticks (`coverage_at` under 30 min old; or the process exists, for writers that do not stamp ticks) | racing start + 30 min | crit, racing |
 | `first:<id>:<day>` | results start appearing today (results written today, or new result files on the host) | stated start + 60 min; else 17:00 Lisbon (morning grace) | warn, racing |
@@ -49,6 +50,8 @@ Scope and data:
 - Stale `ACTIVE` rows in `meets` are listed as a note and otherwise ignored.
 - When the writer is down, its results expectations become `unknown`: one
   root cause, one alert.
+- A failed per-meet read (events, today's results) makes that meet's results
+  expectations `unknown`, never "0 results"; `db:reads` alerts if it lasts.
 - While the database is down, every meet expectation is `unknown`. The
   database alert lists the meets that were live at the last good read.
 - Start times: `events.day_time` when the start list carries it, else a stated
@@ -113,6 +116,16 @@ may spawn the AI narrative (`ai_narrative = true`): a detached child under
 `prompts/investigate-expect.md`) on the investigation file, appends "AI
 narrative" to it and sends a short follow-up. If it fails or times out, the file
 says so and nothing else happens. It can never delay or block the next run.
+
+The narrative is **off by default** (`ai_narrative = false`). Poller logs are
+untrusted text, and the Claude Read tool is not limited to the log folders by
+anything stronger than the prompt. Turn it on only once the investigator runs
+under an OS-enforced file boundary (a restricted user or container). The
+deterministic investigation does not depend on it.
+
+Meet ids from the registry are checked (`valid_sid`: digits only) before they
+go into a URL, a query, a log path or a process match. A bad id is reported by
+`db:reads`, never used.
 
 ## Running it
 

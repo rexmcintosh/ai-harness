@@ -137,6 +137,7 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
 
 _TITLE = {
     "db": "database not answering",
+    "db:reads": "some database reads failing",
     "startlist": "start list missing",
     "writer": "live writer not running",
     "first_results": "no results since racing should have started",
@@ -162,7 +163,7 @@ def render(notices: list[Notice], now: float) -> str:
     stamp = datetime.fromtimestamp(now, tz=tz).strftime("%a %d %b %H:%M Lisbon")
     lines = [f"MeetTrack monitor, {stamp}"]
     for n in notices:
-        what = _TITLE.get(_kind_of(n.id), _kind_of(n.id))
+        what = _TITLE.get(n.id, _TITLE.get(_kind_of(n.id), _kind_of(n.id)))
         who = f"{n.meet}: " if n.meet else ""
         sev = "CRIT" if n.severity == "crit" else "WARN"
         if n.kind == "new":
