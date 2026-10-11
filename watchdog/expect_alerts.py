@@ -26,7 +26,7 @@ from .expectations import Expectation, _zone
 SEVERITY_RANK = {"info": 0, "warn": 1, "crit": 2}
 
 POLICY_DEFAULTS = {
-    "repeat_crit_min": 30,
+    "repeat_crit_min": 60,
     "repeat_warn_min": 60,
     "repeat_startlist_min": 360,
 }

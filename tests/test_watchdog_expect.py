@@ -658,7 +658,7 @@ def test_a_held_run_lock_skips_the_run(tmp_path):
 def test_monitors_toml_carries_the_expect_section():
     cfg, run_cfg = er.load_config(er.Path(__file__).resolve().parents[1] / "watchdog" / "monitors.toml")
     assert cfg["nations"] == ["POR"] and cfg["results_lag_min"] == 20
-    assert run_cfg["db_timeout_s"] == 8 and run_cfg["repeat_crit_min"] == 30
+    assert run_cfg["db_timeout_s"] == 8 and run_cfg["repeat_crit_min"] == 60
     assert "db_timeout_s" not in cfg and "enabled" not in cfg
 
 

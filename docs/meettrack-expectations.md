@@ -80,7 +80,7 @@ read. The 30-minute watchdog's full-table counts are now planner estimates
   RESOLVED, CLOSED. Database lines first.
 - De-duplicated by expectation id. A NEW alert goes out once; after that only
   reminders.
-- Reminders while the problem persists: crit every 30 min, warn every 60 min,
+- Reminders while the problem persists: crit every 60 min (was 30 until 2026-10-11), warn every 60 min,
   start lists every 6 h. A severity rise reminds at once.
 - RESOLVED once, with how long it lasted, when the expectation is met again.
 - Racing-window expectations alert only 08:00-22:00 Lisbon. If one is still
