@@ -132,7 +132,8 @@ class BackupTests(unittest.TestCase):
         self.make_db()
         for name, data in {'.env': 'private setting', 'projects/app/.git/unpushed': 'local commit',
                            'projects/app/node_modules/lib/index.js': 'rebuild me',
-                           'projects/app/asset.png': 'valuable image'}.items():
+                           'projects/app/asset.png': 'valuable image',
+                           '.config/restic-offsite/config.json': 'machine-bound credentials'}.items():
             p = self.home / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(data)
@@ -146,6 +147,7 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((restored / 'projects/app/.git/unpushed').read_text(), 'local commit')
         self.assertEqual((restored / 'projects/app/asset.png').read_text(), 'valuable image')
         self.assertFalse((restored / 'projects/app/node_modules').exists())
+        self.assertFalse((restored / '.config/restic-offsite').exists())
         self.assertFalse((restored / r'projects/app/state[work]?*\data.sqlite').exists())
         self.assertFalse((restored / r'projects/app/state[work]?*\data.sqlite-wal').exists())
         with sqlite3.connect(restored / r'.local/state/restic-offsite/sqlite/projects/app/state[work]?*\data.sqlite') as conn:
@@ -309,6 +311,29 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((status['status'], status['failed_stage'], status['error_type']),
                          ('failed', 'backup', 'Terminated'))
         self.assertFalse((self.state / 'sqlite').exists())
+
+    # A kill after verification must not leave a healthy-looking status for an unfinished run.
+    def test_kill_during_retention_leaves_unfinished_status(self):
+        backup.restic(self.config, ['init'])
+        executable = self.base / 'kill-in-retention'
+        executable.write_text('#!/bin/sh\ncase "$*" in *forget*) kill -9 $PPID; exit 0;; esac\n'
+                              'exec /usr/bin/restic "$@"\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        process = self.run_cli('backup')
+        self.assertEqual(process.returncode, -signal.SIGKILL)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual((status['status'], status['stage'], status['verified']), ('running', 'retention', True))
+        self.assertEqual(json.loads((self.state / 'last-success.json').read_text())['snapshot_id'],
+                         status['snapshot_id'])
+        self.assertEqual(json.loads(self.run_cli('status').stdout.read())['status'], 'interrupted')
+        backup.atomic_json(self.state / 'status.json', status)
+        self.config['restic'] = '/usr/bin/restic'
+        backup.run_backup(self.config)
+        rerun = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual(rerun['status'], 'ok')
+        self.assertEqual(rerun['previous_run_interrupted'],
+                         {'started_at': status['started_at'], 'stage': 'retention'})
 
     # SIGKILL or OOM cannot be caught; status must still show the run did not finish.
     def test_status_reports_killed_run_as_interrupted(self):

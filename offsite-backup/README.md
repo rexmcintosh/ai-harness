@@ -15,7 +15,8 @@ in each snapshot, with a `manifest.json` list. Frozen `.codex/recovery-backups`
 and `migration-archive` are included directly and are not duplicated into staging.
 
 Excludes `node_modules`, `.venv`, `venv`, `__pycache__`, `.cache`, `.npm`, `.rustup`,
-`.local/share/pipx/venvs`, and `.cargo/registry`. Check these exclusions before
+`.local/share/pipx/venvs`, `.cargo/registry`, and the runner's own machine-bound
+`.config/restic-offsite` credentials, which live in the Bitwarden recovery record. Check these exclusions before
 placing unique files inside those directories. Backups preserve links but do not
 follow them. Data outside `/home/dev`, remote Supabase/Postgres databases, macOS
 files, Lima's disk image, and system configuration require separate recovery.
@@ -262,15 +263,23 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - The runner removes its SQLite staging before it writes `status: ok`. If that
   removal fails, the status is `failed` with `failed_stage: cleanup`, and
   `last-success.json` still names the verified snapshot.
-- Captured restic stderr is spooled to a private unlinked temporary file. Only
-  the last 32 KiB, starting at a whole line, is kept and redacted.
+- Captured restic stderr is drained as it arrives. Only the last 32 KiB is kept
+  in memory, starting at a whole line, and it is redacted before it is saved.
 - SIGTERM, SIGINT and SIGHUP, including a systemd stop or `TimeoutStartSec`
   expiry, record `status: failed` with `error_type: Terminated` and the stage
   that was running, then remove staging. An uncatchable SIGKILL or OOM kill
   leaves `running` on disk; `restic-offsite status` then records and reports
   `interrupted` when no run holds the lock. Treat `interrupted` like `failed`.
-- Database copying also checks free space during each copy and stops while the
-  512 MiB reserve remains, because live databases can grow after the estimate.
+- Database copying also checks free space before and during each copy and
+  stops while the 512 MiB reserve remains, because live databases can grow
+  after the estimate.
+- `status.json` stays `running` through verification, retention and cleanup,
+  and becomes `ok` only at the end. `last-success.json` records the verified
+  snapshot as soon as verification passes. Any unfinished state with no lock
+  holder is reported as `interrupted`, and the next run records it under
+  `previous_run_interrupted`.
+- New snapshots exclude `.config/restic-offsite`. Earlier snapshots still hold
+  it, so keep the `--exclude` in the recovery restore command.
 
-Nineteen focused backup tests pass. Run `./install.sh` after merging so the
+Twenty focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.

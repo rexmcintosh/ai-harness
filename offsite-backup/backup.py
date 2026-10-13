@@ -16,15 +16,18 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import threading
 import time
 import tempfile
 from zoneinfo import ZoneInfo
 import socket
 
 SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.cache', '.npm', '.rustup'}
-EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry')
+# The runner's own credentials are machine-bound and kept in the recovery record instead.
+EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry', '.config/restic-offsite')
 CONFIG = Path.home() / '.config/restic-offsite/config.json'
 STDERR_TAIL = 32768
+TERMINAL = ('ok', 'failed', 'interrupted')
 DISK_RESERVE = 512 * 1024 * 1024
 
 
@@ -80,16 +83,36 @@ def restic(config, args, capture=False):
     timeout = config.get('restic_timeout', 10 * 60 * 60)
     if not capture:
         return subprocess.run(command, env=env, check=True, timeout=timeout)
-    # Spool stderr to a private unlinked file so a flood of errors cannot fill memory.
-    with tempfile.TemporaryFile(dir=config['state']) as stderr_file:
-        result = subprocess.run(command, env=env, stdout=subprocess.PIPE, stderr=stderr_file,
-                                timeout=timeout)
-        if result.returncode == 0:
-            return result
-        size = stderr_file.seek(0, os.SEEK_END)
-        start = max(0, size - STDERR_TAIL)
-        stderr_file.seek(start)
-        tail = stderr_file.read()
+    # Drain both pipes concurrently; keep only a bounded stderr tail, never spooled to disk.
+    process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, tail, cut = [], bytearray(), [False]
+    def drain_stdout():
+        stdout.append(process.stdout.read())
+    def drain_stderr():
+        for chunk in iter(lambda: process.stderr.read1(65536), b''):
+            tail.extend(chunk)
+            if len(tail) > STDERR_TAIL:
+                del tail[:-STDERR_TAIL]
+                cut[0] = True
+    readers = [threading.Thread(target=f, daemon=True) for f in (drain_stdout, drain_stderr)]
+    for reader in readers:
+        reader.start()
+    try:
+        returncode = process.wait(timeout=timeout)
+    except BaseException:
+        process.kill()
+        process.wait()
+        for reader in readers:
+            reader.join(timeout=5)
+        raise
+    for reader in readers:
+        reader.join()
+    process.stdout.close()
+    process.stderr.close()
+    result = subprocess.CompletedProcess(command, returncode, stdout[0] if stdout else b'', None)
+    if returncode == 0:
+        return result
+    tail, start = bytes(tail), cut[0]
     if start:
         # Drop the partial first line so a cut-off credential cannot escape redaction.
         tail = tail.partition(b'\n')[2]
@@ -100,13 +123,13 @@ def restic(config, args, capture=False):
             detail = detail.replace(config[field], '[redacted]')
     try:
         atomic_json(Path(config['state']) / 'last-error.json', {
-            'operation': args[0] if args else 'unknown', 'exit_code': result.returncode,
+            'operation': args[0] if args else 'unknown', 'exit_code': returncode,
             'stderr': detail[-STDERR_TAIL:], 'stderr_truncated': bool(start),
             'at': datetime.now(timezone.utc).isoformat()})
     except Exception:
         # Diagnostics are best effort; preserve the actual command failure.
         print('Could not save private command diagnostics.', file=sys.stderr)
-    raise subprocess.CalledProcessError(result.returncode, command, result.stdout,
+    raise subprocess.CalledProcessError(returncode, command, result.stdout,
                                         detail[-STDERR_TAIL:].encode())
 
 
@@ -141,6 +164,8 @@ def snapshot_databases(home, stage, timeout=600):
     stage.mkdir(parents=True, mode=0o700)
     manifest = []
     for source in databases:
+        if shutil.disk_usage(stage).free < DISK_RESERVE:
+            raise RuntimeError('Disk space fell below the reserve during database copies')
         relative = source.relative_to(home)
         target = stage / relative
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -169,6 +194,13 @@ def run_backup(config):
         stage = state / 'sqlite'
         status = {'status': 'running', 'stage': 'sqlite', 'verified': False,
                   'started_at': datetime.now(timezone.utc).isoformat()}
+        try:
+            previous = json.loads((state / 'status.json').read_text())
+        except (OSError, ValueError):
+            previous = {}
+        if previous.get('status', 'ok') not in TERMINAL:
+            # The lock is ours, so that run was killed before it recorded a result.
+            status['previous_run_interrupted'] = {k: previous.get(k) for k in ('started_at', 'stage')}
         atomic_json(state / 'status.json', status)
         try:
             # Only this runner owns this exact staging directory.
@@ -196,15 +228,14 @@ def run_backup(config):
             result = restic(config, args, capture=True)
             events = (json.loads(line) for line in reversed(result.stdout.splitlines()) if line)
             summary = next(e for e in events if e.get('message_type') == 'summary')
-            status.update(status='backed_up', snapshot_id=summary['snapshot_id'],
-                          probe=probe, database_count=len(manifest),
+            # The run stays "running" until cleanup; only last-success records a verified snapshot.
+            status.update(snapshot_id=summary['snapshot_id'], probe=probe,
+                          database_count=len(manifest), stage='verification',
                           finished_at=datetime.now(timezone.utc).isoformat())
             atomic_json(state / 'status.json', status)
-            status['stage'] = 'verification'
-            atomic_json(state / 'status.json', status)
-            status = _verify_locked(config)
-            atomic_json(state / 'last-success.json', status)
-            status['stage'] = 'retention'
+            verified = _verify_locked(config, dict(status))
+            atomic_json(state / 'last-success.json', verified)
+            status.update(verified=True, verified_at=verified['verified_at'], stage='retention')
             atomic_json(state / 'status.json', status)
             retention = ['forget', '--host', config['host'], '--tag', 'bebop-offsite',
                          '--group-by', 'host,tags', '--keep-daily', '30', '--keep-monthly', '6']
@@ -242,11 +273,13 @@ def verify(config):
         return _verify_locked(config)
 
 
-def _verify_locked(config):
+def _verify_locked(config, status=None):
     state = Path(config['state'])
-    status = json.loads((state / 'status.json').read_text())
-    if status['status'] not in ('backed_up', 'ok'):
-        raise RuntimeError('No complete backup available to verify')
+    in_run = status is not None
+    if not in_run:
+        status = json.loads((state / 'status.json').read_text())
+        if status['status'] != 'ok':
+            raise RuntimeError('No complete backup available to verify')
     # Every run checks repository structure and restores an exact snapshot's probe.
     # A fresh, temporary cache avoids fetching the same remote metadata pack
     # for every tree. It never carries previously cached data into the check.
@@ -257,14 +290,15 @@ def _verify_locked(config):
     if actual != status['probe']:
         raise RuntimeError('Restored recovery probe does not match')
     status.update(status='ok', verified=True, verified_at=datetime.now(timezone.utc).isoformat())
-    atomic_json(state / 'status.json', status)
+    if not in_run:
+        atomic_json(state / 'status.json', status)
     return status
 
 
 def show_status(config):
     state = Path(config['state'])
     status = json.loads((state / 'status.json').read_text())
-    if status.get('status') == 'running':
+    if status.get('status') not in TERMINAL:
         try:
             with run_lock(state):
                 # Nothing holds the lock, so the run was killed before it could record a result.
