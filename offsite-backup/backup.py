@@ -148,7 +148,10 @@ def run_backup(config):
             manifest = snapshot_databases(home, stage, timeout=config.get('sqlite_timeout', 600))
             probe = secrets.token_hex(32)
             (stage / 'recovery-probe.txt').write_text(probe)
-            args = ['backup', str(home), '--host', config['host'], '--tag', 'bebop-offsite', '--json']
+            # --quiet keeps JSON output to the final summary; status lines would
+            # otherwise accumulate in memory for the whole multi-hour upload.
+            args = ['backup', str(home), '--host', config['host'], '--tag', 'bebop-offsite',
+                    '--json', '--quiet']
             for directory in sorted(SKIP_DIRS):
                 args += ['--exclude', directory]
             # Exclude live SQLite files and journals; restore the consistent copies instead.
@@ -162,8 +165,8 @@ def run_backup(config):
             status['stage'] = 'backup'
             atomic_json(state / 'status.json', status)
             result = restic(config, args, capture=True)
-            events = [json.loads(line) for line in result.stdout.splitlines() if line]
-            summary = next(e for e in reversed(events) if e.get('message_type') == 'summary')
+            events = (json.loads(line) for line in reversed(result.stdout.splitlines()) if line)
+            summary = next(e for e in events if e.get('message_type') == 'summary')
             status.update(status='backed_up', snapshot_id=summary['snapshot_id'],
                           probe=probe, database_count=len(manifest),
                           finished_at=datetime.now(timezone.utc).isoformat())
@@ -180,6 +183,10 @@ def run_backup(config):
             if datetime.now(ZoneInfo('Europe/Lisbon')).weekday() == 6:
                 retention += ['--prune']
             restic(config, retention)
+            # Report success only after this run's staging is gone.
+            status['stage'] = 'cleanup'
+            atomic_json(state / 'status.json', status)
+            shutil.rmtree(stage)
             status.update(status='ok', stage='complete')
             atomic_json(state / 'status.json', status)
             print('Backup and recovery check passed.', flush=True)

@@ -250,3 +250,18 @@ The verified snapshot remains recoverable independently of that later run.
 Private commissioning evidence is in `~/.local/state/restic-offsite/`, including
 `last-success.json`, `cloud-recovery-test.json`, test logs and review records.
 Use the health checks above for current status rather than this dated record.
+
+## Review fixes, 2026-10-13
+
+Seven scheduled runs from 2026-10-07 to 2026-10-13 each finished with exit status 0
+and a passed recovery check. Review then found two reliability gaps, now fixed:
+
+- `restic backup` runs with `--json --quiet`, so its output is only the final
+  summary. Before, about 40 progress lines per second were held in memory for
+  the whole upload, which reaches hundreds of thousands of lines on a daily run.
+- The runner removes its SQLite staging before it writes `status: ok`. If that
+  removal fails, the status is `failed` with `failed_stage: cleanup`, and
+  `last-success.json` still names the verified snapshot.
+
+Fifteen focused backup tests pass. Run `./install.sh` after merging so the
+installed runner matches this version; the timer stays enabled.

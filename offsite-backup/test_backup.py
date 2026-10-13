@@ -206,6 +206,38 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(status['failed_stage'], 'retention')
         self.assertEqual(status['restic_exit_code'], 19)
 
+    # Buffered per-second status lines from a multi-hour upload can exhaust memory.
+    def test_backup_requests_summary_only_json(self):
+        executable = self.base / 'quiet-observer'
+        executable.write_text('#!/bin/sh\ncase "$*" in *" backup "*) case " $* " in *" --quiet "*) ;; *) exit 82;; esac;; esac\n'
+                              'exec /usr/bin/restic "$@"\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        backup.restic(self.config, ['init'])
+        backup.run_backup(self.config)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual(status['status'], 'ok')
+        self.assertTrue(status['snapshot_id'])
+
+    # A run that cannot remove its staging must not report itself healthy.
+    def test_post_success_cleanup_failure_is_reported_failed(self):
+        backup.restic(self.config, ['init'])
+        stage = self.state / 'sqlite'
+        real_rmtree = backup.shutil.rmtree
+        def blocked(path, *args, **kwargs):
+            if Path(path) == stage:
+                raise PermissionError('cleanup blocked')
+            return real_rmtree(path, *args, **kwargs)
+        with patch.object(backup.shutil, 'rmtree', side_effect=blocked):
+            with self.assertRaises(PermissionError):
+                backup.run_backup(self.config)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual(status['status'], 'failed')
+        self.assertEqual(status['failed_stage'], 'cleanup')
+        self.assertTrue(status['verified'])
+        self.assertEqual(json.loads((self.state / 'last-success.json').read_text())['snapshot_id'],
+                         status['snapshot_id'])
+
     # Two runs sharing staging would overwrite the only consistent DB copy.
     def test_overlap_refused(self):
         import fcntl
