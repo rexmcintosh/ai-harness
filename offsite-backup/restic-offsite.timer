@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily off-site backup at 03:30 Lisbon time
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Europe/Lisbon
+RandomizedDelaySec=10m
+Persistent=true
+Unit=restic-offsite.service
+
+[Install]
+WantedBy=timers.target

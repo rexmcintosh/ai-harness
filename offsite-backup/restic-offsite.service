@@ -1,0 +1,10 @@
+[Unit]
+Description=Encrypted off-site home backup to Backblaze B2
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/restic-offsite backup
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+TimeoutStartSec=12h
