@@ -195,7 +195,14 @@ def snapshot_databases(home, stage, timeout=600, discovered=None):
             # Databases can grow after the estimate; stop while the reserve still remains.
             if shutil.disk_usage(stage).free < DISK_RESERVE:
                 raise RuntimeError('Disk space fell below the reserve during database copies')
-        with closing(sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=30)) as src:
+        try:
+            source_db = sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=30)
+        except sqlite3.OperationalError:
+            if not source.exists():
+                # Deleted after the existence check; still nothing left to copy.
+                continue
+            raise
+        with closing(source_db) as src:
             with closing(sqlite3.connect(target)) as dst:
                 src.backup(dst, pages=256, progress=progress)
                 if dst.execute('PRAGMA quick_check').fetchone() != ('ok',):
@@ -217,8 +224,12 @@ def run_backup(config):
                   'started_at': datetime.now(timezone.utc).isoformat()}
         try:
             previous = json.loads((state / 'status.json').read_text())
-        except (OSError, ValueError):
+        except FileNotFoundError:
             previous = {}
+        except (OSError, ValueError):
+            previous = {'status': 'unknown'}
+        if not isinstance(previous, dict):
+            previous = {'status': 'unknown'}
         if previous.get('status', 'ok') not in ('ok', 'failed'):
             # The lock is ours, so that run was killed before it recorded a result.
             status['previous_run_interrupted'] = {k: previous.get(k) for k in ('started_at', 'stage')}
@@ -228,7 +239,14 @@ def run_backup(config):
             if stage.exists():
                 shutil.rmtree(stage)
             for stale_cache in state.glob('verify-cache-*'):
-                shutil.rmtree(stale_cache)
+                try:
+                    if stale_cache.is_dir() and not stale_cache.is_symlink():
+                        shutil.rmtree(stale_cache)
+                    else:
+                        stale_cache.unlink()
+                except OSError:
+                    # Excluded from backups, so a leftover cache only costs local space.
+                    print(f'Could not remove stale {stale_cache.name}; continuing.', file=sys.stderr)
             discovered = []
             manifest = snapshot_databases(home, stage, timeout=config.get('sqlite_timeout', 600),
                                           discovered=discovered)

@@ -412,6 +412,27 @@ class BackupTests(unittest.TestCase):
             backup.run_backup(self.config)
         self.assertIn(str(self.state) + '/verify-cache-*', next(a for a in args if a[0] == 'backup'))
 
+    def test_database_removed_before_open_is_skipped(self):
+        db = self.make_db()
+        real_connect = sqlite3.connect
+        def vanish(target, *args, **kwargs):
+            if str(target).startswith('file:'):
+                for suffix in ('', '-wal', '-shm'):
+                    Path(str(db) + suffix).unlink(missing_ok=True)
+            return real_connect(target, *args, **kwargs)
+        with patch.object(backup.sqlite3, 'connect', side_effect=vanish):
+            self.assertEqual(backup.snapshot_databases(self.home, self.state / 'sqlite'), [])
+
+    def test_malformed_previous_status_is_recorded_and_replaced(self):
+        backup.restic(self.config, ['init'])
+        (self.state / 'status.json').write_text('[]')
+        (self.state / 'verify-cache-file').write_text('stray file')
+        backup.run_backup(self.config)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual(status['status'], 'ok')
+        self.assertIn('previous_run_interrupted', status)
+        self.assertFalse((self.state / 'verify-cache-file').exists())
+
     def test_config_directory_must_be_private(self):
         config_dir = self.home / '.config/restic-offsite'
         config_dir.mkdir(parents=True, mode=0o700)
