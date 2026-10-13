@@ -205,7 +205,7 @@ def run_backup(config):
             previous = json.loads((state / 'status.json').read_text())
         except (OSError, ValueError):
             previous = {}
-        if previous.get('status', 'ok') not in TERMINAL:
+        if previous.get('status', 'ok') not in ('ok', 'failed'):
             # The lock is ours, so that run was killed before it recorded a result.
             status['previous_run_interrupted'] = {k: previous.get(k) for k in ('started_at', 'stage')}
         atomic_json(state / 'status.json', status)
@@ -238,7 +238,7 @@ def run_backup(config):
             # The run stays "running" until cleanup; only last-success records a verified snapshot.
             status.update(snapshot_id=summary['snapshot_id'], probe=probe,
                           database_count=len(manifest), stage='verification',
-                          finished_at=datetime.now(timezone.utc).isoformat())
+                          uploaded_at=datetime.now(timezone.utc).isoformat())
             atomic_json(state / 'status.json', status)
             verified = _verify_locked(config, dict(status))
             atomic_json(state / 'last-success.json', verified)
@@ -254,7 +254,7 @@ def run_backup(config):
             status['stage'] = 'cleanup'
             atomic_json(state / 'status.json', status)
             shutil.rmtree(stage)
-            status.update(status='ok', stage='complete')
+            status.update(status='ok', stage='complete', finished_at=datetime.now(timezone.utc).isoformat())
             atomic_json(state / 'status.json', status)
             print('Backup and recovery check passed.', flush=True)
         except Exception as error:
@@ -262,6 +262,7 @@ def run_backup(config):
                           error_type=type(error).__name__,
                           restic_exit_code=getattr(error, 'returncode', None),
                           failed_at=datetime.now(timezone.utc).isoformat())
+            status['finished_at'] = status['failed_at']
             atomic_json(state / 'status.json', status)
             raise
         finally:
@@ -276,8 +277,27 @@ def run_backup(config):
 
 
 def verify(config):
-    with run_lock(Path(config['state'])):
-        return _verify_locked(config)
+    state = Path(config['state'])
+    with run_lock(state):
+        try:
+            current = json.loads((state / 'status.json').read_text()).get('status')
+        except (OSError, ValueError, AttributeError):
+            current = None
+        if current == 'ok':
+            return _verify_locked(config)
+        # A later failed run does not erase an earlier verified snapshot; check that one
+        # without overwriting the failed current state.
+        try:
+            last = json.loads((state / 'last-success.json').read_text())
+        except (OSError, ValueError):
+            last = None
+        if not isinstance(last, dict) or not last.get('verified'):
+            raise RuntimeError('No complete backup available to verify')
+        verified = _verify_locked(config, dict(last))
+        atomic_json(state / 'last-success.json', verified)
+        print(f"Latest run is {current or 'unknown'}; verified last successful snapshot "
+              f"{verified['snapshot_id'][:8]}.", flush=True)
+        return verified
 
 
 def _verify_locked(config, status=None):

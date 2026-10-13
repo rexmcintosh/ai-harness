@@ -169,6 +169,12 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((self.state / 'last-success.json').read_bytes(), previous)
         self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'failed')
         self.assertFalse((self.state / 'sqlite').exists())
+        # Manual verification still checks the last verified snapshot and keeps the failed state.
+        self.config['restic'] = '/usr/bin/restic'
+        verified = backup.verify(self.config)
+        self.assertEqual(verified['snapshot_id'], json.loads(previous)['snapshot_id'])
+        self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'failed')
+        (self.state / 'last-success.json').unlink()
         with self.assertRaisesRegex(RuntimeError, 'No complete backup'):
             backup.verify(self.config)
 
@@ -326,8 +332,8 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((status['status'], status['stage'], status['verified']), ('running', 'retention', True))
         self.assertEqual(json.loads((self.state / 'last-success.json').read_text())['snapshot_id'],
                          status['snapshot_id'])
+        # status persists "interrupted"; the next run must still record the interruption.
         self.assertEqual(json.loads(self.run_cli('status').stdout.read())['status'], 'interrupted')
-        backup.atomic_json(self.state / 'status.json', status)
         self.config['restic'] = '/usr/bin/restic'
         backup.run_backup(self.config)
         rerun = json.loads((self.state / 'status.json').read_text())

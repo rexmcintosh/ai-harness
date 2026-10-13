@@ -284,5 +284,11 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - Captured stdout is capped at 1 MiB; more output fails the command. A missing
   or unreadable `status.json` is reported as `unknown`.
 
+- `restic-offsite verify` checks the current snapshot when the latest run is
+  `ok`. Otherwise it checks the snapshot in `last-success.json`, updates only
+  that file, and leaves the failed or interrupted current status in place.
+- `uploaded_at` marks the end of the upload. `finished_at` is set only when
+  the run ends, with success or failure.
+
 Twenty-two focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.
