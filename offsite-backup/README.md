@@ -302,5 +302,10 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - Each run removes `verify-cache-*` directories left by a killed run, and
   backups exclude that prefix.
 
-Twenty-seven focused backup tests pass. Run `./install.sh` after merging so the
-installed runner matches this version; the timer stays enabled.
+The run budget also covers database discovery and copying, so a slow SQLite
+stage fails as `failed_stage: sqlite` with `TimeoutError`.
+
+Thirty focused backup tests pass, including races where a database disappears
+before it is opened and a malformed earlier `status.json`. Run `./install.sh`
+after merging so the installed runner matches this version; the timer stays
+enabled.

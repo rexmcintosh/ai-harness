@@ -144,13 +144,17 @@ def restic(config, args, capture=False):
 
 
 
-def snapshot_databases(home, stage, timeout=600, discovered=None):
+def snapshot_databases(home, stage, timeout=600, discovered=None, run_deadline=None):
     """Inspect regular files; SQLite backup API includes committed WAL transactions."""
     databases = []
     def walk_error(error):
         if not isinstance(error, FileNotFoundError):
             raise error
+    def check_run_budget():
+        if run_deadline is not None and time.monotonic() > run_deadline:
+            raise TimeoutError('Backup run budget exhausted during database copies')
     for base, dirs, files in os.walk(home, onerror=walk_error):
+        check_run_budget()
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != '.git'
                    and not (Path(base) / d).is_symlink()
                    and Path(base) / d not in (stage, home / '.codex/recovery-backups', home / 'migration-archive')
@@ -188,10 +192,12 @@ def snapshot_databases(home, stage, timeout=600, discovered=None):
         relative = source.relative_to(home)
         target = stage / relative
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        check_run_budget()
         deadline = time.monotonic() + timeout
         def progress(status, remaining, total):
             if time.monotonic() > deadline:
                 raise TimeoutError('Database snapshot timed out')
+            check_run_budget()
             # Databases can grow after the estimate; stop while the reserve still remains.
             if shutil.disk_usage(stage).free < DISK_RESERVE:
                 raise RuntimeError('Disk space fell below the reserve during database copies')
@@ -209,6 +215,7 @@ def snapshot_databases(home, stage, timeout=600, discovered=None):
                     raise RuntimeError('Database copy failed integrity check')
         target.chmod(0o600)
         manifest.append(str(relative))
+    check_run_budget()
     atomic_json(stage / 'manifest.json', manifest)
     return manifest
 
@@ -249,7 +256,7 @@ def run_backup(config):
                     print(f'Could not remove stale {stale_cache.name}; continuing.', file=sys.stderr)
             discovered = []
             manifest = snapshot_databases(home, stage, timeout=config.get('sqlite_timeout', 600),
-                                          discovered=discovered)
+                                          discovered=discovered, run_deadline=config['_deadline'])
             probe = secrets.token_hex(32)
             (stage / 'recovery-probe.txt').write_text(probe)
             # --quiet keeps JSON output to the final summary; status lines would

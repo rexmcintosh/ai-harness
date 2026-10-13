@@ -357,6 +357,16 @@ class BackupTests(unittest.TestCase):
         self.assertEqual((status['status'], status['failed_stage'], status['error_type']),
                          ('failed', 'retention', 'TimeoutExpired'))
 
+    def test_run_budget_covers_database_staging(self):
+        self.make_db()
+        self.config['run_timeout'] = 0
+        with self.assertRaisesRegex(TimeoutError, 'run budget'):
+            backup.run_backup(self.config)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual((status['status'], status['failed_stage'], status['error_type']),
+                         ('failed', 'sqlite', 'TimeoutError'))
+        self.assertFalse((self.state / 'sqlite').exists())
+
     def test_database_removed_after_discovery_is_skipped(self):
         db = self.make_db()
         original = backup.shutil.disk_usage
@@ -376,9 +386,9 @@ class BackupTests(unittest.TestCase):
             for suffix in ('', '-wal', '-shm'):
                 Path(str(db) + suffix).unlink(missing_ok=True)
             return usage(path)
-        def recreate(home, stage, timeout=600, discovered=None):
+        def recreate(home, stage, timeout=600, discovered=None, run_deadline=None):
             with patch.object(backup.shutil, 'disk_usage', side_effect=remove_after_discovery):
-                manifest = original(home, stage, timeout, discovered)
+                manifest = original(home, stage, timeout, discovered, run_deadline)
             self.assertEqual((manifest, discovered), ([], [db.relative_to(home)]))
             db.write_bytes(b'SQLite format 3\x00 raw live copy')
             return manifest
