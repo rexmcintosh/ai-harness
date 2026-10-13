@@ -4,9 +4,14 @@ import os
 from pathlib import Path
 import sqlite3
 import subprocess
+import signal
+import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
+import contextlib
+import io
 from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location('backup', Path(__file__).with_name('backup.py'))
@@ -237,6 +242,78 @@ class BackupTests(unittest.TestCase):
         self.assertTrue(status['verified'])
         self.assertEqual(json.loads((self.state / 'last-success.json').read_text())['snapshot_id'],
                          status['snapshot_id'])
+
+    # Per-file error lines on a large tree must not be held whole in memory or leak a cut credential.
+    def test_stderr_flood_keeps_bounded_redacted_tail(self):
+        executable = self.base / 'stderr-flood'
+        executable.write_text('#!/usr/bin/python3\nimport os,sys\nkey=os.environ["AWS_SECRET_ACCESS_KEY"]\n'
+                              'for i in range(200000):sys.stderr.write(f"error {i} {key} unreadable\\n")\n'
+                              'sys.stderr.write("final cause\\n");sys.exit(1)\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        self.config['secret_key'] = 'test-cloud-secret'
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            backup.restic(self.config, ['backup', str(self.home)], capture=True)
+        self.assertLessEqual(len(caught.exception.stderr), backup.STDERR_TAIL)
+        error = json.loads((self.state / 'last-error.json').read_text())
+        self.assertTrue(error['stderr_truncated'])
+        self.assertLessEqual(len(error['stderr']), backup.STDERR_TAIL)
+        self.assertTrue(error['stderr'].endswith('final cause\n'))
+        self.assertTrue(error['stderr'].startswith('error '))
+        self.assertNotIn('secret', error['stderr'])
+        self.assertNotIn(b'secret', caught.exception.stderr)
+        self.assertEqual(list(self.state.glob('tmp*')), [])
+
+    def run_cli(self, *args, wait=True):
+        config_dir = self.home / '.config/restic-offsite'
+        config_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        config = dict(self.config, machine_id=Path('/etc/machine-id').read_text().strip())
+        (config_dir / 'config.json').write_text(json.dumps(config))
+        (config_dir / 'config.json').chmod(0o600)
+        process = subprocess.Popen([sys.executable, str(Path(backup.__file__)), *args],
+                                   env=dict(os.environ, HOME=str(self.home)),
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if wait:
+            process.wait(timeout=120)
+        return process
+
+    # systemd's TimeoutStartSec or a stop sends SIGTERM; status must not stay "running".
+    def test_stop_signal_records_failure_and_removes_staging(self):
+        self.make_db()
+        marker = self.base / 'backup-started'
+        executable = self.base / 'slow-restic'
+        executable.write_text(f'#!/bin/sh\ncase "$*" in *" backup "*) touch {marker}; exec sleep 60;; esac\n'
+                              'exec /usr/bin/restic "$@"\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        process = self.run_cli('backup', wait=False)
+        deadline = time.monotonic() + 60
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(marker.exists())
+        process.send_signal(signal.SIGTERM)
+        _, stderr = process.communicate(timeout=30)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn(b'stopped by SIGTERM', stderr)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual((status['status'], status['failed_stage'], status['error_type']),
+                         ('failed', 'backup', 'Terminated'))
+        self.assertFalse((self.state / 'sqlite').exists())
+
+    # SIGKILL or OOM cannot be caught; status must still show the run did not finish.
+    def test_status_reports_killed_run_as_interrupted(self):
+        backup.atomic_json(self.state / 'status.json', {'status': 'running', 'stage': 'backup'})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            backup.show_status(self.config)
+        self.assertEqual(json.loads(out.getvalue())['status'], 'interrupted')
+        import fcntl
+        with (self.state / 'run.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                backup.show_status(self.config)
+        self.assertEqual(json.loads(out.getvalue())['status'], 'running')
 
     # Two runs sharing staging would overwrite the only consistent DB copy.
     def test_overlap_refused(self):

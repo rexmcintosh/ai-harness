@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import signal
 import sqlite3
 import stat
 import subprocess
@@ -23,6 +24,18 @@ import socket
 SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.cache', '.npm', '.rustup'}
 EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry')
 CONFIG = Path.home() / '.config/restic-offsite/config.json'
+STDERR_TAIL = 32768
+
+
+class Terminated(RuntimeError):
+    """A stop signal arrived; raised so the run records a failed status."""
+
+
+def _terminate(signum, frame):
+    # Let cleanup and status writes finish after the first stop request.
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+    raise Terminated('stopped by ' + signal.Signals(signum).name)
 
 
 def atomic_json(path, value):
@@ -62,26 +75,38 @@ def restic(config, args, capture=False):
             env.pop(key)
     env.update(RESTIC_REPOSITORY=config['repository'], RESTIC_PASSWORD=config['password'],
                AWS_ACCESS_KEY_ID=config['access_key'], AWS_SECRET_ACCESS_KEY=config['secret_key'])
+    command = [config.get('restic', '/usr/bin/restic'), '--no-cache', *args]
+    timeout = config.get('restic_timeout', 10 * 60 * 60)
+    if not capture:
+        return subprocess.run(command, env=env, check=True, timeout=timeout)
+    # Spool stderr to a private unlinked file so a flood of errors cannot fill memory.
+    with tempfile.TemporaryFile(dir=config['state']) as stderr_file:
+        result = subprocess.run(command, env=env, stdout=subprocess.PIPE, stderr=stderr_file,
+                                timeout=timeout)
+        if result.returncode == 0:
+            return result
+        size = stderr_file.seek(0, os.SEEK_END)
+        start = max(0, size - STDERR_TAIL)
+        stderr_file.seek(start)
+        tail = stderr_file.read()
+    if start:
+        # Drop the partial first line so a cut-off credential cannot escape redaction.
+        tail = tail.partition(b'\n')[2]
+    # Keep diagnostics, never dump restored stdout or credentials.
+    detail = tail.decode('utf-8', errors='replace')
+    for field in ('password', 'secret_key', 'access_key'):
+        if config.get(field):
+            detail = detail.replace(config[field], '[redacted]')
     try:
-        return subprocess.run([config.get('restic', '/usr/bin/restic'), '--no-cache', *args],
-                              env=env, check=True, capture_output=capture,
-                              timeout=config.get('restic_timeout', 10 * 60 * 60))
-    except subprocess.CalledProcessError as error:
-        if capture:
-            # Keep diagnostics, never dump restored stdout or credentials.
-            detail = (error.stderr or b'').decode('utf-8', errors='replace')
-            for field in ('password', 'secret_key', 'access_key'):
-                if config.get(field):
-                    detail = detail.replace(config[field], '[redacted]')
-            try:
-                atomic_json(Path(config['state']) / 'last-error.json', {
-                    'operation': args[0] if args else 'unknown', 'exit_code': error.returncode,
-                    'stderr': detail[-32768:],
-                    'at': datetime.now(timezone.utc).isoformat()})
-            except Exception:
-                # Diagnostics are best effort; preserve the actual command failure.
-                print('Could not save private command diagnostics.', file=sys.stderr)
-        raise
+        atomic_json(Path(config['state']) / 'last-error.json', {
+            'operation': args[0] if args else 'unknown', 'exit_code': result.returncode,
+            'stderr': detail[-STDERR_TAIL:], 'stderr_truncated': bool(start),
+            'at': datetime.now(timezone.utc).isoformat()})
+    except Exception:
+        # Diagnostics are best effort; preserve the actual command failure.
+        print('Could not save private command diagnostics.', file=sys.stderr)
+    raise subprocess.CalledProcessError(result.returncode, command, result.stdout,
+                                        detail[-STDERR_TAIL:].encode())
 
 
 
@@ -232,6 +257,19 @@ def _verify_locked(config):
     return status
 
 
+def show_status(config):
+    state = Path(config['state'])
+    status = json.loads((state / 'status.json').read_text())
+    if status.get('status') == 'running':
+        try:
+            with run_lock(state):
+                # Nothing holds the lock, so the run was killed before it could record a result.
+                status.update(status='interrupted', note='Run stopped without a result; check the journal.')
+        except BlockingIOError:
+            pass
+    print(json.dumps(status, indent=2))
+
+
 def configure():
     restic_binary = shutil.which('restic')
     if not restic_binary:
@@ -280,6 +318,8 @@ def main():
     parser.add_argument('command', choices=['configure', 'init', 'backup', 'verify', 'status', 'restic'])
     parser.add_argument('args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, _terminate)
     if args.command == 'configure':
         configure()
         return
@@ -291,7 +331,7 @@ def main():
     elif args.command == 'verify':
         verify(config)
     elif args.command == 'status':
-        print((Path(config['state']) / 'status.json').read_text())
+        show_status(config)
     else:
         restic(config, args.args)
 

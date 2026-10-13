@@ -262,6 +262,13 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - The runner removes its SQLite staging before it writes `status: ok`. If that
   removal fails, the status is `failed` with `failed_stage: cleanup`, and
   `last-success.json` still names the verified snapshot.
+- Captured restic stderr is spooled to a private unlinked temporary file. Only
+  the last 32 KiB, starting at a whole line, is kept and redacted.
+- SIGTERM, SIGINT and SIGHUP, including a systemd stop or `TimeoutStartSec`
+  expiry, record `status: failed` with `error_type: Terminated` and the stage
+  that was running, then remove staging. An uncatchable SIGKILL or OOM kill
+  leaves `running` on disk; `restic-offsite status` then reports `interrupted`
+  when no run holds the lock. Treat `interrupted` like `failed`.
 
-Fifteen focused backup tests pass. Run `./install.sh` after merging so the
+Eighteen focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.
