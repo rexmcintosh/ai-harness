@@ -82,6 +82,9 @@ def restic(config, args, capture=False):
                AWS_ACCESS_KEY_ID=config['access_key'], AWS_SECRET_ACCESS_KEY=config['secret_key'])
     command = [config.get('restic', '/usr/bin/restic'), '--no-cache', *args]
     timeout = config.get('restic_timeout', 10 * 60 * 60)
+    if '_deadline' in config:
+        # Stay inside the run budget so the runner, not systemd, records a timeout.
+        timeout = min(timeout, max(1, config['_deadline'] - time.monotonic()))
     if not capture:
         return subprocess.run(command, env=env, check=True, timeout=timeout)
     # Drain both pipes concurrently; keep only a bounded stderr tail, never spooled to disk.
@@ -164,8 +167,12 @@ def snapshot_databases(home, stage, timeout=600):
                 # A removed transient file contains nothing that can still be backed up.
                 continue
     # Keep space for the OS and for DB growth during online backup.
-    required = sum(p.stat().st_size + (Path(str(p) + '-wal').stat().st_size
-                   if Path(str(p) + '-wal').exists() else 0) for p in databases)
+    def size(path):
+        try:
+            return path.stat().st_size
+        except FileNotFoundError:
+            return 0
+    required = sum(size(p) + size(Path(str(p) + '-wal')) for p in databases)
     if shutil.disk_usage(home).free < required * 2 + DISK_RESERVE:
         raise RuntimeError('Insufficient disk space for consistent database copies')
     stage.mkdir(parents=True, mode=0o700)
@@ -173,6 +180,9 @@ def snapshot_databases(home, stage, timeout=600):
     for source in databases:
         if shutil.disk_usage(stage).free < DISK_RESERVE:
             raise RuntimeError('Disk space fell below the reserve during database copies')
+        if not source.exists():
+            # Deleted since discovery: nothing left to copy, and it is not excluded raw.
+            continue
         relative = source.relative_to(home)
         target = stage / relative
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -195,6 +205,8 @@ def snapshot_databases(home, stage, timeout=600):
 
 
 def run_backup(config):
+    # One budget for the whole run, below the service's TimeoutStartSec of 12 hours.
+    config = dict(config, _deadline=time.monotonic() + config.get('run_timeout', 11 * 60 * 60))
     home, state = Path(config['home']), Path(config['state'])
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     with run_lock(state):
@@ -378,8 +390,10 @@ def configure():
 
 
 def load_config():
-    if stat.S_IMODE(CONFIG.stat().st_mode) & 0o077:
-        raise RuntimeError('Configuration must be readable only by its owner: chmod 600 ' + str(CONFIG))
+    for path, mode in ((CONFIG.parent, '700'), (CONFIG, '600')):
+        info = path.stat()
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+            raise RuntimeError(f'Configuration must be private to its owner: chmod {mode} {path}')
     config = json.loads(CONFIG.read_text())
     if config['machine_id'] != Path('/etc/machine-id').read_text().strip():
         raise RuntimeError('Configuration belongs to another machine; configure this machine separately')

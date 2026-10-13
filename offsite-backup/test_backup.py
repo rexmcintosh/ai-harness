@@ -341,6 +341,42 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(rerun['previous_run_interrupted'],
                          {'started_at': status['started_at'], 'stage': 'retention'})
 
+    # A slow late stage must time out inside the run budget, before systemd kills the service.
+    def test_run_budget_covers_late_stages(self):
+        backup.restic(self.config, ['init'])
+        executable = self.base / 'slow-retention'
+        executable.write_text('#!/bin/sh\ncase "$*" in *forget*) exec sleep 60;; esac\n'
+                              'exec /usr/bin/restic "$@"\n')
+        executable.chmod(0o700)
+        self.config.update(restic=str(executable), run_timeout=15)
+        started = time.monotonic()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            backup.run_backup(self.config)
+        self.assertLess(time.monotonic() - started, 40)
+        status = json.loads((self.state / 'status.json').read_text())
+        self.assertEqual((status['status'], status['failed_stage'], status['error_type']),
+                         ('failed', 'retention', 'TimeoutExpired'))
+
+    def test_database_removed_after_discovery_is_skipped(self):
+        db = self.make_db()
+        original = backup.shutil.disk_usage
+        def remove_then_measure(path):
+            for suffix in ('', '-wal', '-shm'):
+                Path(str(db) + suffix).unlink(missing_ok=True)
+            return original(path)
+        with patch.object(backup.shutil, 'disk_usage', side_effect=remove_then_measure):
+            self.assertEqual(backup.snapshot_databases(self.home, self.state / 'sqlite'), [])
+
+    def test_config_directory_must_be_private(self):
+        config_dir = self.home / '.config/restic-offsite'
+        config_dir.mkdir(parents=True, mode=0o700)
+        (config_dir / 'config.json').write_text('{}')
+        (config_dir / 'config.json').chmod(0o600)
+        config_dir.chmod(0o755)
+        with patch.object(backup, 'CONFIG', config_dir / 'config.json'):
+            with self.assertRaisesRegex(RuntimeError, 'chmod 700'):
+                backup.load_config()
+
     # SIGKILL or OOM cannot be caught; status must still show the run did not finish.
     def test_status_reports_killed_run_as_interrupted(self):
         backup.atomic_json(self.state / 'status.json', {'status': 'running', 'stage': 'backup'})

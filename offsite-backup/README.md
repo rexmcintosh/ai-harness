@@ -136,9 +136,10 @@ verified snapshot and probe across failed later runs. No notification channel is
 use these checks to verify health. Repository structure and a recovery-probe
 restore are tested on each run; this does not read every stored data pack.
 Run periodic `restic check --read-data` when a full integrity audit is needed.
-The private config permits `sqlite_timeout` (seconds per DB, default 600) and
-`restic_timeout` (seconds per command, default 36000). If increasing those, also
-increase the service `TimeoutStartSec` beyond the total expected run time.
+The private config permits `sqlite_timeout` (seconds per DB, default 600),
+`restic_timeout` (seconds per command, default 36000) and `run_timeout` (seconds
+for all restic commands in one backup run, default 39600). Keep `run_timeout`
+below the service `TimeoutStartSec`; raise both together if needed.
 
 If a partial snapshot exists, diagnose unreadable/changing files and rerun.
 Never bypass the failed-backup check or remove a repository lock while a backup
@@ -290,5 +291,12 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - `uploaded_at` marks the end of the upload. `finished_at` is set only when
   the run ends, with success or failure.
 
-Twenty-two focused backup tests pass. Run `./install.sh` after merging so the
+- One run budget, `run_timeout` (default 39600 seconds, 11 hours), caps every
+  restic command in a backup run, so a slow late stage times out and is
+  recorded before the service's 12-hour `TimeoutStartSec` would stop it.
+- A database deleted between discovery and copying is skipped, not a failure.
+- The configuration directory must be mode 700 and the file mode 600, both
+  owned by the running user.
+
+Twenty-five focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.
