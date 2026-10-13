@@ -27,6 +27,7 @@ SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.cache', '.npm', '
 EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry', '.config/restic-offsite')
 CONFIG = Path.home() / '.config/restic-offsite/config.json'
 STDERR_TAIL = 32768
+STDOUT_LIMIT = 1024 * 1024
 TERMINAL = ('ok', 'failed', 'interrupted')
 DISK_RESERVE = 512 * 1024 * 1024
 
@@ -85,9 +86,13 @@ def restic(config, args, capture=False):
         return subprocess.run(command, env=env, check=True, timeout=timeout)
     # Drain both pipes concurrently; keep only a bounded stderr tail, never spooled to disk.
     process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, tail, cut = [], bytearray(), [False]
+    stdout, tail, cut, overflow = [], bytearray(), [False], [False]
     def drain_stdout():
-        stdout.append(process.stdout.read())
+        # Captured commands print one summary line or one probe; refuse anything larger.
+        stdout.append(process.stdout.read(STDOUT_LIMIT + 1))
+        while process.stdout.read1(65536):
+            overflow[0] = True
+        overflow[0] = overflow[0] or len(stdout[0]) > STDOUT_LIMIT
     def drain_stderr():
         for chunk in iter(lambda: process.stderr.read1(65536), b''):
             tail.extend(chunk)
@@ -109,6 +114,8 @@ def restic(config, args, capture=False):
         reader.join()
     process.stdout.close()
     process.stderr.close()
+    if overflow[0] and returncode == 0:
+        raise RuntimeError(f'restic {args[0]} printed more output than expected')
     result = subprocess.CompletedProcess(command, returncode, stdout[0] if stdout else b'', None)
     if returncode == 0:
         return result
@@ -297,7 +304,14 @@ def _verify_locked(config, status=None):
 
 def show_status(config):
     state = Path(config['state'])
-    status = json.loads((state / 'status.json').read_text())
+    try:
+        status = json.loads((state / 'status.json').read_text())
+        if not isinstance(status, dict):
+            raise ValueError('status is not an object')
+    except (OSError, ValueError) as error:
+        print(json.dumps({'status': 'unknown', 'note': f'Status file unreadable ({type(error).__name__}); '
+                          'check the journal and last-success.json.'}, indent=2))
+        return
     if status.get('status') not in TERMINAL:
         try:
             with run_lock(state):

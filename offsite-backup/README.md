@@ -281,5 +281,8 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - New snapshots exclude `.config/restic-offsite`. Earlier snapshots still hold
   it, so keep the `--exclude` in the recovery restore command.
 
-Twenty focused backup tests pass. Run `./install.sh` after merging so the
+- Captured stdout is capped at 1 MiB; more output fails the command. A missing
+  or unreadable `status.json` is reported as `unknown`.
+
+Twenty-two focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.

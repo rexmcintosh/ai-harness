@@ -352,6 +352,27 @@ class BackupTests(unittest.TestCase):
                 backup.show_status(self.config)
         self.assertEqual(json.loads(out.getvalue())['status'], 'running')
 
+    # Unexpected bulk stdout (for example, lost --quiet) must fail rather than fill memory.
+    def test_oversized_stdout_fails(self):
+        executable = self.base / 'stdout-flood'
+        executable.write_text('#!/usr/bin/python3\nimport sys\nsys.stdout.write("x" * (3 * 1024 * 1024))\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        with self.assertRaisesRegex(RuntimeError, 'more output than expected'):
+            backup.restic(self.config, ['backup'], capture=True)
+
+    def test_status_reports_missing_or_corrupt_file(self):
+        for content in (None, '{not json', '[]'):
+            with self.subTest(content=content):
+                path = self.state / 'status.json'
+                path.unlink(missing_ok=True)
+                if content is not None:
+                    path.write_text(content)
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    backup.show_status(self.config)
+                self.assertEqual(json.loads(out.getvalue())['status'], 'unknown')
+
     # Two runs sharing staging would overwrite the only consistent DB copy.
     def test_overlap_refused(self):
         import fcntl
