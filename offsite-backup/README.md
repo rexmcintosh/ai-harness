@@ -295,8 +295,12 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
   restic command in a backup run, so a slow late stage times out and is
   recorded before the service's 12-hour `TimeoutStartSec` would stop it.
 - A database deleted between discovery and copying is skipped, not a failure.
-- The configuration directory must be mode 700 and the file mode 600, both
-  owned by the running user.
+  Every discovered database path and its companions stay excluded, so a file
+  recreated before the upload is not stored raw.
+- The configuration directory and file must be owned by the running user and
+  have no group or other permissions (for example 700 and 600).
+- Each run removes `verify-cache-*` directories left by a killed run, and
+  backups exclude that prefix.
 
-Twenty-five focused backup tests pass. Run `./install.sh` after merging so the
+Twenty-seven focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.

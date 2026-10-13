@@ -144,7 +144,7 @@ def restic(config, args, capture=False):
 
 
 
-def snapshot_databases(home, stage, timeout=600):
+def snapshot_databases(home, stage, timeout=600, discovered=None):
     """Inspect regular files; SQLite backup API includes committed WAL transactions."""
     databases = []
     def walk_error(error):
@@ -163,6 +163,8 @@ def snapshot_databases(home, stage, timeout=600):
                 with path.open('rb') as file:
                     if file.read(16) == b'SQLite format 3\x00':
                         databases.append(path)
+                        if discovered is not None:
+                            discovered.append(path.relative_to(home))
             except FileNotFoundError:
                 # A removed transient file contains nothing that can still be backed up.
                 continue
@@ -222,10 +224,14 @@ def run_backup(config):
             status['previous_run_interrupted'] = {k: previous.get(k) for k in ('started_at', 'stage')}
         atomic_json(state / 'status.json', status)
         try:
-            # Only this runner owns this exact staging directory.
+            # Only this runner owns this exact staging directory and its verify caches.
             if stage.exists():
                 shutil.rmtree(stage)
-            manifest = snapshot_databases(home, stage, timeout=config.get('sqlite_timeout', 600))
+            for stale_cache in state.glob('verify-cache-*'):
+                shutil.rmtree(stale_cache)
+            discovered = []
+            manifest = snapshot_databases(home, stage, timeout=config.get('sqlite_timeout', 600),
+                                          discovered=discovered)
             probe = secrets.token_hex(32)
             (stage / 'recovery-probe.txt').write_text(probe)
             # --quiet keeps JSON output to the final summary; status lines would
@@ -234,14 +240,18 @@ def run_backup(config):
                     '--json', '--quiet']
             for directory in sorted(SKIP_DIRS):
                 args += ['--exclude', directory]
-            # Exclude live SQLite files and journals; restore the consistent copies instead.
-            for relative in manifest:
+            # Exclude every discovered live SQLite file and journal, even one deleted and
+            # recreated during copying; restore the consistent copies instead.
+            for relative in discovered:
                 for suffix in ('', '-wal', '-shm', '-journal'):
                     path = str(home / relative) + suffix
                     pattern = ''.join('\\' + c if c in '\\*?[]' else c for c in path)
                     args += ['--exclude', pattern]
             for relative in EXCLUDED_RELATIVE:
                 args += ['--exclude', str(home / relative)]
+            # A verify cache left by a killed run is scratch metadata, not data to keep.
+            escaped_state = ''.join('\\' + c if c in '\\*?[]' else c for c in str(state))
+            args += ['--exclude', escaped_state + '/verify-cache-*']
             status['stage'] = 'backup'
             atomic_json(state / 'status.json', status)
             result = restic(config, args, capture=True)

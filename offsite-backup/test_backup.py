@@ -367,6 +367,51 @@ class BackupTests(unittest.TestCase):
         with patch.object(backup.shutil, 'disk_usage', side_effect=remove_then_measure):
             self.assertEqual(backup.snapshot_databases(self.home, self.state / 'sqlite'), [])
 
+    # A DB recreated after its copy was skipped must still not be uploaded raw.
+    def test_recreated_database_is_still_excluded(self):
+        db = self.make_db()
+        backup.restic(self.config, ['init'])
+        original, usage = backup.snapshot_databases, backup.shutil.disk_usage
+        def remove_after_discovery(path):
+            for suffix in ('', '-wal', '-shm'):
+                Path(str(db) + suffix).unlink(missing_ok=True)
+            return usage(path)
+        def recreate(home, stage, timeout=600, discovered=None):
+            with patch.object(backup.shutil, 'disk_usage', side_effect=remove_after_discovery):
+                manifest = original(home, stage, timeout, discovered)
+            self.assertEqual((manifest, discovered), ([], [db.relative_to(home)]))
+            db.write_bytes(b'SQLite format 3\x00 raw live copy')
+            return manifest
+        with patch.object(backup, 'snapshot_databases', side_effect=recreate):
+            backup.run_backup(self.config)
+        target = self.base / 'restore'
+        backup.restic(self.config, ['restore', 'latest', '--target', str(target)])
+        self.assertFalse((target / str(db).lstrip('/')).exists())
+
+    # A cache left by SIGKILL must not be uploaded or left to accumulate.
+    def test_stale_verify_cache_is_removed_and_excluded(self):
+        backup.restic(self.config, ['init'])
+        stale = self.state / 'verify-cache-killed'
+        stale.mkdir()
+        (stale / 'pack').write_text('stale metadata')
+        executable = self.base / 'observe-backup'
+        record = self.base / 'stale-seen'
+        executable.write_text(f'#!/bin/sh\ncase "$*" in *" backup "*) [ -e {stale} ] && touch {record};; esac\n'
+                              'exec /usr/bin/restic "$@"\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        backup.run_backup(self.config)
+        self.assertFalse(stale.exists())
+        self.assertFalse(record.exists())
+        args = []
+        original = backup.restic
+        def capture(config, command, capture=False):
+            args.append(command)
+            return original(config, command, capture)
+        with patch.object(backup, 'restic', side_effect=capture):
+            backup.run_backup(self.config)
+        self.assertIn(str(self.state) + '/verify-cache-*', next(a for a in args if a[0] == 'backup'))
+
     def test_config_directory_must_be_private(self):
         config_dir = self.home / '.config/restic-offsite'
         config_dir.mkdir(parents=True, mode=0o700)
