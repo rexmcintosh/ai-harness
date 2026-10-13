@@ -267,8 +267,10 @@ and a passed recovery check. Review then found two reliability gaps, now fixed:
 - SIGTERM, SIGINT and SIGHUP, including a systemd stop or `TimeoutStartSec`
   expiry, record `status: failed` with `error_type: Terminated` and the stage
   that was running, then remove staging. An uncatchable SIGKILL or OOM kill
-  leaves `running` on disk; `restic-offsite status` then reports `interrupted`
-  when no run holds the lock. Treat `interrupted` like `failed`.
+  leaves `running` on disk; `restic-offsite status` then records and reports
+  `interrupted` when no run holds the lock. Treat `interrupted` like `failed`.
+- Database copying also checks free space during each copy and stops while the
+  512 MiB reserve remains, because live databases can grow after the estimate.
 
-Eighteen focused backup tests pass. Run `./install.sh` after merging so the
+Nineteen focused backup tests pass. Run `./install.sh` after merging so the
 installed runner matches this version; the timer stays enabled.

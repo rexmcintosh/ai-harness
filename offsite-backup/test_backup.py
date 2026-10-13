@@ -117,6 +117,16 @@ class BackupTests(unittest.TestCase):
                 backup.snapshot_databases(self.home, self.state / 'sqlite')
         self.assertFalse((self.state / 'sqlite').exists())
 
+    # Live databases can grow after the one-time estimate; copying must stop before the disk fills.
+    def test_disk_reserve_rechecked_during_copy(self):
+        self.make_db()
+        free = iter([10 ** 12])
+        def usage(path):
+            return SimpleNamespace(free=next(free, backup.DISK_RESERVE - 1))
+        with patch.object(backup.shutil, 'disk_usage', side_effect=usage):
+            with self.assertRaisesRegex(RuntimeError, 'fell below the reserve'):
+                backup.snapshot_databases(self.home, self.state / 'sqlite')
+
     # Excluding all hidden files or .git would lose secrets and unpushed work.
     def test_real_encrypted_backup_and_restore_preserves_work_excludes_dependencies(self):
         self.make_db()
@@ -307,6 +317,8 @@ class BackupTests(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             backup.show_status(self.config)
         self.assertEqual(json.loads(out.getvalue())['status'], 'interrupted')
+        self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'interrupted')
+        backup.atomic_json(self.state / 'status.json', {'status': 'running', 'stage': 'backup'})
         import fcntl
         with (self.state / 'run.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -25,6 +25,7 @@ SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.cache', '.npm', '
 EXCLUDED_RELATIVE = ('.local/share/pipx/venvs', '.cargo/registry')
 CONFIG = Path.home() / '.config/restic-offsite/config.json'
 STDERR_TAIL = 32768
+DISK_RESERVE = 512 * 1024 * 1024
 
 
 class Terminated(RuntimeError):
@@ -135,7 +136,7 @@ def snapshot_databases(home, stage, timeout=600):
     # Keep space for the OS and for DB growth during online backup.
     required = sum(p.stat().st_size + (Path(str(p) + '-wal').stat().st_size
                    if Path(str(p) + '-wal').exists() else 0) for p in databases)
-    if shutil.disk_usage(home).free < required * 2 + 512 * 1024 * 1024:
+    if shutil.disk_usage(home).free < required * 2 + DISK_RESERVE:
         raise RuntimeError('Insufficient disk space for consistent database copies')
     stage.mkdir(parents=True, mode=0o700)
     manifest = []
@@ -147,6 +148,9 @@ def snapshot_databases(home, stage, timeout=600):
         def progress(status, remaining, total):
             if time.monotonic() > deadline:
                 raise TimeoutError('Database snapshot timed out')
+            # Databases can grow after the estimate; stop while the reserve still remains.
+            if shutil.disk_usage(stage).free < DISK_RESERVE:
+                raise RuntimeError('Disk space fell below the reserve during database copies')
         with closing(sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=30)) as src:
             with closing(sqlite3.connect(target)) as dst:
                 src.backup(dst, pages=256, progress=progress)
@@ -264,7 +268,9 @@ def show_status(config):
         try:
             with run_lock(state):
                 # Nothing holds the lock, so the run was killed before it could record a result.
-                status.update(status='interrupted', note='Run stopped without a result; check the journal.')
+                status.update(status='interrupted', note='Run stopped without a result; check the journal.',
+                              interrupted_detected_at=datetime.now(timezone.utc).isoformat())
+                atomic_json(state / 'status.json', status)
         except BlockingIOError:
             pass
     print(json.dumps(status, indent=2))
