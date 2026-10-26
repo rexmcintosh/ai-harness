@@ -43,6 +43,8 @@ BASE = Path(os.environ.get("WATCHDOG_BASE", "/home/dev/projects/ai-harness"))
 CRON_LOGS = [
     ("meettrack-ingest", Path("/home/dev/projects/splash_poller/logs/ingest_entries.cron.log")),
     ("meettrack-supervise", Path("/home/dev/projects/splash_poller/logs/supervise.cron.log")),
+    # the daily meet coverage check: a crash here would blind the gap alerts
+    ("meettrack-coverage", Path("/home/dev/projects/splash_poller/logs/coverage_check.cron.log")),
 ]
 SERVICES = ["tailscaled"]
 

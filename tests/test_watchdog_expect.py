@@ -879,3 +879,78 @@ def test_startlist_scope_all_skips_meets_auto_ingest_does_not_fetch():
         assert out[0].status == "n/a" and word in out[0].evidence
     out = ex.eval_startlist({**base, "listed": True, "feed_type": "pdf"}, snap, cfg, tz)
     assert out[0].status in ("missed", "pending")
+
+
+# --- a meet on another SPLASH host (splash_poller meet coverage, 2026-10-26) --
+from watchdog.expectations import label, valid_sid, writer_lines
+
+SPK = "sp-anlisboa-anl02-2627-fajjs"
+ANL = "http://anlisboa.info/results/2026-27/anl02-2627-fajjs/"
+
+
+@pytest.mark.parametrize("sid, ok", [
+    (SPK, True), ("11113", True), ("sp-a b", False), ("sp-", False), ("sp-x/../y", False),
+    ("sp-" + "a" * 61, False), ("1234567890", False), (None, False)])
+def test_valid_sid_accepts_splash_keys(sid, ok):
+    assert valid_sid(sid) is ok
+
+
+def test_writer_lines_finds_a_splash_meets_writers():
+    ps = "\n".join([
+        f"7 01:00 /usr/bin/python3 track_pdf_meet.py --meet-url {ANL} --live",
+        f"8 00:02 /usr/bin/python3 reconcile_meet.py --sr-meet-id {SPK}",
+        "9 00:10 /usr/bin/python3 track_pdf_meet.py --meet-url http://anlisboa.info/results/2026-27/anl05-2627-x/ --live",
+    ])
+    assert len(writer_lines(ps, SPK, meet_url=ANL)) == 2
+    assert len(writer_lines(ps, SPK)) == 2                 # the key alone names its folder
+
+
+def test_a_splash_meet_is_labelled_by_its_own_id():
+    assert label(reg(SPK, city="Setúbal")) == f"Setúbal ({SPK})"
+    assert label(reg()) == "Silves (sr-11113)"
+
+
+def test_an_unlaunched_splash_meet_is_missed_like_any_meet():
+    row = reg(SPK, city="Setúbal", ingest_status="discovered", meet_url=ANL)
+    e = by_id(evaluate(snap(at("08:31"), [row], procs={SPK: []}), CFG, {})[0])[f"writer:{SPK}:2026-10-10"]
+    assert e.status == "missed" and "not launched" in e.evidence
+
+
+def test_snapshot_reads_a_splash_meet_by_its_own_ids():
+    calls = []
+
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(SPK, city="Setúbal", meet_url=ANL)], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1", "live_rankings_id": SPK}], None
+            if path.startswith("events"):
+                return [], None
+            if path.startswith("results"):
+                return 0, None
+            return [], None
+    s = er.build_snapshot(at("17:45"), CFG, RUN_CFG, FakeRest(),
+                          ps=lambda: f"7 01:00 track_pdf_meet.py --meet-url {ANL} --live")
+    assert any(f"live_rankings_id=in.({SPK})" in p for p in calls)
+    assert "meet_url" in [p for p in calls if p.startswith("meet_registry?select=sr_meet_id,name")][0]
+    assert s.meets[SPK]["id"] == "m1" and s.processes[SPK]
+
+
+def test_the_page_probe_reads_a_splash_meets_own_folder(monkeypatch):
+    import requests
+    seen = []
+
+    class R:
+        text = "ok"
+
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(requests, "get", lambda url, **k: seen.append(url) or R())
+    probes = er.real_probes(urls={SPK: ANL, "bad": "file:///etc/passwd"})
+    assert probes.fetch_page(SPK) == "ok" and seen == [ANL]
+    with pytest.raises(ValueError):
+        probes.fetch_page("sp-anlisboa-no-url")

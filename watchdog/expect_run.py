@@ -34,7 +34,8 @@ from pathlib import Path
 import tomllib
 
 from .expectations import (Snapshot, _thin, evaluate, hm_day, in_racing_window, iso_epoch,
-                           make_config, meet_zone, valid_sid, writer_lines, _zone)
+                           is_splash, make_config, meet_zone, meets_id, valid_sid,
+                           writer_lines, _zone)
 from .expect_alerts import POLICY_DEFAULTS, plan, render
 from .expect_investigate import Probes, investigate, write_investigation
 
@@ -59,7 +60,7 @@ RUN_DEFAULTS = {
 _REGISTRY_COLS = ("sr_meet_id,name,city,nation,start_date,end_date,feed_type,ingest_status,"
                   "last_ingest_at,updated_at,events_published,events_with_results,"
                   "last_tick_errors,coverage_at,entries_requested_at,entries_ingested_at,"
-                  "dispatch_paused,listed")
+                  "dispatch_paused,listed,meet_url")
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +152,9 @@ def _ps() -> str:
         return ""
 
 
-def processes_by_meet(ps_text: str, ids) -> dict:
-    return {sid: writer_lines(ps_text, sid) for sid in ids}
+def processes_by_meet(ps_text: str, ids, urls=None) -> dict:
+    urls = urls or {}
+    return {sid: writer_lines(ps_text, sid, meet_url=urls.get(sid)) for sid in ids}
 
 
 def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> Snapshot:
@@ -189,7 +191,7 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
         snap.read_errors.setdefault(sid, []).append(f"{what}: {err}")
 
     if live:
-        ids = ",".join(f"sr-{sid}" for sid, _, _ in live)
+        ids = ",".join(meets_id(sid) for sid, _, _ in live)
         meets, err = rest.get(f"meets?select=id,live_rankings_id,status,start_date,end_date,nation"
                               f"&live_rankings_id=in.({ids})", timeout=t_read)
         if meets is None:
@@ -197,7 +199,7 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 failed(sid, "meets", err)
         by_lr = {m.get("live_rankings_id"): m for m in (meets or [])}
         for sid, mtz, day in live:
-            m = by_lr.get(f"sr-{sid}")
+            m = by_lr.get(meets_id(sid))
             if not m:
                 continue                 # no meets row yet: nothing seeded, nothing written
             snap.meets[sid] = m
@@ -220,7 +222,8 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                                      f"&order=created_at.desc&limit=1", timeout=t_read)
                 if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
-        snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live])
+        urls = {str(r.get("sr_meet_id")): r.get("meet_url") for r in rows if r.get("meet_url")}
+        snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live], urls)
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
     stale, _ = rest.get(f"meets?select=live_rankings_id,name,nation,end_date&status=eq.ACTIVE"
                         f"&end_date=lt.{cutoff}&order=end_date", timeout=run_cfg["read_timeout_s"])
@@ -239,7 +242,11 @@ def _event(e: dict) -> dict:
             "results": n(e.get("results")), "entries": n(e.get("heats"))}
 
 
-def real_probes() -> Probes:
+def real_probes(urls=None) -> Probes:
+    """`urls` maps a registry key to its meet_url, for meets on another
+    SPLASH host (their page is their own folder, not live.swimrankings.net)."""
+    urls = urls or {}
+
     def tail(sid: str):
         if not valid_sid(sid):
             raise ValueError(f"not a meet id: {sid!r}")
@@ -265,8 +272,11 @@ def real_probes() -> Probes:
     def page(sid: str):
         if not valid_sid(sid):
             raise ValueError(f"not a meet id: {sid!r}")
+        url = urls.get(sid) if is_splash(sid) else LIVE_PAGE.format(sid=sid)
+        if not url or not url.startswith(("http://", "https://")):
+            raise ValueError(f"no results page known for {sid!r}")
         import requests
-        r = requests.get(LIVE_PAGE.format(sid=sid), timeout=10,
+        r = requests.get(url, timeout=10,
                          headers={"User-Agent": "Mozilla/5.0 (MeetTrack monitor)"})
         r.raise_for_status()
         return r.text
@@ -475,7 +485,9 @@ def main(argv=None) -> int:
             snap = Snapshot(now=now, db_ok=False, db_error=f"{run_cfg['key_env']} not set")
         else:
             snap = build_snapshot(now, cfg, run_cfg, Rest(run_cfg["url"], key))
-        result = run_once(now, cfg, run_cfg, state, snap, probes=real_probes(),
+        urls = {str(r.get("sr_meet_id")): r.get("meet_url")
+                for r in (snap.registry or []) if r.get("meet_url")}
+        result = run_once(now, cfg, run_cfg, state, snap, probes=real_probes(urls),
                           sender=lambda t: tg_send(t, run_cfg.get("send_timeout_s", 60)),
                           inv_dir=log_dir / "investigations", dry_run=dry_run)
         if dry_run:

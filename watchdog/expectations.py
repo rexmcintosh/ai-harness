@@ -64,21 +64,44 @@ LIVE_FEEDS = ("pdf", "fragment", "lenex")
 WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
 
 
+# A meet on another SPLASH host (anlisboa.info, ...): splash_poller keys it by
+# its live_rankings_id, 'sp-<host label>-<folder slug>' (meet_config.is_splash_key).
+_SPLASH_KEY = re.compile(r"^sp-[a-z0-9_-]{1,60}$")
+
+
 def valid_sid(sid) -> bool:
-    """A swimrankings meet id is a short run of digits. Checked once, before an
-    id from the database goes into a URL, a query, a file path or a ps match."""
+    """A swimrankings meet id (a short run of digits) or a splash_poller key
+    for another SPLASH host. Checked once, before an id from the database goes
+    into a URL, a query, a file path or a ps match."""
     s = str(sid) if isinstance(sid, (str, int)) and not isinstance(sid, bool) else ""
-    return s.isdigit() and 0 < len(s) <= 9
+    return (s.isdigit() and 0 < len(s) <= 9) or bool(_SPLASH_KEY.match(s))
 
 
-def writer_lines(ps_text: str, sid: str) -> list[str]:
+def is_splash(sid) -> bool:
+    return isinstance(sid, str) and bool(_SPLASH_KEY.match(sid))
+
+
+def meets_id(sid: str) -> str:
+    """meets.live_rankings_id for a registry key: 'sr-<id>', or the sp- key itself."""
+    return sid if is_splash(sid) else f"sr-{sid}"
+
+
+def writer_lines(ps_text: str, sid: str, meet_url: str | None = None) -> list[str]:
     """`ps` lines of writer processes for this meet: every form the supervisor
     starts (splash_poller supervise_meets._poller_argv): the live URL
     .../<id>/ for the pdf, fragment and Lenex writers, and --sr-meet-id <id>
-    for the reconcile one-shot. One matcher for the check and the investigation."""
+    for the reconcile one-shot. For another SPLASH host the writers carry the
+    meet's folder: `meet_url` when known, else the folder the key names
+    (host label and folder slug). One matcher for the check and the investigation."""
     if not valid_sid(sid):
         return []
-    rx = re.compile(rf"(?:live\.swimrankings\.net/{sid}/|--sr-meet-id[ =]{sid}\b|\bsr-{sid}\b)")
+    if is_splash(sid):
+        host, _, slug = sid[3:].partition("-")
+        folder = (re.escape(meet_url) if meet_url and meet_url.startswith(("http://", "https://"))
+                  else rf"https?://[^\s/]*{re.escape(host)}[^\s]*/{re.escape(slug)}/")
+        rx = re.compile(rf"(?:--meet-url[ =]{folder}(?=\s|$)|--sr-meet-id[ =]{re.escape(sid)}(?=\s|$))")
+    else:
+        rx = re.compile(rf"(?:live\.swimrankings\.net/{sid}/|--sr-meet-id[ =]{sid}\b|\bsr-{sid}\b)")
     return [ln.strip() for ln in (ps_text or "").splitlines()
             if any(w in ln for w in WRITERS) and rx.search(ln)]
 
@@ -222,9 +245,9 @@ def in_racing_window(now: float, cfg: dict, tz=None) -> bool:
 # ---------------------------------------------------------------------------
 
 def label(row: dict) -> str:
-    sid = row.get("sr_meet_id")
+    sid = str(row.get("sr_meet_id"))
     short = row.get("city") or row.get("name") or "meet"
-    return f"{short} (sr-{sid})"
+    return f"{short} ({meets_id(sid)})"
 
 
 def live_on(row: dict, day: str) -> bool:
