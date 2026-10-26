@@ -272,11 +272,17 @@ def real_probes(urls=None) -> Probes:
     def page(sid: str):
         if not valid_sid(sid):
             raise ValueError(f"not a meet id: {sid!r}")
-        url = urls.get(sid) if is_splash(sid) else LIVE_PAGE.format(sid=sid)
+        splash = is_splash(sid)
+        url = urls.get(sid) if splash else LIVE_PAGE.format(sid=sid)
         if not url or not url.startswith(("http://", "https://")):
             raise ValueError(f"no results page known for {sid!r}")
+        if splash:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            if p.username or p.password or p.port:
+                raise ValueError(f"refused {sid!r}: its meet_url carries credentials or a port")
         import requests
-        r = requests.get(url, timeout=10,
+        r = requests.get(url, timeout=10, allow_redirects=not splash,
                          headers={"User-Agent": "Mozilla/5.0 (MeetTrack monitor)"})
         r.raise_for_status()
         return r.text

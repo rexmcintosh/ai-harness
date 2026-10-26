@@ -954,3 +954,39 @@ def test_the_page_probe_reads_a_splash_meets_own_folder(monkeypatch):
     assert probes.fetch_page(SPK) == "ok" and seen == [ANL]
     with pytest.raises(ValueError):
         probes.fetch_page("sp-anlisboa-no-url")
+
+
+def test_writer_lines_matches_by_the_key_the_folder_makes_even_with_hyphens():
+    # A host label with a hyphen: the key cannot be split back at its first '-'.
+    sid = "sp-provas-annp-52"
+    ps = "\n".join([
+        "7 01:00 python3 track_pdf_meet.py --meet-url https://provas-annp.pt/provas2526/52/ --live",
+        "8 01:00 python3 track_pdf_meet.py --meet-url https://provas-annp.pt/provas2526/53/ --live",
+    ])
+    assert writer_lines(ps, sid) == [ps.splitlines()[0].strip()]
+
+
+def test_a_key_with_a_trailing_newline_is_not_valid():
+    assert not valid_sid(SPK + "\n")
+
+
+@pytest.mark.parametrize("url", ["http://user:pw@anlisboa.info/results/x/",
+                                 "http://anlisboa.info:8080/results/x/"])
+def test_the_page_probe_refuses_credentials_and_ports(url):
+    probes = er.real_probes(urls={SPK: url})
+    with pytest.raises(ValueError):
+        probes.fetch_page(SPK)
+
+
+def test_the_page_probe_does_not_follow_redirects(monkeypatch):
+    import requests
+    seen = {}
+
+    class R:
+        text = "ok"
+
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(requests, "get", lambda url, **k: seen.update(k) or R())
+    er.real_probes(urls={SPK: ANL}).fetch_page(SPK)
+    assert seen.get("allow_redirects") is False

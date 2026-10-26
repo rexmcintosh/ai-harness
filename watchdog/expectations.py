@@ -74,11 +74,28 @@ def valid_sid(sid) -> bool:
     for another SPLASH host. Checked once, before an id from the database goes
     into a URL, a query, a file path or a ps match."""
     s = str(sid) if isinstance(sid, (str, int)) and not isinstance(sid, bool) else ""
-    return (s.isdigit() and 0 < len(s) <= 9) or bool(_SPLASH_KEY.match(s))
+    return (s.isdigit() and 0 < len(s) <= 9) or bool(_SPLASH_KEY.fullmatch(s))
 
 
 def is_splash(sid) -> bool:
-    return isinstance(sid, str) and bool(_SPLASH_KEY.match(sid))
+    return isinstance(sid, str) and bool(_SPLASH_KEY.fullmatch(sid))
+
+
+def _slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9_]+", "-", s.lower()).strip("-")
+
+
+def splash_key_for(url: str) -> str | None:
+    """The registry key splash_poller gives a meet folder on a non-swimrankings
+    SPLASH host: the same rule as its meet_config.from_meet_url. None for a
+    value that is not an http(s) URL."""
+    from urllib.parse import urlparse
+    p = urlparse(url or "")
+    if p.scheme not in ("http", "https") or not p.netloc:
+        return None
+    segments = [s for s in p.path.split("/") if s]
+    last = segments[-1] if segments else p.netloc
+    return f"sp-{_slug(p.netloc.split('.')[0])}-{_slug(last)}"[:60].rstrip("-")
 
 
 def meets_id(sid: str) -> str:
@@ -96,10 +113,18 @@ def writer_lines(ps_text: str, sid: str, meet_url: str | None = None) -> list[st
     if not valid_sid(sid):
         return []
     if is_splash(sid):
-        host, _, slug = sid[3:].partition("-")
-        folder = (re.escape(meet_url) if meet_url and meet_url.startswith(("http://", "https://"))
-                  else rf"https?://[^\s/]*{re.escape(host)}[^\s]*/{re.escape(slug)}/")
-        rx = re.compile(rf"(?:--meet-url[ =]{folder}(?=\s|$)|--sr-meet-id[ =]{re.escape(sid)}(?=\s|$))")
+        # A writer names its folder in --meet-url; the folder's own key (the
+        # rule splash_poller keys it by) must be this meet's. The key is not
+        # split back apart: a host label may itself contain '-'.
+        reconcile = re.compile(rf"--sr-meet-id[ =]{re.escape(sid)}(?=\s|$)")
+        out = []
+        for ln in (ps_text or "").splitlines():
+            if not any(w in ln for w in WRITERS):
+                continue
+            urls = re.findall(r"--meet-url[ =](\S+)", ln)
+            if reconcile.search(ln) or any(u == meet_url or splash_key_for(u) == sid for u in urls):
+                out.append(ln.strip())
+        return out
     else:
         rx = re.compile(rf"(?:live\.swimrankings\.net/{sid}/|--sr-meet-id[ =]{sid}\b|\bsr-{sid}\b)")
     return [ln.strip() for ln in (ps_text or "").splitlines()
