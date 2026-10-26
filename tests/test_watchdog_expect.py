@@ -990,3 +990,17 @@ def test_the_page_probe_does_not_follow_redirects(monkeypatch):
     monkeypatch.setattr(requests, "get", lambda url, **k: seen.update(k) or R())
     er.real_probes(urls={SPK: ANL}).fetch_page(SPK)
     assert seen.get("allow_redirects") is False
+
+
+@pytest.mark.parametrize("url, key", [
+    # The same keys splash_poller's tests pin for meet_config.from_meet_url.
+    (ANL, SPK),
+    ("http://anlisboa.info/results/2026-27/anl02-2627-fajjs", SPK),
+    ("https://provas.annp.pt/provas2526/52/", "sp-provas-52"),
+    ("https://ancnp.pt/Resultados/Natacao_Pura/25-26/23_XXXV_Torneio_Cidade_Estarreja/",
+     "sp-ancnp-23_xxxv_torneio_cidade_estarreja"),
+    ("ftp://anlisboa.info/x/", None),
+])
+def test_splash_key_for_matches_splash_poller(url, key):
+    from watchdog.expectations import splash_key_for
+    assert splash_key_for(url) == key
