@@ -1,6 +1,7 @@
 """Live DIEM balance. Spec rule: if this is unreachable, the checkpoint
 aborts — never drain blind."""
 from __future__ import annotations
+import math
 import requests
 
 RATE_LIMITS_URL = "https://api.venice.ai/api/v1/api_keys/rate_limits"
@@ -17,6 +18,11 @@ class BalanceClient:
         self._get = get or requests.get
 
     def diem_balance(self) -> float:
+        return self.snapshot()["diem"]
+
+    def snapshot(self) -> dict:
+        """{"diem": float, "next_epoch": str or None}. The next-epoch time is a bonus: without
+        it the balance is still good."""
         try:
             r = self._get(RATE_LIMITS_URL,
                           headers={"Authorization": f"Bearer {self.api_key}"},
@@ -30,10 +36,14 @@ class BalanceClient:
         except Exception as e:  # noqa: BLE001
             raise BalanceUnavailable(f"rate_limits non-JSON: {e}") from e
         try:
-            balances = body.get("data", {}).get("balances") or body.get("balances") or {}
+            data = body.get("data") or {}
+            balances = data.get("balances") or body.get("balances") or {}
             if "DIEM" not in balances:
                 raise BalanceUnavailable(f"no DIEM in balances: {body!r:.200}")
-            return float(balances["DIEM"])
+            diem = float(balances["DIEM"])
+            if not math.isfinite(diem):      # NaN is never under a floor: it would read as "plenty"
+                raise BalanceUnavailable(f"DIEM is not a number: {diem}")
+            return {"diem": diem, "next_epoch": data.get("nextEpochBegins") or body.get("nextEpochBegins")}
         except BalanceUnavailable:
             raise
         except Exception as e:  # noqa: BLE001

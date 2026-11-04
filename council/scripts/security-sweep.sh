@@ -16,6 +16,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 [ -f /home/dev/.env ] && set -a && . /home/dev/.env && set +a
 : "${VENICE_API_KEY:?VENICE_API_KEY not set}"
+# A scheduled job never touches the plans. `council sweep` refuses on its own when credits are out.
+export COUNCIL_BACKUP=off
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$DIR/../.." && pwd)"

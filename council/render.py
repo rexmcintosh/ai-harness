@@ -151,6 +151,26 @@ def render_combined(sections, *, rigor: str = "daily") -> str:
     return "\n".join(out)
 
 
+def render_backup_banner(report, fmt: str = "md") -> str:
+    """The first thing in a backup report, whatever the format: why it ran here, how little model
+    spread it really had, and which seat ran on what. Printed above the council's own output, so
+    everything that reads a saved review below it still reads what it always read."""
+    used = ", ".join(report.families) or "none"
+    outcome = (f"Result: INCOMPLETE: {report.incomplete}. This is not a passed review." if report.incomplete
+               else "Merge rule: a complete backup run counts as a council review (owner decision 2026-11-04).")
+    lines = [f"Why: {report.why}.",
+             "Model spread: the backup tools cover 2 model families (Claude and OpenAI) rather than the "
+             f"usual 5. Answers in this run came from {len(report.families)}: {used}.",
+             outcome,
+             "Seats:"]
+    seats = [f"{row.label}: {row.where}{' (failed)' if row.failed else ''}" for row in report.rows]
+    if fmt == "md":
+        return "\n".join(["> **⚠️ BACKUP MODE**", ">"] + [f"> {line}  " for line in lines]
+                         + [f"> - {seat}" for seat in seats])
+    rule = "=" * 60
+    return "\n".join([f"=== BACKUP MODE {rule[16:]}"] + lines + [f"  {seat}" for seat in seats] + [rule])
+
+
 JEV_SHADOW_TITLE = "### Jev shadow signals (display only; not used by the chair or the gate)"
 
 

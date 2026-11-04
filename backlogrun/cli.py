@@ -606,6 +606,7 @@ def scrubbed_env(repo: str, extra_path: list[str] | None = None) -> dict:
         "LANG": os.environ.get("LANG", "C.UTF-8"), "LC_ALL": os.environ.get("LC_ALL", ""), "TERM": "dumb",
         "SHELL": os.environ.get("SHELL", "/bin/bash"), "TZ": os.environ.get("TZ", "UTC"),
         "BACKLOG_RUN": "1", "CI": "1",
+        "COUNCIL_BACKUP": "off",       # an unattended session never spends the owner's plans on a council
     }
     env = {k: v for k, v in env.items() if v}
     parts = list(extra_path or [])

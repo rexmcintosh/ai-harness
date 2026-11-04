@@ -36,6 +36,61 @@ router_max_completion_tokens = 2000    # picks a panel, emits {"panel": "..."}
 max_completion_tokens       = 30000
 chair_max_completion_tokens = 12000
 
+# ---- backup mode -----------------------------------------------------------
+# When Venice's free credits are out, `council ask/review/compare` run the same panel and
+# chair through the owner's Claude and ChatGPT plans. See docs/council-backup-mode-2026-11-04.md.
+[settings.backup]
+diem_floor      = 0.5   # DIEM under this at the start of a run: use the backup from the start
+balance_timeout = 5     # seconds for that check; if it fails the run stays on Venice
+max_concurrent  = 4     # children at once, per run (red-team has 4 seats; measured fine, see the doc)
+
+# Each route: `match` is an exact Venice model id or a family prefix (longest wins), `*` is
+# everything else. Owner rules (2026-11-04): OpenAI, DeepSeek, Grok, Gemini and anything else
+# go to Codex, Claude to Claude, every Adversary stays non-Claude, the code-review chair to
+# Codex and other chairs to Claude. tests/test_council_backup_run.py walks every panel.
+# Model choice: mid-tier for seats and the strongest for chairs, to protect plan limits. All
+# were accepted by a live call on 2026-11-04. Tier order: gpt-6-luna < gpt-6.1-terra <
+# gpt-6.1-sol < gpt-6-astra, and haiku < sonnet < opus < fable.
+# Timeouts come from the measurements in the doc, with room for the largest (200 KB) input.
+
+# The chairs: the strongest of each plan, at high effort.
+[[settings.backup.routes]]
+match   = "openai-gpt-56-sol"   # code-review chair
+tool    = "codex"
+model   = "gpt-6-astra"
+effort  = "high"
+timeout = 600
+
+[[settings.backup.routes]]
+match   = "claude-opus-4-8"     # every other panel's chair
+tool    = "claude"
+model   = "claude-fable-5-1"
+effort  = "high"
+timeout = 600
+
+# The router only picks a panel: the cheapest fast model.
+[[settings.backup.routes]]
+match   = "gemini-3-5-flash"
+tool    = "codex"
+model   = "gpt-6-luna"
+effort  = "low"
+timeout = 60
+
+# Seats: mid-tier at medium effort.
+[[settings.backup.routes]]
+match   = "claude-"
+tool    = "claude"
+model   = "claude-sonnet-5-5"
+effort  = "medium"
+timeout = 300
+
+[[settings.backup.routes]]
+match   = "*"
+tool    = "codex"
+model   = "gpt-6.1-terra"
+effort  = "medium"
+timeout = 300
+
 # ---- code-review -----------------------------------------------------------
 [panels.code-review]
 description   = "Review a code change for correctness, security, and design."

@@ -16,4 +16,6 @@ Success is `rc=0`, a logged target and finding count, and a report containing th
 
 ## Failure, escalation, and gaps
 
+With Venice credits out or the balance unreadable, `council sweep` exits 3 without starting. During a run, credits under the floor, a failed balance read or an HTTP 402 stop further calls, mark the report incomplete and exit 3 (`docs/council-backup-mode-2026-11-04.md`). The sweep never uses backup mode. On a key with a USD limit it can still pay for up to 30 seconds of new calls past the floor, plus calls in flight. The script sets `COUNCIL_BACKUP=off`.
+
 The script records a nonzero council exit, but intentionally ignores a Telegram send failure. This is a delivery mismatch: review the log after a missing Monday summary. The job has no independent escalation channel and no contract pointer in crontab.

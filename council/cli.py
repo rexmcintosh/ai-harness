@@ -1,17 +1,18 @@
 from __future__ import annotations
 import argparse
+import os
 import sys
 import time
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
-from . import __version__
+from . import __version__, backup
 from .config import load_panels, get_api_key, Settings, truncate, resolve_budget, chair_for
 from .venice import VeniceClient
 from .engine import run_panel
 from .router import pick_panel
 from .synthesize import synthesize
-from .render import render_markdown, render_terminal
+from .render import render_backup_banner, render_markdown, render_terminal
 
 
 def _build(panels_path=None):
@@ -19,6 +20,29 @@ def _build(panels_path=None):
     # local-only commands (e.g. `panels`) don't require VENICE_API_KEY.
     settings, panels = load_panels(panels_path)
     return settings, panels, None
+
+
+def _build_client(cmd: str, settings):
+    """The client for one real command. `off` is exactly the plain VeniceClient of before. `sweep`
+    gets the guard and never a backup. `force` is the one mode that needs no Venice key."""
+    try:
+        mode = backup.mode_from_env(os.environ)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
+    # The client-level ceiling is the backstop: every call this process makes
+    # is bounded even if a call site forgets to pass its own.
+    key = None if (mode == "force" and cmd != "sweep") else get_api_key()
+    venice = key and VeniceClient(key, timeout=settings.timeout,
+                                  max_completion_tokens=settings.max_completion_tokens)
+    config = backup.BackupConfig.from_settings(settings)
+    credits = lambda: backup.read_credits(key, timeout=config.balance_timeout)
+    if cmd == "sweep":
+        return backup.CreditGuard(venice, credits=credits, floor=config.diem_floor)
+    if mode == "off":
+        return venice
+    return backup.RunClient(venice, backup.BackupClient(config, secrets=[key] if key else []), config,
+                            mode=mode, credits=credits if key else None, command=cmd)
 
 
 def _gather_context(question: str, files: list[str], cap: int) -> str:
@@ -117,7 +141,30 @@ def _sweep_jev_repo(path):
         return None
 
 
+def _start_backup_run(client):
+    """(the backup-aware client or None, an exit code when the run cannot start)."""
+    if not isinstance(client, backup.RunClient):
+        return None, None
+    problem = client.prepare()
+    if problem:
+        print(problem, file=sys.stderr)
+        return client, backup.EXIT_INCOMPLETE
+    return client, None
+
+
+def _finish_backup_run(run, report) -> int:
+    problem = run.finish(report)
+    if problem:
+        print(problem, file=sys.stderr)
+        return backup.EXIT_INCOMPLETE
+    return 0
+
+
 def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type="chat", shadow=None):
+    run, stopped = _start_backup_run(client)
+    if stopped is not None:
+        return stopped
+    router_model = settings.router_model if panel_name is None else None
     if panel_name is None:
         panel_name = pick_panel(context, panels, client,
                                 router_model=settings.router_model,
@@ -133,9 +180,16 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
     # ceiling for both the seats and the chair (see [settings.rigor.deep]).
     budget = resolve_budget(settings, panel, rigor)
     results = run_panel(panel, context, client, task_type=task_type, budget=budget)
+    if run:
+        run.relabel(panel, results)
     syn = synthesize(context, results, client, chair_model=chair_for(settings, panel),
                      task_type=task_type, max_completion_tokens=budget.chair)
     render = render_markdown if fmt == "md" else render_terminal
+    report = None
+    if run and run.active:
+        report = run.report(panel, results, chair_model=chair_for(settings, panel),
+                            chair_failed=syn.error is not None, router_model=router_model)
+        print(render_backup_banner(report, fmt) + "\n")
     print(f"[panel: {panel_name} · rigor: {rigor}]\n")
     print(render(context[:120], syn, results, rigor=rigor))
     if shadow is not None:                         # `review` only; display and log, nothing else
@@ -145,7 +199,7 @@ def _run(context, panel_name, settings, panels, client, rigor, fmt, *, task_type
                 print("\n" + section)
         except Exception:  # noqa: BLE001 - not even a closed pipe may change the review's exit code
             pass
-    return 0
+    return _finish_backup_run(run, report) if report else 0
 
 
 def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -> int:
@@ -198,13 +252,16 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
             print(f"{name:14} {panel.description}\n{'':14} seats: {seats}")
         return 0
 
-    # ask / review actually call Venice — build the client now (needs the key).
+    # ask / review / compare / sweep actually call a model — build the client now (needs the key).
     if client is None:
-        # The client-level ceiling is the backstop: every call this process makes
-        # is bounded even if a call site forgets to pass its own.
-        client = VeniceClient(get_api_key(), timeout=settings.timeout,
-                              max_completion_tokens=settings.max_completion_tokens)
+        client = _build_client(args.cmd, settings)
+        if isinstance(client, backup.RunClient):
+            with backup.child_cleanup():
+                return _dispatch(args, settings, panels, client)
+    return _dispatch(args, settings, panels, client)
 
+
+def _dispatch(args, settings, panels, client) -> int:
     if args.cmd == "ask":
         ctx = _gather_context(args.question, args.file, settings.byte_cap)
         return _run(ctx, args.panel, settings, panels, client, args.rigor, args.format,
@@ -275,15 +332,24 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
             else:
                 seen[label] = 1
             candidates.append((label, truncate(text, settings.byte_cap // len(args.files))))
+        run, stopped = _start_backup_run(client)
+        if stopped is not None:
+            return stopped
         cmp_panel = panels[args.panel]
         res = run_compare(args.task, candidates, cmp_panel, client,
                           chair_model=chair_for(settings, cmp_panel),
                           budget=resolve_budget(settings, cmp_panel,
-                                                cmp_panel.default_rigor))
+                                                cmp_panel.default_rigor),
+                          on_votes=(lambda votes: run.relabel(cmp_panel, votes)) if run else None)
         from .render import render_comparison
+        report = None
+        if run and run.active:
+            report = run.report(cmp_panel, res.votes, chair_model=chair_for(settings, cmp_panel),
+                                chair_failed=bool(res.error or not res.winner))
+            print(render_backup_banner(report, args.format) + "\n")
         print(f"[compare · panel: {args.panel} · {len(candidates)} candidates]\n")
         print(render_comparison(args.task, res))
-        return 0
+        return _finish_backup_run(run, report) if report else 0
 
     if args.cmd == "sweep":
         from .sweep import chunk_repo, run_sweep
@@ -297,6 +363,11 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
         if not chunks:
             print(f"Nothing to scan at '{args.path}'.")
             return 0
+        guard = client if isinstance(client, backup.CreditGuard) else None
+        refusal = guard.refusal() if guard else None
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return backup.EXIT_INCOMPLETE
         sweep_panel = panels[args.panel]
         report = run_sweep(chunks, sweep_panel, client,
                            chair_model=chair_for(settings, sweep_panel), min_conf=args.min_conf,
@@ -306,6 +377,11 @@ def main(argv=None, *, _settings: Settings = None, _panels=None, _client=None) -
         report.dropped = dropped
         print(f"[sweep · panel: {args.panel} · {report.chunks_scanned} files]\n")
         print(render_sweep(args.path, report))
+        if guard and guard.exhausted:
+            message = guard.exhausted_message()
+            print(f"\n**INCOMPLETE:** {message}")     # a saved report must not read as a clean scan
+            print(message, file=sys.stderr)
+            return backup.EXIT_INCOMPLETE
         return 0
 
     return 1
