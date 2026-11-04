@@ -45,6 +45,16 @@ def _no_live_council_jev(tmp_path, monkeypatch):
     monkeypatch.setenv("COUNCIL_JEV_LOG", str(tmp_path / "council-jev-shadow.jsonl"))
 
 
+@pytest.fixture(autouse=True)
+def _no_live_council_backup(tmp_path, monkeypatch):
+    """`council ask/review/compare` default to auto, which reads Venice's balance and can start
+    the real claude and codex tools. Every test runs with backup off and its log in a temp
+    file. A test of backup mode sets COUNCIL_BACKUP itself and fakes the edges
+    (tests/test_council_backup_run.py)."""
+    monkeypatch.setenv("COUNCIL_BACKUP", "off")
+    monkeypatch.setenv("COUNCIL_BACKUP_LOG", str(tmp_path / "council-backup-runs.jsonl"))
+
+
 class FakeClient:
     """Stand-in for VeniceClient. Scripted responses keyed by model name,
     or a single default. Records calls for assertions."""

@@ -17,6 +17,8 @@
 set -uo pipefail
 
 [ -f /home/dev/.env ] && set -a && . /home/dev/.env && set +a
+# The candidates above come from Venice, so the comparison stays there too.
+export COUNCIL_BACKUP=off
 
 TASK="${1:-$(cat)}"
 [ -n "$TASK" ] || { echo "usage: parallel-attempts.sh \"task\"" >&2; exit 2; }

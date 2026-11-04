@@ -29,6 +29,9 @@ class Settings:
     router_max_completion_tokens: int = 2_000
     # {"daily": {...}, "deep": {...}} — per-rigor overrides of the three above.
     rigor: dict = field(default_factory=dict)
+    # [settings.backup]: when backup mode starts and which tool answers for which model.
+    # Read by council.backup, and only by the council CLI.
+    backup: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -128,6 +131,7 @@ def load_panels(path=None):
         router_max_completion_tokens=int(s.get("router_max_completion_tokens",
                                                Settings.router_max_completion_tokens)),
         rigor=s.get("rigor", {}) or {},
+        backup=s.get("backup") or _packaged_backup(),
     )
     panels = {}
     for name, p in data.get("panels", {}).items():
@@ -141,6 +145,13 @@ def load_panels(path=None):
                              rigor=p.get("rigor", {}) or {},
                              chair_model=_panel_chair(p.get("chair_model")))
     return settings, panels
+
+
+def _packaged_backup() -> dict:
+    """The packaged backup table. A personal panels file that predates backup mode must not
+    leave the owner with no backup on the day the credits run out."""
+    with open(str(files("council") / "panels.toml"), "rb") as fh:
+        return tomllib.load(fh).get("settings", {}).get("backup", {})
 
 
 def _panel_chair(value):

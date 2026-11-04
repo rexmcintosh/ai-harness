@@ -74,10 +74,10 @@ def _synthesize_comparison(task, candidates, votes, client, *, chair_model,
 
 
 def run_compare(task: str, candidates, panel: Panel, client, *,
-                chair_model: str, max_workers=None, budget=None) -> ComparisonResult:
+                chair_model: str, max_workers=None, budget=None, on_votes=None) -> ComparisonResult:
     """Rank `candidates` (a list of (label, text)) against `task` with `panel`,
     then synthesize a winner. Raises ValueError on fewer than two candidates —
-    there is nothing to compare."""
+    there is nothing to compare. `on_votes` sees the votes before the chair does."""
     candidates = list(candidates)
     if len(candidates) < 2:
         raise ValueError("compare needs at least two candidates")
@@ -91,6 +91,8 @@ def run_compare(task: str, candidates, panel: Panel, client, *,
         votes = [f.result() for f in concurrent.futures.as_completed(futures)]
     order = [m.name for m in panel.members]
     votes.sort(key=lambda v: order.index(v.member))
+    if on_votes:
+        on_votes(votes)
 
     return _synthesize_comparison(task, candidates, votes, client, chair_model=chair_model,
                                   max_completion_tokens=budget.chair if budget else None)

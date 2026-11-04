@@ -59,6 +59,8 @@ def _drain_env(key: str, env_path: Path = Path.home() / ".env") -> dict:
     # ~/.env defines it.
     env.setdefault("VENICE_API_KEY", key)
     env.setdefault("VENICE_KEY", key)
+    # The drain exists to spend Venice credits. Its council runs never touch the plans.
+    env["COUNCIL_BACKUP"] = "off"
     pipx_bin = str(Path.home() / ".local" / "bin")
     path = env.get("PATH", "/usr/bin:/bin")
     if pipx_bin not in path.split(":"):

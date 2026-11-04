@@ -93,6 +93,72 @@ by `council.gate`, not by any single panelist:
 
 See `docs/council-audit-2026-06-25.md` for the failure modes this replaced.
 
+## Backup mode
+
+When Venice's free daily credits (DIEM) are gone, `council ask`, `review` and `compare` run the
+same panel, chair and gate through the owner's Claude and ChatGPT plans, using the `claude` and
+`codex` command-line tools. No extra vendor and no API key. A complete backup run counts as a
+council review for merges, provided its report shows the banner (owner decision 2026-11-04).
+Flags, models, measurements and limits: `docs/council-backup-mode-2026-11-04.md`.
+
+    COUNCIL_BACKUP=auto    # default for ask / review / compare
+    COUNCIL_BACKUP=force   # backup now, whatever the balance; needs no Venice key
+    COUNCIL_BACKUP=off     # Venice only, as before; the deliberate way to pay (not for `sweep`)
+
+**When it switches (`auto`).** Before the run, if this key's DIEM is under `diem_floor` (0.5). A key
+with a USD limit gets no error at DIEM 0, it just starts spending, so reacting to errors is not
+enough, and the balance is read again every 30 seconds during the run. During the run, on the first
+HTTP 402: that seat re-runs on the backup, the rest of the run follows, and seats that already
+answered on Venice keep their answers. Nothing else switches: 401, 429, 5xx, timeouts and bad-model
+errors behave as they always did.
+
+**How far that protects money.** Only a key whose USD limit is 0 is a hard stop, because it gets the
+402. On a key with a USD limit, a run can start new calls past the floor for up to 30 seconds, and
+calls already in flight finish. If the balance cannot be read, the run stays on Venice (owner's
+rule), and such a key can pay until a later read works or its limit is hit.
+
+**What you see.** A `BACKUP MODE` banner at the very top in `md` and `term`: why, when credits
+reset, how many model families really answered, and which seat ran on which tool and model. One
+line on stderr at the moment of the switch. The raw panel names the model that really answered.
+
+**Exit codes.** A run that stays on Venice exits as it always did. A backup run exits 3, never 0,
+when every seat failed, at least half failed (the bar `run_pr_review` fails closed on), the chair
+failed, or neither tool can be found. It never falls back to paying.
+
+**Where it never runs.**
+- `council sweep` is Venice credits or nothing. With credits out, or a balance it cannot read, it
+  exits 3 and does not start, in every `COUNCIL_BACKUP` mode, so `off` cannot make a sweep pay on
+  purpose. During a sweep the balance is read every 30 seconds: under the floor, a failed read or an
+  HTTP 402 stops further calls, marks the report incomplete and exits 3.
+- Python entry points never reach it: `run_pr_review`, the CI shim, `backlog-run` and `diem` build
+  their own `VeniceClient`. A `COUNCIL_BACKUP` variable does not change them.
+- The diem drain, `backlog-run` sessions, `security-sweep.sh` and `parallel-attempts.sh` set
+  `COUNCIL_BACKUP=off` for any `council` they start. A new unattended script must do the same: it
+  would otherwise default to `auto` and spend the plans.
+
+**What differs from Venice.**
+- The model spread: at most 2 families (Claude and OpenAI) rather than 5. Today `code-review` maps
+  to Codex for all three seats and the chair, so a backup code review is 1 family.
+- `temperature` and `max_completion_tokens` have no equivalent on these tools. The cap is accepted
+  and ignored, and neither is faked.
+- Plan limits are not credits. `plan limit reached` shows as a seat failure.
+
+**Seat map.** Data, under `[settings.backup]` in `panels.toml`. `tests/test_council_backup_run.py`
+walks every panel, seat, chair and router, and fails on a missing route or a Claude Adversary.
+
+**Isolation.** A child has no tools, MCP servers, hooks, plugins, project or memory files, or saved
+session, and an environment built from an allow list. The login is checked before the first model
+call of each tool, each run: a login that is not the plan is not used. Codex's prompt is previewed
+once per model per run, and Claude's reply carries its own setup. Either way a child that is not
+isolated is refused. These checks fail closed, so a tool update can stop backup mode outright, with
+the reason in the message. After updating `claude` or `codex`, run the live proof:
+
+    COUNCIL_BACKUP_LIVE=1 python3 -m pytest tests/test_council_backup_live.py -q
+
+**Log.** `~/.local/state/council/backup-runs.jsonl`: time, trigger (`diem`, `402`, `force`), panel,
+seat-to-tool map, ok and failed counts. No prompts, diffs or keys. Backup calls never reach the
+Venice usage ledger.
+
 ## Jev shadow signals (display only)
 
 After the chair has answered, `council review` asks Jev (TypeSafe's small typed judge, model

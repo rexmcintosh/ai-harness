@@ -1,6 +1,6 @@
 [project]
 name = "council"
-version = "0.5.0"
+version = "0.6.0"
 description = "Multi-model Venice AI council: ask / review / panels"
 requires-python = ">=3.11"
 dependencies = ["requests>=2.31", "pyyaml>=6"]

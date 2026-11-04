@@ -17,6 +17,12 @@ class VeniceError(RuntimeError):
     pass
 
 
+class VeniceOutOfCredits(VeniceError):
+    """HTTP 402: the key has no credit left to spend. The one failure that means "come back
+    after the reset" and not "this request is broken". It is a VeniceError, so every caller
+    that does not ask for it sees what it always saw."""
+
+
 # Models (name prefixes) that must NOT be sent `response_format: json_object`. Venice's
 # forced-JSON decoder garbles deepseek-v4-pro's first key ('{": ": ", "}', '{".stance": ...')
 # and the model often stops there: 0 of 4 replies usable with it on, 4 of 4 clean with it
@@ -124,6 +130,8 @@ class VeniceClient:
                 if attempt < self.retries:
                     time.sleep(self.backoff * (attempt + 1))
                 continue
+            if status == 402:
+                raise VeniceOutOfCredits("Venice HTTP 402 (not retryable): credits or spend limit exhausted")
             # Non-retryable: a 2xx success, or a 4xx that won't change on retry.
             try:
                 r.raise_for_status()
