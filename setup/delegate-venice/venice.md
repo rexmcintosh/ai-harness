@@ -67,8 +67,9 @@ Only selected source, tests, and task-relevant technical context may be sent to
 `https://api.venice.ai/api/v1/chat/completions` for authorized work. This owner
 instruction authorizes those routine helper and review calls without asking again.
 
-Both keys are inference-only and USD=0 as verified on 2026-09-13. Their configured
-DIEM ceilings are unset; they share the account balance with other initiatives.
+Both keys are inference-only. As of 2026-11-04, `VENICE_SECOND_OPINION_KEY` has a
+$10 USD limit and `VENICE_CODE_HELPER_KEY` has $0. Their configured DIEM ceilings
+are unset; they share the account balance with other initiatives.
 Respect owner budgets and other committed work. Do not change key limits or buy
 credits. More calls do not mean more value. Prefer useful accepted work, and spend
 up only when the expected improvement justifies it.
@@ -80,8 +81,10 @@ opposite-provider rule: a Codex author gets a fresh Claude reviewer (Opus `xhigh
 on Balanced/Max, Sonnet `high` on Lean); a Claude author gets the profile's Codex
 technical reviewer. A Venice-native author gets a fresh subscription reviewer
 from a different model family. If an explicit project or CI gate requires a
-successful Council result, a subscription opinion does not clear that gate;
-report the required review as incomplete. One corrected follow-up is reasonable when the
+successful Council result, a separate one-off subscription opinion does not clear
+that gate; report the required review as incomplete. A Council run in BACKUP MODE
+(same panel, chair and gate, with the banner) is a Council result and counts for
+local merge review (Rex, 2026-11-04). One corrected follow-up is reasonable when the
 problem is missing context or a specific fix; do not loop on weak proposals.
 If fallback is also unavailable, complete independent work and report the exact
 remaining gap. Never treat a failed or partial review as approval. Council keeps
