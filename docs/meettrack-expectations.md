@@ -101,7 +101,11 @@ Scope and data:
   can be wrong for a while (event 4 taken for the empty event 5), but the count
   of late events is right and the event being swum is still exempt; a host
   that publishes an earlier event after a later one gets that event judged
-  like any superseded event.
+  like any superseded event. When the rows show it (more events without
+  results below one with results than the counts allow), the evidence says
+  "the event numbers are a guess" (`data.order_guess`); it never pages by itself.
+- A writer counts files when `feed_type` is `pdf` (case and spaces ignored) or
+  its `events_published` is not NULL.
 - Rows that share an event number are one event: results add up, the start
   list is the larger row's, the slot is the earliest. A second, empty session
   row under the same number (7 Nov 2026, Leiria events 2 and 16) is not an
@@ -140,7 +144,9 @@ read. The 30-minute watchdog's full-table counts are now planner estimates
   2026 alerts): no reminder
   while a late event gains results or the writer writes any result for the
   meet. Once nothing has moved for a full interval, it reminds as above and
-  says so ("nothing new for 1h05"). On the 7 Nov Leiria data this is one NEW
+  says so ("nothing new for 1h05"). A progress time that is not a number, or
+  more than 5 min in the future (clock skew), is ignored, so it can never mute
+  reminders. On the 7 Nov Leiria data this is one NEW
   (10:10), two reminders during the 13:52-16:10 stall with event 2 at 4 of 16,
   and RESOLVED at 16:10, against one NEW and seven reminders before.
 - RESOLVED once, with how long it lasted, when the expectation is met again.

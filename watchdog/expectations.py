@@ -691,7 +691,8 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     if snap.read_errors.get(sid):
         # A failed read is not evidence: keep every clock as it is.
         return exp("unknown", f"not judged: {'; '.join(snap.read_errors[sid])}")
-    if (published is not None or row.get("feed_type") == "pdf") and not counted:
+    counting_writer = str(row.get("feed_type") or "").strip().lower() == "pdf"
+    if (published is not None or counting_writer) and not counted:
         # This writer counts the host's files, but its counters cannot be used:
         # which published events lack results is not known. Never "met" (or a
         # page) on that. Judgment pauses; the clocks keep their start times, so
@@ -709,11 +710,19 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     groups = by_event_number(events)
     by_key = {g["key"]: g for g in groups}
     numbered = [g for g in groups if not g["key"].startswith("row:")]
-    missing, unlisted = [], 0
+    missing, unlisted, order_guess = [], 0, False
     if counted:
         k = max(0, int(published) - int(covered))
-        missing = [g for g in numbered if g["results"] == 0][:k]
+        zero = [g for g in numbered if g["results"] == 0]
+        missing = zero[:k]
         unlisted = k - len(missing)          # published, but no event row for it yet
+        # In number order, every event below one with results is published, so
+        # each of them without results is one the counts must include. More of
+        # them than that: the host did not publish in order (or never lists
+        # some events), so which numbers lack results is a guess. Shown, not paged.
+        top = max((g["event_number"] for g in numbered if g["results"] > 0), default=None)
+        order_guess = k > 0 and top is not None and sum(
+            1 for g in zero if g["event_number"] < top) > k
     # Unlisted events carry no number. One that appeared with the latest rise
     # of the published count is the newest publication (a sole publication
     # with no row must not page as late); once the count grows past it, it
@@ -836,6 +845,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                      f"({_events_txt(waiting)}, due {hm(due, tz)})")
     if newest_txt:
         parts.append(newest_txt)
+    if order_guess:
+        parts.append("the event numbers are a guess: the host has not published in number "
+                     "order, so the counts do not say which events lack results")
     if errors:
         parts.append(f"the last writer tick reported {errors} error(s)")
     parts.append(f"the oldest has been short since {hm_day(since_all, tz, snap.now)}; last "
@@ -844,7 +856,8 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                missing=len(missing) + unlisted, thin=[g["event_number"] for g in _thin(events, cfg)],
                late=[g["event_number"] if not g["key"].startswith("unlisted") else "unlisted"
                      for g in late],
-               newest=newest and newest["event_number"], progress_at=progress_at)
+               newest=newest and newest["event_number"], progress_at=progress_at,
+               order_guess=order_guess)
 
 
 def eval_schedule(row: dict, snap: Snapshot, cfg: dict, tz, day: str) -> Expectation | None:

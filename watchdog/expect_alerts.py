@@ -23,6 +23,7 @@ Rules (docs/meettrack-expectations.md, "Alert policy"):
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -102,12 +103,19 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
             repeat = _repeat_min(e.kind, e.severity, cfg) * 60
             due = now - float(rec.get("last_sent", 0)) >= repeat
             progress_at = (e.data or {}).get("progress_at")
-            if due and progress_at is not None and now - float(progress_at) < repeat:
+            try:
+                progress_at = float(progress_at) if progress_at is not None else None
+            except (TypeError, ValueError):
+                progress_at = None
+            if progress_at is not None and (not math.isfinite(progress_at)
+                                            or progress_at > now + 300):
+                progress_at = None   # a broken or future time (clock skew) never mutes reminders
+            if due and progress_at is not None and now - progress_at < repeat:
                 due = False          # still moving (catching up, results arriving): no reminder
             if worse or due:
                 sends = int(rec.get("sends", 1)) + 1
                 reason = ("now worse" if worse else
-                          f"nothing new for {_ago(now, float(progress_at))}"
+                          f"nothing new for {_ago(now, progress_at)}"
                           if progress_at is not None else "")
                 notices.append(Notice("reminder", e.id, e.meet, e.expected, e.evidence,
                                       e.severity, e.deadline, rec.get("first_missed"), sends,
