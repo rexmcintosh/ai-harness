@@ -597,8 +597,12 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
     # Blind: nothing tells us what the host has. The clock decides. A
     # files_seen time is kept: if the counters come back showing the same
     # files, their deadline is still the one from when they were first seen.
+    counting_writer = str(row.get("feed_type") or "").strip().lower() == "pdf"
     if published is None and iso_epoch(row.get("coverage_at")) is None:
         why = "the writer has not reported the host's result list (no tick counters)"
+    elif published is None and counting_writer:
+        why = ("the writer has not reported the host's result list (its last tick did not "
+               "report its file counts)")
     elif published is None:
         why = "the writer has not reported the host's result list (this writer does not count files)"
     else:
