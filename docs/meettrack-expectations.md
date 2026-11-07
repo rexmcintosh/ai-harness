@@ -83,8 +83,10 @@ Scope and data:
   carries the incident to its own RESOLVED. It keeps the
   time it first saw the files: if `results:*` goes quiet while MeetTrack still
   has nothing, `first:*` is judged from that time, not from a fresh 60 min. The
-  time is cleared only when results arrive or the writer counts no new file;
-  a blind interval (stale or missing counters) keeps it.
+  time is cleared only when results arrive, or when the writer has counted no
+  new file for 10 min (two runs: one sample can be a flicker); a blind
+  interval (stale or missing counters) keeps it. A failed read for the meet
+  leaves `first:*` unknown and its baseline and files_seen untouched.
 - `results:*` judges each event number on its own. An event lacks results when
   the host has published it and MeetTrack has none, or results for under half
   its start list (thin; relays and start lists under 4 never are). Which events

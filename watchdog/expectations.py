@@ -69,6 +69,9 @@ LIVE_FEEDS = ("pdf", "fragment", "lenex")
 # under 100 events); more than that share the newest clock. Bad counters can
 # never grow the state file without bound.
 MAX_UNLISTED_CLOCKS = 100
+# first:* forgets when it first saw the host's new files only once the writer
+# has counted none for this long (two 5-min runs): one sample can be a flicker.
+FILES_GONE_CONFIRM_MIN = 10
 WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
 
 
@@ -547,6 +550,13 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
     """
     sid = str(row.get("sr_meet_id"))
     eid = f"first:{sid}:{day}"
+    if snap.read_errors.get(sid):
+        # A failed read (today's results, the events) is not evidence: neither
+        # judge nor touch this meet's baseline and files_seen.
+        return Expectation(eid, "first_results", label(row), "results start appearing today",
+                           None, "unknown", "warn",
+                           f"not judged: {'; '.join(snap.read_errors[sid])}",
+                           sr_meet_id=sid, day=day)
     events = snap.events.get(sid, [])
     start, src = session_start(cfg, row, events, day, tz)
     grace_min = int(cfg["first_results_grace_min"])
@@ -579,6 +589,7 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
     new_published = (int(published) - baseline) if measured else 0
     checked = hm_day(iso_epoch(row.get("coverage_at")), tz, snap.now)
     files_key = f"files_seen:{sid}:{day}"
+    gone_key = f"files_gone:{sid}:{day}"
     covered = row.get("events_with_results")
     if measured and today_n == 0 and covered is not None:
         # Nothing was written today, so every event that has results got them
@@ -593,9 +604,11 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
 
     if today_n > 0:
         mem.pop(files_key, None)
+        mem.pop(gone_key, None)
         return exp(f"results start appearing {clock_how}", clock_deadline, "met",
                    f"{today_n} results written today; host lists {published or 0} result files")
     if measured and new_published > 0:
+        mem.pop(gone_key, None)
         seen = float(mem.setdefault(files_key, snap.now))
         deadline = seen + grace_min * 60
         files = f"{published} result file{'' if published == 1 else 's'}"
@@ -604,8 +617,14 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                    f"0 results today; the host lists {files} ({new_published} new today), first "
                    f"seen {hm_day(seen, tz, snap.now)}; the writer checked at {checked}",
                    files_seen=seen)
+    if measured and files_key in mem:
+        # The writer counts no new file. Over only once that holds for
+        # FILES_GONE_CONFIRM_MIN: a one-run dip keeps the first-seen time.
+        gone = float(mem.setdefault(gone_key, snap.now))
+        if snap.now - gone >= FILES_GONE_CONFIRM_MIN * 60:
+            mem.pop(files_key, None)
+            mem.pop(gone_key, None)
     if measured:
-        mem.pop(files_key, None)         # the writer sees no new file: that incident is over
         if start is None:
             return exp("results start appearing once the host publishes them (no start time known)",
                        None, "pending",
@@ -1061,7 +1080,7 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
     for key in ("late_events", "results_progress"):
         mem[key] = {k: v for k, v in (mem.get(key) or {}).items() if k in seen_ids}
     today = {f"{e.sr_meet_id}:{e.day}" for e in out if e.kind == "first_results"}
-    for k in [k for k in mem if k.startswith(("baseline:", "files_seen:"))
+    for k in [k for k in mem if k.startswith(("baseline:", "files_seen:", "files_gone:"))
               and k.split(":", 1)[1] not in today]:
         del mem[k]
     mem["last_live"] = live_names
