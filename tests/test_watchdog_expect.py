@@ -1826,3 +1826,52 @@ def test_an_invalid_meet_id_makes_the_meet_unknown_and_pages_db_reads():
     assert "meet id is not a plain id" in e["db:reads"].evidence
     notices, _ = plan(exps, {}, at("17:05"), POLICY, True)
     assert "db:reads" in [n.id for n in notices]
+
+
+# --- council round 7 (2026-11-07) ------------------------------------------------
+
+def test_a_cold_start_on_the_first_day_counts_listed_files_as_todays():
+    # The meet races today for the first time; the monitor (re)starts at 10:00
+    # and the host already lists a file with nothing in MeetTrack. No start time.
+    sent, mem, _ = run_day(lambda t: alapraia(t, events_published=1), "10:00", "11:05")
+    assert mem["baseline:11531:" + D7] == 0
+    assert [s[:3] for s in sent] == [("11:00", "new", f"first:11531:{D7}")]
+
+
+def test_a_meet_that_enters_mid_afternoon_with_files_still_pages():
+    # Like Ponte da Barca at 16:40, but with a writer that counts the files.
+    # One file (the newest, so results:* waits): first:* pages an hour later.
+    sent, _, _ = run_day(lambda t: alapraia(t, events_published=1), "16:40", "17:45")
+    assert [s[:3] for s in sent] == [("17:40", "new", f"first:11531:{D7}")]
+    # Six files: results:* pages 20 min after the first five were superseded,
+    # and first:* stands down (never opened, so nothing more is sent).
+    sent, _, _ = run_day(lambda t: alapraia(t, events_published=6), "16:40", "17:45")
+    assert [s[:3] for s in sent] == [("17:00", "new", f"results:11531:{D7}")]
+
+
+def test_day_two_baseline_is_taken_before_racing_starts():
+    events = {"11113": [ev(n, 10, 10) for n in range(1, 11)] + [ev(11, 10, 0)]}
+    row = reg(events_published=10, events_with_results=10, coverage_at=iso(at("07:55", NEXT)))
+    _, mem = evaluate(snap(at("07:55", NEXT), [row], events=events), CFG, {})
+    assert mem["baseline:11113:2026-10-11"] == 10
+    # a cold start after racing began: only files whose events have results are known to be old
+    row.update(events_published=11, coverage_at=iso(at("12:00", NEXT)))
+    _, mem = evaluate(snap(at("12:00", NEXT), [row], events=events), CFG, {})
+    assert mem["baseline:11113:2026-10-11"] == 10
+
+
+@pytest.mark.parametrize("published, covered", [(2, 3), (-1, 0), (True, 0)])
+def test_inconsistent_counters_are_not_judged_and_keep_the_clocks(published, covered):
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    exps, mem = evaluate(alapraia(t0, events_published=1), CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0
+    bad = alapraia(t0 + 600, events_published=published, events_with_results=covered)
+    exps, mem = evaluate(bad, CFG, mem)
+    e = by_id(exps)
+    assert e[f"results:11531:{D7}"].status == "unknown"
+    assert "do not add up" in e[f"results:11531:{D7}"].evidence
+    assert e[f"first:11531:{D7}"].status == "pending"
+    assert mem["files_seen:11531:" + D7] == t0                 # the deadline is kept
+    exps, mem = evaluate(alapraia(t0 + 3600, events_published=1), CFG, mem)
+    assert by_id(exps)[f"first:11531:{D7}"].status == "missed"
