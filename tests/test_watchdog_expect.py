@@ -1475,7 +1475,8 @@ def test_files_seen_is_kept_while_first_stands_down_and_cleared_by_results():
         exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
     e = by_id(exps)
     assert e["results:11113:2026-10-10"].status == "missed"
-    assert e["first:11113:2026-10-10"].status == "unknown"
+    assert e["first:11113:2026-10-10"].status == "closed"           # superseded by results:*
+    assert "superseded by results:11113" in e["first:11113:2026-10-10"].evidence
     assert mem["files_seen:11113:2026-10-10"] == t0
     # The host withdraws one file: results:* is quiet again, MeetTrack still has
     # nothing. first:* pages at once: the files were seen 70 min ago, not now.
@@ -1753,3 +1754,34 @@ def test_plain_id_accepts_the_ids_splash_poller_writes():
     assert er._PLAIN_ID.fullmatch(str(uuid.uuid4()))
     for bad in ("a,b", "a)", "a.b", "a&b", "a=b", "a b", "a*", "a:b", ""):
         assert not er._PLAIN_ID.fullmatch(bad), bad
+
+
+# --- council round 5 (2026-11-07) ------------------------------------------------
+
+def test_an_open_first_alert_is_closed_once_when_results_takes_over():
+    # 15:00 the host lists one file, MeetTrack nothing: first:* pages at 16:00.
+    # 16:05 a second file: event 1 is no longer the newest and is late at
+    # 16:25, so results:* pages and first:* is closed as superseded, once.
+    # 16:30 results arrive: one RESOLVED, for results:* only.
+    t0 = at("15:00", D7)
+    events = [ev(1, 10, 0), ev(2, 10, 0), ev(3, 10, 0)]
+
+    def make(t):
+        pub = 1 if t < at("16:05", D7) else 2
+        done = t >= at("16:30", D7)
+        row = reg("11531", "Alapraia", start_date=D7, end_date=D7, events_published=pub,
+                  events_with_results=pub if done else 0, coverage_at=iso(t - 30),
+                  last_ingest_at=iso(at("16:30", D7)) if done else None)
+        evs = [ev(1, 10, 10), ev(2, 10, 10), ev(3, 10, 0)] if done else events
+        return snap(t, [row], events={"11531": evs}, today={"11531": 20 if done else 0})
+    mem, state, sent = {"baseline:11531:" + D7: 0}, {}, []
+    t = t0
+    while t <= at("22:10", D7):
+        exps, mem = evaluate(make(t), CFG, mem)
+        notices, state = plan(exps, state, t, LIVE_POLICY, in_racing_window(t, CFG))
+        sent += [(hhmm(t), n.kind, n.id.split(":")[0], n.reason) for n in notices]
+        t += 300
+    assert [s[:3] for s in sent] == [("16:00", "new", "first"), ("16:25", "new", "results"),
+                                     ("16:25", "closed", "first"), ("16:30", "resolved", "results")]
+    assert sent[2][3].startswith("superseded by results:11531:")
+    assert state["open"] == {}
