@@ -291,6 +291,16 @@ def stated_start(cfg: dict, sid: str, day: str) -> str | None:
     return None
 
 
+def event_no(v) -> int | None:
+    """An event number as an int: an int, or a string of digits ('16', ' 9 ').
+    Anything else (None, a bool, 'x', a float) is not a number."""
+    if isinstance(v, int) and not isinstance(v, bool):
+        return v
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip())
+    return None
+
+
 def by_event_number(events: list) -> list[dict]:
     """One record per event number, in number order. Rows that share a number
     are one event: their results add up, the start list is the larger row's,
@@ -299,11 +309,12 @@ def by_event_number(events: list) -> list[dict]:
     without results. Rows without a number stay on their own, last."""
     groups: dict = {}
     for i, e in enumerate(events or []):
-        n = e.get("event_number")
-        key = n if isinstance(n, int) and not isinstance(n, bool) else f"row:{e.get('id') or i}"
+        n = event_no(e.get("event_number"))
+        key = n if n is not None else f"row:{e.get('id') or i}"
         g = groups.get(key)
         if g is None:
-            g = groups[key] = {"event_number": n, "key": str(key), "results": 0, "entries": 0,
+            g = groups[key] = {"event_number": n if n is not None else e.get("event_number"),
+                               "key": str(key), "results": 0, "entries": 0,
                                "relay_count": 1, "rows": 0, "ids": [], "day_times": []}
         g["results"] += int(e.get("results") or 0)
         g["entries"] = max(g["entries"], int(e.get("entries") or 0))
@@ -542,6 +553,7 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                            data={"start": start, "published": published, **data})
 
     if today_n > 0:
+        mem.pop(files_key, None)
         return exp(f"results start appearing {clock_how}", clock_deadline, "met",
                    f"{today_n} results written today; host lists {published or 0} result files")
     if measured and new_published > 0:
@@ -603,10 +615,22 @@ def _thin(events: list, cfg: dict) -> list:
     return out
 
 
+def _n(groups: list) -> int:
+    """How many events: an unlisted entry stands for ``count`` of them."""
+    return sum(int(g.get("count") or 1) for g in groups)
+
+
 def _events_txt(groups: list) -> str:
-    nums = [str(g["event_number"]) if g.get("event_number") is not None else "?" for g in groups]
-    more = f" and {len(nums) - 12} more" if len(nums) > 12 else ""
-    return f"event{'s' if len(nums) > 1 else ''} {', '.join(nums[:12])}{more}"
+    named = [g for g in groups if g.get("key") != "unlisted"]
+    unlisted = _n([g for g in groups if g.get("key") == "unlisted"])
+    out = []
+    if named:
+        nums = [str(g["event_number"]) for g in named]
+        more = f" and {len(nums) - 12} more" if len(nums) > 12 else ""
+        out.append(f"event{'s' if len(nums) > 1 else ''} {', '.join(nums[:12])}{more}")
+    if unlisted:
+        out.append(f"{unlisted} not in MeetTrack's event list")
+    return " and ".join(out)
 
 
 def _so_far(g: dict) -> str:
@@ -621,12 +645,18 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     An event *lacks* results when the host has published it and MeetTrack has
     none (``events_published - events_with_results`` of them: the lowest
     numbers without a result, as the host publishes in order), or only a few
-    (thin). The newest published event is being swum: it never counts. Any
+    (thin). The newest published event is being swum: it never counts. A
+    published event with no MeetTrack row (unlisted) has no number: it is the
+    newest while the published count has not grown since it appeared. Any
     other lacking event is *late* once it has lacked results for
     ``results_lag_min`` since it stopped being the newest (``memory
     late_events``); it leaves the late set when it catches up. ``data
     progress_at`` is the last time a lacking event gained results or the
     writer wrote any result: the alert policy holds reminders while that moves.
+
+    A writer that counts the host's files (PDF) but whose counters are missing
+    or older than ``coverage_max_age_min`` cannot show which published events
+    lack results: ``unknown``, never ``met``, and every clock stays as it was.
     """
     sid = str(row.get("sr_meet_id"))
     eid = f"results:{sid}:{day}"
@@ -648,11 +678,24 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                            data={"published": published, "covered": covered, **data})
 
     all_recs = mem.setdefault("late_events", {})
-    recs = all_recs.setdefault(eid, {})
+    recs = dict(all_recs.get(eid) or {})     # written back below, only when judged
     progress = mem.setdefault("results_progress", {})
     if snap.read_errors.get(sid):
         # A failed read is not evidence: keep every clock as it is.
         return exp("unknown", f"not judged: {'; '.join(snap.read_errors[sid])}")
+    if (published is not None or row.get("feed_type") == "pdf") and not counted:
+        # This writer counts the host's files, but its counters cannot be used:
+        # which published events lack results is not known. Never "met" (or a
+        # page) on that; the clocks are frozen until the counters are fresh.
+        if published is None or ticked is None:
+            why = "the writer has not counted the host's result files yet"
+        elif not fresh:
+            why = (f"the writer's counters are older than {max_age} min (last tick "
+                   f"{hm_day(ticked, tz, snap.now)})")
+        else:
+            why = "the writer's last tick did not count the events with results"
+        return exp("unknown", f"not judged: {why}, so it is not known which published "
+                              f"events lack results")
 
     groups = by_event_number(events)
     by_key = {g["key"]: g for g in groups}
@@ -662,24 +705,23 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         k = max(0, int(published) - int(covered))
         missing = [g for g in numbered if g["results"] == 0][:k]
         unlisted = k - len(missing)          # published, but no event row for it yet
-    elif published is not None and any(
-            (by_key.get(key) or {"results": 0})["results"] == 0 for key in recs):
-        # The counters are old: whether the events without results caught up
-        # is not known. Never resolve (or page) on that.
-        why = (f"the writer's counters are older than {max_age} min (last tick "
-               f"{hm_day(ticked, tz, snap.now)})" if not fresh else
-               "the writer's last tick did not count the events with results")
-        return exp("unknown", f"not judged: {why}, so it is not known whether the events "
-                              f"without results caught up")
+    # Unlisted events carry no number. One that appeared with the latest rise
+    # of the published count is the newest publication (a sole publication
+    # with no row must not page as late); once the count grows past it, it
+    # has been superseded and is judged like any other event.
+    u_prev = recs.get("unlisted") or {}
+    marker = u_prev.get("published")
+    if unlisted > int(u_prev.get("n") or 0):
+        marker = published
+    unlisted_newest = bool(unlisted) and marker is not None and int(published) <= int(marker)
     known = [g for g in numbered if g["results"] > 0] + missing
-    newest = max(known, key=lambda g: g["event_number"]) if known else None
+    newest = None if unlisted_newest else (
+        max(known, key=lambda g: g["event_number"]) if known else None)
     lacking = {g["key"]: g for g in missing}
     for g in _thin(events, cfg):
         lacking[g["key"]] = g
     in_progress = lacking.pop(newest["key"], None) if newest else None
-    if unlisted:
-        lacking["unlisted"] = {"key": "unlisted", "event_number": None, "results": 0,
-                               "entries": 0, "count": unlisted}
+    late_unlisted = unlisted - (1 if unlisted_newest else 0)
 
     # Clocks: when each event started lacking while not the newest.
     continuous = (mem.get("last_run") is not None
@@ -698,35 +740,48 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         elif g["results"] > int(rec.get("results") or 0):
             moved = True
             rec["results"] = g["results"]
-    for key in [k for k in recs if k not in lacking]:
+    for key in [k for k in recs if k not in lacking and k != "unlisted"]:
         if in_progress is not None and key == in_progress["key"]:
             continue                     # the newest again (the host's list flickered)
         g = by_key.get(key)
         if g is not None and g["results"] > int(recs[key].get("results") or 0):
             moved = True                 # caught up
         del recs[key]
+    if unlisted < int(u_prev.get("n") or 0):
+        moved = True                     # an unlisted event got its row or its results
+    if unlisted:
+        recs["unlisted"] = {"n": unlisted, "published": marker, "results": 0}
+        if late_unlisted:
+            recs["unlisted"]["since"] = (u_prev["since"] if u_prev.get("since") is not None
+                                         else snap.now)
+            lacking["unlisted"] = {"key": "unlisted", "event_number": None, "results": 0,
+                                   "entries": 0, "count": late_unlisted}
+    else:
+        recs.pop("unlisted", None)
     if moved:
         progress[eid] = snap.now
-    if not recs:
+    if recs:
+        all_recs[eid] = recs
+    else:
         all_recs.pop(eid, None)
     marks = [t for t in (progress.get(eid), last_write) if t is not None]
     progress_at = max(marks) if marks else None
 
     newest_txt = (f"event {newest['event_number']}, the newest, is in progress ({_so_far(in_progress)})"
-                  if in_progress is not None else None)
+                  if in_progress is not None else
+                  "the newest publication, not in MeetTrack's event list yet, is in progress"
+                  if unlisted_newest else None)
     if not lacking:
         if published is None and not events:
             note = "nothing published yet"
         elif published is None:
             note = "no per-event counters from this writer; every event with results looks complete"
-        elif in_progress is not None:
+        elif newest_txt:
             note = f"every one of the {published} published events but the newest is in MeetTrack"
         else:
             note = f"all {published} published events have results"
         if newest_txt:
             note += f"; {newest_txt}"
-        if not fresh and published is not None:
-            note += " (counters not fresh)"
         return exp("met", note, newest=newest and newest["event_number"],
                    progress_at=progress_at)
 
@@ -737,14 +792,10 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     late_none = [g for g in late if g["results"] == 0]
     late_thin = [g for g in late if g["results"] > 0]
     if late_none:
-        named = [g for g in late_none if g["key"] != "unlisted"]
-        n = len(named) + (unlisted if len(named) < len(late_none) else 0)
-        where = [_events_txt(named)] if named else []
-        if len(named) < len(late_none):
-            where.append(f"{unlisted} not in MeetTrack's event list")
+        n = _n(late_none)
         head = f"the host has published {published} events; " if counted else ""
         parts.append(f"{head}{n} of them {'has' if n == 1 else 'have'} no results in MeetTrack "
-                     f"after {lag}+ min ({'; '.join(where)})")
+                     f"after {lag}+ min ({_events_txt(late_none)})")
     if late_thin:
         res = sum(g["results"] for g in late_thin)
         ent = sum(g["entries"] for g in late_thin)
@@ -754,10 +805,10 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                      f"swimmers on the start list after {lag}+ min ({res} results for {ent} "
                      f"entries; {_events_txt(late_thin)})")
     if waiting:
-        one = len(waiting) == 1
+        one = _n(waiting) == 1
         due = min(float(recs[g["key"]]["since"]) for g in waiting) + lag * 60
         lead = "more" if late else f"published event{'' if one else 's'}"
-        parts.append(f"{len(waiting)} {lead} {'is' if one else 'are'} short, not yet due "
+        parts.append(f"{_n(waiting)} {lead} {'is' if one else 'are'} short, not yet due "
                      f"({_events_txt(waiting)}, due {hm(due, tz)})")
     if newest_txt:
         parts.append(newest_txt)

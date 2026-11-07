@@ -123,7 +123,12 @@ Since 8 Nov 2026 (after the 7 Nov Leiria, Alapraia and Ponte da Barca alerts):
   results or the writer writes any result for the meet. Once nothing has moved
   for an hour, it reminds every hour ("nothing new for 1h05").
 - Rows that share an event number count as one event (results added up, the
-  larger start list), for `results:*`, `schedule:*` and the source note.
+  larger start list), for `results:*`, `schedule:*`, the source note and the
+  investigation's totals.
+- A PDF writer whose counters are missing or older than 30 min makes
+  `results:*` "not judged": never resolved, never paged, clocks frozen until
+  the counters are fresh. A racing alert that is not judged at 22:00 closes
+  then, like a missed one.
 - `first:*` pages when the host lists result files and MeetTrack has none for
   60 min. When the writer sees the host has published nothing, it never pages
   without a known start time, and pages 180 min after a known start. Only when

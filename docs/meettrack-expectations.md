@@ -57,7 +57,7 @@ Scope and data:
 - Start times: a stated time in `[[expect.start_times]]`, else the earliest
   `events.day_time` when the start list carries it, else none.
 - `first:*` asks what the writer can see of the host (`events_published` with a
-  `coverage_at` under 30 min old). If the host lists new result files today and
+  `coverage_at` at most 30 min old: "fresh"; one second older is stale). If the host lists new result files today and
   MeetTrack has no result, that is a MeetTrack fault: missed 60 min after the
   files were first seen (`files_seen:<id>:<day>` in memory). If the host lists
   none, the host has published nothing: not a MeetTrack fault, so no alert
@@ -67,23 +67,41 @@ Scope and data:
   Example, 7 Nov 2026: Alapraia's writer counted 0 files, so 17:00 is no longer
   an alert; Ponte da Barca had no meet row, its writer never ticked, so 17:00
   still alerts (the host had 6 result PDFs). When `results:*` is missed for the
-  same meet, `first:*` stands down (one root cause, one alert).
+  same meet, `first:*` stands down (one root cause, one alert) but keeps the
+  time it first saw the files: if `results:*` goes quiet while MeetTrack still
+  has nothing, `first:*` is judged from that time, not from a fresh 60 min. The
+  time is cleared when results arrive or the host's new files disappear.
 - `results:*` judges each event number on its own. An event lacks results when
   the host has published it and MeetTrack has none, or results for under half
   its start list (thin; relays and start lists under 4 never are). Which events
   the host has published with no results comes from the writer's counters:
   `events_published - events_with_results` of them, the lowest event numbers
   with no result (the host publishes in order). The newest published event is
-  being swum and never counts, however short. Any other lacking event becomes
-  late 20 min after it was first seen lacking while not the newest (memory
-  `late_events`); it leaves the late set when it catches up, and the alert
-  resolves when no event is late or short. If the writer's counters go older
-  than 30 min while an event without results is tracked, the result is
-  `unknown`: never resolved or paged on old counters.
+  being swum and never counts, however short. A published event with no
+  MeetTrack row at all ("not in MeetTrack's event list") has no number: one
+  that appeared with the latest rise of `events_published` is the newest, so a
+  sole publication without a row never pages from here (`first:*` covers it);
+  once the count grows past it, it is judged like any other. Any other lacking
+  event becomes late 20 min after it was first seen lacking while not the
+  newest (memory `late_events`); it leaves the late set when it catches up, and
+  the alert resolves when no event is late or short.
+- A writer that counts the host's files (`feed_type = pdf`, or any non-NULL
+  `events_published`) whose counters are missing, NULL or stale makes
+  `results:*` `unknown`: never `met` (a restart with no memory cannot prove
+  completeness) and never paged. The clocks freeze while it lasts and resume
+  when the counters are fresh again. Writers that never count files (fragment,
+  Lenex) are judged on their event rows (thin events) only.
+- The order assumption: if a host publishes out of order, the inferred numbers
+  can be wrong for a while (event 4 taken for the empty event 5), but the count
+  of late events is right and the event being swum is still exempt; a host
+  that publishes an earlier event after a later one gets that event judged
+  like any superseded event.
 - Rows that share an event number are one event: results add up, the start
   list is the larger row's, the slot is the earliest. A second, empty session
   row under the same number (7 Nov 2026, Leiria events 2 and 16) is not an
   event without results, for `results:*`, `schedule:*` and the source note.
+- Memory is per expectation id (meet and day) and is dropped as soon as that
+  id is no longer produced: a meet that leaves the registry, or yesterday.
 - Limit: the newest event is not paged while it is the newest, so a stuck
   last event of a session is only judged once the next event is published
   (on a multi-day meet, the next morning). The monitor cannot tell a host
@@ -120,7 +138,8 @@ read. The 30-minute watchdog's full-table counts are now planner estimates
   and RESOLVED at 16:10, against one NEW and seven reminders before.
 - RESOLVED once, with how long it lasted, when the expectation is met again.
 - Racing-window expectations alert only 08:00-22:00 Lisbon. If one is still
-  open at 22:00, one CLOSED line says so and the reminders stop. If it is still
+  open at 22:00 (missed, or not judged or not due at that moment), one CLOSED
+  line says so and the reminders stop. If it is still
   wrong tomorrow, tomorrow's id alerts anew.
 - `always` expectations (database, start lists) alert at any hour.
 - An open alert whose expectation is no longer produced (meet finished, left

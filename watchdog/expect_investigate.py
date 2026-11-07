@@ -160,9 +160,11 @@ def investigate(exp: Expectation, snap: Snapshot, probes: Probes, *,
         if shared:
             rows.append(f"(rows that share a number are judged as one event: {', '.join(shared[:12])})")
         sections.append(("MeetTrack per-event counts", rows))
+        # One per event number, like the checks: results add up, the start
+        # list is the larger row's (a duplicate row's entries are not new swimmers).
         facts["events_with_results"] = sum(1 for g in groups if g["results"] > 0)
-        facts["results_total"] = sum(int(e.get("results") or 0) for e in events)
-        facts["entries_total"] = sum(int(e.get("entries") or 0) for e in events)
+        facts["results_total"] = sum(g["results"] for g in groups)
+        facts["entries_total"] = sum(g["entries"] for g in groups)
     facts["summary"] = _summary(exp, facts)
     return {"summary": facts["summary"], "sections": sections, "facts": facts}
 

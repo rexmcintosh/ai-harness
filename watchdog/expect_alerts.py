@@ -12,8 +12,9 @@ Rules (docs/meettrack-expectations.md, "Alert policy"):
   it catches up.
 - When it is met again, one RESOLVED line says so and how long it lasted.
 - Live-meet expectations (window "racing") only alert inside racing hours.
-  When racing hours end with one still open, one CLOSED line says so and the
-  reminders stop; a problem that persists tomorrow is a new id, so a new alert.
+  When racing hours end with one still open (missed, or not judged / not due
+  at that moment), one CLOSED line says so and the reminders stop; a problem
+  that persists tomorrow is a new id, so a new alert.
   Database and start-list expectations (window "always") alert at any hour.
 - An open alert whose expectation is no longer produced (the meet finished or
   left the registry window) is CLOSED, never left hanging. While the database
@@ -119,6 +120,17 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
         if not rec:
             continue
         if e.status in ("unknown", "pending"):
+            if e.window == "racing" and not racing_now:
+                # Racing is over and it is not judged (or not due) now: close it
+                # like a missed one, rather than leave it open until its id
+                # changes at midnight.
+                why = "not judged" if e.status == "unknown" else "not due yet"
+                notices.append(Notice("closed", e.id, e.meet, e.expected, e.evidence,
+                                      rec.get("severity", e.severity), e.deadline,
+                                      rec.get("first_missed"), rec.get("sends", 1),
+                                      reason=f"racing hours are over; {why} at close, "
+                                             f"no more reminders today"))
+                del open_[e.id]
             continue                                    # not judged / not due: keep it open
         if e.status == "met":
             notices.append(Notice("resolved", e.id, e.meet, e.expected, e.evidence,

@@ -25,6 +25,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -216,7 +217,8 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 failed(sid, "results today", err or "no count")
             snap.results_today[sid] = n or 0
             thin = _thin(snap.events[sid], cfg)        # one per event number
-            if thin and all(g["ids"] for g in thin):
+            if thin and all(g["ids"] and all(_PLAIN_ID.fullmatch(str(i)) for i in g["ids"])
+                            for g in thin):
                 ids_in = ",".join(i for g in thin for i in g["ids"])
                 newest, _ = rest.get(f"results?select=created_at&event_id=in.({ids_in})"
                                      f"&order=created_at.desc&limit=1", timeout=t_read)
@@ -229,6 +231,10 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                         f"&end_date=lt.{cutoff}&order=end_date", timeout=run_cfg["read_timeout_s"])
     snap.stale_active = stale or []
     return snap
+
+
+# Event ids go into a PostgREST in.(...) filter: plain ids (uuid-like) only.
+_PLAIN_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
 def _event(e: dict) -> dict:
