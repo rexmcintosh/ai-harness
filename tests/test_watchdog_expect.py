@@ -1956,3 +1956,69 @@ def test_results_alert_through_missed_unknown_missed_reminds_only_when_stuck():
             assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
     # NEW at +20; reminders once an hour; none while not judged (70-95)
     assert kinds == [(20, "new"), (100, "reminder"), (160, "reminder")]
+
+
+# --- council round 10 (2026-11-07) -----------------------------------------------
+
+def test_a_clocked_event_missing_from_the_snapshot_is_not_judged_until_confirmed_gone():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    mem = {}
+
+    def run(minutes, events):
+        nonlocal mem
+        now = t + minutes * 60
+        row["coverage_at"] = iso(now - 30)
+        exps, mem = evaluate(snap(now, [row], events={"11113": events}), CFG, mem)
+        return by_id(exps)["results:11113:2026-10-10"]
+    full = FOUR["11113"]
+    without_2 = [e for e in full if e["event_number"] != 2]
+    assert run(0, full).status == "pending"                     # event 2: clock from 15:00
+    e = run(5, without_2)                                       # event 2 vanished from the read
+    assert e.status == "unknown" and "event 2" in e.evidence
+    assert mem["late_events"]["results:11113:2026-10-10"]["2"]["since"] == t
+    e = run(20, full)                                           # back: its clock is intact
+    assert e.status == "missed" and "short since 15:00" in e.evidence
+    for m in (25, 30, 35, 40):                                  # gone for good (15 min)
+        e = run(m, without_2)
+    assert e.status != "unknown"
+    assert "2" not in mem["late_events"].get("results:11113:2026-10-10", {})
+
+
+def test_thin_refinement_queries_the_usable_ids_and_says_which_it_skipped():
+    calls = []
+
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(events_published=3, events_with_results=3,
+                            coverage_at=iso(at("17:57")), last_ingest_at=iso(at("17:57")))], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1", "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return [{"id": "e1", "event_number": 1, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]},
+                        {"id": "bad,id", "event_number": 2, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]},
+                        {"id": "e3", "event_number": 3, "relay_count": 1,
+                         "results": [{"count": 30}], "heats": [{"count": 30}]}], None
+            if path.startswith("results?select=created_at"):
+                return [{"created_at": iso(at("16:35"))}], None
+            if path.startswith("results"):
+                return 34, None
+            return [], None
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+    assert [p for p in calls if p.startswith("results?select=created_at")] == [
+        "results?select=created_at&event_id=in.(e1)&order=created_at.desc&limit=1"]
+    assert s.thin_last_write["11113"] == at("16:35") and s.thin_refined["11113"] == {"1"}
+    # cold start: event 1 counts from its own newest result (16:35), event 2
+    # (not queried) from the meet's last write (17:57)
+    exps, mem = evaluate(s, CFG, {})
+    e = by_id(exps)["results:11113:2026-10-10"]
+    recs = mem["late_events"]["results:11113:2026-10-10"]
+    assert recs["1"]["since"] == at("16:35") and recs["2"]["since"] == at("17:57")
+    assert "1 thin event has ids that cannot be queried" in e.evidence
