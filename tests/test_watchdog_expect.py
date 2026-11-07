@@ -1555,3 +1555,87 @@ def test_thin_refinement_skips_event_ids_that_are_not_plain_ids():
             return [], None
     er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
     assert not [p for p in calls if p.startswith("results?select=created_at")]
+
+
+# --- council round 2 (2026-11-07) ------------------------------------------------
+
+def _unlisted(now, published):
+    return reg(events_published=published, events_with_results=0, coverage_at=iso(now - 30))
+
+
+def test_each_superseded_unlisted_publication_has_its_own_clock():
+    # Published 1 -> 2 -> 3 (no MeetTrack rows): the first is superseded at
+    # 15:05, the second at 15:15. At 15:25 only the first is late.
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 2), (10, 2), (15, 3), (20, 3), (25, 3)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed"
+    assert "1 of them has no results in MeetTrack after 20+ min (1 not in MeetTrack's event list)" \
+        in e.evidence
+    assert "1 more is short, not yet due (1 not in MeetTrack's event list, due 15:35)" in e.evidence
+
+
+def test_a_published_count_that_dips_keeps_the_oldest_unlisted_clock():
+    # The host's list loses a file for one run (it flickers) and gets it back:
+    # the oldest clock survives and the dip is not progress.
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 2), (10, 3), (15, 2), (20, 3)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    assert "results:11113:2026-10-10" not in mem.get("results_progress", {})
+    exps, mem = evaluate(snap(t + 25 * 60, [_unlisted(t + 25 * 60, 3)]), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed" and "short since 15:05" in e.evidence
+
+
+def test_first_results_after_a_cold_start_past_the_deadline_ignores_yesterdays_files():
+    # Day two, the monitor restarts at 18:00 with no memory. The host lists
+    # yesterday's 16 files, all with results in MeetTrack, none written today.
+    # They are not today's news: no "files but no results" warning, ever.
+    events = {"11113": [ev(n, 10, 10) for n in range(1, 17)] + [ev(n, 10, 0) for n in range(17, 33)]}
+    mem = {}
+    for minutes in range(0, 121, 5):
+        now = at("18:00", NEXT) + minutes * 60
+        row = reg(events_published=16, events_with_results=16, coverage_at=iso(now - 30))
+        exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+        f = by_id(exps)["first:11113:2026-10-11"]
+        assert f.status == "pending", (minutes, f.evidence)
+    # a new file today with nothing in MeetTrack is still news
+    now = at("20:05", NEXT)
+    row = reg(events_published=17, events_with_results=16, coverage_at=iso(now - 30))
+    exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+    assert "(1 new today)" in by_id(exps)["first:11113:2026-10-11"].evidence
+
+
+def test_snapshot_handles_numeric_ids_and_refuses_odd_meet_ids():
+    calls = []
+
+    class FakeRest:
+        def __init__(self, meet_id):
+            self.meet_id = meet_id
+
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg()], None
+            if path.startswith("meets?select=id"):
+                return [{"id": self.meet_id, "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return [{"id": 41, "event_number": 1, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]}], None
+            if path.startswith("results?select=created_at"):
+                return [{"created_at": iso(at("16:35"))}], None
+            if path.startswith("results"):
+                return 2, None
+            return [], None
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(7), ps=lambda: "")
+    assert "results?select=created_at&event_id=in.(41)&order=created_at.desc&limit=1" in calls
+    assert s.thin_last_write["11113"] == at("16:35")
+    calls.clear()
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest("m1&select=*"), ps=lambda: "")
+    assert not [p for p in calls if p.startswith(("events", "results"))]
+    assert s.read_errors["11113"] == ["meets: meet id is not a plain id"]
