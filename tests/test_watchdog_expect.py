@@ -1875,3 +1875,43 @@ def test_inconsistent_counters_are_not_judged_and_keep_the_clocks(published, cov
     assert mem["files_seen:11531:" + D7] == t0                 # the deadline is kept
     exps, mem = evaluate(alapraia(t0 + 3600, events_published=1), CFG, mem)
     assert by_id(exps)[f"first:11531:{D7}"].status == "missed"
+
+
+# --- council round 8 (2026-11-07) ------------------------------------------------
+
+def test_a_one_run_dip_in_the_hosts_files_keeps_the_first_seen_time():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    for minutes, pub in ((0, 1), (5, 1), (20, 0), (25, 1)):         # one run without the file
+        exps, mem = evaluate(alapraia(t0 + minutes * 60, events_published=pub), CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0
+    exps, mem = evaluate(alapraia(t0 + 3600, events_published=1), CFG, mem)
+    f = by_id(exps)[f"first:11531:{D7}"]
+    assert f.status == "missed" and "first seen 15:00" in f.evidence
+
+
+def test_files_gone_for_ten_minutes_clears_the_first_seen_time():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    for minutes, pub in ((0, 1), (20, 0), (25, 0)):
+        exps, mem = evaluate(alapraia(t0 + minutes * 60, events_published=pub), CFG, mem)
+    assert "files_seen:11531:" + D7 in mem                           # 5 min: not yet confirmed
+    exps, mem = evaluate(alapraia(t0 + 30 * 60, events_published=0), CFG, mem)
+    assert "files_seen:11531:" + D7 not in mem and "files_gone:11531:" + D7 not in mem
+
+
+def test_first_results_keeps_its_memory_while_the_meets_reads_fail():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    exps, mem = evaluate(alapraia(t0, events_published=1), CFG, mem)
+    before = {k: v for k, v in mem.items() if k.startswith(("baseline:", "files_"))}
+    s = alapraia(t0 + 300, events_published=0)
+    s.read_errors = {"11531": ["results today: ReadTimeout"]}
+    exps, mem = evaluate(s, CFG, mem)
+    assert by_id(exps)[f"first:11531:{D7}"].status == "unknown"
+    assert {k: v for k, v in mem.items() if k.startswith(("baseline:", "files_"))} == before
+    # a cold start during failed reads does not fix a baseline either
+    s = alapraia(t0, events_published=3)
+    s.read_errors = {"11531": ["events: HTTP 500"]}
+    _, fresh_mem = evaluate(s, CFG, {})
+    assert not [k for k in fresh_mem if k.startswith(("baseline:", "files_"))]
