@@ -128,6 +128,14 @@ Scope and data:
   event without results, for `results:*`, `schedule:*` and the source note.
 - Memory is per expectation id (meet and day) and is dropped as soon as that
   id is no longer produced: a meet that leaves the registry, or yesterday.
+- A late clock whose event is missing from an otherwise good read of the
+  events (a partial read) is kept and `results:*` is `unknown` for that run;
+  after 15 min of absence (`ABSENT_CONFIRM_MIN`) the event counts as gone and
+  its clock is retired (not progress).
+- After a restart, a thin event's clock starts at its own newest result when
+  the snapshot could ask for it (`thin_refined`); one whose event ids cannot
+  go into a filter safely uses the meet's last result time instead (later,
+  so never an earlier page), and the evidence says how many were skipped.
 - Limit: the newest event is not paged while it is the newest, so a stuck
   last event of a session is only judged once the next event is published
   (on a multi-day meet, the next morning). The monitor cannot tell a host

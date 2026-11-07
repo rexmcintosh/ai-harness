@@ -72,6 +72,9 @@ MAX_UNLISTED_CLOCKS = 100
 # first:* forgets when it first saw the host's new files only once the writer
 # has counted none for this long (two 5-min runs): one sample can be a flicker.
 FILES_GONE_CONFIRM_MIN = 10
+# A late-event clock whose event is missing from an otherwise good read of the
+# events is kept, and results:* is not judged, until it has been missing this long.
+ABSENT_CONFIRM_MIN = 15
 WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
 
 
@@ -196,6 +199,10 @@ class Snapshot:
     processes: dict | None = None                      # "11113" -> [ps lines]; None = unknown
     thin_last_write: dict = field(default_factory=dict)  # "11113" -> epoch of the newest
                                                          # result on its thin events
+    thin_refined: dict = field(default_factory=dict)     # "11113" -> event-number keys that
+                                                         # query covered (absent: all of them)
+    thin_skipped: dict = field(default_factory=dict)     # "11113" -> thin events whose ids
+                                                         # could not be queried safely
     read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
 
 
@@ -802,6 +809,26 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     if unlisted > prev_n:
         marker = published
     unlisted_newest = bool(unlisted) and marker is not None and int(published) <= int(marker)
+    # A clocked event missing from this read (no read error, the row is just
+    # not there) may be a partial read: keep its clock and do not judge until
+    # it has been missing for ABSENT_CONFIRM_MIN; then it is gone.
+    for key in [k for k in recs if k in by_key]:
+        recs[key].pop("absent_since", None)
+    absent = [k for k in recs if not k.startswith("unlisted") and k not in by_key]
+    if absent:
+        for key in absent:
+            recs[key].setdefault("absent_since", snap.now)
+        pending_gone = [k for k in absent
+                        if snap.now - float(recs[k]["absent_since"]) < ABSENT_CONFIRM_MIN * 60]
+        if pending_gone:
+            all_recs[eid] = recs
+            names = _events_txt([{"key": k, "event_number": k} for k in pending_gone])
+            return exp("unknown", f"not judged: {names}, with a running late clock, "
+                                  f"{'is' if len(pending_gone) == 1 else 'are'} not in this read "
+                                  f"of MeetTrack's events; kept for {ABSENT_CONFIRM_MIN} min "
+                                  f"before counted as gone")
+        for key in absent:
+            del recs[key]                # gone for good: retired, not progress
     known = [g for g in numbered if g["results"] > 0] + missing
     newest = None if unlisted_newest else (
         max(known, key=lambda g: g["event_number"]) if known else None)
@@ -814,16 +841,24 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     # Clocks: when each event started lacking while not the newest.
     continuous = (mem.get("last_run") is not None
                   and snap.now - float(mem["last_run"]) <= max_age * 60)
-    thin_since = snap.thin_last_write.get(sid) or last_write
+    refined = snap.thin_refined.get(sid)
+
+    def thin_since(key):
+        # The newest result on the queried thin events bounds only those; any
+        # other falls back to the meet's last write (later, so conservative).
+        tw = snap.thin_last_write.get(sid)
+        if tw is not None and (refined is None or key in refined):
+            return tw
+        return last_write
     moved = False
     for key, g in lacking.items():
         rec = recs.get(key)
         if rec is None:
             since = snap.now
-            if not continuous and g["results"] > 0 and thin_since is not None:
+            if not continuous and g["results"] > 0 and thin_since(key) is not None:
                 # No memory of the last runs: a thin event has looked like this
                 # at least since its newest result (or the meet's last write).
-                since = min(since, thin_since)
+                since = min(since, thin_since(key))
             recs[key] = {"since": since, "results": g["results"]}
         elif g["results"] > int(rec.get("results") or 0):
             moved = True
@@ -912,6 +947,11 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                      f"({_events_txt(waiting)}, due {hm(due, tz)})")
     if newest_txt:
         parts.append(newest_txt)
+    skipped = int(snap.thin_skipped.get(sid) or 0)
+    if skipped:
+        parts.append(f"{skipped} thin event{'' if skipped == 1 else 's'} "
+                     f"{'has' if skipped == 1 else 'have'} ids that cannot be queried safely; "
+                     f"{'its' if skipped == 1 else 'their'} clock uses the meet's last result time")
     if order_guess:
         parts.append("the event numbers are a guess: the host has not published in number "
                      "order, so the counts do not say which events lack results")

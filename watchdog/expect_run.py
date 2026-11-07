@@ -220,13 +220,17 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 failed(sid, "results today", err or "no count")
             snap.results_today[sid] = n or 0
             thin = _thin(snap.events[sid], cfg)        # one per event number
-            if thin and all(g["ids"] and all(_PLAIN_ID.fullmatch(str(i)) for i in g["ids"])
-                            for g in thin):
-                ids_in = ",".join(str(i) for g in thin for i in g["ids"])
+            usable = [g for g in thin
+                      if g["ids"] and all(_PLAIN_ID.fullmatch(str(i)) for i in g["ids"])]
+            if len(usable) < len(thin):
+                snap.thin_skipped[sid] = len(thin) - len(usable)
+            if usable:
+                ids_in = ",".join(str(i) for g in usable for i in g["ids"])
                 newest, _ = rest.get(f"results?select=created_at&event_id=in.({ids_in})"
                                      f"&order=created_at.desc&limit=1", timeout=t_read)
                 if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
+                    snap.thin_refined[sid] = {g["key"] for g in usable}
         urls = {str(r.get("sr_meet_id")): r.get("meet_url") for r in rows if r.get("meet_url")}
         snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live], urls)
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
