@@ -1785,3 +1785,44 @@ def test_an_open_first_alert_is_closed_once_when_results_takes_over():
                                      ("16:25", "closed", "first"), ("16:30", "resolved", "results")]
     assert sent[2][3].startswith("superseded by results:11531:")
     assert state["open"] == {}
+
+
+# --- council round 6 (2026-11-07) ------------------------------------------------
+
+def test_blind_first_results_evidence_names_the_real_reason():
+    from watchdog.expectations import eval_first_results
+    now = at("17:05")
+    # a PDF writer that ticks but stamps NULL counters: its counters are broken
+    row = reg(events_published=None, events_with_results=None, coverage_at=iso(now - 30))
+    e = eval_first_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert "did not report its file counts" in e.evidence and "does not count" not in e.evidence
+    # a fragment or Lenex writer genuinely does not count the host's files
+    row = reg(feed_type="lenex", events_published=None, events_with_results=None,
+              coverage_at=iso(now - 30))
+    e = eval_first_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert "this writer does not count files" in e.evidence
+
+
+def test_an_invalid_meet_id_makes_the_meet_unknown_and_pages_db_reads():
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(events_published=4, events_with_results=2,
+                            coverage_at=iso(at("16:59")))], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1,id.neq.x", "live_rankings_id": "sr-11113"}], None
+            return [], None
+    mem, kinds = {}, []
+    for now in (at("17:00"), at("17:05")):
+        s = er.build_snapshot(now, CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+        exps, mem = evaluate(s, CFG, mem)
+        e = by_id(exps)
+        assert e["results:11113:2026-10-10"].status == "unknown"
+        assert e["first:11113:2026-10-10"].status == "unknown"
+        kinds.append(e["db:reads"].status)
+    assert kinds == ["pending", "missed"]
+    assert "meet id is not a plain id" in e["db:reads"].evidence
+    notices, _ = plan(exps, {}, at("17:05"), POLICY, True)
+    assert "db:reads" in [n.id for n in notices]
