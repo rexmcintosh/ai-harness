@@ -1639,3 +1639,47 @@ def test_snapshot_handles_numeric_ids_and_refuses_odd_meet_ids():
     s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest("m1&select=*"), ps=lambda: "")
     assert not [p for p in calls if p.startswith(("events", "results"))]
     assert s.read_errors["11113"] == ["meets: meet id is not a plain id"]
+
+
+# --- council round 3 (2026-11-07) ------------------------------------------------
+
+def test_a_counting_writer_is_recognised_whatever_the_case_of_its_feed_type():
+    from watchdog.expectations import eval_results
+    now = at("15:00")
+    row = reg(feed_type=" PDF ", events_published=None, events_with_results=None)
+    e = eval_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert e.status == "unknown"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_future_or_broken_progress_time_never_mutes_reminders(bad):
+    from watchdog.expectations import Expectation
+    t = at("12:00", D7)
+
+    def exp(progress_at):
+        return Expectation("results:1:d", "results", "M", "e", None, "missed", "crit", "x",
+                           data={"progress_at": progress_at})
+    _, s = plan([exp(None)], {}, t, LIVE_POLICY, True)
+    for p in (t + 6 * 3600, bad):                      # 6 h ahead (clock skew), or not a number
+        notices, s2 = plan([exp(p)], s, t + 3600, LIVE_POLICY, True)
+        assert [n.kind for n in notices] == ["reminder"], p
+        assert notices[0].reason == ""
+
+
+def test_evidence_says_when_event_numbers_are_a_guess():
+    # Events 1 and 4 have results, 2 and 3 none; the counts say one published
+    # event lacks results. In order, 2 and 3 would both be published: the host
+    # did not publish in number order, so the named event is a guess.
+    t = at("15:00")
+    events = {"11113": [ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 0), ev(4, 10, 10), ev(5, 10, 10)]}
+    row = reg(events_published=4, events_with_results=3, coverage_at=iso(t - 30))
+    exps, mem = evaluate(snap(t, [row], events=events), CFG, {})
+    row["coverage_at"] = iso(t + 1170)
+    exps, mem = evaluate(snap(t + 1200, [row], events=events), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed"
+    assert "event numbers are a guess" in e.evidence
+    # in number order there is no such note
+    exps, _ = evaluate(snap(t + 1200, [row], events={"11113": [
+        ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 10), ev(5, 10, 0)]}), CFG, mem)
+    assert "guess" not in by_id(exps)["results:11113:2026-10-10"].evidence
