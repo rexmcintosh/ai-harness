@@ -1915,3 +1915,44 @@ def test_first_results_keeps_its_memory_while_the_meets_reads_fail():
     s.read_errors = {"11531": ["events: HTTP 500"]}
     _, fresh_mem = evaluate(s, CFG, {})
     assert not [k for k in fresh_mem if k.startswith(("baseline:", "files_"))]
+
+
+# --- council round 9 (2026-11-07) ------------------------------------------------
+
+def test_a_fresh_count_without_events_with_results_is_not_a_measured_host():
+    # events_published=1 but events_with_results NULL: both checks treat the
+    # host as unseen. results:* is unknown; first:* follows the blind clock and
+    # neither starts nor expires files_seen.
+    t0 = at("15:00", D7)
+    exps, mem = evaluate(alapraia(t0, events_published=1, events_with_results=None), CFG,
+                         {"baseline:11531:" + D7: 0})
+    e = by_id(exps)
+    assert e[f"results:11531:{D7}"].status == "unknown"
+    assert "did not count the events with results" in e[f"results:11531:{D7}"].evidence
+    assert e[f"first:11531:{D7}"].status == "pending"
+    assert "did not count the events with results" in e[f"first:11531:{D7}"].evidence
+    assert "files_seen:11531:" + D7 not in mem
+    # with a clock already running, such runs neither restart nor clear it
+    mem["files_seen:11531:" + D7] = t0 - 600
+    for m in (5, 20, 35):
+        exps, mem = evaluate(alapraia(t0 + m * 60, events_published=1, events_with_results=None),
+                             CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0 - 600 and "files_gone:11531:" + D7 not in mem
+
+
+def test_results_alert_through_missed_unknown_missed_reminds_only_when_stuck():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    mem, state, kinds = {}, {}, []
+    for minutes in range(0, 181, 5):
+        now = t + minutes * 60
+        stale = 70 <= minutes < 100                       # the writer stops counting for a while
+        row["coverage_at"] = iso(now - (40 * 60 if stale else 30))
+        exps, mem = evaluate(snap(now, [row], events=FOUR), CFG, mem)
+        notices, state = plan(exps, state, now, LIVE_POLICY, True)
+        kinds += [(minutes, n.kind) for n in notices if n.id.startswith("results:")]
+        if stale:
+            assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    # NEW at +20; reminders once an hour; none while not judged (70-95)
+    assert kinds == [(20, "new"), (100, "reminder"), (160, "reminder")]
