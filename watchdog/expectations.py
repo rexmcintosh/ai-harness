@@ -506,6 +506,23 @@ def eval_writer(row: dict, snap: Snapshot, cfg: dict, tz, day: str) -> Expectati
     return exp("met", f"status '{status_now}'; {proc}")
 
 
+def counts_host_files(row: dict) -> bool:
+    """The writer counts the host's published result files (the PDF writer).
+    Fragment and Lenex writers stamp NULL counters by design."""
+    return str(row.get("feed_type") or "").strip().lower() == "pdf"
+
+
+def counters_sane(row: dict) -> bool:
+    """events_published is a count, and events_with_results (when given) is
+    at most that: the writer stamps both from one tick, so anything else is
+    a broken row, not evidence."""
+    pub, cov = row.get("events_published"), row.get("events_with_results")
+
+    def count(v):
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+    return count(pub) and (cov is None or (count(cov) and cov <= pub))
+
+
 def counters_fresh(row: dict, now: float, cfg: dict) -> bool:
     """The writer counted the host's published result files (events_published
     is not NULL) in a tick at most coverage_max_age_min ago."""
@@ -541,15 +558,25 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
         clock_deadline = at_local(day, by, tz)
         clock_how = f"by {by} (no start time known)"
     published = row.get("events_published")
+    measured = counters_fresh(row, snap.now, cfg) and counters_sane(row)
     base_key = f"baseline:{sid}:{day}"
     if base_key not in mem:
-        # Files the host already lists before racing could have produced any
-        # are yesterday's (day two of a meet), not today's news.
-        mem[base_key] = int(published or 0) if snap.now < clock_deadline else 0
+        # Which listed files are not today's news. First day of the meet: none
+        # are older. Later days, seen before racing starts: all that are listed
+        # then are yesterday's. Seen later (a cold start): only files whose
+        # events already have results are known to be old.
+        racing_from = at_local(day, cfg["racing_start"], tz)
+        if start is not None:
+            racing_from = min(racing_from, start)
+        if row.get("start_date") == day or not measured:
+            mem[base_key] = 0
+        elif snap.now < racing_from:
+            mem[base_key] = int(published)
+        else:
+            mem[base_key] = int(row.get("events_with_results") or 0)
     baseline = int(mem[base_key])
     today_n = int(snap.results_today.get(sid, 0) or 0)
-    new_published = int(published or 0) - baseline
-    measured = counters_fresh(row, snap.now, cfg)
+    new_published = (int(published) - baseline) if measured else 0
     checked = hm_day(iso_epoch(row.get("coverage_at")), tz, snap.now)
     files_key = f"files_seen:{sid}:{day}"
     covered = row.get("events_with_results")
@@ -597,7 +624,7 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
     # Blind: nothing tells us what the host has. The clock decides. A
     # files_seen time is kept: if the counters come back showing the same
     # files, their deadline is still the one from when they were first seen.
-    counting_writer = str(row.get("feed_type") or "").strip().lower() == "pdf"
+    counting_writer = counts_host_files(row)
     if published is None and iso_epoch(row.get("coverage_at")) is None:
         why = "the writer has not reported the host's result list (no tick counters)"
     elif published is None and counting_writer:
@@ -605,6 +632,9 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                "report its file counts)")
     elif published is None:
         why = "the writer has not reported the host's result list (this writer does not count files)"
+    elif not counters_sane(row):
+        why = (f"the writer's counts do not add up ({row.get('events_with_results')} with results "
+               f"of {published!r} published)")
     else:
         why = (f"the writer has not reported the host's result list since {checked} "
                f"(counters older than {int(cfg['coverage_max_age_min'])} min)")
@@ -686,7 +716,7 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     published, covered = row.get("events_published"), row.get("events_with_results")
     ticked = iso_epoch(row.get("coverage_at"))
     fresh = ticked is not None and (snap.now - ticked) / 60 <= max_age
-    counted = fresh and published is not None and covered is not None
+    counted = fresh and published is not None and covered is not None and counters_sane(row)
     last_write = iso_epoch(row.get("last_ingest_at"))
     errors = row.get("last_tick_errors") if fresh else None
 
@@ -701,8 +731,7 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     if snap.read_errors.get(sid):
         # A failed read is not evidence: keep every clock as it is.
         return exp("unknown", f"not judged: {'; '.join(snap.read_errors[sid])}")
-    counting_writer = str(row.get("feed_type") or "").strip().lower() == "pdf"
-    if (published is not None or counting_writer) and not counted:
+    if (published is not None or counts_host_files(row)) and not counted:
         # This writer counts the host's files, but its counters cannot be used:
         # which published events lack results is not known. Never "met" (or a
         # page) on that. Judgment pauses; the clocks keep their start times, so
@@ -712,6 +741,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         elif not fresh:
             why = (f"the writer's counters are older than {max_age} min (last tick "
                    f"{hm_day(ticked, tz, snap.now)})")
+        elif not counters_sane(row):
+            why = (f"the writer's counts do not add up ({covered!r} with results of "
+                   f"{published!r} published)")
         else:
             why = "the writer's last tick did not count the events with results"
         return exp("unknown", f"not judged: {why}, so it is not known which published "

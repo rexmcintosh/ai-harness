@@ -59,10 +59,18 @@ Scope and data:
 - `first:*` asks what the writer can see of the host (`events_published` with a
   `coverage_at` at most 30 min old: "fresh"; one second older is stale). If the host lists new result files today and
   MeetTrack has no result, that is a MeetTrack fault: missed 60 min after the
-  files were first seen (`files_seen:<id>:<day>` in memory). With no result
-  written today, a file whose event already has results is not new today, so
-  a cold start after the deadline on day two does not mistake yesterday's
-  files for today's. If the host lists
+  files were first seen (`files_seen:<id>:<day>` in memory). Which listed
+  files are new today (`baseline:<id>:<day>`): on a meet's first day, all of
+  them; on later days, all but those listed before racing starts (08:00, or an
+  earlier known start); after a cold start later in the day, all but those
+  whose events already have results. And with no result written today, a file
+  whose event already has results is never new today. So a restart, or a meet
+  that enters the registry mid-afternoon with files listed, still pages, and
+  day two never mistakes yesterday's files for today's.
+- The writer's counts must add up (`events_published` a count,
+  `events_with_results` at most that). If they do not, `results:*` is
+  `unknown` and `first:*` treats the host as unseen; every clock, including
+  `files_seen`, is kept. If the host lists
   none, the host has published nothing: not a MeetTrack fault, so no alert
   without a start time, and a warning 180 min after a known one
   (`first_results_host_quiet_min`). Only when the writer cannot see the host
