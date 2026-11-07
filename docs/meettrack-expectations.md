@@ -73,7 +73,8 @@ Scope and data:
   same meet, `first:*` stands down (one root cause, one alert) but keeps the
   time it first saw the files: if `results:*` goes quiet while MeetTrack still
   has nothing, `first:*` is judged from that time, not from a fresh 60 min. The
-  time is cleared when results arrive or the host's new files disappear.
+  time is cleared only when results arrive or the writer counts no new file;
+  a blind interval (stale or missing counters) keeps it.
 - `results:*` judges each event number on its own. An event lacks results when
   the host has published it and MeetTrack has none, or results for under half
   its start list (thin; relays and start lists under 4 never are). Which events
@@ -86,7 +87,9 @@ Scope and data:
   sole publication without a row never pages from here (`first:*` covers it);
   once the count grows past it, it is judged like any other, each on its own
   clock. A dip in the count (the host's list loses a file for a run) retires
-  the newest such clock and is not progress; a catch-up retires the oldest. Any other lacking
+  the newest such clock and is not progress; a catch-up retires the oldest.
+  At most 100 such clocks are kept (`MAX_UNLISTED_CLOCKS`); more share the
+  newest, so bad counters cannot grow the state file without bound. Any other lacking
   event becomes late 20 min after it was first seen lacking while not the
   newest (memory `late_events`); it leaves the late set when it catches up, and
   the alert resolves when no event is late or short.

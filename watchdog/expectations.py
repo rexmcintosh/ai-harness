@@ -65,6 +65,10 @@ DEFAULTS = {
 }
 
 LIVE_FEEDS = ("pdf", "fragment", "lenex")
+# Unlisted publications get one clock each, up to this many (a meet has well
+# under 100 events); more than that share the newest clock. Bad counters can
+# never grow the state file without bound.
+MAX_UNLISTED_CLOCKS = 100
 WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
 
 
@@ -573,8 +577,8 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                    f"0 results today; the host lists {files} ({new_published} new today), first "
                    f"seen {hm_day(seen, tz, snap.now)}; the writer checked at {checked}",
                    files_seen=seen)
-    mem.pop(files_key, None)
     if measured:
+        mem.pop(files_key, None)         # the writer sees no new file: that incident is over
         if start is None:
             return exp("results start appearing once the host publishes them (no start time known)",
                        None, "pending",
@@ -590,7 +594,9 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                    f"the {src} ({hm(start, tz)}); the writer checked at {checked}; MeetTrack "
                    f"holds everything the host has published" if late else
                    f"the host has published no results yet (the writer checked at {checked})")
-    # Blind: nothing tells us what the host has. The clock decides.
+    # Blind: nothing tells us what the host has. The clock decides. A
+    # files_seen time is kept: if the counters come back showing the same
+    # files, their deadline is still the one from when they were first seen.
     if published is None and iso_epoch(row.get("coverage_at")) is None:
         why = "the writer has not reported the host's result list (no tick counters)"
     elif published is None:
@@ -772,11 +778,12 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         del recs[key]
     # One clock per superseded unlisted publication, oldest first. Fewer of
     # them: a catch-up retires the oldest; a dip in the list, the newest.
-    clocks = sorted(float(x) for x in u_prev.get("sinces") or [])
-    if late_unlisted > len(clocks):
-        clocks += [snap.now] * (late_unlisted - len(clocks))
-    elif late_unlisted < len(clocks):
-        drop = len(clocks) - late_unlisted
+    clocks = sorted(float(x) for x in u_prev.get("sinces") or [])[:MAX_UNLISTED_CLOCKS]
+    wanted = min(late_unlisted, MAX_UNLISTED_CLOCKS)
+    if wanted > len(clocks):
+        clocks += [snap.now] * (wanted - len(clocks))
+    elif wanted < len(clocks):
+        drop = len(clocks) - wanted
         clocks = clocks[:-drop] if dipped else clocks[drop:]
     if unlisted < prev_n and not dipped:
         moved = True                     # an unlisted event got its row or its results
@@ -786,8 +793,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                             "sinces": clocks, "results": 0}
         for i, t in enumerate(clocks):
             key = f"unlisted:{i}"
+            extra = late_unlisted - len(clocks) if i == len(clocks) - 1 else 0
             lacking[key] = {"key": key, "event_number": None, "results": 0, "entries": 0,
-                            "count": 1}
+                            "count": 1 + extra}
             since_of[key] = t
     else:
         recs.pop("unlisted", None)

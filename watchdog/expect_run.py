@@ -236,7 +236,9 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
     return snap
 
 
-# Meet and event ids go into PostgREST filters: plain ids (uuid-like) only.
+# Meet and event ids go into PostgREST filters: plain ids only. Both columns
+# are text NOT NULL filled by splash_poller db.gen_id() (str(uuid.uuid4())):
+# this accepts every such id and none of the filter metacharacters (, . ( ) & = * : space).
 _PLAIN_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
