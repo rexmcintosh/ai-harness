@@ -516,14 +516,15 @@ def counts_host_files(row: dict) -> bool:
 
 
 def counters_sane(row: dict) -> bool:
-    """events_published is a count, and events_with_results (when given) is
-    at most that: the writer stamps both from one tick, so anything else is
-    a broken row, not evidence."""
+    """Both counts are there and add up: events_published and
+    events_with_results are counts and the second is at most the first. The
+    writer stamps both from one tick; anything else (one of them NULL, a
+    negative, a bool, more covered than published) is not a view of the host."""
     pub, cov = row.get("events_published"), row.get("events_with_results")
 
     def count(v):
         return isinstance(v, int) and not isinstance(v, bool) and v >= 0
-    return count(pub) and (cov is None or (count(cov) and cov <= pub))
+    return count(pub) and count(cov) and cov <= pub
 
 
 def counters_fresh(row: dict, now: float, cfg: dict) -> bool:
@@ -651,12 +652,15 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                "report its file counts)")
     elif published is None:
         why = "the writer has not reported the host's result list (this writer does not count files)"
-    elif not counters_sane(row):
-        why = (f"the writer's counts do not add up ({row.get('events_with_results')} with results "
-               f"of {published!r} published)")
-    else:
+    elif not counters_fresh(row, snap.now, cfg):
         why = (f"the writer has not reported the host's result list since {checked} "
                f"(counters older than {int(cfg['coverage_max_age_min'])} min)")
+    elif row.get("events_with_results") is None:
+        why = ("the writer's last tick did not count the events with results, so its file "
+               "count cannot be read")
+    else:                                # fresh, both counts there: they do not add up
+        why = (f"the writer's counts do not add up ({row.get('events_with_results')} with results "
+               f"of {published!r} published)")
     if not events:
         why += "; MeetTrack holds no events for this meet (no meet row, or nothing seeded)"
     if snap.now < clock_deadline:
@@ -760,11 +764,11 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         elif not fresh:
             why = (f"the writer's counters are older than {max_age} min (last tick "
                    f"{hm_day(ticked, tz, snap.now)})")
-        elif not counters_sane(row):
+        elif covered is None:
+            why = "the writer's last tick did not count the events with results"
+        else:
             why = (f"the writer's counts do not add up ({covered!r} with results of "
                    f"{published!r} published)")
-        else:
-            why = "the writer's last tick did not count the events with results"
         return exp("unknown", f"not judged: {why}, so it is not known which published "
                               f"events lack results")
 

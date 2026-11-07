@@ -67,8 +67,9 @@ Scope and data:
   whose event already has results is never new today. So a restart, or a meet
   that enters the registry mid-afternoon with files listed, still pages, and
   day two never mistakes yesterday's files for today's.
-- The writer's counts must add up (`events_published` a count,
-  `events_with_results` at most that). If they do not, `results:*` is
+- The writer's counts must both be there and add up (`events_published` and
+  `events_with_results` counts, the second at most the first). If not (one of
+  them NULL, negative, more covered than published), `results:*` is
   `unknown` and `first:*` treats the host as unseen; every clock, including
   `files_seen`, is kept. If the host lists
   none, the host has published nothing: not a MeetTrack fault, so no alert
