@@ -70,7 +70,9 @@ Scope and data:
   Example, 7 Nov 2026: Alapraia's writer counted 0 files, so 17:00 is no longer
   an alert; Ponte da Barca had no meet row, its writer never ticked, so 17:00
   still alerts (the host had 6 result PDFs). When `results:*` is missed for the
-  same meet, `first:*` stands down (one root cause, one alert) but keeps the
+  same meet, `first:*` stands down (one root cause, one alert): an open
+  `first:*` alert is CLOSED once, "superseded by results:*", and results:*
+  carries the incident to its own RESOLVED. It keeps the
   time it first saw the files: if `results:*` goes quiet while MeetTrack still
   has nothing, `first:*` is judged from that time, not from a fresh 60 min. The
   time is cleared only when results arrive or the writer counts no new file;

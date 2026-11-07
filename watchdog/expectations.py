@@ -991,9 +991,12 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
         results = eval_results(row, snap, cfg, tz, day, mem)
         if first.status == "missed" and results.status == "missed":
             # One root cause, one alert: results:* already names the published
-            # events MeetTrack lacks. Kept open (not resolved) if it was open.
-            first.status = "unknown"
-            first.evidence = f"not judged while {results.id} is missed; {first.evidence}"
+            # events MeetTrack lacks. An open first:* alert is closed once,
+            # "superseded" (the policy uses the evidence as the reason); if it
+            # was not open, nothing is sent. Its files_seen time is kept.
+            first.status = "closed"
+            first.evidence = (f"superseded by {results.id}, which names the published events "
+                              f"MeetTrack lacks")
         downstream = [first, results,
                       eval_schedule(row, snap, cfg, tz, day),
                       eval_source(row, snap, cfg, tz, day)]
