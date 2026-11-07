@@ -6,6 +6,10 @@ Rules (docs/meettrack-expectations.md, "Alert policy"):
   same problem is never announced twice.
 - While it stays missed, a REMINDER goes out every ``repeat_crit_min`` /
   ``repeat_warn_min`` (start lists: ``repeat_startlist_min``). No long mute.
+  An expectation that reports progress (``data["progress_at"]``: late
+  results:* events gaining results, or any result written for the meet) is
+  reminded only once nothing has moved for a full interval: no reminder while
+  it catches up.
 - When it is met again, one RESOLVED line says so and how long it lasted.
 - Live-meet expectations (window "racing") only alert inside racing hours.
   When racing hours end with one still open, one CLOSED line says so and the
@@ -94,12 +98,19 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
                 open_[e.id] = _record(e, now)
                 continue
             worse = SEVERITY_RANK[e.severity] > SEVERITY_RANK.get(rec.get("severity"), 0)
-            due = now - float(rec.get("last_sent", 0)) >= _repeat_min(e.kind, e.severity, cfg) * 60
+            repeat = _repeat_min(e.kind, e.severity, cfg) * 60
+            due = now - float(rec.get("last_sent", 0)) >= repeat
+            progress_at = (e.data or {}).get("progress_at")
+            if due and progress_at is not None and now - float(progress_at) < repeat:
+                due = False          # still moving (catching up, results arriving): no reminder
             if worse or due:
                 sends = int(rec.get("sends", 1)) + 1
+                reason = ("now worse" if worse else
+                          f"nothing new for {_ago(now, float(progress_at))}"
+                          if progress_at is not None else "")
                 notices.append(Notice("reminder", e.id, e.meet, e.expected, e.evidence,
                                       e.severity, e.deadline, rec.get("first_missed"), sends,
-                                      reason="now worse" if worse else ""))
+                                      reason=reason))
                 open_[e.id] = _record(e, now, rec.get("first_missed"), sends)
             else:
                 rec["evidence"] = e.evidence

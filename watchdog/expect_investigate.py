@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from .expectations import Expectation, Snapshot, _zone, writer_lines
+from .expectations import Expectation, Snapshot, _zone, by_event_number, writer_lines
 
 _ERROR_TYPES = [
     ("ReadTimeout", re.compile(r"ReadTimeout|read timed out", re.I)),
@@ -155,8 +155,12 @@ def investigate(exp: Expectation, snap: Snapshot, probes: Probes, *,
         for e in events:
             rows.append(f"{e.get('event_number')} | {'yes' if (e.get('relay_count') or 1) > 1 else 'no'}"
                         f" | {e.get('entries')} | {e.get('results')}")
+        groups = by_event_number(events)
+        shared = [str(g["event_number"]) for g in groups if g["rows"] > 1]
+        if shared:
+            rows.append(f"(rows that share a number are judged as one event: {', '.join(shared[:12])})")
         sections.append(("MeetTrack per-event counts", rows))
-        facts["events_with_results"] = sum(1 for e in events if (e.get("results") or 0) > 0)
+        facts["events_with_results"] = sum(1 for g in groups if g["results"] > 0)
         facts["results_total"] = sum(int(e.get("results") or 0) for e in events)
         facts["entries_total"] = sum(int(e.get("entries") or 0) for e in events)
     facts["summary"] = _summary(exp, facts)
