@@ -1683,3 +1683,73 @@ def test_evidence_says_when_event_numbers_are_a_guess():
     exps, _ = evaluate(snap(t + 1200, [row], events={"11113": [
         ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 10), ev(5, 10, 0)]}), CFG, mem)
     assert "guess" not in by_id(exps)["results:11113:2026-10-10"].evidence
+
+
+# --- council round 4 (2026-11-07) ------------------------------------------------
+
+def test_files_seen_survives_a_blind_interval():
+    # The host lists a new file at 15:00. The writer's last count is from 15:05
+    # while 15:40-15:50 run; at 16:00 it counts again: the deadline is still
+    # 16:00 (files first seen 15:00), not a fresh hour from the recovery.
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+
+    def run(minutes, fresh=True):
+        nonlocal mem
+        now = t0 + minutes * 60
+        s = alapraia(now, events_published=1,
+                     coverage_at=iso(now - 30 if fresh else t0 + 5 * 60))
+        exps, mem = evaluate(s, CFG, mem)
+        return by_id(exps)[f"first:11531:{D7}"]
+    run(0)
+    run(5)
+    for m in (40, 45, 50):
+        run(m, fresh=False)                         # blind: counters from 15:05
+    assert mem["files_seen:11531:" + D7] == t0
+    f = run(60)
+    assert f.status == "missed" and "first seen 15:00" in f.evidence
+
+
+def test_unlisted_clocks_are_bounded_whatever_the_counters_say():
+    from watchdog.expectations import MAX_UNLISTED_CLOCKS
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 10_000)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    clocks = mem["late_events"]["results:11113:2026-10-10"]["unlisted"]["sinces"]
+    assert len(clocks) == MAX_UNLISTED_CLOCKS
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert "9999 more are short" in e.evidence or "9999 published events are short" in e.evidence
+
+
+def test_repeated_dips_keep_the_oldest_unlisted_clock_and_do_not_pile_up():
+    t = at("15:00")
+    mem = {}
+    seq = [(0, 1), (5, 2), (10, 3)] + [(15 + 5 * i, 2 if i % 2 == 0 else 3) for i in range(6)]
+    for minutes, n in seq:
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+        clocks = mem["late_events"]["results:11113:2026-10-10"]["unlisted"]["sinces"]
+        assert len(clocks) == n - 1                      # the newest has no clock
+        assert minutes == 0 or clocks[0] == t + 300      # the oldest survives every dip
+    assert by_id(exps)["results:11113:2026-10-10"].status == "missed"     # 15:05 + 20 min
+
+
+def test_save_json_never_leaves_a_half_written_state_file(tmp_path, monkeypatch):
+    path = tmp_path / "expect-state.json"
+    er.save_json(path, {"memory": {"late_events": {"a": 1}}})
+    before = path.read_text()
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(er.os, "fsync", boom)
+    with pytest.raises(OSError):
+        er.save_json(path, {"memory": {}})
+    assert path.read_text() == before
+
+
+def test_plain_id_accepts_the_ids_splash_poller_writes():
+    # meets.id and events.id are text NOT NULL, filled by db.gen_id(): uuid4.
+    import uuid
+    assert er._PLAIN_ID.fullmatch(str(uuid.uuid4()))
+    for bad in ("a,b", "a)", "a.b", "a&b", "a=b", "a b", "a*", "a:b", ""):
+        assert not er._PLAIN_ID.fullmatch(bad), bad
