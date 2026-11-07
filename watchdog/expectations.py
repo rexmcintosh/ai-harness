@@ -666,9 +666,11 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
             (by_key.get(key) or {"results": 0})["results"] == 0 for key in recs):
         # The counters are old: whether the events without results caught up
         # is not known. Never resolve (or page) on that.
-        return exp("unknown", f"not judged: the writer's counters are older than {max_age} min "
-                              f"(last tick {hm_day(ticked, tz, snap.now)}), so it is not known "
-                              f"whether the events without results caught up")
+        why = (f"the writer's counters are older than {max_age} min (last tick "
+               f"{hm_day(ticked, tz, snap.now)})" if not fresh else
+               "the writer's last tick did not count the events with results")
+        return exp("unknown", f"not judged: {why}, so it is not known whether the events "
+                              f"without results caught up")
     known = [g for g in numbered if g["results"] > 0] + missing
     newest = max(known, key=lambda g: g["event_number"]) if known else None
     lacking = {g["key"]: g for g in missing}
