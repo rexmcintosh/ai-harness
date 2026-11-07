@@ -306,7 +306,9 @@ def by_event_number(events: list) -> list[dict]:
     are one event: their results add up, the start list is the larger row's,
     and the slot is the earliest. A second, empty session row under the same
     number (a pipeline bug seen on 7 Nov 2026) must not read as an event
-    without results. Rows without a number stay on their own, last."""
+    without results. Rows without a number stay on their own, last.
+    ``events.event_number`` is ``integer NOT NULL`` (splash_poller's baseline
+    migration); digit strings are accepted in case a reader ever stringifies it."""
     groups: dict = {}
     for i, e in enumerate(events or []):
         n = event_no(e.get("event_number"))
@@ -546,6 +548,12 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
     measured = counters_fresh(row, snap.now, cfg)
     checked = hm_day(iso_epoch(row.get("coverage_at")), tz, snap.now)
     files_key = f"files_seen:{sid}:{day}"
+    covered = row.get("events_with_results")
+    if measured and today_n == 0 and covered is not None:
+        # Nothing was written today, so every event that has results got them
+        # before today: its file is not today's news. This bounds the baseline
+        # after a cold start past the deadline (baseline 0 on day two).
+        new_published = min(new_published, int(published) - int(covered))
 
     def exp(expected, deadline, status, evidence, **data):
         return Expectation(eid, "first_results", label(row), expected, deadline, status, "warn",
@@ -621,8 +629,8 @@ def _n(groups: list) -> int:
 
 
 def _events_txt(groups: list) -> str:
-    named = [g for g in groups if g.get("key") != "unlisted"]
-    unlisted = _n([g for g in groups if g.get("key") == "unlisted"])
+    named = [g for g in groups if not str(g.get("key")).startswith("unlisted")]
+    unlisted = _n([g for g in groups if str(g.get("key")).startswith("unlisted")])
     out = []
     if named:
         nums = [str(g["event_number"]) for g in named]
@@ -656,7 +664,7 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
 
     A writer that counts the host's files (PDF) but whose counters are missing
     or older than ``coverage_max_age_min`` cannot show which published events
-    lack results: ``unknown``, never ``met``, and every clock stays as it was.
+    lack results: ``unknown``, never ``met``; every clock keeps its start time.
     """
     sid = str(row.get("sr_meet_id"))
     eid = f"results:{sid}:{day}"
@@ -686,7 +694,8 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     if (published is not None or row.get("feed_type") == "pdf") and not counted:
         # This writer counts the host's files, but its counters cannot be used:
         # which published events lack results is not known. Never "met" (or a
-        # page) on that; the clocks are frozen until the counters are fresh.
+        # page) on that. Judgment pauses; the clocks keep their start times, so
+        # an event short before can be overdue at once when they are fresh again.
         if published is None or ticked is None:
             why = "the writer has not counted the host's result files yet"
         elif not fresh:
@@ -710,8 +719,13 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
     # with no row must not page as late); once the count grows past it, it
     # has been superseded and is judged like any other event.
     u_prev = recs.get("unlisted") or {}
+    prev_n = int(u_prev.get("n") or 0)
+    seen_pub = u_prev.get("seen_published")
+    # The host's list can lose a file for a run (7 Nov: it flickered): fewer
+    # unlisted events with a smaller published count is that, not a catch-up.
+    dipped = seen_pub is not None and published is not None and int(published) < int(seen_pub)
     marker = u_prev.get("published")
-    if unlisted > int(u_prev.get("n") or 0):
+    if unlisted > prev_n:
         marker = published
     unlisted_newest = bool(unlisted) and marker is not None and int(published) <= int(marker)
     known = [g for g in numbered if g["results"] > 0] + missing
@@ -740,22 +754,32 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         elif g["results"] > int(rec.get("results") or 0):
             moved = True
             rec["results"] = g["results"]
-    for key in [k for k in recs if k not in lacking and k != "unlisted"]:
+    for key in [k for k in recs if k not in lacking and not k.startswith("unlisted")]:
         if in_progress is not None and key == in_progress["key"]:
             continue                     # the newest again (the host's list flickered)
         g = by_key.get(key)
         if g is not None and g["results"] > int(recs[key].get("results") or 0):
             moved = True                 # caught up
         del recs[key]
-    if unlisted < int(u_prev.get("n") or 0):
+    # One clock per superseded unlisted publication, oldest first. Fewer of
+    # them: a catch-up retires the oldest; a dip in the list, the newest.
+    clocks = sorted(float(x) for x in u_prev.get("sinces") or [])
+    if late_unlisted > len(clocks):
+        clocks += [snap.now] * (late_unlisted - len(clocks))
+    elif late_unlisted < len(clocks):
+        drop = len(clocks) - late_unlisted
+        clocks = clocks[:-drop] if dipped else clocks[drop:]
+    if unlisted < prev_n and not dipped:
         moved = True                     # an unlisted event got its row or its results
+    since_of = {k: float(recs[k]["since"]) for k in lacking}
     if unlisted:
-        recs["unlisted"] = {"n": unlisted, "published": marker, "results": 0}
-        if late_unlisted:
-            recs["unlisted"]["since"] = (u_prev["since"] if u_prev.get("since") is not None
-                                         else snap.now)
-            lacking["unlisted"] = {"key": "unlisted", "event_number": None, "results": 0,
-                                   "entries": 0, "count": late_unlisted}
+        recs["unlisted"] = {"n": unlisted, "published": marker, "seen_published": published,
+                            "sinces": clocks, "results": 0}
+        for i, t in enumerate(clocks):
+            key = f"unlisted:{i}"
+            lacking[key] = {"key": key, "event_number": None, "results": 0, "entries": 0,
+                            "count": 1}
+            since_of[key] = t
     else:
         recs.pop("unlisted", None)
     if moved:
@@ -785,9 +809,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         return exp("met", note, newest=newest and newest["event_number"],
                    progress_at=progress_at)
 
-    since_all = min(float(recs[k]["since"]) for k in lacking)
-    late = [g for k, g in lacking.items() if snap.now - float(recs[k]["since"]) >= lag * 60]
-    waiting = [g for k, g in lacking.items() if snap.now - float(recs[k]["since"]) < lag * 60]
+    since_all = min(since_of.values())
+    late = [g for k, g in lacking.items() if snap.now - since_of[k] >= lag * 60]
+    waiting = [g for k, g in lacking.items() if snap.now - since_of[k] < lag * 60]
     parts = []
     late_none = [g for g in late if g["results"] == 0]
     late_thin = [g for g in late if g["results"] > 0]
@@ -806,7 +830,7 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                      f"entries; {_events_txt(late_thin)})")
     if waiting:
         one = _n(waiting) == 1
-        due = min(float(recs[g["key"]]["since"]) for g in waiting) + lag * 60
+        due = min(since_of[g["key"]] for g in waiting) + lag * 60
         lead = "more" if late else f"published event{'' if one else 's'}"
         parts.append(f"{_n(waiting)} {lead} {'is' if one else 'are'} short, not yet due "
                      f"({_events_txt(waiting)}, due {hm(due, tz)})")
@@ -818,7 +842,8 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                  f"result written {hm_day(last_write, tz, snap.now)}")
     return exp("missed" if late else "pending", "; ".join(parts), since_all + lag * 60,
                missing=len(missing) + unlisted, thin=[g["event_number"] for g in _thin(events, cfg)],
-               late=[g["event_number"] if g["key"] != "unlisted" else "unlisted" for g in late],
+               late=[g["event_number"] if not g["key"].startswith("unlisted") else "unlisted"
+                     for g in late],
                newest=newest and newest["event_number"], progress_at=progress_at)
 
 
@@ -972,7 +997,7 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
     out.append(eval_reads(snap, cfg, mem, bad_ids))
 
     seen_ids = {e.id for e in out}
-    mem.pop("gap_since", None)           # the old one-clock-per-meet memory (before 2026-11-08)
+    mem.pop("gap_since", None)           # the old one-clock-per-meet memory (before per-event rules)
     for key in ("late_events", "results_progress"):
         mem[key] = {k: v for k, v in (mem.get(key) or {}).items() if k in seen_ids}
     today = {f"{e.sr_meet_id}:{e.day}" for e in out if e.kind == "first_results"}

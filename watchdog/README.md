@@ -113,7 +113,7 @@ expectations without sending or saving state, but its investigations still read
 the hosts' live pages. Design, alert policy and how to add an expectation:
 [`docs/meettrack-expectations.md`](../docs/meettrack-expectations.md).
 
-Since 8 Nov 2026 (after the 7 Nov Leiria, Alapraia and Ponte da Barca alerts):
+After the 7 Nov 2026 Leiria, Alapraia and Ponte da Barca alerts:
 
 - `results:*` judges each published event on its own. An event is late when it
   has lacked most of its results for 20 min since a later event was published.
@@ -126,8 +126,9 @@ Since 8 Nov 2026 (after the 7 Nov Leiria, Alapraia and Ponte da Barca alerts):
   larger start list), for `results:*`, `schedule:*`, the source note and the
   investigation's totals.
 - A PDF writer whose counters are missing or older than 30 min makes
-  `results:*` "not judged": never resolved, never paged, clocks frozen until
-  the counters are fresh. A racing alert that is not judged at 22:00 closes
+  `results:*` "not judged": never resolved, never paged until the counters are
+  fresh. The clocks keep their start times, so an event can be overdue at once
+  on recovery. A racing alert that is not judged at 22:00 closes
   then, like a missed one.
 - `first:*` pages when the host lists result files and MeetTrack has none for
   60 min. When the writer sees the host has published nothing, it never pages

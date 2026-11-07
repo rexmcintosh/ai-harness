@@ -59,7 +59,10 @@ Scope and data:
 - `first:*` asks what the writer can see of the host (`events_published` with a
   `coverage_at` at most 30 min old: "fresh"; one second older is stale). If the host lists new result files today and
   MeetTrack has no result, that is a MeetTrack fault: missed 60 min after the
-  files were first seen (`files_seen:<id>:<day>` in memory). If the host lists
+  files were first seen (`files_seen:<id>:<day>` in memory). With no result
+  written today, a file whose event already has results is not new today, so
+  a cold start after the deadline on day two does not mistake yesterday's
+  files for today's. If the host lists
   none, the host has published nothing: not a MeetTrack fault, so no alert
   without a start time, and a warning 180 min after a known one
   (`first_results_host_quiet_min`). Only when the writer cannot see the host
@@ -81,15 +84,18 @@ Scope and data:
   MeetTrack row at all ("not in MeetTrack's event list") has no number: one
   that appeared with the latest rise of `events_published` is the newest, so a
   sole publication without a row never pages from here (`first:*` covers it);
-  once the count grows past it, it is judged like any other. Any other lacking
+  once the count grows past it, it is judged like any other, each on its own
+  clock. A dip in the count (the host's list loses a file for a run) retires
+  the newest such clock and is not progress; a catch-up retires the oldest. Any other lacking
   event becomes late 20 min after it was first seen lacking while not the
   newest (memory `late_events`); it leaves the late set when it catches up, and
   the alert resolves when no event is late or short.
 - A writer that counts the host's files (`feed_type = pdf`, or any non-NULL
   `events_published`) whose counters are missing, NULL or stale makes
   `results:*` `unknown`: never `met` (a restart with no memory cannot prove
-  completeness) and never paged. The clocks freeze while it lasts and resume
-  when the counters are fresh again. Writers that never count files (fragment,
+  completeness) and never paged. Judgment pauses while it lasts, but each
+  clock keeps its start time: an event that was short before can be overdue
+  at once when the counters are fresh again. Writers that never count files (fragment,
   Lenex) are judged on their event rows (thin events) only.
 - The order assumption: if a host publishes out of order, the inferred numbers
   can be wrong for a while (event 4 taken for the empty event 5), but the count
@@ -130,7 +136,8 @@ read. The 30-minute watchdog's full-table counts are now planner estimates
   reminders.
 - Reminders while the problem persists: crit every 60 min (was 30 until 2026-10-11), warn every 60 min,
   start lists every 6 h. A severity rise reminds at once.
-- `results:*` reminders are progress-aware (since 2026-11-08): no reminder
+- `results:*` reminders are progress-aware (from the change after the 7 Nov
+  2026 alerts): no reminder
   while a late event gains results or the writer writes any result for the
   meet. Once nothing has moved for a full interval, it reminds as above and
   says so ("nothing new for 1h05"). On the 7 Nov Leiria data this is one NEW
