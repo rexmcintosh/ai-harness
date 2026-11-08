@@ -2162,6 +2162,13 @@ def test_rows_sharing_a_number_judge_the_larger_rows_due_count():
     assert (g["entries"], g["entries_due"], due_entries(g)) == (14, 14, 14)
     g = by_event_number([ev(3, 14, 32), ev(3, 8, 0)])[0]
     assert g["entries_due"] is None and due_entries(g) == 14
+    # the due count is the larger row's own, never a smaller row's
+    g = by_event_number([due_ev(3, 14, 2, 1), due_ev(3, 8, 8, 0)])[0]
+    assert (g["entries"], due_entries(g)) == (14, 2)
+    g = by_event_number([due_ev(3, 8, 8, 0), due_ev(3, 14, 2, 1)])[0]
+    assert (g["entries"], due_entries(g)) == (14, 2)
+    g = by_event_number([due_ev(3, 8, 2, 0), due_ev(3, 8, 6, 0)])[0]   # a tie: the larger due
+    assert (g["entries"], due_entries(g)) == (8, 6)
 
 
 def test_rows_sharing_a_number_keep_the_latest_due_slot():

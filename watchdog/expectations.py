@@ -340,9 +340,12 @@ def by_event_number(events: list) -> list[dict]:
                                "entries_due": None,
                                "relay_count": 1, "rows": 0, "ids": [], "day_times": []}
         g["results"] += int(e.get("results") or 0)
-        g["entries"] = max(g["entries"], int(e.get("entries") or 0))
-        if e.get("entries_due") is not None:
-            g["entries_due"] = max(g["entries_due"] or 0, int(e["entries_due"]))
+        entries = int(e.get("entries") or 0)
+        due = None if e.get("entries_due") is None else int(e["entries_due"])
+        if g["rows"] == 0 or entries > g["entries"]:
+            g["entries"], g["entries_due"] = entries, due      # the larger row's pair
+        elif entries == g["entries"] and due is not None:
+            g["entries_due"] = max(g["entries_due"] or 0, due)
         if "due_slot" in e:          # absent: not read; None: no due heat has a slot
             slot = e["due_slot"]
             g["due_slot"] = slot if g.get("due_slot") is None else (
