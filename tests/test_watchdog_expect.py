@@ -624,14 +624,20 @@ def test_snapshot_reads_only_cheap_scoped_queries():
                 return [{"id": "m1", "live_rankings_id": "sr-11113"}], None
             if path.startswith("events"):
                 return [{"event_number": 1, "relay_count": 1, "results": [{"count": 2}],
-                         "heats": [{"count": 9}]}], None
+                         "heats": [{"count": 9}], "due": [{"count": 4}]}], None
             if path.startswith("results"):
                 return 2, None
             return [], None
     s = er.build_snapshot(now, CFG, RUN_CFG, FakeRest(),
                           ps=lambda: "7 01:00 track_pdf_meet.py https://live.swimrankings.net/11113/")
     assert s.events["11113"] == [{"event_number": 1, "id": None, "session_number": None,
-                                  "day_time": None, "relay_count": 1, "results": 2, "entries": 9}]
+                                  "day_time": None, "relay_count": 1, "results": 2, "entries": 9,
+                                  "entries_due": 4}]
+    # due: heats past their slot by heat_due_min (25), or with no slot; 17:45
+    # Lisbon is 16:45 UTC in October
+    ev_q = [p for p, _ in calls if p.startswith("events")][0]
+    assert "due:heats(count)" in ev_q
+    assert "&due.or=(scheduled_at.is.null,scheduled_at.lte.2026-10-10T16:20:00Z)" in ev_q
     assert s.results_today["11113"] == 2 and s.processes["11113"]
     reg_q = [p for p, _ in calls if p.startswith("meet_registry?select=sr_meet_id,name")][0]
     assert "nation=in.(POR)" in reg_q
@@ -2022,3 +2028,74 @@ def test_thin_refinement_queries_the_usable_ids_and_says_which_it_skipped():
     recs = mem["late_events"]["results:11113:2026-10-10"]
     assert recs["1"]["since"] == at("16:35") and recs["2"]["since"] == at("17:57")
     assert "1 thin event has ids that cannot be queried" in e.evidence
+
+
+# --- 8 Nov 2026: heats swum outside the start list's slot --------------------
+
+def due_ev(n, entries, due, results, day_time=None):
+    e = ev(n, entries, results, day_time=day_time)
+    e["entries_due"] = due
+    return e
+
+
+def test_a_start_list_whose_heats_are_not_due_is_not_thin():
+    # Leiria, 8 Nov 2026, 11:15: the host swam event 30's fast heats in the
+    # morning and printed only its slow heats, all slotted 12:23. 19 results
+    # for 39 start-list swimmers who were not due yet is not a gap.
+    t = at("11:15", D8)
+    row = reg("11115", "Leiria", start_date=D7, end_date=D8, feed_type="fragment",
+              events_published=None, events_with_results=None,
+              last_ingest_at=iso(at("10:54", D8)), coverage_at=iso(at("10:54", D8)))
+    events = [due_ev(29, 35, 0, 24, f"{D8}T12:16:00"), due_ev(30, 39, 0, 19, f"{D8}T12:23:00"),
+              due_ev(31, 14, 0, 22, f"{D8}T12:33:00")]
+    mem = {"last_run": t - 300}
+    exps, mem = evaluate(snap(t, [row], events={"11115": events}), CFG, mem)
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "met" and e.data["newest"] == 31
+    # 12:50: its heats are due (12:23 + 25 min) and nothing new came: short,
+    # not yet due; late 20 min on (slot + 45 min).
+    t2 = at("12:50", D8)
+    events[1]["entries_due"] = 39
+    exps, mem = evaluate(snap(t2, [row], events={"11115": events}), CFG, {**mem, "last_run": t2 - 300})
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "pending" and e.data["thin"] == [30]
+    t3 = at("13:10", D8)
+    exps, mem = evaluate(snap(t3, [row], events={"11115": events}), CFG, {**mem, "last_run": t3 - 300})
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "missed" and "19 results for 39 entries;" in e.evidence
+
+
+def test_only_due_heats_count_and_the_evidence_says_so():
+    # Leiria event 18: heat 1 at 09:15, heat 2 (the fast heat) at 16:00. At
+    # 11:15 four results for its 8 due swimmers is half: not thin. Two is.
+    t = at("11:15", D8)
+    row = reg("11115", "Leiria", start_date=D7, end_date=D8, feed_type="fragment",
+              events_published=None, events_with_results=None,
+              last_ingest_at=iso(t - 60), coverage_at=iso(t - 60))
+    events = [due_ev(18, 16, 8, 4, f"{D8}T09:15:00"), due_ev(19, 8, 8, 27, f"{D8}T09:20:00")]
+    exps, _ = evaluate(snap(t, [row], events={"11115": events}), CFG, {"last_run": t - 300})
+    assert by_id(exps)[f"results:11115:{D8}"].status == "met"
+    events[0]["results"] = 2
+    mem = {"last_run": t - 300,
+           "late_events": {f"results:11115:{D8}": {"18": {"since": t - 1500, "results": 2}}}}
+    exps, _ = evaluate(snap(t, [row], events={"11115": events}), CFG, mem)
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "missed"
+    assert "2 results for 8 entries due by the schedule; event 18" in e.evidence
+
+
+def test_after_a_memory_gap_a_thin_clock_never_starts_before_the_start_list_was_due():
+    # No memory: the clock would start at the newest result (10:47). The slow
+    # heats were due only from 12:48 (12:23 + 25), so at 12:55 it is short,
+    # not late.
+    t = at("12:55", D8)
+    row = reg("11115", "Leiria", start_date=D7, end_date=D8, feed_type="fragment",
+              events_published=None, events_with_results=None,
+              last_ingest_at=iso(at("12:40", D8)), coverage_at=iso(at("12:40", D8)))
+    events = [due_ev(30, 39, 39, 19, f"{D8}T12:23:00"), due_ev(31, 14, 14, 22, f"{D8}T12:33:00")]
+    s = snap(t, [row], events={"11115": events})
+    s.thin_last_write["11115"] = at("10:47", D8)
+    s.thin_refined["11115"] = {"30"}
+    exps, _ = evaluate(s, CFG, {})
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "pending" and "short since 12:48" in e.evidence

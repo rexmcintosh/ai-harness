@@ -207,8 +207,13 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 failed(sid, "meets", "meet id is not a plain id")   # it goes into filters
                 continue
             snap.meets[sid] = m
+            # due: the start-list heats past their slot + heat_due_min (a heat
+            # with no slot counts as due), what a thin judgment counts against.
+            due_by = _utc(now - int(cfg["heat_due_min"]) * 60)
             evs, err = rest.get(f"events?select=id,event_number,session_number,day_time,relay_count,"
-                                f"results(count),heats(count)&meet_id=eq.{m['id']}&order=event_number",
+                                f"results(count),heats(count),due:heats(count)"
+                                f"&due.or=(scheduled_at.is.null,scheduled_at.lte.{due_by})"
+                                f"&meet_id=eq.{m['id']}&order=event_number",
                                 timeout=t_read)
             if evs is None:
                 failed(sid, "events", err)
@@ -254,7 +259,8 @@ def _event(e: dict) -> dict:
     return {"event_number": e.get("event_number"), "session_number": e.get("session_number"),
             "id": e.get("id"),
             "day_time": e.get("day_time"), "relay_count": e.get("relay_count") or 1,
-            "results": n(e.get("results")), "entries": n(e.get("heats"))}
+            "results": n(e.get("results")), "entries": n(e.get("heats")),
+            "entries_due": n(e.get("due")) if "due" in e else None}
 
 
 def real_probes(urls=None) -> Probes:

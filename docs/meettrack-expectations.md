@@ -90,7 +90,14 @@ Scope and data:
   leaves `first:*` unknown and its baseline and files_seen untouched.
 - `results:*` judges each event number on its own. An event lacks results when
   the host has published it and MeetTrack has none, or results for under half
-  its start list (thin; relays and start lists under 4 never are). Which events
+  of its start-list swimmers whose heats are due (thin; relays and under 4 due
+  swimmers never are). A heat is due 25 min after its scheduled time
+  (`heat_due_min`; a heat with no time is always due), so a thin event is late
+  45 min after its slot at the earliest, the `schedule:*` tolerance. A host can
+  swim part of an event outside its start list's slot: Leiria (8 Nov 2026)
+  swam the fast heats of events 19-31 in the morning and printed only the slow
+  heats, slotted from 11:40, and event 30 paged at 11:15 for 39 swimmers who
+  were due at 12:23. Which events
   the host has published with no results comes from the writer's counters:
   `events_published - events_with_results` of them, the lowest event numbers
   with no result (the host publishes in order). The newest published event is
@@ -136,6 +143,8 @@ Scope and data:
   the snapshot could ask for it (`thin_refined`); one whose event ids cannot
   go into a filter safely uses the meet's last result time instead (later,
   so never an earlier page), and the evidence says how many were skipped.
+  Never before its earliest slot plus `heat_due_min`: its start list cannot
+  have been short before it was due.
 - Limit: the newest event is not paged while it is the newest, so a stuck
   last event of a session is only judged once the next event is published
   (on a multi-day meet, the next morning). The monitor cannot tell a host

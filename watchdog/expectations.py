@@ -15,9 +15,10 @@ Design notes live in docs/meettrack-expectations.md. In short:
                         them (or, when the writer cannot see the host, once
                         racing should have begun)
 - ``results:<id>:<day>`` every event the host has published is in MeetTrack,
-                        with roughly as many results as start-list swimmers,
-                        within N minutes of that event becoming late (judged
-                        per event number; the newest event is in progress)
+                        with roughly as many results as start-list swimmers
+                        whose heats are due by the schedule, within N minutes
+                        of that event becoming late (judged per event number;
+                        the newest event is in progress)
 - ``schedule:<id>:<day>`` events past their scheduled slot have results (only
                         when the start list carries times)
 - ``source:<id>:<day>``, ``feed:<id>``, ``hygiene:stale-active`` notes only:
@@ -57,6 +58,10 @@ DEFAULTS = {
     "results_lag_min": 20,
     "thin_pct": 50,
     "thin_min_entries": 4,
+    # A start-list heat counts toward "thin" this long after its scheduled
+    # time. With results_lag_min that is late at slot + 45 min, the same
+    # tolerance as slot_lag_min: a meet may run that far behind its schedule.
+    "heat_due_min": 25,
     "slot_lag_min": 45,
     "source_gap_min": 60,
     "stale_active_days": 2,
@@ -317,8 +322,8 @@ def event_no(v) -> int | None:
 
 def by_event_number(events: list) -> list[dict]:
     """One record per event number, in number order. Rows that share a number
-    are one event: their results add up, the start list is the larger row's,
-    and the slot is the earliest. A second, empty session row under the same
+    are one event: their results add up, the start list is the larger row's
+    (so is its count of heats due by the schedule), and the slot is the earliest. A second, empty session row under the same
     number (a pipeline bug seen on 7 Nov 2026) must not read as an event
     without results. Rows without a number stay on their own, last.
     ``events.event_number`` is ``integer NOT NULL`` (splash_poller's baseline
@@ -331,9 +336,12 @@ def by_event_number(events: list) -> list[dict]:
         if g is None:
             g = groups[key] = {"event_number": n if n is not None else e.get("event_number"),
                                "key": str(key), "results": 0, "entries": 0,
+                               "entries_due": None,
                                "relay_count": 1, "rows": 0, "ids": [], "day_times": []}
         g["results"] += int(e.get("results") or 0)
         g["entries"] = max(g["entries"], int(e.get("entries") or 0))
+        if e.get("entries_due") is not None:
+            g["entries_due"] = max(g["entries_due"] or 0, int(e["entries_due"]))
         g["relay_count"] = max(g["relay_count"], int(e.get("relay_count") or 1))
         g["rows"] += 1
         if e.get("id"):
@@ -678,19 +686,40 @@ def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: 
                f"0 results today{after}; {why}, so we cannot tell whether the host has published")
 
 
+def due_entries(g: dict) -> int:
+    """The start-list entries a thin judgment counts: those whose heat is due
+    by the schedule when the snapshot read it (``entries_due``), else all.
+
+    A host can swim part of an event outside its start list's slot. Leiria
+    (8 Nov 2026) swam the fast heats of events 19-31 in the morning and
+    printed only the slow heats, slotted from 11:40; event 30's 19 morning
+    results read as thin against 39 swimmers who were not due until 12:23."""
+    due = g.get("entries_due")
+    return g["entries"] if due is None else int(due)
+
+
 def _thin(events: list, cfg: dict) -> list:
     """Events (one per number, see ``by_event_number``) with results for under
-    ``thin_pct`` % of their start list. Relays, events with no result and
-    events whose start list is under ``thin_min_entries`` are never thin."""
+    ``thin_pct`` % of their start list's due entries (``due_entries``).
+    Relays, events with no result and events with under ``thin_min_entries``
+    due entries are never thin."""
     pct, floor = int(cfg["thin_pct"]), int(cfg["thin_min_entries"])
     out = []
     for g in by_event_number(events):
-        res, ent = g["results"], g["entries"]
+        res, ent = g["results"], due_entries(g)
         if g["relay_count"] > 1 or res == 0 or ent < floor:
             continue
         if res * 100 < pct * ent:
             out.append(g)
     return out
+
+
+def due_from(g: dict, cfg: dict, tz) -> float:
+    """Earliest time the event's start list can have been due: its earliest
+    slot plus ``heat_due_min``. 0 when no slot is known (no bound)."""
+    slots = [s for s in (naive_local_epoch(t, tz) for t in g.get("day_times") or [])
+             if s is not None]
+    return min(slots) + int(cfg["heat_due_min"]) * 60 if slots else 0.0
 
 
 def _n(groups: list) -> int:
@@ -857,8 +886,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
             since = snap.now
             if not continuous and g["results"] > 0 and thin_since(key) is not None:
                 # No memory of the last runs: a thin event has looked like this
-                # at least since its newest result (or the meet's last write).
-                since = min(since, thin_since(key))
+                # at least since its newest result (or the meet's last write),
+                # but never since before its start list was due.
+                since = min(since, max(thin_since(key), due_from(g, cfg, tz)))
             recs[key] = {"since": since, "results": g["results"]}
         elif g["results"] > int(rec.get("results") or 0):
             moved = True
@@ -933,12 +963,13 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                      f"after {lag}+ min ({_events_txt(late_none)})")
     if late_thin:
         res = sum(g["results"] for g in late_thin)
-        ent = sum(g["entries"] for g in late_thin)
+        ent = sum(due_entries(g) for g in late_thin)
+        held = "" if ent == sum(g["entries"] for g in late_thin) else " due by the schedule"
         one = len(late_thin) == 1
         lead = "more" if late_none else f"published event{'' if one else 's'}"
         parts.append(f"{len(late_thin)} {lead} {'has' if one else 'have'} far fewer results than "
                      f"swimmers on the start list after {lag}+ min ({res} results for {ent} "
-                     f"entries; {_events_txt(late_thin)})")
+                     f"entries{held}; {_events_txt(late_thin)})")
     if waiting:
         one = _n(waiting) == 1
         due = min(since_of[g["key"]] for g in waiting) + lag * 60
