@@ -151,10 +151,11 @@ def investigate(exp: Expectation, snap: Snapshot, probes: Probes, *,
     # 5. per-event counts
     events = snap.events.get(sid, [])
     if events:
-        rows = ["event | relay | start-list entries | results"]
+        rows = ["event | relay | start-list entries | due by the schedule | results"]
         for e in events:
+            due = e.get("entries_due")
             rows.append(f"{e.get('event_number')} | {'yes' if (e.get('relay_count') or 1) > 1 else 'no'}"
-                        f" | {e.get('entries')} | {e.get('results')}")
+                        f" | {e.get('entries')} | {'?' if due is None else due} | {e.get('results')}")
         groups = by_event_number(events)
         shared = [str(g["event_number"]) for g in groups if g["rows"] > 1]
         if shared:
