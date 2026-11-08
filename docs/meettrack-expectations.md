@@ -96,8 +96,8 @@ Scope and data:
   45 min after its slot at the earliest, the `schedule:*` tolerance. A host can
   swim part of an event outside its start list's slot: Leiria (8 Nov 2026)
   swam the fast heats of events 19-31 in the morning and printed only the slow
-  heats, slotted from 11:40, and event 30 paged at 11:15 for 39 swimmers who
-  were due at 12:23. Which events
+  heats, slotted from 11:40, and event 30 paged at 11:15 for 39 swimmers whose
+  heats were scheduled at 12:23 (due from 12:48). Which events
   the host has published with no results comes from the writer's counters:
   `events_published - events_with_results` of them, the lowest event numbers
   with no result (the host publishes in order). The newest published event is
