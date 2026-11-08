@@ -208,10 +208,6 @@ class Snapshot:
                                                          # query covered (absent: all of them)
     thin_skipped: dict = field(default_factory=dict)     # "11113" -> thin events whose ids
                                                          # could not be queried safely
-    thin_due_at: dict = field(default_factory=dict)      # "11113" -> latest slot of a due
-                                                         # heat on its thin_refined events
-                                                         # (None: none has a slot); absent:
-                                                         # not known
     read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
 
 
@@ -327,7 +323,8 @@ def event_no(v) -> int | None:
 def by_event_number(events: list) -> list[dict]:
     """One record per event number, in number order. Rows that share a number
     are one event: their results add up, the start list is the larger row's
-    (so is its count of heats due by the schedule), and the slot is the earliest. A second, empty session row under the same
+    (so is its count of heats due by the schedule), the slot is the earliest
+    and the newest due heat's slot (``due_slot``) the latest. A second, empty session row under the same
     number (a pipeline bug seen on 7 Nov 2026) must not read as an event
     without results. Rows without a number stay on their own, last.
     ``events.event_number`` is ``integer NOT NULL`` (splash_poller's baseline
@@ -346,6 +343,10 @@ def by_event_number(events: list) -> list[dict]:
         g["entries"] = max(g["entries"], int(e.get("entries") or 0))
         if e.get("entries_due") is not None:
             g["entries_due"] = max(g["entries_due"] or 0, int(e["entries_due"]))
+        if "due_slot" in e:          # absent: not read; None: no due heat has a slot
+            slot = e["due_slot"]
+            g["due_slot"] = slot if g.get("due_slot") is None else (
+                g["due_slot"] if slot is None else max(g["due_slot"], slot))
         g["relay_count"] = max(g["relay_count"], int(e.get("relay_count") or 1))
         g["rows"] += 1
         if e.get("id"):
@@ -876,16 +877,17 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
             return tw
         return last_write
 
-    def due_since(key, g):
+    def due_since(g):
         # A heat becoming due grows the count a thin event is judged on, so
-        # it cannot have been short before its newest due heat was due. Not
-        # known for this event: no earlier than now. No due counts: no bound.
+        # it cannot have been short before its own newest due heat was due.
+        # Not read: no earlier than now. No due counts, or no due heat with a
+        # slot: no bound beyond its newest result.
         if g.get("entries_due") is None:
             return 0.0
-        if sid in snap.thin_due_at and (refined is None or key in refined):
-            slot = snap.thin_due_at[sid]
-            return 0.0 if slot is None else slot + int(cfg["heat_due_min"]) * 60
-        return snap.now
+        if "due_slot" not in g:
+            return snap.now
+        slot = g["due_slot"]
+        return 0.0 if slot is None else slot + int(cfg["heat_due_min"]) * 60
     moved = False
     for key, g in lacking.items():
         rec = recs.get(key)
@@ -895,7 +897,7 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
                 # No memory of the last runs: a thin event has looked like this
                 # at least since its newest result (or the meet's last write)
                 # and since its newest due heat was due.
-                since = min(since, max(thin_since(key), due_since(key, g)))
+                since = min(since, max(thin_since(key), due_since(g)))
             recs[key] = {"since": since, "results": g["results"]}
         elif g["results"] > int(rec.get("results") or 0):
             moved = True

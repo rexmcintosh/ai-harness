@@ -208,11 +208,15 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 continue
             snap.meets[sid] = m
             # due: the start-list heats past their slot + heat_due_min (a heat
-            # with no slot counts as due), what a thin judgment counts against.
+            # with no slot counts as due), what a thin judgment counts against;
+            # last_due: the newest of them with a slot, from the same read.
             due_by = _utc(now - int(cfg["heat_due_min"]) * 60)
             evs, err = rest.get(f"events?select=id,event_number,session_number,day_time,relay_count,"
-                                f"results(count),heats(count),due:heats(count)"
+                                f"results(count),heats(count),due:heats(count),"
+                                f"last_due:heats(scheduled_at)"
                                 f"&due.or=(scheduled_at.is.null,scheduled_at.lte.{due_by})"
+                                f"&last_due.scheduled_at=lte.{due_by}"
+                                f"&last_due.order=scheduled_at.desc&last_due.limit=1"
                                 f"&meet_id=eq.{m['id']}&order=event_number",
                                 timeout=t_read)
             if evs is None:
@@ -236,15 +240,6 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
                     snap.thin_refined[sid] = {g["key"] for g in usable}
-                    # The newest due heat with a slot on the same events: a
-                    # thin clock cannot start before it was due (no row: none
-                    # has a slot). A failure leaves it unknown: no backdating.
-                    due_heat, err = rest.get(f"heats?select=scheduled_at&event_id=in.({ids_in})"
-                                             f"&scheduled_at=lte.{due_by}"
-                                             f"&order=scheduled_at.desc&limit=1", timeout=t_read)
-                    if due_heat is not None:
-                        snap.thin_due_at[sid] = (iso_epoch(due_heat[0].get("scheduled_at"))
-                                                 if due_heat else None)
         urls = {str(r.get("sr_meet_id")): r.get("meet_url") for r in rows if r.get("meet_url")}
         snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live], urls)
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
@@ -269,7 +264,15 @@ def _event(e: dict) -> dict:
             "id": e.get("id"),
             "day_time": e.get("day_time"), "relay_count": e.get("relay_count") or 1,
             "results": n(e.get("results")), "entries": n(e.get("heats")),
-            "entries_due": n(e.get("due")) if "due" in e else None}
+            "entries_due": n(e.get("due")) if "due" in e else None,
+            **({"due_slot": _newest_slot(e["last_due"])} if "last_due" in e else {})}
+
+
+def _newest_slot(rows) -> float | None:
+    """The newest due heat's slot (epoch); None when no due heat has one."""
+    if isinstance(rows, list) and rows:
+        return iso_epoch(rows[0].get("scheduled_at"))
+    return None
 
 
 def real_probes(urls=None) -> Probes:

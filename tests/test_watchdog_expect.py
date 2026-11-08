@@ -2084,16 +2084,19 @@ def test_only_due_heats_count_and_the_evidence_says_so():
     assert "2 results for 8 entries due by the schedule; event 18" in e.evidence
 
 
-def _gap_snapshot(t, events, due_at="absent"):
+def _gap_snapshot(t, events):
     row = reg("11115", "Leiria", start_date=D7, end_date=D8, feed_type="fragment",
               events_published=None, events_with_results=None,
               last_ingest_at=iso(t - 900), coverage_at=iso(t - 900))
     s = snap(t, [row], events={"11115": events})
     s.thin_last_write["11115"] = at("10:47", D8)
     s.thin_refined["11115"] = {str(e["event_number"]) for e in events}
-    if due_at != "absent":
-        s.thin_due_at["11115"] = due_at
     return s
+
+
+def slotted(e, due_slot):
+    e["due_slot"] = due_slot
+    return e
 
 
 def test_after_a_memory_gap_a_thin_clock_never_starts_before_its_newest_due_heat():
@@ -2101,8 +2104,9 @@ def test_after_a_memory_gap_a_thin_clock_never_starts_before_its_newest_due_heat
     # heats were due only from 12:48 (12:23 + 25), so at 12:55 it is short,
     # not late.
     t = at("12:55", D8)
-    events = [due_ev(30, 39, 39, 19, f"{D8}T12:23:00"), due_ev(31, 14, 14, 22, f"{D8}T12:33:00")]
-    exps, _ = evaluate(_gap_snapshot(t, events, due_at=at("12:23", D8)), CFG, {})
+    events = [slotted(due_ev(30, 39, 39, 19, f"{D8}T12:23:00"), at("12:23", D8)),
+              slotted(due_ev(31, 14, 14, 22, f"{D8}T12:33:00"), at("12:33", D8))]
+    exps, _ = evaluate(_gap_snapshot(t, events), CFG, {})
     e = by_id(exps)[f"results:11115:{D8}"]
     assert e.status == "pending" and "short since 12:48" in e.evidence
 
@@ -2112,13 +2116,28 @@ def test_after_a_memory_gap_a_later_heat_that_made_it_thin_bounds_the_clock():
     # (16:00) is due from 16:25 and makes it 4 of 16. At 16:30 with no memory
     # that is 5 min old, not 6 hours (its newest result, 10:47).
     t = at("16:30", D8)
-    events = [due_ev(18, 16, 16, 4, f"{D8}T09:15:00"), due_ev(19, 8, 8, 27, f"{D8}T09:20:00")]
-    exps, _ = evaluate(_gap_snapshot(t, events, due_at=at("16:00", D8)), CFG, {})
+    events = [slotted(due_ev(18, 16, 16, 4, f"{D8}T09:15:00"), at("16:00", D8)),
+              slotted(due_ev(19, 8, 8, 27, f"{D8}T09:20:00"), at("09:20", D8))]
+    exps, _ = evaluate(_gap_snapshot(t, events), CFG, {})
     e = by_id(exps)[f"results:11115:{D8}"]
     assert e.status == "pending" and "short since 16:25" in e.evidence
 
 
-def test_after_a_memory_gap_an_unknown_due_time_starts_the_clock_now():
+def test_after_a_memory_gap_each_thin_event_is_bounded_by_its_own_due_heat():
+    # Two thin events: 18's newest due heat is 09:15, 22's is 16:00. A later
+    # event's due heat must not push the earlier event's clock forward.
+    t = at("16:30", D8)
+    events = [slotted(due_ev(18, 8, 8, 2, f"{D8}T09:15:00"), at("09:15", D8)),
+              slotted(due_ev(22, 16, 16, 4, f"{D8}T11:51:00"), at("16:00", D8)),
+              slotted(due_ev(23, 8, 8, 27, f"{D8}T11:55:00"), at("11:55", D8))]
+    exps, mem = evaluate(_gap_snapshot(t, events), CFG, {})
+    e = by_id(exps)[f"results:11115:{D8}"]
+    assert e.status == "missed" and e.data["late"] == [18]
+    recs = mem["late_events"][f"results:11115:{D8}"]
+    assert recs["18"]["since"] == at("10:47", D8) and recs["22"]["since"] == at("16:25", D8)
+
+
+def test_after_a_memory_gap_an_unread_due_time_starts_the_clock_now():
     t = at("16:30", D8)
     events = [due_ev(18, 16, 16, 4, f"{D8}T09:15:00"), due_ev(19, 8, 8, 27, f"{D8}T09:20:00")]
     exps, _ = evaluate(_gap_snapshot(t, events), CFG, {})
@@ -2129,8 +2148,8 @@ def test_after_a_memory_gap_an_unknown_due_time_starts_the_clock_now():
 def test_after_a_memory_gap_heats_without_a_slot_keep_the_old_backdating():
     # Every due heat has no slot (always due): its newest result bounds it.
     t = at("16:30", D8)
-    events = [due_ev(18, 16, 16, 4), due_ev(19, 8, 8, 27)]
-    exps, _ = evaluate(_gap_snapshot(t, events, due_at=None), CFG, {})
+    events = [slotted(due_ev(18, 16, 16, 4), None), slotted(due_ev(19, 8, 8, 27), None)]
+    exps, _ = evaluate(_gap_snapshot(t, events), CFG, {})
     e = by_id(exps)[f"results:11115:{D8}"]
     assert e.status == "missed" and "short since 10:47" in e.evidence
 
@@ -2145,7 +2164,18 @@ def test_rows_sharing_a_number_judge_the_larger_rows_due_count():
     assert g["entries_due"] is None and due_entries(g) == 14
 
 
-def test_snapshot_asks_when_the_thin_events_newest_due_heat_was_due():
+def test_rows_sharing_a_number_keep_the_latest_due_slot():
+    from watchdog.expectations import by_event_number
+    g = by_event_number([slotted(due_ev(3, 14, 14, 32), at("11:45", D7)),
+                         slotted(due_ev(3, 8, 8, 0), at("16:07", D7))])[0]
+    assert g["due_slot"] == at("16:07", D7)
+    g = by_event_number([slotted(due_ev(3, 14, 14, 32), None),
+                         slotted(due_ev(3, 8, 8, 0), at("16:07", D7))])[0]
+    assert g["due_slot"] == at("16:07", D7)
+    assert "due_slot" not in by_event_number([due_ev(3, 14, 14, 32)])[0]
+
+
+def test_snapshot_reads_each_events_newest_due_heat_with_its_counts():
     calls = []
     now = at("13:10", D8)
 
@@ -2161,16 +2191,20 @@ def test_snapshot_asks_when_the_thin_events_newest_due_heat_was_due():
             if path.startswith("events"):
                 return [{"id": "e30", "event_number": 30, "relay_count": 1,
                          "results": [{"count": 19}], "heats": [{"count": 39}],
-                         "due": [{"count": 39}]}], None
+                         "due": [{"count": 39}],
+                         "last_due": [{"scheduled_at": "2026-11-08T12:23:00+00:00"}]},
+                        {"id": "e31", "event_number": 31, "relay_count": 1,
+                         "results": [{"count": 22}], "heats": [{"count": 14}],
+                         "due": [{"count": 0}], "last_due": []}], None
             if path.startswith("results?select=created_at"):
                 return [{"created_at": iso(at("10:47", D8))}], None
-            if path.startswith("heats?select=scheduled_at"):
-                return [{"scheduled_at": "2026-11-08T12:23:00+00:00"}], None
             if path.startswith("results"):
-                return 19, None
+                return 41, None
             return [], None
     s = er.build_snapshot(now, CFG, RUN_CFG, FakeRest(), ps=lambda: "")
-    q = [p for p in calls if p.startswith("heats?")]
-    assert q == ["heats?select=scheduled_at&event_id=in.(e30)&scheduled_at=lte.2026-11-08T12:45:00Z"
-                 "&order=scheduled_at.desc&limit=1"]
-    assert s.thin_due_at["11115"] == at("12:23", D8)
+    ev_q = [p for p in calls if p.startswith("events")][0]
+    assert ("last_due:heats(scheduled_at)&due.or=(scheduled_at.is.null,scheduled_at.lte."
+            "2026-11-08T12:45:00Z)&last_due.scheduled_at=lte.2026-11-08T12:45:00Z"
+            "&last_due.order=scheduled_at.desc&last_due.limit=1") in ev_q
+    assert [e["due_slot"] for e in s.events["11115"]] == [at("12:23", D8), None]
+    assert not [p for p in calls if p.startswith("heats?")]

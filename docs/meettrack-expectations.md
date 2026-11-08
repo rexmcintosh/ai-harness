@@ -143,8 +143,10 @@ Scope and data:
   the snapshot could ask for it (`thin_refined`); one whose event ids cannot
   go into a filter safely uses the meet's last result time instead (later,
   so never an earlier page), and the evidence says how many were skipped.
-  Never before its earliest slot plus `heat_due_min`: its start list cannot
-  have been short before it was due.
+  Never before its own newest due heat's slot plus `heat_due_min` (read with
+  its due count, in the same query): a heat becoming due grows the count it is
+  judged on. Not read: the clock starts at that run. No due heat with a slot:
+  its newest result bounds it, as before.
 - Limit: the newest event is not paged while it is the newest, so a stuck
   last event of a session is only judged once the next event is published
   (on a multi-day meet, the next morning). The monitor cannot tell a host
