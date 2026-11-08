@@ -208,6 +208,10 @@ class Snapshot:
                                                          # query covered (absent: all of them)
     thin_skipped: dict = field(default_factory=dict)     # "11113" -> thin events whose ids
                                                          # could not be queried safely
+    thin_due_at: dict = field(default_factory=dict)      # "11113" -> latest slot of a due
+                                                         # heat on its thin_refined events
+                                                         # (None: none has a slot); absent:
+                                                         # not known
     read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
 
 
@@ -714,14 +718,6 @@ def _thin(events: list, cfg: dict) -> list:
     return out
 
 
-def due_from(g: dict, cfg: dict, tz) -> float:
-    """Earliest time the event's start list can have been due: its earliest
-    slot plus ``heat_due_min``. 0 when no slot is known (no bound)."""
-    slots = [s for s in (naive_local_epoch(t, tz) for t in g.get("day_times") or [])
-             if s is not None]
-    return min(slots) + int(cfg["heat_due_min"]) * 60 if slots else 0.0
-
-
 def _n(groups: list) -> int:
     """How many events: an unlisted entry stands for ``count`` of them."""
     return sum(int(g.get("count") or 1) for g in groups)
@@ -879,6 +875,17 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
         if tw is not None and (refined is None or key in refined):
             return tw
         return last_write
+
+    def due_since(key, g):
+        # A heat becoming due grows the count a thin event is judged on, so
+        # it cannot have been short before its newest due heat was due. Not
+        # known for this event: no earlier than now. No due counts: no bound.
+        if g.get("entries_due") is None:
+            return 0.0
+        if sid in snap.thin_due_at and (refined is None or key in refined):
+            slot = snap.thin_due_at[sid]
+            return 0.0 if slot is None else slot + int(cfg["heat_due_min"]) * 60
+        return snap.now
     moved = False
     for key, g in lacking.items():
         rec = recs.get(key)
@@ -886,9 +893,9 @@ def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) 
             since = snap.now
             if not continuous and g["results"] > 0 and thin_since(key) is not None:
                 # No memory of the last runs: a thin event has looked like this
-                # at least since its newest result (or the meet's last write),
-                # but never since before its start list was due.
-                since = min(since, max(thin_since(key), due_from(g, cfg, tz)))
+                # at least since its newest result (or the meet's last write)
+                # and since its newest due heat was due.
+                since = min(since, max(thin_since(key), due_since(key, g)))
             recs[key] = {"since": since, "results": g["results"]}
         elif g["results"] > int(rec.get("results") or 0):
             moved = True

@@ -236,6 +236,15 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                 if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
                     snap.thin_refined[sid] = {g["key"] for g in usable}
+                    # The newest due heat with a slot on the same events: a
+                    # thin clock cannot start before it was due (no row: none
+                    # has a slot). A failure leaves it unknown: no backdating.
+                    due_heat, err = rest.get(f"heats?select=scheduled_at&event_id=in.({ids_in})"
+                                             f"&scheduled_at=lte.{due_by}"
+                                             f"&order=scheduled_at.desc&limit=1", timeout=t_read)
+                    if due_heat is not None:
+                        snap.thin_due_at[sid] = (iso_epoch(due_heat[0].get("scheduled_at"))
+                                                 if due_heat else None)
         urls = {str(r.get("sr_meet_id")): r.get("meet_url") for r in rows if r.get("meet_url")}
         snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live], urls)
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
