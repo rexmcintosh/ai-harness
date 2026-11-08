@@ -6,10 +6,15 @@ Rules (docs/meettrack-expectations.md, "Alert policy"):
   same problem is never announced twice.
 - While it stays missed, a REMINDER goes out every ``repeat_crit_min`` /
   ``repeat_warn_min`` (start lists: ``repeat_startlist_min``). No long mute.
+  An expectation that reports progress (``data["progress_at"]``: late
+  results:* events gaining results, or any result written for the meet) is
+  reminded only once nothing has moved for a full interval: no reminder while
+  it catches up.
 - When it is met again, one RESOLVED line says so and how long it lasted.
 - Live-meet expectations (window "racing") only alert inside racing hours.
-  When racing hours end with one still open, one CLOSED line says so and the
-  reminders stop; a problem that persists tomorrow is a new id, so a new alert.
+  When racing hours end with one still open (missed, or not judged / not due
+  at that moment), one CLOSED line says so and the reminders stop; a problem
+  that persists tomorrow is a new id, so a new alert.
   Database and start-list expectations (window "always") alert at any hour.
 - An open alert whose expectation is no longer produced (the meet finished or
   left the registry window) is CLOSED, never left hanging. While the database
@@ -18,6 +23,7 @@ Rules (docs/meettrack-expectations.md, "Alert policy"):
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -94,12 +100,26 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
                 open_[e.id] = _record(e, now)
                 continue
             worse = SEVERITY_RANK[e.severity] > SEVERITY_RANK.get(rec.get("severity"), 0)
-            due = now - float(rec.get("last_sent", 0)) >= _repeat_min(e.kind, e.severity, cfg) * 60
+            repeat = _repeat_min(e.kind, e.severity, cfg) * 60
+            due = now - float(rec.get("last_sent", 0)) >= repeat
+            progress_at = (e.data or {}).get("progress_at")
+            try:
+                progress_at = float(progress_at) if progress_at is not None else None
+            except (TypeError, ValueError):
+                progress_at = None
+            if progress_at is not None and (not math.isfinite(progress_at)
+                                            or progress_at > now + 300):
+                progress_at = None   # a broken or future time (clock skew) never mutes reminders
+            if due and progress_at is not None and now - progress_at < repeat:
+                due = False          # still moving (catching up, results arriving): no reminder
             if worse or due:
                 sends = int(rec.get("sends", 1)) + 1
+                reason = ("now worse" if worse else
+                          f"nothing new for {_ago(now, progress_at)}"
+                          if progress_at is not None else "")
                 notices.append(Notice("reminder", e.id, e.meet, e.expected, e.evidence,
                                       e.severity, e.deadline, rec.get("first_missed"), sends,
-                                      reason="now worse" if worse else ""))
+                                      reason=reason))
                 open_[e.id] = _record(e, now, rec.get("first_missed"), sends)
             else:
                 rec["evidence"] = e.evidence
@@ -108,6 +128,17 @@ def plan(expectations: list[Expectation], state: dict, now: float, cfg: dict,
         if not rec:
             continue
         if e.status in ("unknown", "pending"):
+            if e.window == "racing" and not racing_now:
+                # Racing is over and it is not judged (or not due) now: close it
+                # like a missed one, rather than leave it open until its id
+                # changes at midnight.
+                why = "not judged" if e.status == "unknown" else "not due yet"
+                notices.append(Notice("closed", e.id, e.meet, e.expected, e.evidence,
+                                      rec.get("severity", e.severity), e.deadline,
+                                      rec.get("first_missed"), rec.get("sends", 1),
+                                      reason=f"racing hours are over; {why} at close, "
+                                             f"no more reminders today"))
+                del open_[e.id]
             continue                                    # not judged / not due: keep it open
         if e.status == "met":
             notices.append(Notice("resolved", e.id, e.meet, e.expected, e.evidence,

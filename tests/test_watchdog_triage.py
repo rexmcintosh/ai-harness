@@ -157,6 +157,21 @@ def test_triage_worsening_refires_within_cooldown():
     assert out["escalate"] is True             # warn -> crit escalates immediately
 
 
+def test_cron_log_warnings_repeat_on_the_six_hour_cooldown_not_the_meet_one():
+    # 6-7 Nov 2026: one real ingest_entries parser error (meet 11344) stayed in
+    # the tail, so cron:meettrack-ingest re-sent every 6 h. Not muted (it was
+    # real), not hourly (cron:* is not a live-meet check), and a crit fires at once.
+    warn = CheckStatus("cron:meettrack-ingest", "warn", "2 error marker(s)")
+    out = triage([warn], {}, NOW)
+    assert out["escalate"] is True
+    state = out["state"]
+    for hours in (1, 3, 5.9):
+        assert triage([warn], state, NOW + hours * HOUR)["escalate"] is False
+    assert triage([warn], state, NOW + 6 * HOUR)["escalate"] is True
+    crit = CheckStatus("cron:meettrack-ingest", "crit", "worse")
+    assert triage([crit], state, NOW + HOUR)["escalate"] is True
+
+
 def test_triage_recovery_clears_state():
     prior = {"disk": {"level": "crit", "ts": NOW - HOUR}}
     out = triage([CheckStatus("disk", "ok", "fine")], prior, NOW)

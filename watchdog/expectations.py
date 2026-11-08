@@ -11,18 +11,21 @@ Design notes live in docs/meettrack-expectations.md. In short:
 - ``db:registry``      the meet registry can be read at all
 - ``startlist:<id>``   a requested Portugal meet has its start list by T-24h
 - ``writer:<id>:<day>`` the live writer for a meet racing today runs and ticks
-- ``first:<id>:<day>``  results start appearing once racing should have begun
+- ``first:<id>:<day>``  results start appearing once the host has published
+                        them (or, when the writer cannot see the host, once
+                        racing should have begun)
 - ``results:<id>:<day>`` every event the host has published is in MeetTrack,
                         with roughly as many results as start-list swimmers,
-                        within N minutes
+                        within N minutes of that event becoming late (judged
+                        per event number; the newest event is in progress)
 - ``schedule:<id>:<day>`` events past their scheduled slot have results (only
                         when the start list carries times)
 - ``source:<id>:<day>``, ``feed:<id>``, ``hygiene:stale-active`` notes only:
                         never paged, shown in dry-runs and investigations
 
 ``memory`` is the evaluator's own small state between runs (consecutive
-database failures, when a gap was first seen, today's baseline). It is a plain
-dict so the runner can persist it as JSON.
+database failures, when each late event became late, the last progress on
+them, today's baseline). It is a plain dict so the runner can persist it as JSON.
 """
 from __future__ import annotations
 
@@ -45,8 +48,9 @@ DEFAULTS = {
     "startlist_lead_hours": 24,
     "startlist_request_grace_min": 60,
     "default_session_start": "09:00",  # first session when nothing better is known
-    "first_results_by": "17:00",      # morning grace: unknown start -> results by then
-    "first_results_grace_min": 60,    # known start -> results within this
+    "first_results_by": "17:00",      # unknown start and the writer cannot see the host -> by then
+    "first_results_grace_min": 60,    # host files (or a known start, writer blind) -> results within this
+    "first_results_host_quiet_min": 180,  # known start, host has published nothing -> warn after this
     "launch_grace_min": 30,
     "tick_crit_min": 30,
     "coverage_max_age_min": 30,
@@ -61,6 +65,16 @@ DEFAULTS = {
 }
 
 LIVE_FEEDS = ("pdf", "fragment", "lenex")
+# Unlisted publications get one clock each, up to this many (a meet has well
+# under 100 events); more than that share the newest clock. Bad counters can
+# never grow the state file without bound.
+MAX_UNLISTED_CLOCKS = 100
+# first:* forgets when it first saw the host's new files only once the writer
+# has counted none for this long (two 5-min runs): one sample can be a flicker.
+FILES_GONE_CONFIRM_MIN = 10
+# A late-event clock whose event is missing from an otherwise good read of the
+# events is kept, and results:* is not judged, until it has been missing this long.
+ABSENT_CONFIRM_MIN = 15
 WRITERS = ("track_pdf_meet", "poller.py", "lastheat_ingest", "reconcile_meet")
 
 
@@ -185,6 +199,10 @@ class Snapshot:
     processes: dict | None = None                      # "11113" -> [ps lines]; None = unknown
     thin_last_write: dict = field(default_factory=dict)  # "11113" -> epoch of the newest
                                                          # result on its thin events
+    thin_refined: dict = field(default_factory=dict)     # "11113" -> event-number keys that
+                                                         # query covered (absent: all of them)
+    thin_skipped: dict = field(default_factory=dict)     # "11113" -> thin events whose ids
+                                                         # could not be queried safely
     read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
 
 
@@ -287,13 +305,55 @@ def stated_start(cfg: dict, sid: str, day: str) -> str | None:
     return None
 
 
+def event_no(v) -> int | None:
+    """An event number as an int: an int, or a string of digits ('16', ' 9 ').
+    Anything else (None, a bool, 'x', a float) is not a number."""
+    if isinstance(v, int) and not isinstance(v, bool):
+        return v
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip())
+    return None
+
+
+def by_event_number(events: list) -> list[dict]:
+    """One record per event number, in number order. Rows that share a number
+    are one event: their results add up, the start list is the larger row's,
+    and the slot is the earliest. A second, empty session row under the same
+    number (a pipeline bug seen on 7 Nov 2026) must not read as an event
+    without results. Rows without a number stay on their own, last.
+    ``events.event_number`` is ``integer NOT NULL`` (splash_poller's baseline
+    migration); digit strings are accepted in case a reader ever stringifies it."""
+    groups: dict = {}
+    for i, e in enumerate(events or []):
+        n = event_no(e.get("event_number"))
+        key = n if n is not None else f"row:{e.get('id') or i}"
+        g = groups.get(key)
+        if g is None:
+            g = groups[key] = {"event_number": n if n is not None else e.get("event_number"),
+                               "key": str(key), "results": 0, "entries": 0,
+                               "relay_count": 1, "rows": 0, "ids": [], "day_times": []}
+        g["results"] += int(e.get("results") or 0)
+        g["entries"] = max(g["entries"], int(e.get("entries") or 0))
+        g["relay_count"] = max(g["relay_count"], int(e.get("relay_count") or 1))
+        g["rows"] += 1
+        if e.get("id"):
+            g["ids"].append(e["id"])
+        if e.get("day_time"):
+            g["day_times"].append(e["day_time"])
+    return sorted(groups.values(),
+                  key=lambda g: (0, g["event_number"]) if not g["key"].startswith("row:")
+                  else (1, 0))
+
+
 def scheduled_events_on(events: list, day: str, tz) -> list:
-    """Events whose start-list slot (day_time) falls on `day`, with the slot epoch."""
+    """Events (one per number) whose start-list slot (day_time) falls on `day`,
+    with the earliest such slot epoch."""
     out = []
-    for e in events or []:
-        slot = naive_local_epoch(e.get("day_time"), tz)
-        if slot is not None and local(slot, tz).date().isoformat() == day:
-            out.append((slot, e))
+    for g in by_event_number(events):
+        slots = [s for s in (naive_local_epoch(t, tz) for t in g["day_times"])
+                 if s is not None and local(s, tz).date().isoformat() == day]
+        if slots:
+            out.append((min(slots), g))
     out.sort(key=lambda p: p[0])
     return out
 
@@ -456,115 +516,455 @@ def eval_writer(row: dict, snap: Snapshot, cfg: dict, tz, day: str) -> Expectati
     return exp("met", f"status '{status_now}'; {proc}")
 
 
+def counts_host_files(row: dict) -> bool:
+    """The writer counts the host's published result files (the PDF writer).
+    Fragment and Lenex writers stamp NULL counters by design."""
+    return str(row.get("feed_type") or "").strip().lower() == "pdf"
+
+
+def counters_sane(row: dict) -> bool:
+    """Both counts are there and add up: events_published and
+    events_with_results are counts and the second is at most the first. The
+    writer stamps both from one tick; anything else (one of them NULL, a
+    negative, a bool, more covered than published) is not a view of the host."""
+    pub, cov = row.get("events_published"), row.get("events_with_results")
+
+    def count(v):
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+    return count(pub) and count(cov) and cov <= pub
+
+
+def counters_fresh(row: dict, now: float, cfg: dict) -> bool:
+    """The writer counted the host's published result files (events_published
+    is not NULL) in a tick at most coverage_max_age_min ago."""
+    measured = iso_epoch(row.get("coverage_at"))
+    return (row.get("events_published") is not None and measured is not None
+            and (now - measured) / 60 <= int(cfg["coverage_max_age_min"]))
+
+
 def eval_first_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) -> Expectation:
+    """Results start appearing today. What is wrong depends on what the writer
+    can see of the host:
+
+    - it counts the host's files and the host lists new ones, but MeetTrack has
+      no result today: missed ``first_results_grace_min`` after they were first
+      seen (the host has results, MeetTrack has none);
+    - it counts the host's files and there are none: the host has published
+      nothing, which is not a MeetTrack fault. Never paged without a start
+      time; with one, a warning ``first_results_host_quiet_min`` after it;
+    - it does not count them (no tick yet, no meet row, a writer without a
+      file list, or old counters): we cannot see the host, so the clock
+      decides as before: the known start + grace, else ``first_results_by``.
+    """
     sid = str(row.get("sr_meet_id"))
     eid = f"first:{sid}:{day}"
+    if snap.read_errors.get(sid):
+        # A failed read (today's results, the events) is not evidence: neither
+        # judge nor touch this meet's baseline and files_seen.
+        return Expectation(eid, "first_results", label(row), "results start appearing today",
+                           None, "unknown", "warn",
+                           f"not judged: {'; '.join(snap.read_errors[sid])}",
+                           sr_meet_id=sid, day=day)
     events = snap.events.get(sid, [])
     start, src = session_start(cfg, row, events, day, tz)
+    grace_min = int(cfg["first_results_grace_min"])
     if start is not None:
-        deadline = start + float(cfg["first_results_grace_min"]) * 60
-        how = f"{int(cfg['first_results_grace_min'])} min after the {src} ({hm(start, tz)})"
+        clock_deadline = start + grace_min * 60
+        clock_how = f"{grace_min} min after the {src} ({hm(start, tz)})"
     else:
         by = nation_value(cfg, row.get("nation"), "first_results_by")
-        deadline = at_local(day, by, tz)
-        how = f"by {by} (no start time known)"
+        clock_deadline = at_local(day, by, tz)
+        clock_how = f"by {by} (no start time known)"
     published = row.get("events_published")
+    measured = counters_fresh(row, snap.now, cfg) and counters_sane(row)
     base_key = f"baseline:{sid}:{day}"
     if base_key not in mem:
-        mem[base_key] = int(published or 0) if snap.now < deadline else 0
+        # Which listed files are not today's news. First day of the meet: none
+        # are older. Later days, seen before racing starts: all that are listed
+        # then are yesterday's. Seen later (a cold start): only files whose
+        # events already have results are known to be old.
+        racing_from = at_local(day, cfg["racing_start"], tz)
+        if start is not None:
+            racing_from = min(racing_from, start)
+        if row.get("start_date") == day or not measured:
+            mem[base_key] = 0
+        elif snap.now < racing_from:
+            mem[base_key] = int(published)
+        else:
+            mem[base_key] = int(row.get("events_with_results") or 0)
     baseline = int(mem[base_key])
     today_n = int(snap.results_today.get(sid, 0) or 0)
-    expected = f"results start appearing {how}"
-    new_published = int(published or 0) - baseline
-    if today_n > 0 or new_published > 0:
-        return Expectation(eid, "first_results", label(row), expected, deadline, "met", "warn",
-                           f"{today_n} results written today; host lists {published or 0} result "
-                           f"files", sr_meet_id=sid, day=day)
-    if snap.now < deadline:
-        return Expectation(eid, "first_results", label(row), expected, deadline, "pending", "warn",
-                           "no results yet today", sr_meet_id=sid, day=day)
-    since = start if start is not None else None
-    after = (f"; racing started about {minutes(snap.now, since)} min ago"
-             if since is not None else "")
-    return Expectation(
-        eid, "first_results", label(row), expected, deadline, "missed", "warn",
-        f"0 results today{after}; the host lists {published or 0} result files "
-        f"({max(new_published, 0)} new today)", sr_meet_id=sid, day=day,
-        data={"start": start, "published": published})
+    new_published = (int(published) - baseline) if measured else 0
+    checked = hm_day(iso_epoch(row.get("coverage_at")), tz, snap.now)
+    files_key = f"files_seen:{sid}:{day}"
+    gone_key = f"files_gone:{sid}:{day}"
+    covered = row.get("events_with_results")
+    if measured and today_n == 0 and covered is not None:
+        # Nothing was written today, so every event that has results got them
+        # before today: its file is not today's news. This bounds the baseline
+        # after a cold start past the deadline (baseline 0 on day two).
+        new_published = min(new_published, int(published) - int(covered))
+
+    def exp(expected, deadline, status, evidence, **data):
+        return Expectation(eid, "first_results", label(row), expected, deadline, status, "warn",
+                           evidence, sr_meet_id=sid, day=day,
+                           data={"start": start, "published": published, **data})
+
+    if today_n > 0:
+        mem.pop(files_key, None)
+        mem.pop(gone_key, None)
+        return exp(f"results start appearing {clock_how}", clock_deadline, "met",
+                   f"{today_n} results written today; host lists {published or 0} result files")
+    if measured and new_published > 0:
+        mem.pop(gone_key, None)
+        seen = float(mem.setdefault(files_key, snap.now))
+        deadline = seen + grace_min * 60
+        files = f"{published} result file{'' if published == 1 else 's'}"
+        return exp(f"results reach MeetTrack within {grace_min} min of the host's first result file",
+                   deadline, "missed" if snap.now >= deadline else "pending",
+                   f"0 results today; the host lists {files} ({new_published} new today), first "
+                   f"seen {hm_day(seen, tz, snap.now)}; the writer checked at {checked}",
+                   files_seen=seen)
+    if measured and files_key in mem:
+        # The writer counts no new file. Over only once that holds for
+        # FILES_GONE_CONFIRM_MIN: a one-run dip keeps the first-seen time.
+        gone = float(mem.setdefault(gone_key, snap.now))
+        if snap.now - gone >= FILES_GONE_CONFIRM_MIN * 60:
+            mem.pop(files_key, None)
+            mem.pop(gone_key, None)
+    if measured:
+        if start is None:
+            return exp("results start appearing once the host publishes them (no start time known)",
+                       None, "pending",
+                       f"the host has published no results yet (the writer checked at {checked}); "
+                       f"no start time is known, so nothing is due")
+        quiet = int(cfg["first_results_host_quiet_min"])
+        deadline = start + quiet * 60
+        late = snap.now >= deadline
+        return exp(f"the host publishes results within {quiet} min of the {src} ({hm(start, tz)})",
+                   deadline, "missed" if late else "pending",
+                   f"the host has published no {'new ' if baseline else ''}result files "
+                   f"{minutes(snap.now, start)} min after "
+                   f"the {src} ({hm(start, tz)}); the writer checked at {checked}; MeetTrack "
+                   f"holds everything the host has published" if late else
+                   f"the host has published no results yet (the writer checked at {checked})")
+    # Blind: nothing tells us what the host has. The clock decides. A
+    # files_seen time is kept: if the counters come back showing the same
+    # files, their deadline is still the one from when they were first seen.
+    counting_writer = counts_host_files(row)
+    if published is None and iso_epoch(row.get("coverage_at")) is None:
+        why = "the writer has not reported the host's result list (no tick counters)"
+    elif published is None and counting_writer:
+        why = ("the writer has not reported the host's result list (its last tick did not "
+               "report its file counts)")
+    elif published is None:
+        why = "the writer has not reported the host's result list (this writer does not count files)"
+    elif not counters_fresh(row, snap.now, cfg):
+        why = (f"the writer has not reported the host's result list since {checked} "
+               f"(counters older than {int(cfg['coverage_max_age_min'])} min)")
+    elif row.get("events_with_results") is None:
+        why = ("the writer's last tick did not count the events with results, so its file "
+               "count cannot be read")
+    else:                                # fresh, both counts there: they do not add up
+        why = (f"the writer's counts do not add up ({row.get('events_with_results')} with results "
+               f"of {published!r} published)")
+    if not events:
+        why += "; MeetTrack holds no events for this meet (no meet row, or nothing seeded)"
+    if snap.now < clock_deadline:
+        return exp(f"results start appearing {clock_how}", clock_deadline, "pending",
+                   f"no results yet today; {why}")
+    after = f"; racing started about {minutes(snap.now, start)} min ago" if start is not None else ""
+    return exp(f"results start appearing {clock_how}", clock_deadline, "missed",
+               f"0 results today{after}; {why}, so we cannot tell whether the host has published")
 
 
 def _thin(events: list, cfg: dict) -> list:
+    """Events (one per number, see ``by_event_number``) with results for under
+    ``thin_pct`` % of their start list. Relays, events with no result and
+    events whose start list is under ``thin_min_entries`` are never thin."""
     pct, floor = int(cfg["thin_pct"]), int(cfg["thin_min_entries"])
     out = []
-    for e in events or []:
-        res, ent = int(e.get("results") or 0), int(e.get("entries") or 0)
-        if (e.get("relay_count") or 1) > 1 or res == 0 or ent < floor:
+    for g in by_event_number(events):
+        res, ent = g["results"], g["entries"]
+        if g["relay_count"] > 1 or res == 0 or ent < floor:
             continue
         if res * 100 < pct * ent:
-            out.append(e)
+            out.append(g)
     return out
 
 
+def _n(groups: list) -> int:
+    """How many events: an unlisted entry stands for ``count`` of them."""
+    return sum(int(g.get("count") or 1) for g in groups)
+
+
+def _events_txt(groups: list) -> str:
+    named = [g for g in groups if not str(g.get("key")).startswith("unlisted")]
+    unlisted = _n([g for g in groups if str(g.get("key")).startswith("unlisted")])
+    out = []
+    if named:
+        nums = [str(g["event_number"]) for g in named]
+        more = f" and {len(nums) - 12} more" if len(nums) > 12 else ""
+        out.append(f"event{'s' if len(nums) > 1 else ''} {', '.join(nums[:12])}{more}")
+    if unlisted:
+        out.append(f"{unlisted} not in MeetTrack's event list")
+    return " and ".join(out)
+
+
+def _so_far(g: dict) -> str:
+    if g["results"] == 0:
+        return "no results yet"
+    return f"{g['results']} of {g['entries']}" if g["entries"] else f"{g['results']} results"
+
+
 def eval_results(row: dict, snap: Snapshot, cfg: dict, tz, day: str, mem: dict) -> Expectation:
+    """What is wrong now, per event number, not since the first gap of the day.
+
+    An event *lacks* results when the host has published it and MeetTrack has
+    none (``events_published - events_with_results`` of them: the lowest
+    numbers without a result, as the host publishes in order), or only a few
+    (thin). The newest published event is being swum: it never counts. A
+    published event with no MeetTrack row (unlisted) has no number: it is the
+    newest while the published count has not grown since it appeared. Any
+    other lacking event is *late* once it has lacked results for
+    ``results_lag_min`` since it stopped being the newest (``memory
+    late_events``); it leaves the late set when it catches up. ``data
+    progress_at`` is the last time a lacking event gained results or the
+    writer wrote any result: the alert policy holds reminders while that moves.
+
+    A writer that counts the host's files (PDF) but whose counters are missing
+    or older than ``coverage_max_age_min`` cannot show which published events
+    lack results: ``unknown``, never ``met``; every clock keeps its start time.
+    """
     sid = str(row.get("sr_meet_id"))
     eid = f"results:{sid}:{day}"
     lag = int(cfg["results_lag_min"])
+    max_age = int(cfg["coverage_max_age_min"])
     expected = (f"every event the host publishes is in MeetTrack within {lag} min, with "
                 f"results for most swimmers on its start list")
     events = snap.events.get(sid, [])
     published, covered = row.get("events_published"), row.get("events_with_results")
-    measured = iso_epoch(row.get("coverage_at"))
-    fresh = (measured is not None
-             and (snap.now - measured) / 60 <= int(cfg["coverage_max_age_min"]))
-    missing = (published - covered) if (fresh and published is not None and covered is not None) else 0
-    missing = max(0, missing)
-    thin = _thin(events, cfg)
-    gaps = mem.setdefault("gap_since", {})
+    ticked = iso_epoch(row.get("coverage_at"))
+    fresh = ticked is not None and (snap.now - ticked) / 60 <= max_age
+    counted = fresh and published is not None and covered is not None and counters_sane(row)
     last_write = iso_epoch(row.get("last_ingest_at"))
     errors = row.get("last_tick_errors") if fresh else None
 
-    if missing == 0 and not thin:
-        gaps.pop(eid, None)
+    def exp(status, evidence, deadline=None, **data):
+        return Expectation(eid, "results", label(row), expected, deadline, status, "crit",
+                           evidence, sr_meet_id=sid, day=day,
+                           data={"published": published, "covered": covered, **data})
+
+    all_recs = mem.setdefault("late_events", {})
+    recs = dict(all_recs.get(eid) or {})     # written back below, only when judged
+    progress = mem.setdefault("results_progress", {})
+    if snap.read_errors.get(sid):
+        # A failed read is not evidence: keep every clock as it is.
+        return exp("unknown", f"not judged: {'; '.join(snap.read_errors[sid])}")
+    if (published is not None or counts_host_files(row)) and not counted:
+        # This writer counts the host's files, but its counters cannot be used:
+        # which published events lack results is not known. Never "met" (or a
+        # page) on that. Judgment pauses; the clocks keep their start times, so
+        # an event short before can be overdue at once when they are fresh again.
+        if published is None or ticked is None:
+            why = "the writer has not counted the host's result files yet"
+        elif not fresh:
+            why = (f"the writer's counters are older than {max_age} min (last tick "
+                   f"{hm_day(ticked, tz, snap.now)})")
+        elif covered is None:
+            why = "the writer's last tick did not count the events with results"
+        else:
+            why = (f"the writer's counts do not add up ({covered!r} with results of "
+                   f"{published!r} published)")
+        return exp("unknown", f"not judged: {why}, so it is not known which published "
+                              f"events lack results")
+
+    groups = by_event_number(events)
+    by_key = {g["key"]: g for g in groups}
+    numbered = [g for g in groups if not g["key"].startswith("row:")]
+    missing, unlisted, order_guess = [], 0, False
+    if counted:
+        k = max(0, int(published) - int(covered))
+        zero = [g for g in numbered if g["results"] == 0]
+        missing = zero[:k]
+        unlisted = k - len(missing)          # published, but no event row for it yet
+        # In number order, every event below one with results is published, so
+        # each of them without results is one the counts must include. More of
+        # them than that: the host did not publish in order (or never lists
+        # some events), so which numbers lack results is a guess. Shown, not paged.
+        top = max((g["event_number"] for g in numbered if g["results"] > 0), default=None)
+        order_guess = k > 0 and top is not None and sum(
+            1 for g in zero if g["event_number"] < top) > k
+    # Unlisted events carry no number. One that appeared with the latest rise
+    # of the published count is the newest publication (a sole publication
+    # with no row must not page as late); once the count grows past it, it
+    # has been superseded and is judged like any other event.
+    u_prev = recs.get("unlisted") or {}
+    prev_n = int(u_prev.get("n") or 0)
+    seen_pub = u_prev.get("seen_published")
+    # The host's list can lose a file for a run (7 Nov: it flickered): fewer
+    # unlisted events with a smaller published count is that, not a catch-up.
+    dipped = seen_pub is not None and published is not None and int(published) < int(seen_pub)
+    marker = u_prev.get("published")
+    if unlisted > prev_n:
+        marker = published
+    unlisted_newest = bool(unlisted) and marker is not None and int(published) <= int(marker)
+    # A clocked event missing from this read (no read error, the row is just
+    # not there) may be a partial read: keep its clock and do not judge until
+    # it has been missing for ABSENT_CONFIRM_MIN; then it is gone.
+    for key in [k for k in recs if k in by_key]:
+        recs[key].pop("absent_since", None)
+    absent = [k for k in recs if not k.startswith("unlisted") and k not in by_key]
+    if absent:
+        for key in absent:
+            recs[key].setdefault("absent_since", snap.now)
+        pending_gone = [k for k in absent
+                        if snap.now - float(recs[k]["absent_since"]) < ABSENT_CONFIRM_MIN * 60]
+        if pending_gone:
+            all_recs[eid] = recs
+            names = _events_txt([{"key": k, "event_number": k} for k in pending_gone])
+            return exp("unknown", f"not judged: {names}, with a running late clock, "
+                                  f"{'is' if len(pending_gone) == 1 else 'are'} not in this read "
+                                  f"of MeetTrack's events; kept for {ABSENT_CONFIRM_MIN} min "
+                                  f"before counted as gone")
+        for key in absent:
+            del recs[key]                # gone for good: retired, not progress
+    known = [g for g in numbered if g["results"] > 0] + missing
+    newest = None if unlisted_newest else (
+        max(known, key=lambda g: g["event_number"]) if known else None)
+    lacking = {g["key"]: g for g in missing}
+    for g in _thin(events, cfg):
+        lacking[g["key"]] = g
+    in_progress = lacking.pop(newest["key"], None) if newest else None
+    late_unlisted = unlisted - (1 if unlisted_newest else 0)
+
+    # Clocks: when each event started lacking while not the newest.
+    continuous = (mem.get("last_run") is not None
+                  and snap.now - float(mem["last_run"]) <= max_age * 60)
+    refined = snap.thin_refined.get(sid)
+
+    def thin_since(key):
+        # The newest result on the queried thin events bounds only those; any
+        # other falls back to the meet's last write (later, so conservative).
+        tw = snap.thin_last_write.get(sid)
+        if tw is not None and (refined is None or key in refined):
+            return tw
+        return last_write
+    moved = False
+    for key, g in lacking.items():
+        rec = recs.get(key)
+        if rec is None:
+            since = snap.now
+            if not continuous and g["results"] > 0 and thin_since(key) is not None:
+                # No memory of the last runs: a thin event has looked like this
+                # at least since its newest result (or the meet's last write).
+                since = min(since, thin_since(key))
+            recs[key] = {"since": since, "results": g["results"]}
+        elif g["results"] > int(rec.get("results") or 0):
+            moved = True
+            rec["results"] = g["results"]
+    for key in [k for k in recs if k not in lacking and not k.startswith("unlisted")]:
+        if in_progress is not None and key == in_progress["key"]:
+            continue                     # the newest again (the host's list flickered)
+        g = by_key.get(key)
+        if g is not None and g["results"] > int(recs[key].get("results") or 0):
+            moved = True                 # caught up
+        del recs[key]
+    # One clock per superseded unlisted publication, oldest first. Fewer of
+    # them: a catch-up retires the oldest; a dip in the list, the newest.
+    clocks = sorted(float(x) for x in u_prev.get("sinces") or [])[:MAX_UNLISTED_CLOCKS]
+    wanted = min(late_unlisted, MAX_UNLISTED_CLOCKS)
+    if wanted > len(clocks):
+        clocks += [snap.now] * (wanted - len(clocks))
+    elif wanted < len(clocks):
+        drop = len(clocks) - wanted
+        clocks = clocks[:-drop] if dipped else clocks[drop:]
+    if unlisted < prev_n and not dipped:
+        moved = True                     # an unlisted event got its row or its results
+    since_of = {k: float(recs[k]["since"]) for k in lacking}
+    if unlisted:
+        recs["unlisted"] = {"n": unlisted, "published": marker, "seen_published": published,
+                            "sinces": clocks, "results": 0}
+        for i, t in enumerate(clocks):
+            key = f"unlisted:{i}"
+            extra = late_unlisted - len(clocks) if i == len(clocks) - 1 else 0
+            lacking[key] = {"key": key, "event_number": None, "results": 0, "entries": 0,
+                            "count": 1 + extra}
+            since_of[key] = t
+    else:
+        recs.pop("unlisted", None)
+    if moved:
+        progress[eid] = snap.now
+    if recs:
+        all_recs[eid] = recs
+    else:
+        all_recs.pop(eid, None)
+    marks = [t for t in (progress.get(eid), last_write) if t is not None]
+    progress_at = max(marks) if marks else None
+
+    newest_txt = (f"event {newest['event_number']}, the newest, is in progress ({_so_far(in_progress)})"
+                  if in_progress is not None else
+                  "the newest publication, not in MeetTrack's event list yet, is in progress"
+                  if unlisted_newest else None)
+    if not lacking:
         if published is None and not events:
             note = "nothing published yet"
         elif published is None:
             note = "no per-event counters from this writer; every event with results looks complete"
+        elif newest_txt:
+            note = f"every one of the {published} published events but the newest is in MeetTrack"
         else:
             note = f"all {published} published events have results"
-        if not fresh and published is not None:
-            note += " (counters not fresh)"
-        return Expectation(eid, "results", label(row), expected, None, "met", "crit", note,
-                           sr_meet_id=sid, day=day)
+        if newest_txt:
+            note += f"; {newest_txt}"
+        return exp("met", note, newest=newest and newest["event_number"],
+                   progress_at=progress_at)
 
-    since = gaps.get(eid, snap.now)
-    if thin:
-        # The thin events have not gained a result since their newest one
-        # (snapshot), or at worst since the meet's last write: they have looked
-        # like this at least since then, memory or not.
-        lw = snap.thin_last_write.get(sid) or last_write
-        if lw is not None:
-            since = min(since, lw)
-    gaps[eid] = since
-    deadline = since + lag * 60
-    status = "missed" if snap.now >= deadline else "pending"
+    since_all = min(since_of.values())
+    late = [g for k, g in lacking.items() if snap.now - since_of[k] >= lag * 60]
+    waiting = [g for k, g in lacking.items() if snap.now - since_of[k] < lag * 60]
     parts = []
-    if published is not None and fresh:
-        parts.append(f"the host has published {published} events; {missing} of them {'has' if missing == 1 else 'have'} no "
-                     f"results in MeetTrack")
-    if thin:
-        res = sum(int(e.get("results") or 0) for e in thin)
-        ent = sum(int(e.get("entries") or 0) for e in thin)
-        nums = ", ".join(str(e.get("event_number")) for e in thin[:12])
-        parts.append(f"{len(thin)} more have far fewer results than swimmers on the start "
-                     f"list ({res} results for {ent} entries; events {nums})")
+    late_none = [g for g in late if g["results"] == 0]
+    late_thin = [g for g in late if g["results"] > 0]
+    if late_none:
+        n = _n(late_none)
+        head = f"the host has published {published} events; " if counted else ""
+        parts.append(f"{head}{n} of them {'has' if n == 1 else 'have'} no results in MeetTrack "
+                     f"after {lag}+ min ({_events_txt(late_none)})")
+    if late_thin:
+        res = sum(g["results"] for g in late_thin)
+        ent = sum(g["entries"] for g in late_thin)
+        one = len(late_thin) == 1
+        lead = "more" if late_none else f"published event{'' if one else 's'}"
+        parts.append(f"{len(late_thin)} {lead} {'has' if one else 'have'} far fewer results than "
+                     f"swimmers on the start list after {lag}+ min ({res} results for {ent} "
+                     f"entries; {_events_txt(late_thin)})")
+    if waiting:
+        one = _n(waiting) == 1
+        due = min(since_of[g["key"]] for g in waiting) + lag * 60
+        lead = "more" if late else f"published event{'' if one else 's'}"
+        parts.append(f"{_n(waiting)} {lead} {'is' if one else 'are'} short, not yet due "
+                     f"({_events_txt(waiting)}, due {hm(due, tz)})")
+    if newest_txt:
+        parts.append(newest_txt)
+    skipped = int(snap.thin_skipped.get(sid) or 0)
+    if skipped:
+        parts.append(f"{skipped} thin event{'' if skipped == 1 else 's'} "
+                     f"{'has' if skipped == 1 else 'have'} ids that cannot be queried safely; "
+                     f"{'its' if skipped == 1 else 'their'} clock uses the meet's last result time")
+    if order_guess:
+        parts.append("the event numbers are a guess: the host has not published in number "
+                     "order, so the counts do not say which events lack results")
     if errors:
         parts.append(f"the last writer tick reported {errors} error(s)")
-    parts.append(f"gap open since {hm_day(since, tz, snap.now)}; last result written "
-                 f"{hm_day(last_write, tz, snap.now)}")
-    return Expectation(eid, "results", label(row), expected, deadline, status, "crit",
-                       "; ".join(parts), sr_meet_id=sid, day=day,
-                       data={"missing": missing, "thin": [e.get("event_number") for e in thin],
-                             "published": published, "covered": covered})
+    parts.append(f"the oldest has been short since {hm_day(since_all, tz, snap.now)}; last "
+                 f"result written {hm_day(last_write, tz, snap.now)}")
+    return exp("missed" if late else "pending", "; ".join(parts), since_all + lag * 60,
+               missing=len(missing) + unlisted, thin=[g["event_number"] for g in _thin(events, cfg)],
+               late=[g["event_number"] if not g["key"].startswith("unlisted") else "unlisted"
+                     for g in late],
+               newest=newest and newest["event_number"], progress_at=progress_at,
+               order_guess=order_guess)
 
 
 def eval_schedule(row: dict, snap: Snapshot, cfg: dict, tz, day: str) -> Expectation | None:
@@ -603,12 +1003,13 @@ def eval_source(row: dict, snap: Snapshot, cfg: dict, tz, day: str) -> Expectati
     if covered is not None and covered < published:
         return None            # our side is behind: that is results:<id>
     quiet = minutes(snap.now, last_write)
-    if published >= len(events) or quiet < int(cfg["source_gap_min"]):
+    n_events = len(by_event_number(events))
+    if published >= n_events or quiet < int(cfg["source_gap_min"]):
         return None
     return Expectation(
         f"source:{sid}:{day}", "source", label(row), "the host keeps publishing during racing",
         None, "missed", "info",
-        f"the host has published {published} of {len(events)} start-list events and MeetTrack "
+        f"the host has published {published} of {n_events} start-list events and MeetTrack "
         f"holds all of them; nothing new for {quiet} min (lunch, end of a session, or the "
         f"organiser is behind)", sr_meet_id=sid, day=day)
 
@@ -685,8 +1086,17 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
         out.append(writer)
         if row.get("ingest_status") == "finished":
             continue
-        downstream = [eval_first_results(row, snap, cfg, tz, day, mem),
-                      eval_results(row, snap, cfg, tz, day, mem),
+        first = eval_first_results(row, snap, cfg, tz, day, mem)
+        results = eval_results(row, snap, cfg, tz, day, mem)
+        if first.status == "missed" and results.status == "missed":
+            # One root cause, one alert: results:* already names the published
+            # events MeetTrack lacks. An open first:* alert is closed once,
+            # "superseded" (the policy uses the evidence as the reason); if it
+            # was not open, nothing is sent. Its files_seen time is kept.
+            first.status = "closed"
+            first.evidence = (f"superseded by {results.id}, which names the published events "
+                              f"MeetTrack lacks")
+        downstream = [first, results,
                       eval_schedule(row, snap, cfg, tz, day),
                       eval_source(row, snap, cfg, tz, day)]
         errs = snap.read_errors.get(str(row.get("sr_meet_id")))
@@ -710,9 +1120,12 @@ def evaluate(snap: Snapshot, cfg: dict, memory: dict | None) -> tuple[list[Expec
     out.append(eval_reads(snap, cfg, mem, bad_ids))
 
     seen_ids = {e.id for e in out}
-    mem["gap_since"] = {k: v for k, v in (mem.get("gap_since") or {}).items() if k in seen_ids}
-    today_keys = {f"baseline:{e.sr_meet_id}:{e.day}" for e in out if e.kind == "first_results"}
-    for k in [k for k in mem if k.startswith("baseline:") and k not in today_keys]:
+    mem.pop("gap_since", None)           # the old one-clock-per-meet memory (before per-event rules)
+    for key in ("late_events", "results_progress"):
+        mem[key] = {k: v for k, v in (mem.get(key) or {}).items() if k in seen_ids}
+    today = {f"{e.sr_meet_id}:{e.day}" for e in out if e.kind == "first_results"}
+    for k in [k for k in mem if k.startswith(("baseline:", "files_seen:", "files_gone:"))
+              and k.split(":", 1)[1] not in today]:
         del mem[k]
     mem["last_live"] = live_names
     mem["last_run"] = snap.now

@@ -25,6 +25,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -202,6 +203,9 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
             m = by_lr.get(meets_id(sid))
             if not m:
                 continue                 # no meets row yet: nothing seeded, nothing written
+            if not _PLAIN_ID.fullmatch(str(m.get("id"))):
+                failed(sid, "meets", "meet id is not a plain id")   # it goes into filters
+                continue
             snap.meets[sid] = m
             evs, err = rest.get(f"events?select=id,event_number,session_number,day_time,relay_count,"
                                 f"results(count),heats(count)&meet_id=eq.{m['id']}&order=event_number",
@@ -215,13 +219,18 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
             if n is None:
                 failed(sid, "results today", err or "no count")
             snap.results_today[sid] = n or 0
-            thin = _thin(snap.events[sid], cfg)
-            if thin and all(e.get("id") for e in thin):
-                ids_in = ",".join(e["id"] for e in thin)
+            thin = _thin(snap.events[sid], cfg)        # one per event number
+            usable = [g for g in thin
+                      if g["ids"] and all(_PLAIN_ID.fullmatch(str(i)) for i in g["ids"])]
+            if len(usable) < len(thin):
+                snap.thin_skipped[sid] = len(thin) - len(usable)
+            if usable:
+                ids_in = ",".join(str(i) for g in usable for i in g["ids"])
                 newest, _ = rest.get(f"results?select=created_at&event_id=in.({ids_in})"
                                      f"&order=created_at.desc&limit=1", timeout=t_read)
                 if newest:               # optional refinement: a failure only costs precision
                     snap.thin_last_write[sid] = iso_epoch(newest[0].get("created_at"))
+                    snap.thin_refined[sid] = {g["key"] for g in usable}
         urls = {str(r.get("sr_meet_id")): r.get("meet_url") for r in rows if r.get("meet_url")}
         snap.processes = processes_by_meet(ps(), [sid for sid, _, _ in live], urls)
     cutoff = (today - timedelta(days=int(cfg["stale_active_days"]))).isoformat()
@@ -229,6 +238,12 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                         f"&end_date=lt.{cutoff}&order=end_date", timeout=run_cfg["read_timeout_s"])
     snap.stale_active = stale or []
     return snap
+
+
+# Meet and event ids go into PostgREST filters: plain ids only. Both columns
+# are text NOT NULL filled by splash_poller db.gen_id() (str(uuid.uuid4())):
+# this accepts every such id and none of the filter metacharacters (, . ( ) & = * : space).
+_PLAIN_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
 def _event(e: dict) -> dict:

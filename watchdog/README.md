@@ -106,11 +106,35 @@ automatically. The last accepted provider receipt is retained in
 `run-expect.sh` (cron, every 5 min) runs `expect_run.py`: it states what should
 have happened on each live Portugal meet (start list by T-24h, writer ticking,
 results flowing, every published event in MeetTrack within 20 min, the database
-answering) and alerts directly on Telegram when it did not, with reminders every
-30/60 min, a RESOLVED line, and a deterministic investigation written to
+answering) and alerts directly on Telegram when it did not, with hourly
+reminders, a RESOLVED line, and a deterministic investigation written to
 `logs/investigations/`. `./watchdog/run-expect.sh --dry-run` prints today's
-expectations read-only. Design, alert policy and how to add an expectation:
+expectations without sending or saving state, but its investigations still read
+the hosts' live pages. Design, alert policy and how to add an expectation:
 [`docs/meettrack-expectations.md`](../docs/meettrack-expectations.md).
+
+After the 7 Nov 2026 Leiria, Alapraia and Ponte da Barca alerts:
+
+- `results:*` judges each published event on its own. An event is late when it
+  has lacked most of its results for 20 min since a later event was published.
+  The newest published event is being swum, so it never counts. The alert
+  resolves when the late events catch up, not when the whole day is clean.
+- Its reminders wait while things move: no reminder while late events gain
+  results or the writer writes any result for the meet. Once nothing has moved
+  for an hour, it reminds every hour ("nothing new for 1h05").
+- Rows that share an event number count as one event (results added up, the
+  larger start list), for `results:*`, `schedule:*`, the source note and the
+  investigation's totals.
+- A PDF writer whose counters are missing or older than 30 min makes
+  `results:*` "not judged": never resolved, never paged until the counters are
+  fresh. The clocks keep their start times, so an event can be overdue at once
+  on recovery. A racing alert that is not judged at 22:00 closes
+  then, like a missed one.
+- `first:*` pages when the host lists result files and MeetTrack has none for
+  60 min. When the writer sees the host has published nothing, it never pages
+  without a known start time, and pages 180 min after a known start. Only when
+  the writer cannot see the host (no tick counters, no meet row, old counters)
+  does the old clock apply: 60 min after a known start, else 17:00.
 
 While it runs, this watchdog's own meet rules stand down (`defer_to_expect`);
 if it stops for 15 minutes they take over and `meets.expect-heartbeat` warns.

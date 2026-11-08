@@ -34,8 +34,8 @@ Each expectation has an id, a deadline, a status (`met`, `missed`, `pending`,
 | `db:reads` | every per-meet read succeeds, every registry id is a meet id | 2 runs with failed reads; a bad id at once | crit (warn for bad ids only), always |
 | `startlist:<id>` | a Portugal meet someone requested in the app has its start list (`entries_ingested_at`) | 24 h before racing starts; a late request gets 60 min | warn, always |
 | `writer:<id>:<day>` | the live writer runs and ticks (`coverage_at` under 30 min old; or the process exists, for writers that do not stamp ticks) | racing start + 30 min | crit, racing |
-| `first:<id>:<day>` | results start appearing today (results written today, or new result files on the host) | stated start + 60 min; else 17:00 Lisbon (morning grace) | warn, racing |
-| `results:<id>:<day>` | every event the host has published is in MeetTrack, with results for at least half the swimmers on its start list | 20 min after the gap was first seen | crit, racing |
+| `first:<id>:<day>` | results start appearing today (results written today) | the writer counts new result files on the host: 60 min after it first saw them. It counts none: never without a start time; 180 min after a known start. It cannot count them (no tick, no meet row, counters over 30 min old, a writer that does not count): known start + 60 min, else 17:00 Lisbon | warn, racing |
+| `results:<id>:<day>` | every event the host has published is in MeetTrack, with results for at least half the swimmers on its start list | per event: 20 min after it was first seen lacking while not the newest published event | crit, racing |
 | `schedule:<id>:<day>` | events past their scheduled slot (`events.day_time`) have results | slot + 45 min, 2 or more events late | warn, racing |
 | `source:<id>:<day>` | the host keeps publishing | note only | info |
 | `feed:<id>` | a meet racing today has a live results feed | note only | info |
@@ -54,11 +54,93 @@ Scope and data:
   expectations `unknown`, never "0 results"; `db:reads` alerts if it lasts.
 - While the database is down, every meet expectation is `unknown`. The
   database alert lists the meets that were live at the last good read.
-- Start times: `events.day_time` when the start list carries it, else a stated
-  time in `[[expect.start_times]]`, else the per-nation default. The default
-  is the morning grace: no results are expected before 17:00 when nothing says
-  when racing starts. A meet whose host has published result files but whose
-  results are missing is caught by `results:*` at any racing hour.
+- Start times: a stated time in `[[expect.start_times]]`, else the earliest
+  `events.day_time` when the start list carries it, else none.
+- `first:*` asks what the writer can see of the host (`events_published` with a
+  `coverage_at` at most 30 min old: "fresh"; one second older is stale). If the host lists new result files today and
+  MeetTrack has no result, that is a MeetTrack fault: missed 60 min after the
+  files were first seen (`files_seen:<id>:<day>` in memory). Which listed
+  files are new today (`baseline:<id>:<day>`): on a meet's first day, all of
+  them; on later days, all but those listed before racing starts (08:00, or an
+  earlier known start); after a cold start later in the day, all but those
+  whose events already have results. And with no result written today, a file
+  whose event already has results is never new today. So a restart, or a meet
+  that enters the registry mid-afternoon with files listed, still pages, and
+  day two never mistakes yesterday's files for today's.
+- The writer's counts must both be there and add up (`events_published` and
+  `events_with_results` counts, the second at most the first). If not (one of
+  them NULL, negative, more covered than published), `results:*` is
+  `unknown` and `first:*` treats the host as unseen; every clock, including
+  `files_seen`, is kept. If the host lists
+  none, the host has published nothing: not a MeetTrack fault, so no alert
+  without a start time, and a warning 180 min after a known one
+  (`first_results_host_quiet_min`). Only when the writer cannot see the host
+  does the clock decide: known start + 60 min, else 17:00 (the morning grace).
+  Example, 7 Nov 2026: Alapraia's writer counted 0 files, so 17:00 is no longer
+  an alert; Ponte da Barca had no meet row, its writer never ticked, so 17:00
+  still alerts (the host had 6 result PDFs). When `results:*` is missed for the
+  same meet, `first:*` stands down (one root cause, one alert): an open
+  `first:*` alert is CLOSED once, "superseded by results:*", and results:*
+  carries the incident to its own RESOLVED. It keeps the
+  time it first saw the files: if `results:*` goes quiet while MeetTrack still
+  has nothing, `first:*` is judged from that time, not from a fresh 60 min. The
+  time is cleared only when results arrive, or when the writer has counted no
+  new file for 10 min (two runs: one sample can be a flicker); a blind
+  interval (stale or missing counters) keeps it. A failed read for the meet
+  leaves `first:*` unknown and its baseline and files_seen untouched.
+- `results:*` judges each event number on its own. An event lacks results when
+  the host has published it and MeetTrack has none, or results for under half
+  its start list (thin; relays and start lists under 4 never are). Which events
+  the host has published with no results comes from the writer's counters:
+  `events_published - events_with_results` of them, the lowest event numbers
+  with no result (the host publishes in order). The newest published event is
+  being swum and never counts, however short. A published event with no
+  MeetTrack row at all ("not in MeetTrack's event list") has no number: one
+  that appeared with the latest rise of `events_published` is the newest, so a
+  sole publication without a row never pages from here (`first:*` covers it);
+  once the count grows past it, it is judged like any other, each on its own
+  clock. A dip in the count (the host's list loses a file for a run) retires
+  the newest such clock and is not progress; a catch-up retires the oldest.
+  At most 100 such clocks are kept (`MAX_UNLISTED_CLOCKS`); more share the
+  newest, so bad counters cannot grow the state file without bound. Any other lacking
+  event becomes late 20 min after it was first seen lacking while not the
+  newest (memory `late_events`); it leaves the late set when it catches up, and
+  the alert resolves when no event is late or short.
+- A writer that counts the host's files (`feed_type = pdf`, or any non-NULL
+  `events_published`) whose counters are missing, NULL or stale makes
+  `results:*` `unknown`: never `met` (a restart with no memory cannot prove
+  completeness) and never paged. Judgment pauses while it lasts, but each
+  clock keeps its start time: an event that was short before can be overdue
+  at once when the counters are fresh again. Writers that never count files (fragment,
+  Lenex) are judged on their event rows (thin events) only.
+- The order assumption: if a host publishes out of order, the inferred numbers
+  can be wrong for a while (event 4 taken for the empty event 5), but the count
+  of late events is right and the event being swum is still exempt; a host
+  that publishes an earlier event after a later one gets that event judged
+  like any superseded event. When the rows show it (more events without
+  results below one with results than the counts allow), the evidence says
+  "the event numbers are a guess" (`data.order_guess`); it never pages by itself.
+- A writer counts files when `feed_type` is `pdf` (case and spaces ignored) or
+  its `events_published` is not NULL.
+- Rows that share an event number are one event: results add up, the start
+  list is the larger row's, the slot is the earliest. A second, empty session
+  row under the same number (7 Nov 2026, Leiria events 2 and 16) is not an
+  event without results, for `results:*`, `schedule:*` and the source note.
+- Memory is per expectation id (meet and day) and is dropped as soon as that
+  id is no longer produced: a meet that leaves the registry, or yesterday.
+- A late clock whose event is missing from an otherwise good read of the
+  events (a partial read) is kept and `results:*` is `unknown` for that run;
+  after 15 min of absence (`ABSENT_CONFIRM_MIN`) the event counts as gone and
+  its clock is retired (not progress).
+- After a restart, a thin event's clock starts at its own newest result when
+  the snapshot could ask for it (`thin_refined`); one whose event ids cannot
+  go into a filter safely uses the meet's last result time instead (later,
+  so never an earlier page), and the evidence says how many were skipped.
+- Limit: the newest event is not paged while it is the newest, so a stuck
+  last event of a session is only judged once the next event is published
+  (on a multi-day meet, the next morning). The monitor cannot tell a host
+  that publishes an empty or partial result file from a parser that reads too
+  few rows: both look like an event short of results. Time is the only signal.
 - Start lists are only expected when someone asked for them
   (`entries_requested_at`), because `ingest_entries.py` is demand-triggered.
   `startlist_scope = "all"` expects one for every listed Portugal meet.
@@ -82,9 +164,19 @@ read. The 30-minute watchdog's full-table counts are now planner estimates
   reminders.
 - Reminders while the problem persists: crit every 60 min (was 30 until 2026-10-11), warn every 60 min,
   start lists every 6 h. A severity rise reminds at once.
+- `results:*` reminders are progress-aware (from the change after the 7 Nov
+  2026 alerts): no reminder
+  while a late event gains results or the writer writes any result for the
+  meet. Once nothing has moved for a full interval, it reminds as above and
+  says so ("nothing new for 1h05"). A progress time that is not a number, or
+  more than 5 min in the future (clock skew), is ignored, so it can never mute
+  reminders. On the 7 Nov Leiria data this is one NEW
+  (10:10), two reminders during the 13:52-16:10 stall with event 2 at 4 of 16,
+  and RESOLVED at 16:10, against one NEW and seven reminders before.
 - RESOLVED once, with how long it lasted, when the expectation is met again.
 - Racing-window expectations alert only 08:00-22:00 Lisbon. If one is still
-  open at 22:00, one CLOSED line says so and the reminders stop. If it is still
+  open at 22:00 (missed, or not judged or not due at that moment), one CLOSED
+  line says so and the reminders stop. If it is still
   wrong tomorrow, tomorrow's id alerts anew.
 - `always` expectations (database, start lists) alert at any hour.
 - An open alert whose expectation is no longer produced (meet finished, left
@@ -131,6 +223,11 @@ go into a URL, a query, a log path or a process match. A bad id is reported by
 
     ./watchdog/run-expect.sh --dry-run   # read-only, prints every expectation and the message it would send
     ./watchdog/run-expect.sh             # one real run
+
+The dry run sends nothing and saves no state, but it does run the
+investigation for every alert it would send, and that fetches the meet's live
+results page (swimrankings or the SPLASH host). For a check that must not
+touch the hosts, replay recorded data through the tests instead.
 
 Files: `watchdog/expect-state.json` (memory and open alerts),
 `watchdog/logs/expect-runs.log` (one JSON line per run),

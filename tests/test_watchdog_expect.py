@@ -84,8 +84,10 @@ def test_replay_silves_is_missed_results_and_benedita_is_clean():
     e = by_id(exps)
     silves = e["results:11113:2026-10-10"]
     assert silves.status == "missed" and silves.severity == "crit"
-    assert "6 of them have no results" in silves.evidence
-    assert "8 results for 142 entries" in silves.evidence
+    assert "8 results for 142 entries" in silves.evidence           # events 5-9, thin
+    # events 1-4 and 10 have no results; event 11 is the newest, still being swum
+    assert "events 1, 2, 3, 4, 10" in silves.evidence
+    assert "event 11, the newest, is in progress (no results yet)" in silves.evidence
     missed = [x for x in exps if x.status == "missed" and x.severity != "info"]
     assert [x.id for x in missed] == ["results:11113:2026-10-10"]
     assert all(x.status in ("met", "n/a") for x in exps if x.sr_meet_id == "10987")
@@ -105,7 +107,7 @@ def test_thin_events_count_from_their_own_newest_result():
     s.thin_last_write["11113"] = at("16:35")
     exps, _ = evaluate(s, CFG, {})
     e = by_id(exps)["results:11113:2026-10-10"]
-    assert e.status == "missed" and "gap open since 16:35" in e.evidence
+    assert e.status == "missed" and "short since 16:35" in e.evidence
 
 
 def test_snapshot_asks_for_the_newest_result_on_thin_events_only():
@@ -288,36 +290,59 @@ def test_a_meet_without_a_live_feed_is_a_note_not_a_page():
 
 # --- first results (morning grace) ------------------------------------------
 
-def test_morning_grace_without_a_start_time():
+def test_morning_grace_without_a_start_time_only_when_the_host_is_unseen():
+    # The writer counts the host's files and there are none (Alapraia, 7 Nov):
+    # the host has published nothing, so 17:00 passing is not a fault.
     row = reg(coverage_at=iso(at("12:00")))
     exps, mem = evaluate(snap(at("12:00"), [row]), CFG, {})
-    assert by_id(exps)["first:11113:2026-10-10"].status == "pending"   # afternoon meets
+    assert by_id(exps)["first:11113:2026-10-10"].status == "pending"
     exps, _ = evaluate(snap(at("17:01"), [reg(coverage_at=iso(at("17:00")))]), CFG, mem)
+    assert by_id(exps)["first:11113:2026-10-10"].status == "pending"
+    # The writer has not counted them (no tick yet): we cannot see the host, so
+    # the morning grace still decides (afternoon meets: results by 17:00).
+    blind = reg(events_published=None, events_with_results=None)
+    exps, mem = evaluate(snap(at("12:00"), [blind]), CFG, {})
+    assert by_id(exps)["first:11113:2026-10-10"].status == "pending"
+    exps, _ = evaluate(snap(at("17:01"), [blind]), CFG, mem)
     e = by_id(exps)["first:11113:2026-10-10"]
     assert e.status == "missed" and e.severity == "warn" and "0 results today" in e.evidence
 
 
 def test_a_stated_start_moves_the_deadline():
     cfg = make_config({"start_times": [{"sr_meet_id": "11113", "date": DAY, "start": "15:30"}]})
-    row = reg(coverage_at=iso(at("16:29")))
-    exps, mem = evaluate(snap(at("16:29"), [row]), cfg, {})
+    # writer blind to the host: start + 60 min, as before
+    blind = reg(events_published=None, events_with_results=None)
+    exps, mem = evaluate(snap(at("16:29"), [blind]), cfg, {})
     assert by_id(exps)["first:11113:2026-10-10"].status == "pending"
-    exps, _ = evaluate(snap(at("16:31"), [reg(coverage_at=iso(at("16:31")))]), cfg, mem)
+    exps, _ = evaluate(snap(at("16:31"), [blind]), cfg, mem)
     e = by_id(exps)["first:11113:2026-10-10"]
     assert e.status == "missed" and "racing started about 61 min ago" in e.evidence
+    # the writer sees a host with no files: only long after the start (180 min)
+    exps, mem = evaluate(snap(at("16:31"), [reg(coverage_at=iso(at("16:31")))]), cfg, {})
+    assert by_id(exps)["first:11113:2026-10-10"].status == "pending"
+    exps, _ = evaluate(snap(at("18:30"), [reg(coverage_at=iso(at("18:30")))]), cfg, mem)
+    e = by_id(exps)["first:11113:2026-10-10"]
+    assert e.status == "missed" and "no result files 180 min after the stated start time" in e.evidence
 
 
-def test_first_results_met_by_todays_results_or_new_publications():
+def test_first_results_met_by_todays_results_and_day_two_counts_only_new_files():
     row = reg(coverage_at=iso(at("17:30")))
     exps, _ = evaluate(snap(at("17:30"), [row], today={"11113": 3}), CFG, {})
     assert by_id(exps)["first:11113:2026-10-10"].status == "met"
     # day two: yesterday's 10 published files are the baseline, not today's news
+    events = {"11113": [ev(n, 10, 10) for n in range(1, 11)] + [ev(11, 10, 0)]}
     row = reg(events_published=10, events_with_results=10, coverage_at=iso(at("08:00", NEXT)))
-    exps, mem = evaluate(snap(at("08:00", NEXT), [row]), CFG, {})
+    exps, mem = evaluate(snap(at("08:00", NEXT), [row], events=events), CFG, {})
     assert mem["baseline:11113:2026-10-11"] == 10
-    row["events_published"] = 11
-    exps, _ = evaluate(snap(at("17:30", NEXT), [row]), CFG, mem)
-    assert by_id(exps)["first:11113:2026-10-11"].status == "met"
+    assert by_id(exps)["first:11113:2026-10-11"].status == "pending"
+    # one new file today and still nothing in MeetTrack: due 60 min after it appeared
+    row.update(events_published=11, coverage_at=iso(at("12:00", NEXT)))
+    exps, mem = evaluate(snap(at("12:00", NEXT), [row], events=events), CFG, mem)
+    e = by_id(exps)["first:11113:2026-10-11"]
+    assert e.status == "pending" and "(1 new today)" in e.evidence
+    row["coverage_at"] = iso(at("13:00", NEXT))
+    exps, _ = evaluate(snap(at("13:00", NEXT), [row], events=events), CFG, mem)
+    assert by_id(exps)["first:11113:2026-10-11"].status == "missed"
 
 
 # --- results complete -------------------------------------------------------
@@ -326,26 +351,31 @@ def test_published_without_results_waits_the_lag_then_misses():
     t = at("15:00")
     row = reg(events_published=4, events_with_results=3, coverage_at=iso(t - 30),
               last_ingest_at=iso(t - 120))
-    exps, mem = evaluate(snap(t, [row]), CFG, {})
-    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"
-    row["coverage_at"] = iso(t + 19 * 60)
-    exps, mem = evaluate(snap(t + 19 * 60, [row]), CFG, mem)
-    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"
-    row["coverage_at"] = iso(t + 20 * 60)
-    exps, mem = evaluate(snap(t + 20 * 60, [row]), CFG, mem)
-    e = by_id(exps)["results:11113:2026-10-10"]
+    # event 2 is published without results; event 4, the newest, has its results
+    events = {"11113": [ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 10)]}
+
+    def run(minutes, mem):
+        row["coverage_at"] = iso(t + minutes * 60 - 30)
+        exps, mem = evaluate(snap(t + minutes * 60, [row], events=events), CFG, mem)
+        return by_id(exps)["results:11113:2026-10-10"], mem
+    e, mem = run(0, {})
+    assert e.status == "pending"
+    e, mem = run(19, mem)
+    assert e.status == "pending"
+    e, mem = run(20, mem)
     assert e.status == "missed" and "1 of them has no results" in e.evidence
-    row.update(events_with_results=4, coverage_at=iso(t + 25 * 60))
-    exps, mem = evaluate(snap(t + 25 * 60, [row]), CFG, mem)
-    assert by_id(exps)["results:11113:2026-10-10"].status == "met"
-    assert "results:11113:2026-10-10" not in mem["gap_since"]
+    row["events_with_results"] = 4
+    e, mem = run(25, mem)
+    assert e.status == "met"
+    assert "results:11113:2026-10-10" not in mem["late_events"]
 
 
 def test_stale_counters_do_not_count_as_missing():
+    # ...nor as complete: not judged (council round 1, 2026-11-07)
     t = at("15:00")
     row = reg(events_published=4, events_with_results=1, coverage_at=iso(t - 45 * 60))
     exps, _ = evaluate(snap(t, [row]), CFG, {})
-    assert by_id(exps)["results:11113:2026-10-10"].status == "met"
+    assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
 
 
 def test_relays_and_unseeded_events_are_never_thin():
@@ -384,9 +414,10 @@ def test_a_quiet_host_is_a_note_only():
 # --- alert policy -----------------------------------------------------------
 
 def _missed_results(now):
+    # event 1 is thin and no longer the newest (event 2 is complete)
     row = reg(last_ingest_at=iso(now - 3600), events_published=5, events_with_results=5,
               coverage_at=iso(now - 30))
-    return evaluate(snap(now, [row], events={"11113": [ev(1, 20, 1)]}), CFG, {})[0]
+    return evaluate(snap(now, [row], events={"11113": [ev(1, 20, 1), ev(2, 20, 20)]}), CFG, {})[0]
 
 
 def test_new_then_reminder_every_30_minutes_then_resolved_once():
@@ -666,8 +697,8 @@ def test_a_stopped_writer_is_one_alert_not_three():
     now = at("17:45")
     row = reg(last_ingest_at=iso(now - 3600), events_published=5, events_with_results=3,
               coverage_at=iso(now - 40 * 60))
-    exps, _ = evaluate(snap(now, [row], events={"11113": [ev(1, 20, 1)]}, procs={"11113": []}),
-                       CFG, {})
+    exps, _ = evaluate(snap(now, [row], events={"11113": [ev(1, 20, 1), ev(2, 20, 20)]},
+                            procs={"11113": []}), CFG, {})
     e = by_id(exps)
     assert e["writer:11113:2026-10-10"].status == "missed"
     assert e["results:11113:2026-10-10"].status == "unknown"
@@ -1004,3 +1035,990 @@ def test_the_page_probe_does_not_follow_redirects(monkeypatch):
 def test_splash_key_for_matches_splash_poller(url, key):
     from watchdog.expectations import splash_key_for
     assert splash_key_for(url) == key
+
+
+# --- the 7 Nov 2026 replay: alerts that mean something is wrong ----------------
+#
+# Leiria (sr-11115) opened "results" at 10:00 and reminded 7 times while the writer
+# was healthy: gap_since stayed at 09:36 because some event, often the newest one
+# still being swum, was always a little behind. Events 2 and 16 also had a second,
+# empty session row under the same number. Alapraia (sr-11531) paged at 17:00
+# although its host had published nothing; Ponte da Barca (sr-11334) paged at 17:00
+# and was a real failure (no meet row, so the writer could write nothing).
+
+from watchdog.expectations import in_racing_window
+
+D7, D8 = "2026-11-07", "2026-11-08"
+LIVE_POLICY = {"repeat_crit_min": 60, "repeat_warn_min": 60, "repeat_startlist_min": 360}
+
+# start-list entries per event number (the larger row where a number has two)
+LEIRIA_ENTRIES = {1: 19, 2: 16, 3: 14, 4: 8, 5: 20, 6: 3, 7: 4, 8: 12, 9: 0, 10: 3, 11: 22,
+                  12: 0, 13: 25, 14: 45, 15: 24, 16: 16, 17: 17, 18: 16, 19: 8, 20: 8,
+                  21: 12, 22: 4, 23: 14, 24: 3, 25: 0, 26: 3, 27: 10, 28: 11, 29: 35,
+                  30: 39, 31: 14, 32: 16}
+LEIRIA_RELAYS = {1, 17}
+LEIRIA_SHARED = {2: 8, 16: 8, 18: 8, 32: 8}      # the second, empty session row
+
+# What the poller log (splash_poller logs/poller-11115.log) shows on 7 Nov: when
+# each ResultList first appeared, and every result write (event, total after it).
+# The host published most files empty and filled them later; event 2 stayed at
+# 4 rows until 16:10 and event 16 (the newest) at 5 until 17:26. 494 written by 16:10.
+LEIRIA_PUBLISHED = {1: "09:34", 2: "09:36", 3: "09:47", 4: "09:56", 5: "10:08", 6: "10:20",
+                    7: "10:26", 8: "10:38", 9: "10:44", 10: "10:47", 11: "11:00", 12: "11:08",
+                    13: "11:12", 14: "11:19", 15: "11:26", 16: "11:29"}
+LEIRIA_WRITES = [("09:34", 1, 20), ("09:36", 2, 4), ("10:20", 6, 1), ("10:38", 8, 1),
+                 ("10:44", 9, 15), ("11:00", 11, 1), ("11:08", 12, 18), ("11:29", 16, 5),
+                 ("11:46", 3, 32), ("11:48", 4, 32), ("12:03", 5, 43), ("12:03", 6, 25),
+                 ("12:03", 7, 27), ("12:14", 8, 35), ("12:15", 10, 27), ("12:39", 11, 41),
+                 ("12:47", 13, 46), ("13:10", 14, 68), ("13:20", 15, 44), ("13:52", 11, 43),
+                 ("16:10", 2, 14), ("17:26", 16, 16)]
+
+
+def hhmm(epoch):
+    return datetime.fromtimestamp(epoch, tz=LIS).strftime("%H:%M")
+
+
+def leiria_snapshot(now, published_at, writes, day_times=None, shared_slot=f"{D7}T15:15:00"):
+    res, last = {}, None
+    for when, n, total in writes:
+        t = at(when, D7)
+        if t <= now:
+            res[n] = total
+            last = t if last is None else max(last, t)
+    pub = [n for n, when in published_at.items() if at(when, D7) <= now]
+    events = []
+    for n, ent in LEIRIA_ENTRIES.items():
+        events.append(ev(n, ent, res.get(n, 0), relay=4 if n in LEIRIA_RELAYS else 1,
+                         day_time=(day_times or {}).get(n)))
+        if n in LEIRIA_SHARED:
+            # 7 Nov: the empty rows of events 2 and 16 sat in the afternoon session
+            # ("events 2, 16 ... first was due at 16:00"); 18 and 32 race on day two.
+            slot = shared_slot if day_times and n in (2, 16) else None
+            events.append(ev(n, LEIRIA_SHARED[n], 0, day_time=slot))
+    row = reg("11115", "Leiria", start_date=D7, end_date=D8, events_published=len(pub),
+              events_with_results=sum(1 for n in pub if res.get(n, 0) > 0),
+              coverage_at=iso(now - 30), last_ingest_at=iso(last) if last else None)
+    return snap(now, [row], events={"11115": events}, today={"11115": sum(res.values())})
+
+
+def run_day(make, start, end, day=D7, policy=LIVE_POLICY, cfg=CFG, step=300):
+    """Every 5-minute run of the monitor over a day: (HH:MM, kind, id) per notice."""
+    mem, state, sent = {}, {}, []
+    t = at(start, day)
+    while t <= at(end, day):
+        exps, mem = evaluate(make(t), cfg, mem)
+        notices, state = plan(exps, state, t, policy, in_racing_window(t, cfg))
+        sent += [(hhmm(t), n.kind, n.id, n.reason) for n in notices]
+        t += step
+    return sent, mem, state
+
+
+def flowing_day(stuck=()):
+    """A healthy Leiria-shaped morning: event k is published 7 min after event k-1
+    with a few results, and is complete 10 min after the next one appears. The
+    newest, event 16, then sits at 5 of 16 until 17:26. `stuck` events never get
+    a result (a parser that reads nothing from their file)."""
+    published = {k: hhmm(at("09:30", D7) + 7 * 60 * (k - 1)) for k in range(1, 17)}
+    writes = []
+    for k in range(1, 16):
+        if k in stuck:
+            continue
+        ent = max(LEIRIA_ENTRIES[k], 10)
+        writes.append((published[k], k, max(1, ent // 4)))
+        writes.append((hhmm(at(published[k + 1], D7) + 600), k, ent))
+    writes += [(published[16], 16, 5), ("17:26", 16, 16)]
+    writes.sort(key=lambda w: w[0])
+    slots = {k: f"{D7}T{published[k]}:00" for k in published}
+    return published, writes, slots
+
+
+def test_leiria_healthy_flow_with_a_lagging_newest_event_sends_nothing():
+    published, writes, slots = flowing_day()
+    sent, _, _ = run_day(lambda t: leiria_snapshot(t, published, writes, slots), "09:00", "18:00")
+    assert [s for s in sent if s[2].startswith(("results:", "schedule:"))] == []
+
+
+def test_leiria_newest_event_in_progress_is_shown_not_paged():
+    published, writes, slots = flowing_day()
+    now = at("16:25", D7)
+    exps, _ = evaluate(leiria_snapshot(now, published, writes, slots), CFG,
+                       {"last_run": now - 300})
+    e = by_id(exps)[f"results:11115:{D7}"]
+    assert e.status == "met"
+    assert "event 16, the newest, is in progress (5 of 16)" in e.evidence
+
+
+def test_leiria_replay_alerts_once_and_reminds_only_when_nothing_moves():
+    sent, mem, state = run_day(
+        lambda t: leiria_snapshot(t, LEIRIA_PUBLISHED, LEIRIA_WRITES), "09:00", "18:00")
+    results = [s[:3] for s in sent if s[2] == f"results:11115:{D7}"]
+    # Event 2 (4 of 16 since 09:36, superseded at 09:47) is late from 10:07. While
+    # results keep arriving (until 13:52) nothing repeats. From 13:52 to 16:10
+    # nothing is written at all and event 2 does not move: that is stuck.
+    assert results == [("10:10", "new", f"results:11115:{D7}"),
+                       ("14:55", "reminder", f"results:11115:{D7}"),
+                       ("15:55", "reminder", f"results:11115:{D7}"),
+                       ("16:10", "resolved", f"results:11115:{D7}")]
+    reasons = [s[3] for s in sent if s[1] == "reminder"]
+    assert all(r.startswith("nothing new for") for r in reasons)
+    assert state["open"] == {}
+
+
+def test_leiria_replay_evidence_names_the_late_events_not_a_morning_gap():
+    now = at("10:10", D7)
+    s = leiria_snapshot(now, LEIRIA_PUBLISHED, LEIRIA_WRITES)
+    mem = {"last_run": now - 300,
+           "late_events": {f"results:11115:{D7}": {"2": {"since": at("09:50", D7), "results": 4},
+                                                  "3": {"since": at("10:00", D7), "results": 0},
+                                                  "4": {"since": at("10:10", D7), "results": 0}}}}
+    exps, mem = evaluate(s, CFG, mem)
+    e = by_id(exps)[f"results:11115:{D7}"]
+    assert e.status == "missed"
+    assert "event 2" in e.evidence and "4 results for 16 entries" in e.evidence
+    assert "event 5, the newest, is in progress (no results yet)" in e.evidence
+    assert "short since 09:50" in e.evidence
+
+
+def test_a_truly_stuck_event_alerts_and_reminds_once_the_meet_stops_moving():
+    published, writes, slots = flowing_day(stuck={3})
+    sent, _, state = run_day(lambda t: leiria_snapshot(t, published, writes), "09:00", "15:00")
+    results = [s[:2] for s in sent if s[2] == f"results:11115:{D7}"]
+    # event 3 is superseded at 09:51: late at 10:11, paged at the 10:15 run.
+    assert results[0] == ("10:15", "new")
+    # results keep arriving until 11:25: no reminder until an hour after that
+    reminders = [t for t, kind in results if kind == "reminder"]
+    assert reminders and reminders[0] == "12:25"
+    assert reminders == ["12:25", "13:25", "14:25"]
+    assert f"results:11115:{D7}" in state["open"]
+
+
+def test_a_meet_that_is_stuck_everywhere_reminds_every_hour():
+    now = at("12:00", D7)
+    rows = [reg("11115", "Leiria", start_date=D7, end_date=D8, events_published=6,
+                events_with_results=2, coverage_at=iso(now - 30),
+                last_ingest_at=iso(at("09:40", D7)))]
+    events = [ev(1, 20, 20), ev(2, 20, 20), ev(3, 20, 0), ev(4, 20, 0), ev(5, 20, 0), ev(6, 20, 0)]
+
+    def make(t):
+        rows[0]["coverage_at"] = iso(t - 30)
+        return snap(t, rows, events={"11115": events}, today={"11115": 40})
+    sent, _, _ = run_day(make, "10:00", "13:05")
+    kinds = [(s[0], s[1]) for s in sent if s[2] == f"results:11115:{D7}"]
+    assert kinds == [("10:20", "new"), ("11:20", "reminder"), ("12:20", "reminder")]
+
+
+def test_event_rows_sharing_a_number_are_one_event():
+    # 17:45 on 7 Nov: events 2 and 16 each have a second, empty session row.
+    now = at("17:45", D7)
+    published, writes, slots = flowing_day()
+    s = leiria_snapshot(now, published, writes, slots)
+    exps, _ = evaluate(s, CFG, {"last_run": now - 300})
+    e = by_id(exps)
+    assert e[f"schedule:11115:{D7}"].status == "met"
+    assert e[f"results:11115:{D7}"].status == "met"
+    from watchdog.expectations import by_event_number
+    groups = {g["event_number"]: g for g in by_event_number(s.events["11115"])}
+    assert groups[2]["results"] == 16 and groups[2]["entries"] == 16 and groups[2]["rows"] == 2
+
+
+def alapraia(now, **kw):
+    row = reg("11531", "Alapraia", start_date=D7, end_date=D7, events_published=0,
+              events_with_results=0, coverage_at=iso(now - 30), last_ingest_at=None)
+    row.update(kw)
+    events = [ev(n, ent, 0, relay=4) for n, ent in enumerate([7, 10, 8, 10, 1, 8], start=1)]
+    return snap(now, [row], events={"11531": events})
+
+
+def test_alapraia_host_with_nothing_published_and_no_start_time_is_not_an_alert():
+    sent, _, _ = run_day(alapraia, "08:00", "21:55")
+    assert sent == []
+    exps, _ = evaluate(alapraia(at("17:05", D7)), CFG, {})
+    e = by_id(exps)[f"first:11531:{D7}"]
+    assert e.status == "pending" and "the host has published no results yet" in e.evidence
+
+
+def test_a_silent_host_after_a_known_start_alerts_only_long_after_it():
+    # Abrantes (sr-11511): the start list says 09:00, the host published its
+    # first result about 11:10. That is the host, not MeetTrack: no page at 10:00.
+    def make(t):
+        s = alapraia(t)
+        for e in s.events["11531"]:
+            e["day_time"] = f"{D7}T09:00:00"
+        return s
+    exps, mem = evaluate(make(at("10:05", D7)), CFG, {})
+    assert by_id(exps)[f"first:11531:{D7}"].status == "pending"
+    exps, _ = evaluate(make(at("12:00", D7)), CFG, mem)
+    e = by_id(exps)[f"first:11531:{D7}"]
+    assert e.status == "missed" and "no result files 180 min after" in e.evidence
+
+
+def ponte_da_barca(now):
+    # The writer runs, but there is no meets row: it cannot tick, so it never
+    # counts the host's files (counters NULL) and writes nothing.
+    row = reg("11334", "Ponte da Barca", start_date=D7, end_date=D7, events_published=None,
+              events_with_results=None, coverage_at=None, last_ingest_at=None)
+    return snap(now, [row], procs={"11334": ["2727722 20:00 track_pdf_meet.py --meet-url "
+                                             "https://live.swimrankings.net/11334/ --live"]})
+
+
+def test_ponte_da_barca_unmeasured_host_and_no_results_still_alerts():
+    sent, _, _ = run_day(ponte_da_barca, "16:40", "17:10")
+    assert [s[:3] for s in sent] == [("17:00", "new", f"first:11334:{D7}")]
+    exps, _ = evaluate(ponte_da_barca(at("17:00", D7)), CFG, {})
+    e = by_id(exps)[f"first:11334:{D7}"]
+    assert "has not reported the host's result list" in e.evidence
+    assert "MeetTrack holds no events for this meet" in e.evidence
+
+
+def test_first_results_fire_when_the_host_lists_files_and_meettrack_has_none():
+    # The host lists one result file; the writer counts it, but nothing reaches
+    # MeetTrack. Only one file, so it is the newest and results:* waits on it.
+    def make(t):
+        return alapraia(t, events_published=1 if t >= at("15:00", D7) else 0)
+    sent, _, _ = run_day(make, "14:00", "16:30")
+    assert [s[:3] for s in sent] == [("16:00", "new", f"first:11531:{D7}")]
+    exps, _ = evaluate(make(at("16:00", D7)), CFG, {"files_seen:11531:" + D7: at("15:00", D7),
+                                                    "baseline:11531:" + D7: 0})
+    e = by_id(exps)[f"first:11531:{D7}"]
+    assert "the host lists 1 result file" in e.evidence and "first seen 15:00" in e.evidence
+
+
+def test_reminders_wait_while_the_problem_is_moving():
+    from watchdog.expectations import Expectation
+    t = at("12:00", D7)
+
+    def exp(progress_at):
+        return Expectation("results:1:d", "results", "M", "e", None, "missed", "crit", "x",
+                           data={"progress_at": progress_at})
+    _, s = plan([exp(t - 600)], {}, t, LIVE_POLICY, True)
+    notices, s = plan([exp(t + 3000)], s, t + 3600, LIVE_POLICY, True)
+    assert notices == []                               # results arrived 10 min ago
+    notices, s = plan([exp(t + 3000)], s, t + 3000 + 3600, LIVE_POLICY, True)
+    assert [n.kind for n in notices] == ["reminder"]
+    assert notices[0].reason == "nothing new for 1h00"
+    assert "nothing new for 1h00" in render(notices, t + 6600)
+
+
+def test_investigation_counts_event_numbers_not_rows():
+    now = at("17:45", D7)
+    s = leiria_snapshot(now, LEIRIA_PUBLISHED, LEIRIA_WRITES)
+    from watchdog.expectations import Expectation
+    e = Expectation(f"results:11115:{D7}", "results", "Leiria (sr-11115)", "e", None, "missed",
+                    "crit", "x", sr_meet_id="11115", day=D7)
+    out = inv.investigate(e, s, fake_probes(fetch_page=lambda sid: ""))
+    assert out["facts"]["events_with_results"] == 16          # not 16 + empty session rows
+    table = dict(out["sections"])["MeetTrack per-event counts"]
+    assert table[-1] == "(rows that share a number are judged as one event: 2, 16, 18, 32)"
+
+
+def test_stale_counters_never_resolve_events_that_had_no_results():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    events = {"11113": [ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 0)]}
+    exps, mem = evaluate(snap(t, [row], events=events), CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"     # event 2 is short
+    row["coverage_at"] = iso(t - 45 * 60)                                  # writer stops counting
+    exps, mem = evaluate(snap(t + 300, [row], events=events), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "unknown" and "counters are older than 30 min" in e.evidence
+    assert "2" in mem["late_events"]["results:11113:2026-10-10"]           # its clock is kept
+
+
+# --- council round 1 (2026-11-07): stale state, restarts, unlisted events ------
+
+def _stale_row(now, **kw):
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(now - 45 * 60),
+              last_ingest_at=iso(now - 50 * 60))
+    row.update(kw)
+    return row
+
+
+FOUR = {"11113": [ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 0)]}
+
+
+def test_stale_counters_on_a_cold_start_are_unknown_never_met():
+    # After a restart (no late_events memory) the old counters cannot show
+    # which published events lack results: never "met" on them.
+    now = at("15:00")
+    exps, mem = evaluate(snap(now, [_stale_row(now)], events=FOUR), CFG, {})
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "unknown" and "older than 30 min" in e.evidence
+    # ...so an alert left open before the restart is neither resolved nor reminded
+    state = {"open": {"results:11113:2026-10-10": {"kind": "results", "severity": "crit",
+                                                    "first_missed": now - 3600,
+                                                    "last_sent": now - 7200, "sends": 2}}}
+    notices, state = plan(exps, state, now, POLICY, True)
+    assert not [n for n in notices if n.id.startswith("results:")]
+    assert "results:11113:2026-10-10" in state["open"]
+
+
+def test_a_pdf_writer_that_has_not_counted_yet_is_unknown_for_results():
+    now = at("15:00")
+    row = reg(events_published=None, events_with_results=None, coverage_at=None)
+    exps, _ = evaluate(snap(now, [row], events=FOUR), CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    # a writer that never counts files (fragment, Lenex) is judged on its rows
+    row = reg(feed_type="fragment", events_published=None, events_with_results=None,
+              coverage_at=iso(now - 30))
+    exps, _ = evaluate(snap(now, [row], events=FOUR), CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "met"
+
+
+def test_stale_to_fresh_recovery_resumes_the_frozen_clocks():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    exps, mem = evaluate(snap(t, [row], events=FOUR), CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"     # event 2 since 15:00
+    row["coverage_at"] = iso(t - 31 * 60)                                  # stale for 25 min
+    for step in range(1, 6):
+        exps, mem = evaluate(snap(t + step * 300, [row], events=FOUR), CFG, mem)
+        assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    row["coverage_at"] = iso(t + 1795)                                     # fresh again
+    exps, mem = evaluate(snap(t + 1800, [row], events=FOUR), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed" and "short since 15:00" in e.evidence      # clock kept
+
+
+def test_counters_exactly_thirty_minutes_old_are_still_fresh():
+    now = at("15:00")
+    exps, _ = evaluate(snap(now, [_stale_row(now, coverage_at=iso(now - 1800))], events=FOUR),
+                       CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"
+    exps, _ = evaluate(snap(now, [_stale_row(now, coverage_at=iso(now - 1801))], events=FOUR),
+                       CFG, {})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+
+
+def test_an_open_racing_alert_that_is_not_judged_closes_at_the_end_of_racing():
+    # Stale counters freeze the clock (unknown). At 22:00 the alert closes like
+    # a missed one; it does not linger until the id changes at midnight.
+    t = at("21:30")
+    _, s = plan(_missed_results(t), {}, t, POLICY, True)
+    row = _stale_row(at("21:55"))
+    exps, _ = evaluate(snap(at("21:55"), [row], events=FOUR), CFG, {"last_run": at("21:50")})
+    assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    notices, s = plan(exps, s, at("21:55"), POLICY, True)
+    assert not [n for n in notices if n.id.startswith("results:")]   # (the writer pages)
+    notices, s = plan(exps, s, at("22:00"), POLICY, racing_now=False)
+    closed = [n for n in notices if n.id.startswith("results:")]
+    assert [(n.kind, n.id) for n in closed] == [("closed", "results:11113:2026-10-10")]
+    assert "racing hours are over; not judged at close" in closed[0].reason
+    assert s["open"] == {}
+
+
+def test_a_sole_publication_missing_from_meettracks_event_list_is_the_newest():
+    # The host lists 1 file, MeetTrack has no row for it: it is the newest
+    # publication (being swum), so results:* waits; first:* covers it.
+    t = at("15:00")
+    row = reg(events_published=1, events_with_results=0, coverage_at=iso(t - 30))
+    mem = {}
+    for step in range(0, 13):                              # an hour
+        now = t + step * 300
+        row["coverage_at"] = iso(now - 30)
+        exps, mem = evaluate(snap(now, [row]), CFG, mem)
+        e = by_id(exps)["results:11113:2026-10-10"]
+        assert e.status == "met", (step, e.evidence)
+    assert "the newest" in e.evidence and "not in MeetTrack's event list" in e.evidence
+
+
+def test_a_second_unlisted_publication_makes_the_first_one_late():
+    t = at("15:00")
+    row = reg(events_published=1, events_with_results=0, coverage_at=iso(t - 30))
+    exps, mem = evaluate(snap(t, [row]), CFG, {})
+    row.update(events_published=2, coverage_at=iso(t + 270))
+    exps, mem = evaluate(snap(t + 300, [row]), CFG, mem)
+    assert by_id(exps)["results:11113:2026-10-10"].status == "pending"
+    row["coverage_at"] = iso(t + 1470)
+    exps, mem = evaluate(snap(t + 1500, [row]), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed" and "1 not in MeetTrack's event list" in e.evidence
+
+
+def test_unlisted_clock_is_frozen_while_counters_are_stale_and_ends_when_they_clear():
+    t = at("15:00")
+    row = reg(events_published=2, events_with_results=0, coverage_at=iso(t - 30))
+    exps, mem = evaluate(snap(t, [row]), CFG, {})
+    row["coverage_at"] = iso(t - 40 * 60)                       # writer stops counting
+    exps, mem = evaluate(snap(t + 300, [row]), CFG, mem)
+    assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    # the writer comes back and the events now have rows with results
+    row.update(events_with_results=2, coverage_at=iso(t + 570))
+    exps, mem = evaluate(snap(t + 600, [row], events={"11113": [ev(1, 10, 10), ev(2, 10, 9)]}),
+                         CFG, mem)
+    assert by_id(exps)["results:11113:2026-10-10"].status == "met"
+    assert "results:11113:2026-10-10" not in mem["late_events"]
+
+
+def test_investigation_entries_total_counts_each_event_number_once():
+    now = at("17:45", D7)
+    s = leiria_snapshot(now, LEIRIA_PUBLISHED, LEIRIA_WRITES)
+    from watchdog.expectations import Expectation
+    e = Expectation(f"results:11115:{D7}", "results", "Leiria (sr-11115)", "e", None, "missed",
+                    "crit", "x", sr_meet_id="11115", day=D7)
+    facts = inv.investigate(e, s, fake_probes(fetch_page=lambda sid: ""))["facts"]
+    assert facts["entries_total"] == sum(LEIRIA_ENTRIES.values())            # not + 4 x 8
+    assert facts["results_total"] == 505
+
+
+def test_files_seen_is_kept_while_first_stands_down_and_cleared_by_results():
+    # Two files, nothing in MeetTrack: results:* pages (event 1 is not the
+    # newest) and first:* stands down, keeping the time the files were seen.
+    t0 = at("15:00")
+    events = {"11113": [ev(1, 10, 0), ev(2, 10, 0), ev(3, 10, 0)]}
+    row = reg(events_published=2, events_with_results=0, coverage_at=iso(t0 - 30))
+    mem = {"baseline:11113:2026-10-10": 0}         # watched since midnight: both files are new
+    for step in range(0, 14):
+        now = t0 + step * 300
+        row["coverage_at"] = iso(now - 30)
+        exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+    e = by_id(exps)
+    assert e["results:11113:2026-10-10"].status == "missed"
+    assert e["first:11113:2026-10-10"].status == "closed"           # superseded by results:*
+    assert "superseded by results:11113" in e["first:11113:2026-10-10"].evidence
+    assert mem["files_seen:11113:2026-10-10"] == t0
+    # The host withdraws one file: results:* is quiet again, MeetTrack still has
+    # nothing. first:* pages at once: the files were seen 70 min ago, not now.
+    now = t0 + 70 * 60
+    row.update(events_published=1, coverage_at=iso(now - 30))
+    exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+    f = by_id(exps)["first:11113:2026-10-10"]
+    assert f.status == "missed" and "first seen 15:00" in f.evidence
+    # Results arrive: the clock is cleared.
+    exps, mem = evaluate(snap(now + 300, [row], events=events, today={"11113": 5}), CFG, mem)
+    assert by_id(exps)["first:11113:2026-10-10"].status == "met"
+    assert "files_seen:11113:2026-10-10" not in mem
+
+
+def test_memory_of_a_meet_that_leaves_the_registry_or_the_day_is_dropped():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30))
+    exps, mem = evaluate(snap(t, [row], events=FOUR), CFG, {})
+    assert "results:11113:2026-10-10" in mem["late_events"]
+    exps, mem = evaluate(snap(t + 300, []), CFG, mem)                    # meet left the registry
+    assert mem["late_events"] == {} and mem["results_progress"] == {}
+    assert not [k for k in mem if k.startswith(("baseline:", "files_seen:"))]
+    # a not-judged meet leaves no empty record behind
+    s = snap(t + 600, [row], events=FOUR)
+    s.read_errors = {"11113": ["events: HTTP 500"]}
+    exps, mem = evaluate(s, CFG, mem)
+    assert mem["late_events"] == {}
+
+
+def test_numeric_string_event_numbers_are_grouped_as_numbers():
+    from watchdog.expectations import by_event_number
+    rows = [{"event_number": "2", "results": 0, "entries": 8},
+            {"event_number": 2, "results": 14, "entries": 16},
+            {"event_number": "10", "results": 3, "entries": 3},
+            {"event_number": " 9 ", "results": 1, "entries": 1},
+            {"event_number": "x", "results": 0, "entries": 0},
+            {"event_number": True, "results": 0, "entries": 0}]
+    groups = by_event_number(rows)
+    assert [g["event_number"] for g in groups[:3]] == [2, 9, 10]
+    assert groups[0]["results"] == 14 and groups[0]["rows"] == 2
+    assert all(g["key"].startswith("row:") for g in groups[3:])
+
+
+def test_out_of_order_publication_never_pages_the_event_being_swum():
+    # Events 1-3 have results; the host lists 5 (being swum, empty) before 4.
+    # The count says one published event has no result: the lowest is taken
+    # (4), and as the newest number it waits. Nothing pages in an hour.
+    t = at("15:00")
+    events = {"11113": [ev(1, 10, 10), ev(2, 10, 10), ev(3, 10, 10), ev(4, 10, 0),
+                        ev(5, 10, 0), ev(6, 10, 0)]}
+    row = reg(events_published=4, events_with_results=3, coverage_at=iso(t - 30))
+    mem = {}
+    for step in range(0, 13):
+        now = t + step * 300
+        row["coverage_at"] = iso(now - 30)
+        exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+        assert by_id(exps)["results:11113:2026-10-10"].status == "met"
+
+
+def test_thin_refinement_skips_event_ids_that_are_not_plain_ids():
+    calls = []
+
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg()], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1", "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return [{"id": "e1),id.neq.(x", "event_number": 1, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]}], None
+            if path.startswith("results"):
+                return 2, None
+            return [], None
+    er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+    assert not [p for p in calls if p.startswith("results?select=created_at")]
+
+
+# --- council round 2 (2026-11-07) ------------------------------------------------
+
+def _unlisted(now, published):
+    return reg(events_published=published, events_with_results=0, coverage_at=iso(now - 30))
+
+
+def test_each_superseded_unlisted_publication_has_its_own_clock():
+    # Published 1 -> 2 -> 3 (no MeetTrack rows): the first is superseded at
+    # 15:05, the second at 15:15. At 15:25 only the first is late.
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 2), (10, 2), (15, 3), (20, 3), (25, 3)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed"
+    assert "1 of them has no results in MeetTrack after 20+ min (1 not in MeetTrack's event list)" \
+        in e.evidence
+    assert "1 more is short, not yet due (1 not in MeetTrack's event list, due 15:35)" in e.evidence
+
+
+def test_a_published_count_that_dips_keeps_the_oldest_unlisted_clock():
+    # The host's list loses a file for one run (it flickers) and gets it back:
+    # the oldest clock survives and the dip is not progress.
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 2), (10, 3), (15, 2), (20, 3)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    assert "results:11113:2026-10-10" not in mem.get("results_progress", {})
+    exps, mem = evaluate(snap(t + 25 * 60, [_unlisted(t + 25 * 60, 3)]), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed" and "short since 15:05" in e.evidence
+
+
+def test_first_results_after_a_cold_start_past_the_deadline_ignores_yesterdays_files():
+    # Day two, the monitor restarts at 18:00 with no memory. The host lists
+    # yesterday's 16 files, all with results in MeetTrack, none written today.
+    # They are not today's news: no "files but no results" warning, ever.
+    events = {"11113": [ev(n, 10, 10) for n in range(1, 17)] + [ev(n, 10, 0) for n in range(17, 33)]}
+    mem = {}
+    for minutes in range(0, 121, 5):
+        now = at("18:00", NEXT) + minutes * 60
+        row = reg(events_published=16, events_with_results=16, coverage_at=iso(now - 30))
+        exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+        f = by_id(exps)["first:11113:2026-10-11"]
+        assert f.status == "pending", (minutes, f.evidence)
+    # a new file today with nothing in MeetTrack is still news
+    now = at("20:05", NEXT)
+    row = reg(events_published=17, events_with_results=16, coverage_at=iso(now - 30))
+    exps, mem = evaluate(snap(now, [row], events=events), CFG, mem)
+    assert "(1 new today)" in by_id(exps)["first:11113:2026-10-11"].evidence
+
+
+def test_snapshot_handles_numeric_ids_and_refuses_odd_meet_ids():
+    calls = []
+
+    class FakeRest:
+        def __init__(self, meet_id):
+            self.meet_id = meet_id
+
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg()], None
+            if path.startswith("meets?select=id"):
+                return [{"id": self.meet_id, "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return [{"id": 41, "event_number": 1, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]}], None
+            if path.startswith("results?select=created_at"):
+                return [{"created_at": iso(at("16:35"))}], None
+            if path.startswith("results"):
+                return 2, None
+            return [], None
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(7), ps=lambda: "")
+    assert "results?select=created_at&event_id=in.(41)&order=created_at.desc&limit=1" in calls
+    assert s.thin_last_write["11113"] == at("16:35")
+    calls.clear()
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest("m1&select=*"), ps=lambda: "")
+    assert not [p for p in calls if p.startswith(("events", "results"))]
+    assert s.read_errors["11113"] == ["meets: meet id is not a plain id"]
+
+
+# --- council round 3 (2026-11-07) ------------------------------------------------
+
+def test_a_counting_writer_is_recognised_whatever_the_case_of_its_feed_type():
+    from watchdog.expectations import eval_results
+    now = at("15:00")
+    row = reg(feed_type=" PDF ", events_published=None, events_with_results=None)
+    e = eval_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert e.status == "unknown"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_future_or_broken_progress_time_never_mutes_reminders(bad):
+    from watchdog.expectations import Expectation
+    t = at("12:00", D7)
+
+    def exp(progress_at):
+        return Expectation("results:1:d", "results", "M", "e", None, "missed", "crit", "x",
+                           data={"progress_at": progress_at})
+    _, s = plan([exp(None)], {}, t, LIVE_POLICY, True)
+    for p in (t + 6 * 3600, bad):                      # 6 h ahead (clock skew), or not a number
+        notices, s2 = plan([exp(p)], s, t + 3600, LIVE_POLICY, True)
+        assert [n.kind for n in notices] == ["reminder"], p
+        assert notices[0].reason == ""
+
+
+def test_evidence_says_when_event_numbers_are_a_guess():
+    # Events 1 and 4 have results, 2 and 3 none; the counts say one published
+    # event lacks results. In order, 2 and 3 would both be published: the host
+    # did not publish in number order, so the named event is a guess.
+    t = at("15:00")
+    events = {"11113": [ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 0), ev(4, 10, 10), ev(5, 10, 10)]}
+    row = reg(events_published=4, events_with_results=3, coverage_at=iso(t - 30))
+    exps, mem = evaluate(snap(t, [row], events=events), CFG, {})
+    row["coverage_at"] = iso(t + 1170)
+    exps, mem = evaluate(snap(t + 1200, [row], events=events), CFG, mem)
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert e.status == "missed"
+    assert "event numbers are a guess" in e.evidence
+    # in number order there is no such note
+    exps, _ = evaluate(snap(t + 1200, [row], events={"11113": [
+        ev(1, 10, 10), ev(2, 10, 0), ev(3, 10, 10), ev(4, 10, 10), ev(5, 10, 0)]}), CFG, mem)
+    assert "guess" not in by_id(exps)["results:11113:2026-10-10"].evidence
+
+
+# --- council round 4 (2026-11-07) ------------------------------------------------
+
+def test_files_seen_survives_a_blind_interval():
+    # The host lists a new file at 15:00. The writer's last count is from 15:05
+    # while 15:40-15:50 run; at 16:00 it counts again: the deadline is still
+    # 16:00 (files first seen 15:00), not a fresh hour from the recovery.
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+
+    def run(minutes, fresh=True):
+        nonlocal mem
+        now = t0 + minutes * 60
+        s = alapraia(now, events_published=1,
+                     coverage_at=iso(now - 30 if fresh else t0 + 5 * 60))
+        exps, mem = evaluate(s, CFG, mem)
+        return by_id(exps)[f"first:11531:{D7}"]
+    run(0)
+    run(5)
+    for m in (40, 45, 50):
+        run(m, fresh=False)                         # blind: counters from 15:05
+    assert mem["files_seen:11531:" + D7] == t0
+    f = run(60)
+    assert f.status == "missed" and "first seen 15:00" in f.evidence
+
+
+def test_unlisted_clocks_are_bounded_whatever_the_counters_say():
+    from watchdog.expectations import MAX_UNLISTED_CLOCKS
+    t = at("15:00")
+    mem = {}
+    for minutes, n in ((0, 1), (5, 10_000)):
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+    clocks = mem["late_events"]["results:11113:2026-10-10"]["unlisted"]["sinces"]
+    assert len(clocks) == MAX_UNLISTED_CLOCKS
+    e = by_id(exps)["results:11113:2026-10-10"]
+    assert "9999 more are short" in e.evidence or "9999 published events are short" in e.evidence
+
+
+def test_repeated_dips_keep_the_oldest_unlisted_clock_and_do_not_pile_up():
+    t = at("15:00")
+    mem = {}
+    seq = [(0, 1), (5, 2), (10, 3)] + [(15 + 5 * i, 2 if i % 2 == 0 else 3) for i in range(6)]
+    for minutes, n in seq:
+        exps, mem = evaluate(snap(t + minutes * 60, [_unlisted(t + minutes * 60, n)]), CFG, mem)
+        clocks = mem["late_events"]["results:11113:2026-10-10"]["unlisted"]["sinces"]
+        assert len(clocks) == n - 1                      # the newest has no clock
+        assert minutes == 0 or clocks[0] == t + 300      # the oldest survives every dip
+    assert by_id(exps)["results:11113:2026-10-10"].status == "missed"     # 15:05 + 20 min
+
+
+def test_save_json_never_leaves_a_half_written_state_file(tmp_path, monkeypatch):
+    path = tmp_path / "expect-state.json"
+    er.save_json(path, {"memory": {"late_events": {"a": 1}}})
+    before = path.read_text()
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(er.os, "fsync", boom)
+    with pytest.raises(OSError):
+        er.save_json(path, {"memory": {}})
+    assert path.read_text() == before
+
+
+def test_plain_id_accepts_the_ids_splash_poller_writes():
+    # meets.id and events.id are text NOT NULL, filled by db.gen_id(): uuid4.
+    import uuid
+    assert er._PLAIN_ID.fullmatch(str(uuid.uuid4()))
+    for bad in ("a,b", "a)", "a.b", "a&b", "a=b", "a b", "a*", "a:b", ""):
+        assert not er._PLAIN_ID.fullmatch(bad), bad
+
+
+# --- council round 5 (2026-11-07) ------------------------------------------------
+
+def test_an_open_first_alert_is_closed_once_when_results_takes_over():
+    # 15:00 the host lists one file, MeetTrack nothing: first:* pages at 16:00.
+    # 16:05 a second file: event 1 is no longer the newest and is late at
+    # 16:25, so results:* pages and first:* is closed as superseded, once.
+    # 16:30 results arrive: one RESOLVED, for results:* only.
+    t0 = at("15:00", D7)
+    events = [ev(1, 10, 0), ev(2, 10, 0), ev(3, 10, 0)]
+
+    def make(t):
+        pub = 1 if t < at("16:05", D7) else 2
+        done = t >= at("16:30", D7)
+        row = reg("11531", "Alapraia", start_date=D7, end_date=D7, events_published=pub,
+                  events_with_results=pub if done else 0, coverage_at=iso(t - 30),
+                  last_ingest_at=iso(at("16:30", D7)) if done else None)
+        evs = [ev(1, 10, 10), ev(2, 10, 10), ev(3, 10, 0)] if done else events
+        return snap(t, [row], events={"11531": evs}, today={"11531": 20 if done else 0})
+    mem, state, sent = {"baseline:11531:" + D7: 0}, {}, []
+    t = t0
+    while t <= at("22:10", D7):
+        exps, mem = evaluate(make(t), CFG, mem)
+        notices, state = plan(exps, state, t, LIVE_POLICY, in_racing_window(t, CFG))
+        sent += [(hhmm(t), n.kind, n.id.split(":")[0], n.reason) for n in notices]
+        t += 300
+    assert [s[:3] for s in sent] == [("16:00", "new", "first"), ("16:25", "new", "results"),
+                                     ("16:25", "closed", "first"), ("16:30", "resolved", "results")]
+    assert sent[2][3].startswith("superseded by results:11531:")
+    assert state["open"] == {}
+
+
+# --- council round 6 (2026-11-07) ------------------------------------------------
+
+def test_blind_first_results_evidence_names_the_real_reason():
+    from watchdog.expectations import eval_first_results
+    now = at("17:05")
+    # a PDF writer that ticks but stamps NULL counters: its counters are broken
+    row = reg(events_published=None, events_with_results=None, coverage_at=iso(now - 30))
+    e = eval_first_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert "did not report its file counts" in e.evidence and "does not count" not in e.evidence
+    # a fragment or Lenex writer genuinely does not count the host's files
+    row = reg(feed_type="lenex", events_published=None, events_with_results=None,
+              coverage_at=iso(now - 30))
+    e = eval_first_results(row, snap(now, [row], events=FOUR), CFG, LIS, DAY, {})
+    assert "this writer does not count files" in e.evidence
+
+
+def test_an_invalid_meet_id_makes_the_meet_unknown_and_pages_db_reads():
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(events_published=4, events_with_results=2,
+                            coverage_at=iso(at("16:59")))], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1,id.neq.x", "live_rankings_id": "sr-11113"}], None
+            return [], None
+    mem, kinds = {}, []
+    for now in (at("17:00"), at("17:05")):
+        s = er.build_snapshot(now, CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+        exps, mem = evaluate(s, CFG, mem)
+        e = by_id(exps)
+        assert e["results:11113:2026-10-10"].status == "unknown"
+        assert e["first:11113:2026-10-10"].status == "unknown"
+        kinds.append(e["db:reads"].status)
+    assert kinds == ["pending", "missed"]
+    assert "meet id is not a plain id" in e["db:reads"].evidence
+    notices, _ = plan(exps, {}, at("17:05"), POLICY, True)
+    assert "db:reads" in [n.id for n in notices]
+
+
+# --- council round 7 (2026-11-07) ------------------------------------------------
+
+def test_a_cold_start_on_the_first_day_counts_listed_files_as_todays():
+    # The meet races today for the first time; the monitor (re)starts at 10:00
+    # and the host already lists a file with nothing in MeetTrack. No start time.
+    sent, mem, _ = run_day(lambda t: alapraia(t, events_published=1), "10:00", "11:05")
+    assert mem["baseline:11531:" + D7] == 0
+    assert [s[:3] for s in sent] == [("11:00", "new", f"first:11531:{D7}")]
+
+
+def test_a_meet_that_enters_mid_afternoon_with_files_still_pages():
+    # Like Ponte da Barca at 16:40, but with a writer that counts the files.
+    # One file (the newest, so results:* waits): first:* pages an hour later.
+    sent, _, _ = run_day(lambda t: alapraia(t, events_published=1), "16:40", "17:45")
+    assert [s[:3] for s in sent] == [("17:40", "new", f"first:11531:{D7}")]
+    # Six files: results:* pages 20 min after the first five were superseded,
+    # and first:* stands down (never opened, so nothing more is sent).
+    sent, _, _ = run_day(lambda t: alapraia(t, events_published=6), "16:40", "17:45")
+    assert [s[:3] for s in sent] == [("17:00", "new", f"results:11531:{D7}")]
+
+
+def test_day_two_baseline_is_taken_before_racing_starts():
+    events = {"11113": [ev(n, 10, 10) for n in range(1, 11)] + [ev(11, 10, 0)]}
+    row = reg(events_published=10, events_with_results=10, coverage_at=iso(at("07:55", NEXT)))
+    _, mem = evaluate(snap(at("07:55", NEXT), [row], events=events), CFG, {})
+    assert mem["baseline:11113:2026-10-11"] == 10
+    # a cold start after racing began: only files whose events have results are known to be old
+    row.update(events_published=11, coverage_at=iso(at("12:00", NEXT)))
+    _, mem = evaluate(snap(at("12:00", NEXT), [row], events=events), CFG, {})
+    assert mem["baseline:11113:2026-10-11"] == 10
+
+
+@pytest.mark.parametrize("published, covered", [(2, 3), (-1, 0), (True, 0)])
+def test_inconsistent_counters_are_not_judged_and_keep_the_clocks(published, covered):
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    exps, mem = evaluate(alapraia(t0, events_published=1), CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0
+    bad = alapraia(t0 + 600, events_published=published, events_with_results=covered)
+    exps, mem = evaluate(bad, CFG, mem)
+    e = by_id(exps)
+    assert e[f"results:11531:{D7}"].status == "unknown"
+    assert "do not add up" in e[f"results:11531:{D7}"].evidence
+    assert e[f"first:11531:{D7}"].status == "pending"
+    assert mem["files_seen:11531:" + D7] == t0                 # the deadline is kept
+    exps, mem = evaluate(alapraia(t0 + 3600, events_published=1), CFG, mem)
+    assert by_id(exps)[f"first:11531:{D7}"].status == "missed"
+
+
+# --- council round 8 (2026-11-07) ------------------------------------------------
+
+def test_a_one_run_dip_in_the_hosts_files_keeps_the_first_seen_time():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    for minutes, pub in ((0, 1), (5, 1), (20, 0), (25, 1)):         # one run without the file
+        exps, mem = evaluate(alapraia(t0 + minutes * 60, events_published=pub), CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0
+    exps, mem = evaluate(alapraia(t0 + 3600, events_published=1), CFG, mem)
+    f = by_id(exps)[f"first:11531:{D7}"]
+    assert f.status == "missed" and "first seen 15:00" in f.evidence
+
+
+def test_files_gone_for_ten_minutes_clears_the_first_seen_time():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    for minutes, pub in ((0, 1), (20, 0), (25, 0)):
+        exps, mem = evaluate(alapraia(t0 + minutes * 60, events_published=pub), CFG, mem)
+    assert "files_seen:11531:" + D7 in mem                           # 5 min: not yet confirmed
+    exps, mem = evaluate(alapraia(t0 + 30 * 60, events_published=0), CFG, mem)
+    assert "files_seen:11531:" + D7 not in mem and "files_gone:11531:" + D7 not in mem
+
+
+def test_first_results_keeps_its_memory_while_the_meets_reads_fail():
+    t0 = at("15:00", D7)
+    mem = {"baseline:11531:" + D7: 0}
+    exps, mem = evaluate(alapraia(t0, events_published=1), CFG, mem)
+    before = {k: v for k, v in mem.items() if k.startswith(("baseline:", "files_"))}
+    s = alapraia(t0 + 300, events_published=0)
+    s.read_errors = {"11531": ["results today: ReadTimeout"]}
+    exps, mem = evaluate(s, CFG, mem)
+    assert by_id(exps)[f"first:11531:{D7}"].status == "unknown"
+    assert {k: v for k, v in mem.items() if k.startswith(("baseline:", "files_"))} == before
+    # a cold start during failed reads does not fix a baseline either
+    s = alapraia(t0, events_published=3)
+    s.read_errors = {"11531": ["events: HTTP 500"]}
+    _, fresh_mem = evaluate(s, CFG, {})
+    assert not [k for k in fresh_mem if k.startswith(("baseline:", "files_"))]
+
+
+# --- council round 9 (2026-11-07) ------------------------------------------------
+
+def test_a_fresh_count_without_events_with_results_is_not_a_measured_host():
+    # events_published=1 but events_with_results NULL: both checks treat the
+    # host as unseen. results:* is unknown; first:* follows the blind clock and
+    # neither starts nor expires files_seen.
+    t0 = at("15:00", D7)
+    exps, mem = evaluate(alapraia(t0, events_published=1, events_with_results=None), CFG,
+                         {"baseline:11531:" + D7: 0})
+    e = by_id(exps)
+    assert e[f"results:11531:{D7}"].status == "unknown"
+    assert "did not count the events with results" in e[f"results:11531:{D7}"].evidence
+    assert e[f"first:11531:{D7}"].status == "pending"
+    assert "did not count the events with results" in e[f"first:11531:{D7}"].evidence
+    assert "files_seen:11531:" + D7 not in mem
+    # with a clock already running, such runs neither restart nor clear it
+    mem["files_seen:11531:" + D7] = t0 - 600
+    for m in (5, 20, 35):
+        exps, mem = evaluate(alapraia(t0 + m * 60, events_published=1, events_with_results=None),
+                             CFG, mem)
+    assert mem["files_seen:11531:" + D7] == t0 - 600 and "files_gone:11531:" + D7 not in mem
+
+
+def test_results_alert_through_missed_unknown_missed_reminds_only_when_stuck():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    mem, state, kinds = {}, {}, []
+    for minutes in range(0, 181, 5):
+        now = t + minutes * 60
+        stale = 70 <= minutes < 100                       # the writer stops counting for a while
+        row["coverage_at"] = iso(now - (40 * 60 if stale else 30))
+        exps, mem = evaluate(snap(now, [row], events=FOUR), CFG, mem)
+        notices, state = plan(exps, state, now, LIVE_POLICY, True)
+        kinds += [(minutes, n.kind) for n in notices if n.id.startswith("results:")]
+        if stale:
+            assert by_id(exps)["results:11113:2026-10-10"].status == "unknown"
+    # NEW at +20; reminders once an hour; none while not judged (70-95)
+    assert kinds == [(20, "new"), (100, "reminder"), (160, "reminder")]
+
+
+# --- council round 10 (2026-11-07) -----------------------------------------------
+
+def test_a_clocked_event_missing_from_the_snapshot_is_not_judged_until_confirmed_gone():
+    t = at("15:00")
+    row = reg(events_published=4, events_with_results=2, coverage_at=iso(t - 30),
+              last_ingest_at=iso(t - 60))
+    mem = {}
+
+    def run(minutes, events):
+        nonlocal mem
+        now = t + minutes * 60
+        row["coverage_at"] = iso(now - 30)
+        exps, mem = evaluate(snap(now, [row], events={"11113": events}), CFG, mem)
+        return by_id(exps)["results:11113:2026-10-10"]
+    full = FOUR["11113"]
+    without_2 = [e for e in full if e["event_number"] != 2]
+    assert run(0, full).status == "pending"                     # event 2: clock from 15:00
+    e = run(5, without_2)                                       # event 2 vanished from the read
+    assert e.status == "unknown" and "event 2" in e.evidence
+    assert mem["late_events"]["results:11113:2026-10-10"]["2"]["since"] == t
+    e = run(20, full)                                           # back: its clock is intact
+    assert e.status == "missed" and "short since 15:00" in e.evidence
+    for m in (25, 30, 35, 40):                                  # gone for good (15 min)
+        e = run(m, without_2)
+    assert e.status != "unknown"
+    assert "2" not in mem["late_events"].get("results:11113:2026-10-10", {})
+
+
+def test_thin_refinement_queries_the_usable_ids_and_says_which_it_skipped():
+    calls = []
+
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return [reg(events_published=3, events_with_results=3,
+                            coverage_at=iso(at("17:57")), last_ingest_at=iso(at("17:57")))], None
+            if path.startswith("meets?select=id"):
+                return [{"id": "m1", "live_rankings_id": "sr-11113"}], None
+            if path.startswith("events"):
+                return [{"id": "e1", "event_number": 1, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]},
+                        {"id": "bad,id", "event_number": 2, "relay_count": 1,
+                         "results": [{"count": 2}], "heats": [{"count": 30}]},
+                        {"id": "e3", "event_number": 3, "relay_count": 1,
+                         "results": [{"count": 30}], "heats": [{"count": 30}]}], None
+            if path.startswith("results?select=created_at"):
+                return [{"created_at": iso(at("16:35"))}], None
+            if path.startswith("results"):
+                return 34, None
+            return [], None
+    s = er.build_snapshot(at("17:58"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+    assert [p for p in calls if p.startswith("results?select=created_at")] == [
+        "results?select=created_at&event_id=in.(e1)&order=created_at.desc&limit=1"]
+    assert s.thin_last_write["11113"] == at("16:35") and s.thin_refined["11113"] == {"1"}
+    # cold start: event 1 counts from its own newest result (16:35), event 2
+    # (not queried) from the meet's last write (17:57)
+    exps, mem = evaluate(s, CFG, {})
+    e = by_id(exps)["results:11113:2026-10-10"]
+    recs = mem["late_events"]["results:11113:2026-10-10"]
+    assert recs["1"]["since"] == at("16:35") and recs["2"]["since"] == at("17:57")
+    assert "1 thin event has ids that cannot be queried" in e.evidence
