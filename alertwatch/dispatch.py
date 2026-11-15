@@ -610,7 +610,11 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
     if not dry_run and t - float(st.get("pruned_at") or 0) >= 3600:
         inbox.prune(state, t)  # retention holds on idle, paused and capped passes too
-        ledger.prune_runs(state, t)
+        done = set(st.get("checks_enqueued") or [])
+        keep = {r.get("run_id") for r in ledger.recent_runs(state, t, 24 * 3650)
+                if any(f"{r.get('run_id')}:{i}" not in done
+                       for i, _ in enumerate((r.get("result") or {}).get("pending_checks") or []))}
+        ledger.prune_runs(state, t, keep=keep)  # a check not yet enqueued is never pruned
         st["pruned_at"] = t
         _save_state(state, st)
     if (state / "PAUSED").exists():
@@ -647,7 +651,8 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         fresh = [p for p in stale if p.name not in noted]
         if fresh:
             # the noted names and the queued note are saved in the same state write
-            st["unknown_noted"] = sorted(noted | {p.name for p in fresh})[-500:]
+            present = {p.name for p in inbox._visible_json(state / "inbox")}
+            st["unknown_noted"] = sorted((noted | {p.name for p in fresh}) & present)
             item = _queue_note(cfg, st, "", notes.broken_note(
                 "inbox", [(p.name, "its chat could not be proven for an hour; deleted") for p in fresh], state))
         for p in stale:
@@ -655,6 +660,9 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
                 p.unlink()
             except OSError:
                 pass
+        # The names are held until their files are gone, then dropped.
+        st["unknown_noted"] = [n for n in st.get("unknown_noted") or [] if (state / "inbox" / n).exists()]
+        _save_state(state, st)
         if fresh:
             _deliver(cfg, st, item, t)
     run_id = ledger.new_run_id(t)

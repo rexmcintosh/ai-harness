@@ -80,8 +80,9 @@ session, for example `do it: write the 3 club rows`.
    test suite must pass.
 3. Run `venice-delegate council-review --diff`. Fix the valid findings, then review
    again. At most 3 rounds. Findings still open after that: no merge, `needs_rex`.
-4. Rebase your branch onto `origin/main` and run the full suite again. A fix that
-   needs a denied path (listed below) ends as a branch and `needs_rex`.
+4. Rebase your branch onto `origin/main` as a straight line (no merge commits: the
+   helper refuses them, so a revert always applies) and run the full suite again. A
+   fix that needs a denied path (listed below) ends as a branch and `needs_rex`.
 5. Commit, then `python3 -m alertwatch.merge merge <repo> <worktree path>`. It checks
    the rules (main clean and equal to `origin/main`, a fast forward, no denied path,
    the daily merge limit), pushes `main` without force and moves the main checkout.

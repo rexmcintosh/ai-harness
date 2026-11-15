@@ -44,6 +44,7 @@ python3 -m alertwatch.restart history       # restarts in the last 24 hours
 python3 -m alertwatch.merge merge <repo> <worktree>   # checked fast-forward merge and push
 python3 -m alertwatch.merge revert <repo> <sha>       # revert an alert-watch merge
 python3 -m alertwatch.dbread <table> [filters]        # read-only database rows
+python3 -m alertwatch.gitinfo <repo>                  # recent commits and changed file names
 ```
 
 The run never pushes, merges, reverts or kills by itself (those shell commands are
@@ -99,9 +100,16 @@ standing rule for those runs only. Every other session keeps the merge protocol.
 
 ## Guard rails
 
-- `diagnose` mode: an allowlist of read-only tools (Read, Grep, Glob, read-only shell
-  commands, `alertwatch.dbread`); everything else is refused. Proved with real runs
-  on 2026-11-15.
+- `diagnose` mode: an allowlist only: Read, Grep and Glob (they honor the
+  credential and `.env` deny rules), `ls`, `stat`, and the read-only helpers
+  `alertwatch.dbread`, `alertwatch.restart history` and `alertwatch.gitinfo` (commit
+  lines and file names, never contents). No `cat`, `grep`, `git log/show/diff`, `wc`
+  or `date`: each can print a file's contents past the deny rules. Everything else is
+  refused. Proved with real runs on Claude Code 2.1.317 on 2026-11-15, planted
+  secrets included.
+- Only messages to `watch_chats` (Rex's chat) are captured or claimed; a capture
+  whose chat cannot be proven is never claimed and is deleted after an hour.
+- The run gets a whitelisted environment, and credential files are denied in both modes.
 - `act` mode: `--dangerously-skip-permissions` with deny rules passed by `--settings`
   (proved on 2026-11-15 to hold): no push, merge, revert or kill as shell commands
   (only the helpers), no Edit or Write inside `~/projects` (fixes are made in

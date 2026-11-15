@@ -423,3 +423,21 @@ def test_a_denied_change_made_inside_merge_commits_is_refused(world, capsys):
     assert run(world, "merge", "repo", str(wt)) == 2
     assert "web/evil.ts" in capsys.readouterr().err
     assert git(world["origin"], "rev-parse", "main") == before
+
+
+def test_a_branch_with_a_merge_commit_is_refused(world, capsys):
+    before = git(world["origin"], "rev-parse", "main")
+    git(world["repo"], "fetch", "-q", "origin")
+    wt = world["state"] / "worktrees" / "withmerge"
+    git(world["repo"], "worktree", "add", "-q", "-b", "alertwatch/run-test-wm", str(wt), "origin/main")
+    git(wt, "branch", "side", "origin/main")
+    git(wt, "checkout", "-q", "side")
+    (wt / "side.py").write_text("s\n")
+    git(wt, "add", "-A"); git(wt, "commit", "-qm", "side")
+    git(wt, "checkout", "-q", "alertwatch/run-test-wm")
+    (wt / "app.py").write_text("x = 5\n")
+    git(wt, "commit", "-qam", "fix")
+    git(wt, "merge", "-q", "--no-ff", "-m", "merge side", "side")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert "merge commits" in capsys.readouterr().err
+    assert git(world["origin"], "rev-parse", "main") == before

@@ -194,7 +194,7 @@ def merges_in_window(state: Path, now: float, hours: float = 24) -> int:
     return sum(1 for a in merged(state) if float(a.get("at") or 0) >= cutoff)
 
 
-def prune_runs(state: Path, now: float, days: int = 30) -> int:
+def prune_runs(state: Path, now: float, days: int = 30, keep=frozenset()) -> int:
     """Remove run records older than `days` (they hold report first lines and run
     results; batches are pruned at the same age, and checks look back as far)."""
     cutoff = now - days * 86400
@@ -207,7 +207,7 @@ def prune_runs(state: Path, now: float, days: int = 30) -> int:
                 started = p.stat().st_mtime
             except OSError:
                 continue
-        if started < cutoff:
+        if started < cutoff and p.stem not in keep:
             try:
                 p.unlink()
                 removed += 1

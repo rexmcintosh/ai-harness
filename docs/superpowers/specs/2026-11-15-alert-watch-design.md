@@ -436,3 +436,31 @@ JSON shows zero turns. Deny rules are built from the configured folders and also
 protect alert-watch's own records. Capture records process and script names only.
 A real diagnose run on Claude Code 2.1.317 refused `;`, `&&`, `>`, `| tee` and
 `$(...)` forms of allowed commands.
+
+Rounds 8 to 24 (the panel's models changed to stronger ones at round 8) closed the
+remaining paths, each with a test and, for permissions, a real run:
+
+- **Diagnose reads.** File contents only through Read, Grep and Glob, which honor the
+  deny rules (a real run with planted `secret.key` and `.env` files leaked neither).
+  Shell commands that can print or write a file by themselves are gone: `cat`,
+  `head`, `tail`, `grep`, `jq`, `ps`, `sort`, `uniq`, `sed`, `rg`, `wc`, `date` and
+  `git log/show/diff`. `alertwatch/gitinfo.py` gives commit lines and file names
+  only. Git `-c` and `--config-env` are denied. `/proc` and credential files are
+  denied, and the run's environment is a whitelist.
+- **Chats.** Only messages to `watch_chats` are captured, and only a proven watched
+  destination is claimed. A message to another chat, or one whose chat cannot be
+  proven, never reaches a batch, a prompt, a record or `--dry-run` output.
+- **Crash safety.** The run record (decision, result, pending checks, note) is one
+  atomic save before the batch moves; notes go through an outbox marked `sending`,
+  and an interrupted send is never repeated; a dead dispatcher's run is killed and
+  its batch finished from the record; only explicit zero turns proves a run idle;
+  the self-pause is one recoverable step, and deleting `PAUSED` resumes; state and
+  records are fsynced.
+- **Merges.** Every pushed commit is checked against the denied paths (merge
+  commits against each parent, renames both ways), and branches must be a straight
+  line so a revert always applies. Restarts are journaled before the signal, and
+  a rerun's job keeps the cron lock if the helper dies.
+
+Round 24 approved the diagnose-mode rollout. The gates before `mode = "act"` stay:
+a read-only database key for the run and an OS sandbox, or Rex's explicit
+acceptance of their absence.

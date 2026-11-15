@@ -1159,3 +1159,21 @@ def test_an_out_of_range_due_time_does_not_break_the_scan():
     for value in ("9999-12-31T23:59:59-14:00", "0001-01-01T00:00:00+14:00"):
         got = dispatch._parse_due(value)  # never raises
         assert got is None or isinstance(got, float)
+
+
+def test_a_run_with_a_check_not_yet_enqueued_is_not_pruned(env):
+    inbox.ensure_dirs(env["state"])
+    ledger.write_run(env["state"], {"run_id": "longago", "started_at": time.time() - 40 * 86400, "status": "ok",
+                                    "result": {"pending_checks": [{"due_at": "2020-01-01T00:00:00Z", "what": "x"}]}})
+    (env["state"] / "PAUSED").write_text("x")  # a long pause: the check was never enqueued
+    go(env)
+    assert (env["state"] / "runs" / "longago.json").exists()
+
+
+def test_the_noted_list_keeps_only_files_still_in_the_inbox(env):
+    for i in range(3):
+        p = _raw_report(env, {"version": 1, "id": f"gone{i}", "text": "x", "source": "y"})
+        old = time.time() - 7200
+        os.utime(p, (old, old))
+    go(env)
+    assert json.loads((env["state"] / "state.json").read_text())["unknown_noted"] == []
