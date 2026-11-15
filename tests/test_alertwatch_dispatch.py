@@ -35,6 +35,10 @@ if mode == "ok_quiet":
                                             for i in ids]})})
 if mode == "crash_early":
     sys.exit(1)
+if mode == "bad_due":
+    out({"is_error": False, "num_turns": 3, "session_id": "sess-b", "result": block({
+        "note": "alert-watch: merged a fix", "entries": [{"id": i, "verdict": "fixed"} for i in ids],
+        "pending_checks": [{"repo": "splash_poller", "due_at": "after lunch", "what": "event 8 results"}]})})
 if mode == "no_turn_count":
     out({"is_error": True, "session_id": "sess-n", "result": "error, no turn count"}, 1)
 if mode == "error_with_block":
@@ -654,3 +658,64 @@ def test_a_result_block_from_a_failed_run_is_not_a_success(env, monkeypatch):
     (rec,) = runs(env)
     assert rec["status"] == "failed" and "ignored" in rec["reason"]
     assert list((env["state"] / "failed").iterdir())
+
+
+def test_a_crash_after_the_decision_still_delivers_the_note(env, monkeypatch):
+    real_finish = inbox.finish
+
+    def crash(*a, **k):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(inbox, "finish", crash)
+    report(env)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    monkeypatch.setattr(inbox, "finish", real_finish)
+    assert sent(env) == []
+    go(env)  # recovery: the batch is finished as recorded, the queued note goes out
+    (note,) = sent(env)
+    assert note["text"].startswith("alert-watch: restarted the writer")
+    assert list((env["state"] / "done").iterdir())
+
+
+def test_a_crash_during_a_send_is_never_resent(env, monkeypatch):
+    def crash(cfg, text):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(dispatch.notes, "send", crash)
+    report(env)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    monkeypatch.undo()
+    monkeypatch.setenv("FAKE_TG_LOG", str(env["tg.jsonl"]))
+    go(env)
+    assert sent(env) == []
+    st = json.loads((env["state"] / "state.json").read_text())
+    assert st["unsent_notes"] == [] and st["note_dropped_at"]
+    assert runs(env)[0]["note_status"] == "uncertain"
+
+
+def test_a_dead_run_is_killed_even_while_paused(env):
+    import subprocess as _sp
+    report(env)
+    inbox.claim_all(env["state"], "dead-run")
+    (env["state"] / "PAUSED").write_text("x")
+    orphan = _sp.Popen(["sleep", "60"], env={**os.environ, "ALERT_WATCH_RUN_ID": "dead-run"})
+    try:
+        go(env)
+        assert orphan.wait(timeout=5) != 0
+    finally:
+        if orphan.poll() is None:
+            orphan.kill()
+
+
+def test_an_unreadable_due_time_is_named_for_rex(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "bad_due")
+    report(env)
+    go(env)
+    (note,) = sent(env)
+    assert "no readable due time" in note["text"] and "event 8 results" in note["text"]
+
+
+def test_git_config_overrides_are_denied_in_diagnose(env):
+    deny = dispatch.session_settings(env["cfg"])["permissions"]["deny"]
+    for rule in ("Bash(git* -c*)", "Bash(git*--config-env*)", "Bash(*GIT_CONFIG*)"):
+        assert rule in deny

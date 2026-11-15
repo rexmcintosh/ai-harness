@@ -169,9 +169,12 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
         raise subprocess.CalledProcessError(proc.returncode, ["git", "diff"], proc.stdout, proc.stderr)
     files = [f for f in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
     # Every commit that will be pushed, not only the net diff: a denied file changed in
-    # one commit and restored in a later one is still published by the push.
-    log = subprocess.run(["git", "log", "--pretty=format:", "--name-only", "--no-renames", "-z",
-                          f"{base}..{head}"], cwd=str(repo), capture_output=True, timeout=300)
+    # one commit and restored in a later one is still published by the push. Merge
+    # commits are compared with each parent, so a change made in a merge resolution
+    # shows too.
+    log = subprocess.run(["git", "log", "--diff-merges=separate", "--pretty=format:", "--name-only",
+                          "--no-renames", "-z", f"{base}..{head}"], cwd=str(repo), capture_output=True,
+                         timeout=300)
     if log.returncode != 0:
         raise subprocess.CalledProcessError(log.returncode, ["git", "log"], log.stdout, log.stderr)
     touched = {f.strip("\n") for f in log.stdout.decode("utf-8", "surrogateescape").split("\0")}

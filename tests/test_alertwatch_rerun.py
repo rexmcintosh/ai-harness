@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import time
+from pathlib import Path
 
 from alertwatch import rerun
 from alertwatch.config import RerunJob, load_config
@@ -128,3 +129,46 @@ def test_refused_in_diagnose_mode(tmp_path, capsys):
     cfg = dataclasses.replace(cfg_with(tmp_path, "true"), mode="diagnose")
     assert rerun.main(["demo"], cfg=cfg) == 2
     assert "reruns need mode = act" in capsys.readouterr().err
+
+
+def test_the_job_inherits_the_cron_lock(tmp_path, monkeypatch):
+    import subprocess as _sp
+    seen = {}
+    real = _sp.Popen
+
+    def spy(*a, **k):
+        seen.update(k)
+        return real(*a, **k)
+    monkeypatch.setattr(rerun.subprocess, "Popen", spy)
+    assert rerun.main(["demo"], cfg=cfg_with(tmp_path, "true", lock=str(tmp_path / "job.lock"))) == 0
+    assert seen["pass_fds"] and len(seen["pass_fds"]) == 1
+
+
+def test_the_lock_outlives_the_helper(tmp_path):
+    """The job keeps the lock after the helper is gone: a cron copy would find it busy."""
+    import fcntl, subprocess as _sp, sys as _sys, time as _t
+    lock = tmp_path / "job.lock"
+    marker = tmp_path / "started"
+    code = (
+        "import dataclasses, sys\n"
+        "from alertwatch import rerun\n"
+        "from alertwatch.config import RerunJob, load_config\n"
+        f"cfg = load_config(env={{'ALERT_WATCH_STATE': {str(tmp_path / 'state')!r}}})\n"
+        f"job = RerunJob(cmd='touch {marker}; sleep 5', cwd={str(tmp_path)!r}, lock={str(lock)!r}, "
+        f"log={str(tmp_path / 'job.log')!r}, timeout_s=30)\n"
+        "cfg = dataclasses.replace(cfg, mode='act', rerun={'demo': job})\n"
+        "sys.exit(rerun.main(['demo'], cfg=cfg))\n")
+    helper = _sp.Popen([_sys.executable, "-c", code], cwd=str(Path(__file__).resolve().parents[1]))
+    for _ in range(100):
+        if marker.exists():
+            break
+        _t.sleep(0.05)
+    helper.kill()          # the helper dies; the job (its own session) runs on
+    helper.wait()
+    with open(lock, "a") as fh:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            got = True
+        except BlockingIOError:
+            got = False
+    assert got is False

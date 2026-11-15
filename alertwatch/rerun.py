@@ -102,8 +102,11 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
                    .encode())
         logf.flush()
+        # The job inherits the locked file, so the lock stays held for the job's whole
+        # life even if this helper dies first (flock locks follow the open file).
         proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
-                                stderr=subprocess.STDOUT, start_new_session=True)
+                                stderr=subprocess.STDOUT, start_new_session=True,
+                                pass_fds=(held.fileno(),) if held else ())
     except OSError as e:
         for fh in (held, logf):
             if fh:

@@ -92,8 +92,10 @@ DIAGNOSE_ALLOW = [
     "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
 ]
 _DIAGNOSE_DENY = ["Edit", "Write", "NotebookEdit", "Bash(git commit*)", "Bash(git * commit*)",
-                  # git log, diff and show can write a file or run a configured program
+                  # git log, diff and show can write a file or run a configured program,
+                  # and -c or --config-env can make any git command run one (core.fsmonitor)
                   "Bash(*--output*)", "Bash(*--ext-diff*)", "Bash(*--textconv*)",
+                  "Bash(git* -c*)", "Bash(git*--config-env*)", "Bash(*GIT_CONFIG*)",
                   "Bash(*alertwatch.rerun*)", "Bash(*alertwatch.merge*)",
                   "Bash(*alertwatch.restart restart*)"]
 
@@ -348,9 +350,16 @@ def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
 
 
 def check_result(result: dict, ids: list[str]) -> list[str]:
-    """Problems with a run's result, as lines for Rex: a report with no valid verdict."""
+    """Problems with a run's result, as lines for Rex: a report with no valid verdict,
+    and a pending check whose due time cannot be read (it would never be enqueued)."""
     got = {e.get("id"): e.get("verdict") for e in result.get("entries") or [] if isinstance(e, dict)}
-    return [f"report {i} got no valid verdict; check the run" for i in ids if got.get(i) not in VERDICTS]
+    out = [f"report {i} got no valid verdict; check the run" for i in ids if got.get(i) not in VERDICTS]
+    for chk in result.get("pending_checks") or []:
+        if not isinstance(chk, dict) or _parse_due(chk.get("due_at")) is None:
+            what = chk.get("what", "") if isinstance(chk, dict) else str(chk)
+            out.append(f"a follow-up check has no readable due time, so it will not run by itself; "
+                       f"check it by hand: {str(what)[:200]}")
+    return out
 
 
 def _cap_reached(cfg: Config, st: dict, now: float) -> bool:
@@ -376,38 +385,57 @@ def _summary(entry: dict) -> dict:
 NOTE_TRIES = 5
 
 
-def _send_note(cfg: Config, st: dict, run_id: str, text: str) -> str:
-    """Send a note through an outbox: it is saved in state.json before the send, so a
-    crash cannot lose it. A definite rejection stays there and is retried on later
-    passes; an uncertain send may have arrived, so it is never sent again."""
-    item = {"run_id": run_id, "text": text, "tries": 0}
+def _queue_note(cfg: Config, st: dict, run_id: str, text: str) -> dict:
+    """Put a note in the outbox in state.json, saved before anything else happens."""
+    item = {"run_id": run_id, "text": text, "tries": 0, "state": "queued"}
     st.setdefault("unsent_notes", []).append(item)
     _save_state(cfg.state_dir, st)
-    status = notes.send(cfg, text)
-    if status == "failed":
-        item["tries"] = 1
-    else:
-        st["unsent_notes"] = [n for n in st["unsent_notes"] if n is not item]
+    return item
+
+
+def _deliver(cfg: Config, st: dict, item: dict, now: float) -> str:
+    """Send one outbox note. It is marked `sending` (saved) before the send, so a crash
+    during the send leaves it `sending`: that one may have arrived and is never sent
+    again. A definite rejection stays for a retry; anything else leaves the outbox."""
+    item["state"] = "sending"
     _save_state(cfg.state_dir, st)
-    return status
-
-
-def retry_notes(cfg: Config, st: dict, now: float) -> None:
-    keep = []
-    for item in st.get("unsent_notes") or []:
-        status = notes.send(cfg, item["text"])
-        if status == "failed" and item.get("tries", 0) + 1 < NOTE_TRIES:
-            keep.append({**item, "tries": item.get("tries", 0) + 1})
-            continue
+    status = notes.send(cfg, item["text"])
+    item["tries"] = item.get("tries", 0) + 1
+    if status == "failed" and item["tries"] < NOTE_TRIES:
+        item["state"] = "failed"
+    else:
         if status == "failed":
             _log(now, f"note for {item.get('run_id')} dropped after {NOTE_TRIES} failed sends")
             st["note_dropped_at"] = now  # the watchdog check reads this
+        st["unsent_notes"] = [n for n in st["unsent_notes"] if n is not item]
+    _save_state(cfg.state_dir, st)
+    if item.get("run_id"):
         try:
-            if item.get("run_id"):
-                ledger.update_run(cfg.state_dir, item["run_id"], note_status=status)
+            ledger.update_run(cfg.state_dir, item["run_id"], note_status=status)
         except (OSError, ValueError):
             pass
-    st["unsent_notes"] = keep
+    return status
+
+
+def _send_note(cfg: Config, st: dict, run_id: str, text: str) -> str:
+    return _deliver(cfg, st, _queue_note(cfg, st, run_id, text), time.time())
+
+
+def retry_notes(cfg: Config, st: dict, now: float) -> None:
+    for item in list(st.get("unsent_notes") or []):
+        if item.get("state") == "sending":  # a send a crash interrupted: it may have arrived
+            st["unsent_notes"] = [n for n in st["unsent_notes"] if n is not item]
+            st["note_dropped_at"] = now
+            _log(now, f"note for {item.get('run_id')} was being sent when the dispatcher stopped; "
+                      "not sent again")
+            _save_state(cfg.state_dir, st)
+            if item.get("run_id"):
+                try:
+                    ledger.update_run(cfg.state_dir, item["run_id"], note_status="uncertain")
+                except (OSError, ValueError):
+                    pass
+            continue
+        _deliver(cfg, st, item, now)
 
 
 def _kill_until_gone(run_id: str, tries: int = 5) -> bool:
@@ -478,9 +506,17 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     state = cfg.state_dir
     t = now()
     st = _load_state(state)
-    if st.get("unsent_notes") and not dry_run:
-        retry_notes(cfg, st, t)  # even while paused: Rex must still get the notes
-        _save_state(state, st)
+    if not dry_run:
+        # Before the PAUSED and usage-limit gates: a dead dispatcher's run is never
+        # left running, and Rex still gets every note, while paused.
+        for dead in inbox.stale_batches(state):
+            if not _kill_until_gone(dead):
+                _log(t, f"batch {dead}: its run still has processes after SIGKILL; no new run this pass")
+                _save_state(state, st)
+                return 0
+            _recover_batch(cfg, st, dead, t)
+        if st.get("unsent_notes"):
+            retry_notes(cfg, st, t)
     if (state / "PAUSED").exists():
         return 0
     if float(st.get("limit_until") or 0) > t:
@@ -496,14 +532,6 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             except (OSError, ValueError):
                 print(p.name, "unreadable")
         return 0
-
-    for dead in inbox.stale_batches(state):
-        if not _kill_until_gone(dead):
-            _log(t, f"batch {dead}: its run still has processes after SIGKILL; no new run this pass")
-            _save_state(state, st)
-            return 0
-        if not _recover_batch(cfg, st, dead, t):
-            return 0
 
     inbox.clean_tmp(state, t)
     enqueue_due_checks(cfg, st, t)
@@ -580,29 +608,35 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             reason += "; its result block was ignored because the run did not end cleanly"
         record.update(status="failed", reason=reason, dest="release_count" if idle else "failed",
                       stderr_tail=run["stderr"][-4000:], stdout_tail=run["stdout"][-4000:])
-    ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
-
-    failed_ids = []
-    if record["dest"] in ("done", "failed"):
-        inbox.finish(state, run_id, record["dest"])
-        if record["status"] == "failed":
-            failed_ids = [e["id"] for e in looks]
+    # The note is decided and queued with the decision, before the batch moves, so a
+    # crash at any later point cannot lose it.
+    if record["dest"] == "failed" and record["status"] == "failed":
+        failed_ids = [e["id"] for e in looks]
+    elif record["dest"] == "release_count":
+        failed_ids = [e["id"] for e in looks if int(e.get("attempts") or 0) + 1 >= 2]
     else:
-        failed_ids = inbox.release(state, run_id, looks, count_attempt=record["dest"] == "release_count")
-
+        failed_ids = []
     if record["status"] == "ok":
         text = notes.run_note(record)
-        record["note_text"] = text
-        record["note_status"] = _send_note(cfg, st, run_id, text) if text else "none"
     elif record["status"] == "limit":
         part_way = record["dest"] == "failed"
-        if part_way or float(st.get("limit_noted_until") or 0) != until:
-            record["note_text"] = notes.limit_note(until, part_way=part_way)
-            record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
+        text = (notes.limit_note(until, part_way=part_way)
+                if part_way or float(st.get("limit_noted_until") or 0) != until else None)
+        if text:
             st["limit_noted_until"] = until
     else:
-        record["note_text"] = notes.failure_note(record, failed_ids)
-        record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
+        text = notes.failure_note(record, failed_ids)
+    record["note_text"] = text
+    item = _queue_note(cfg, st, run_id, text) if text else None
+    record["note_status"] = "queued" if text else "none"
+    ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
+
+    if record["dest"] in ("done", "failed"):
+        inbox.finish(state, run_id, record["dest"])
+    else:
+        inbox.release(state, run_id, looks, count_attempt=record["dest"] == "release_count")
+    if item:
+        record["note_status"] = _deliver(cfg, st, item, ended)
 
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())

@@ -398,3 +398,28 @@ def test_an_untracked_file_with_an_odd_name_in_the_way_is_refused(world):
     (world["repo"] / name).write_text("scratch\n")
     assert run(world, "merge", "repo", str(wt)) == 2
     assert git(world["origin"], "rev-parse", "main") == before
+
+
+def test_a_denied_change_made_inside_merge_commits_is_refused(world, capsys):
+    before = git(world["origin"], "rev-parse", "main")
+    git(world["repo"], "fetch", "-q", "origin")
+    wt = world["state"] / "worktrees" / "merges"
+    git(world["repo"], "worktree", "add", "-q", "-b", "alertwatch/run-test-merges", str(wt), "origin/main")
+    for side, path in (("side1", "one.py"), ("side2", "two.py")):
+        git(wt, "branch", side, "origin/main")
+    git(wt, "checkout", "-q", "side1")
+    (wt / "one.py").write_text("1\n")
+    git(wt, "add", "-A"); git(wt, "commit", "-qm", "one")
+    git(wt, "checkout", "-q", "side2")
+    (wt / "two.py").write_text("2\n")
+    git(wt, "add", "-A"); git(wt, "commit", "-qm", "two")
+    git(wt, "checkout", "-q", "alertwatch/run-test-merges")
+    git(wt, "merge", "-q", "--no-ff", "--no-commit", "side1")
+    (wt / "web" / "evil.ts").write_text("x\n")   # added only in a merge resolution
+    git(wt, "add", "-A"); git(wt, "commit", "-qm", "merge one")
+    git(wt, "merge", "-q", "--no-ff", "--no-commit", "side2")
+    git(wt, "rm", "-q", "web/evil.ts")            # and removed only in another
+    git(wt, "commit", "-qm", "merge two")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert "web/evil.ts" in capsys.readouterr().err
+    assert git(world["origin"], "rev-parse", "main") == before
