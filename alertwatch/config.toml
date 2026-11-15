@@ -1,0 +1,89 @@
+# alert-watch settings. Data, not code; no secrets.
+# Design: docs/superpowers/specs/2026-11-15-alert-watch-design.md
+
+chat_id = "7735693897"
+# "diagnose": the run reads and explains only. "act": allowed live steps and merges.
+# Switching to "act" needs Rex's go and the dated section in ~/.claude/CLAUDE.md.
+mode = "diagnose"
+model = "opus"
+projects_dir = "/home/dev/projects"
+tg_send = "/home/dev/projects/ai-harness/bin/tg-send"
+
+run_timeout_s = 3600
+kill_after_s = 30
+
+# Caps over rolling windows. Reverts do not count as merges.
+max_runs_day = 30
+max_runs_hour = 6
+max_merges_day = 3
+
+# Three failed runs in a row pause the watcher. Usage-limit runs do not count.
+fail_streak_pause = 3
+# Wait this long after a usage limit when its message gives no reset time.
+limit_backoff_s = 3600
+# A job is rerun at most once in this window.
+rerun_window_s = 21600
+
+# The only repositories whose code the run may change and merge.
+repos = ["splash_poller", "ai-harness"]
+
+# A merge may not touch these (repo-relative). An entry ending in "/" matches a
+# path prefix; any other entry matches anywhere in the path.
+denied_paths = [
+  "web/",
+  ".env",
+  "crontab",
+  ".service",
+  ".timer",
+  "migrations/",
+  ".sql",
+  "alertwatch/",
+  "bin/tg-send",
+  "council/",
+  "watchdog/",
+]
+
+# Jobs the run may start again once, through `python3 -m alertwatch.rerun <job>`.
+# Copied from the live crontab on 2026-11-15. supervise_meets.py is never listed:
+# it runs every 5 minutes by itself and starts the meet writers.
+[rerun.coverage_check]
+cwd = "/home/dev/projects/splash_poller"
+lock = "/home/dev/.local/state/meettrack/coverage.lock"
+cmd = "/usr/bin/python3 coverage_check.py"
+log = "/home/dev/projects/splash_poller/logs/coverage_check.cron.log"
+timeout_s = 900
+
+[rerun.discover_meets]
+cwd = "/home/dev/projects/splash_poller"
+lock = "/home/dev/.local/state/meettrack/discover.lock"
+cmd = "/usr/bin/python3 discover_meets.py"
+log = "/home/dev/projects/splash_poller/logs/discover.cron.log"
+timeout_s = 900
+
+[rerun.folder_finder]
+cwd = "/home/dev/projects/splash_poller"
+lock = "/home/dev/.local/state/meettrack/finder.lock"
+cmd = "/usr/bin/python3 folder_finder.py --apply"
+log = "/home/dev/projects/splash_poller/logs/folder_finder.cron.log"
+timeout_s = 900
+
+[rerun.announcements]
+cwd = "/home/dev/projects/splash_poller"
+lock = "/home/dev/.local/state/meettrack/announcements.lock"
+cmd = "/usr/bin/python3 announcements.py"
+log = "/home/dev/projects/splash_poller/logs/announcements.cron.log"
+timeout_s = 900
+
+[rerun.ingest_entries]
+cwd = "/home/dev/projects/splash_poller"
+lock = "/tmp/meettrack-ingest-entries.lock"
+cmd = "/usr/bin/python3 ingest_entries.py"
+log = "/home/dev/projects/splash_poller/logs/ingest_entries.cron.log"
+timeout_s = 900
+
+[rerun.finance_backup]
+cwd = "/home/dev/projects/finance-tracker"
+lock = ""
+cmd = "USER=dev /usr/bin/python3 scripts/backup/backup_data.py"
+log = "/home/dev/projects/finance-tracker/scripts/backup/logs/backup.log"
+timeout_s = 1800

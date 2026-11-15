@@ -1,0 +1,51 @@
+# Which captured messages reach a run. Read before any model runs.
+# Each rule: name, action ("ignore" or "look"), and a `source` and/or `text`
+# regex (Python re.search; `text` ignores case). A rule with both needs both.
+# The first matching rule wins. A message no rule matches is looked at.
+# Messages from sources starting with "alert-watch" (except "alert-watch-check")
+# are dropped before these rules: the watcher never reacts to its own notes.
+
+# MeetTrack expected-but-missing monitor (watchdog/expect_alerts.py): a RESOLVED
+# line says a problem went away.
+[[rule]]
+name = "expect-resolved"
+action = "ignore"
+source = "run-expect\\.sh|expect_run"
+text = "^\\s*\\[OK\\] RESOLVED"
+
+# Bebop (retired 2026-10-23 from cron): the briefing itself is not a failure,
+# its failure line is (bebop/run-briefing.sh).
+[[rule]]
+name = "bebop-failed"
+action = "look"
+source = "run-briefing\\.sh"
+text = "briefing failed"
+
+[[rule]]
+name = "bebop-briefing"
+action = "ignore"
+source = "run-briefing\\.sh"
+
+# Finished backlog work waits for Rex's review; it is not a failure.
+[[rule]]
+name = "backlog-run"
+action = "ignore"
+source = "backlog-?run"
+
+# Stranded work needs Rex's choice of recovery.
+[[rule]]
+name = "session-gc"
+action = "ignore"
+source = "session-gc|sessiongc"
+
+# A page-change watch, not a failure.
+[[rule]]
+name = "hq-watch"
+action = "ignore"
+source = "usna-summer-seminar"
+
+# New user feedback already becomes a backlog item.
+[[rule]]
+name = "attainprep-feedback"
+action = "ignore"
+source = "feedback-sync|feedback:market"
