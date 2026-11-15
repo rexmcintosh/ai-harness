@@ -329,6 +329,8 @@ def _save_state(state: Path, st: dict) -> None:
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(st, fh, indent=1)
+        fh.flush()
+        os.fsync(fh.fileno())  # durable before the rename, so a power cut cannot empty it
     os.replace(tmp, path)
     ledger.fsync_dir(state)
 
@@ -555,6 +557,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             _recover_batch(cfg, st, dead, t)
         if st.get("unsent_notes"):
             retry_notes(cfg, st, t)
+    # Before any new run: a crash between a third failure and its pause must not let
+    # the next pass carry on.
+    if not dry_run and not (state / "PAUSED").exists() and ledger.fail_streak(state) >= cfg.fail_streak_pause:
+        _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
     if (state / "PAUSED").exists():
         return 0
     if float(st.get("limit_until") or 0) > t:

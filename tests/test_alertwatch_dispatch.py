@@ -848,3 +848,28 @@ def test_a_cut_report_says_where_the_whole_text_is(env):
     go(env)
     prompt = env["prompt.txt"].read_text()
     assert "[report cut at 4000 of 5000 characters" in prompt and "/batch/" in prompt
+
+
+def test_three_failures_pause_even_if_the_pause_step_was_lost(env):
+    inbox.ensure_dirs(env["state"])
+    for i in range(3):  # three failed runs recorded, then a crash before _pause
+        ledger.write_run(env["state"], {"run_id": f"f{i}", "started_at": time.time() - 300 + i, "status": "failed"})
+    report(env)
+    go(env)
+    assert (env["state"] / "PAUSED").exists()
+    assert not env["prompt.txt"].exists()
+    assert sent(env)[-1]["text"].startswith("alert-watch paused itself")
+
+
+def test_records_and_state_are_fsynced_before_their_rename(env, monkeypatch):
+    synced = []
+    real = os.fsync
+    monkeypatch.setattr(os, "fsync", lambda fd: synced.append(fd) or real(fd))
+    inbox.ensure_dirs(env["state"])
+    ledger.write_run(env["state"], {"run_id": "x", "started_at": time.time(), "status": "running"})
+    synced.clear()
+    ledger.update_run(env["state"], "x", status="ok")
+    assert len(synced) >= 2  # the file, then its folder
+    synced.clear()
+    dispatch._save_state(env["state"], {"a": 1})
+    assert len(synced) >= 2

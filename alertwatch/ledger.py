@@ -59,11 +59,8 @@ def update_run(state: Path, run_id: str, **fields) -> dict:
     path = _path(state, run_id)
     record = json.loads(path.read_text(encoding="utf-8"))
     record.update(fields)
-    tmp = path.with_name(f".tmp-{path.name}")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        json.dump(record, fh, ensure_ascii=False, indent=1)
-    os.replace(tmp, path)
+    os.replace(_write_tmp(path, record), path)  # contents fsynced before the rename
+    fsync_dir(path.parent)
     return record
 
 
