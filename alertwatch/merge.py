@@ -168,13 +168,23 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, ["git", "diff"], proc.stdout, proc.stderr)
     files = [f for f in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
-    untracked = {line[3:] for line in _git(repo, "status", "--porcelain", "--untracked-files=all").splitlines()
-                 if line.startswith("?? ")}
+    # Every commit that will be pushed, not only the net diff: a denied file changed in
+    # one commit and restored in a later one is still published by the push.
+    log = subprocess.run(["git", "log", "--pretty=format:", "--name-only", "--no-renames", "-z",
+                          f"{base}..{head}"], cwd=str(repo), capture_output=True, timeout=300)
+    if log.returncode != 0:
+        raise subprocess.CalledProcessError(log.returncode, ["git", "log"], log.stdout, log.stderr)
+    touched = {f.strip("\n") for f in log.stdout.decode("utf-8", "surrogateescape").split("\0")}
+    touched = {f for f in touched if f}
+    status = subprocess.run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=str(repo),
+                            capture_output=True, timeout=300)
+    untracked = {e[3:] for e in status.stdout.decode("utf-8", "surrogateescape").split("\0")
+                 if e.startswith("?? ")}
     blocking = sorted({u for u in untracked for f in files
                        if u == f or f.startswith(u.rstrip("/") + "/") or u.startswith(f + "/")})
     if blocking:  # they would stop the local fast forward after the push
         raise Refused(f"untracked files in {repo} are in the way: {', '.join(blocking)}")
-    bad = denied(files, cfg.denied_paths)
+    bad = denied(sorted(set(files) | touched), cfg.denied_paths)
     if bad:
         raise Refused(f"the diff touches denied paths: {', '.join(bad)}")
     made = ledger.merges_in_window(cfg.state_dir, now)

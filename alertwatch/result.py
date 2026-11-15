@@ -57,3 +57,12 @@ def started(data: dict | None) -> bool:
         return int((data or {}).get("num_turns") or 0) > 0
     except (TypeError, ValueError):
         return False
+
+
+def proved_idle(data: dict | None) -> bool:
+    """True only when the run's JSON says, with a real integer, that it took zero
+    turns. Missing or malformed counts prove nothing, so they are never replayed."""
+    if not isinstance(data, dict):
+        return False
+    turns = data.get("num_turns")
+    return type(turns) is int and turns == 0

@@ -145,6 +145,24 @@ def release(state: Path, run_id: str, entries: list[dict], *, count_attempt: boo
     return failed_ids
 
 
+def batch_entries(state: Path, run_id: str) -> list[dict]:
+    out = []
+    for p in _visible_json(Path(state) / "batch" / run_id):
+        try:
+            entry = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not _problem(entry):
+            entry["_file"] = p.name
+            out.append(entry)
+    return out
+
+
+def stale_batches(state: Path) -> list[str]:
+    folder = Path(state) / "batch"
+    return sorted(p.name for p in folder.iterdir() if p.is_dir()) if folder.exists() else []
+
+
 def recover_stale(state: Path) -> list[str]:
     """Batches left by a dispatcher that died mid-run. Its run may have acted, so they
     are never replayed: they go to failed/. Call only while holding the dispatch lock."""

@@ -1,6 +1,6 @@
 import json
 
-from alertwatch.result import parse_result, started, usage_limit
+from alertwatch.result import parse_result, proved_idle, started, usage_limit
 
 
 def block(obj):
@@ -72,3 +72,9 @@ def test_started():
     assert started({"num_turns": 0}) is False
     assert started(None) is False
     assert started({}) is False
+
+
+def test_proved_idle_needs_a_real_zero():
+    assert proved_idle({"num_turns": 0}) is True
+    for data in (None, {}, {"num_turns": None}, {"num_turns": "0"}, {"num_turns": False}, {"num_turns": 2}):
+        assert proved_idle(data) is False, data

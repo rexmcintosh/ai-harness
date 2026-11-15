@@ -22,7 +22,7 @@ from typing import Callable
 
 from alertwatch import inbox, ledger, notes
 from alertwatch.config import Config, load_config
-from alertwatch.result import parse_result, started, usage_limit
+from alertwatch.result import parse_result, proved_idle, started, usage_limit
 from alertwatch.rules import classify, load_rules
 from backlogrun.cli import DENY_RULES
 
@@ -377,11 +377,18 @@ NOTE_TRIES = 5
 
 
 def _send_note(cfg: Config, st: dict, run_id: str, text: str) -> str:
-    """Send a note. A definite rejection is kept in state.json and retried on later
+    """Send a note through an outbox: it is saved in state.json before the send, so a
+    crash cannot lose it. A definite rejection stays there and is retried on later
     passes; an uncertain send may have arrived, so it is never sent again."""
+    item = {"run_id": run_id, "text": text, "tries": 0}
+    st.setdefault("unsent_notes", []).append(item)
+    _save_state(cfg.state_dir, st)
     status = notes.send(cfg, text)
     if status == "failed":
-        st.setdefault("unsent_notes", []).append({"run_id": run_id, "text": text, "tries": 1})
+        item["tries"] = 1
+    else:
+        st["unsent_notes"] = [n for n in st["unsent_notes"] if n is not item]
+    _save_state(cfg.state_dir, st)
     return status
 
 
@@ -389,8 +396,8 @@ def retry_notes(cfg: Config, st: dict, now: float) -> None:
     keep = []
     for item in st.get("unsent_notes") or []:
         status = notes.send(cfg, item["text"])
-        if status == "failed" and item.get("tries", 1) + 1 < NOTE_TRIES:
-            keep.append({**item, "tries": item.get("tries", 1) + 1})
+        if status == "failed" and item.get("tries", 0) + 1 < NOTE_TRIES:
+            keep.append({**item, "tries": item.get("tries", 0) + 1})
             continue
         if status == "failed":
             _log(now, f"note for {item.get('run_id')} dropped after {NOTE_TRIES} failed sends")
@@ -401,6 +408,45 @@ def retry_notes(cfg: Config, st: dict, now: float) -> None:
         except (OSError, ValueError):
             pass
     st["unsent_notes"] = keep
+
+
+def _kill_until_gone(run_id: str, tries: int = 5) -> bool:
+    """Kill every process a run left behind and check that none is left."""
+    for _ in range(tries):
+        if _kill_marked(run_id) == 0:
+            return True
+        time.sleep(0.2)
+    return _kill_marked(run_id) == 0
+
+
+def _read_run(state: Path, run_id: str) -> dict | None:
+    try:
+        return json.loads((state / "runs" / f"{run_id}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
+    """A batch a dead dispatcher left. If its run record already holds the decision
+    (`dest`), carry it out; the result and pending checks are in the record. If not,
+    the run may have acted: the batch goes to failed/ and Rex is told."""
+    state = cfg.state_dir
+    rec = _read_run(state, run_id) or {}
+    dest = rec.get("dest")
+    if dest in ("done", "failed"):
+        inbox.finish(state, run_id, dest)
+    elif dest in ("release", "release_count"):
+        inbox.release(state, run_id, inbox.batch_entries(state, run_id), count_attempt=dest == "release_count")
+    else:
+        inbox.finish(state, run_id, "failed")
+        try:
+            ledger.update_run(state, run_id, status="failed", reason="the dispatcher stopped during this run")
+        except (OSError, ValueError):
+            pass
+        _send_note(cfg, st, "", notes.failure_note(
+            {"run_id": run_id, "reason": "the dispatcher stopped during this run"}, []))
+    _log(now, f"batch {run_id} was left by a dispatcher that stopped; finished as {dest or 'failed'}")
+    return True
 
 
 def _pause(cfg: Config, st: dict, reason: str, now: float) -> None:
@@ -451,14 +497,13 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
                 print(p.name, "unreadable")
         return 0
 
-    for dead in inbox.recover_stale(state):
-        _log(t, f"batch {dead} was left by a dispatcher that stopped; moved to failed/")
-        try:
-            ledger.update_run(state, dead, status="failed", reason="the dispatcher stopped during this run")
-        except (OSError, ValueError):
-            pass
-        _send_note(cfg, st, "", notes.failure_note(
-            {"run_id": dead, "reason": "the dispatcher stopped during this run"}, []))
+    for dead in inbox.stale_batches(state):
+        if not _kill_until_gone(dead):
+            _log(t, f"batch {dead}: its run still has processes after SIGKILL; no new run this pass")
+            _save_state(state, st)
+            return 0
+        if not _recover_batch(cfg, st, dead, t):
+            return 0
 
     inbox.clean_tmp(state, t)
     enqueue_due_checks(cfg, st, t)
@@ -505,31 +550,25 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
                   leftovers_killed=run.get("leftovers_killed", 0),
                   helper_actions=[a for a in ledger.actions(state) if a.get("run_id") == run_id])
     parsed = parse_result(str((data or {}).get("result") or "")) if data else None
+    clean = data is not None and not run["timed_out"] and run["rc"] == 0 and not data.get("is_error")
+    ignored = bool(parsed) and not clean
+    if ignored:
+        parsed = None  # a result block from a run that failed or timed out is not a success
     hit, until = (False, None) if parsed else usage_limit(data, run["stdout"], run["stderr"])
+    idle = proved_idle(data) and not run["timed_out"]
 
+    # 1. decide; 2. persist the decision and result (a crash after this is finished by
+    # _recover_batch, and the pending checks are safe); 3. move the batch; 4. the note.
     if parsed:
         parsed["needs_rex"] = [*parsed["needs_rex"], *check_result(parsed, [e["id"] for e in looks])]
-        record.update(status="ok", result=parsed)
-        text = notes.run_note(record)
-        record["note_text"] = text
-        record["note_status"] = _send_note(cfg, st, run_id, text) if text else "none"
-        inbox.finish(state, run_id, "done")
+        record.update(status="ok", result=parsed, dest="done")
     elif hit:
         until = until or ended + cfg.limit_backoff_s
-        record.update(status="limit", reason="Claude usage limit")
         st["limit_until"] = until
-        _save_state(state, st)  # before the release, so a crash cannot retry at once
-        # Only JSON that shows zero turns proves the run did nothing.
-        part_way = data is None or started(data)
-        if part_way:
-            inbox.finish(state, run_id, "failed")  # it may have acted: never replayed
-            record["reason"] = "Claude usage limit, part way through the run (or no JSON)"
-        else:
-            inbox.release(state, run_id, looks, count_attempt=False)
-        if part_way or float(st.get("limit_noted_until") or 0) != until:
-            record["note_text"] = notes.limit_note(until, part_way=part_way)
-            record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
-            st["limit_noted_until"] = until
+        _save_state(state, st)
+        record.update(status="limit", dest="release" if idle else "failed",
+                      reason="Claude usage limit" if idle else
+                      "Claude usage limit, part way through the run (or no proof it was idle)")
     else:
         if run["timed_out"]:
             reason = f"timed out after {cfg.run_timeout_s} s"
@@ -537,15 +576,31 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             reason = f"exited with rc={run['rc']} and no JSON output"
         else:
             reason = f"no readable result (rc={run['rc']})"
-        record.update(status="failed", reason=reason,
+        if ignored:
+            reason += "; its result block was ignored because the run did not end cleanly"
+        record.update(status="failed", reason=reason, dest="release_count" if idle else "failed",
                       stderr_tail=run["stderr"][-4000:], stdout_tail=run["stdout"][-4000:])
-        # Only a run that shows zero turns provably did nothing; no JSON at all may
-        # have acted before it died, so it is never replayed.
-        if data is not None and not started(data) and not run["timed_out"]:
-            failed_ids = inbox.release(state, run_id, looks, count_attempt=True)
-        else:
-            inbox.finish(state, run_id, "failed")
+    ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
+
+    failed_ids = []
+    if record["dest"] in ("done", "failed"):
+        inbox.finish(state, run_id, record["dest"])
+        if record["status"] == "failed":
             failed_ids = [e["id"] for e in looks]
+    else:
+        failed_ids = inbox.release(state, run_id, looks, count_attempt=record["dest"] == "release_count")
+
+    if record["status"] == "ok":
+        text = notes.run_note(record)
+        record["note_text"] = text
+        record["note_status"] = _send_note(cfg, st, run_id, text) if text else "none"
+    elif record["status"] == "limit":
+        part_way = record["dest"] == "failed"
+        if part_way or float(st.get("limit_noted_until") or 0) != until:
+            record["note_text"] = notes.limit_note(until, part_way=part_way)
+            record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
+            st["limit_noted_until"] = until
+    else:
         record["note_text"] = notes.failure_note(record, failed_ids)
         record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
 

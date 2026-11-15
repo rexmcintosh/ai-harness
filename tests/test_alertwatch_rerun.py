@@ -9,7 +9,7 @@ from alertwatch.config import RerunJob, load_config
 def cfg_with(tmp_path, cmd, lock=""):
     cfg = load_config(env={"ALERT_WATCH_STATE": str(tmp_path / "state")})
     job = RerunJob(cmd=cmd, cwd=str(tmp_path), lock=lock, log=str(tmp_path / "job.log"), timeout_s=30)
-    return dataclasses.replace(cfg, rerun={"demo": job})
+    return dataclasses.replace(cfg, mode="act", rerun={"demo": job})
 
 
 def test_unknown_job_refused(tmp_path, capsys):
@@ -122,3 +122,9 @@ def test_every_failure_before_the_start_gives_the_rerun_back(tmp_path):
         cfg = dataclasses.replace(base, rerun={"demo": bad})
         assert rerun.main(["demo"], cfg=cfg) == 1, bad
     assert rerun.main(["demo"], cfg=base) == 0
+
+
+def test_refused_in_diagnose_mode(tmp_path, capsys):
+    cfg = dataclasses.replace(cfg_with(tmp_path, "true"), mode="diagnose")
+    assert rerun.main(["demo"], cfg=cfg) == 2
+    assert "reruns need mode = act" in capsys.readouterr().err

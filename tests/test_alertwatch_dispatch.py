@@ -35,6 +35,10 @@ if mode == "ok_quiet":
                                             for i in ids]})})
 if mode == "crash_early":
     sys.exit(1)
+if mode == "no_turn_count":
+    out({"is_error": True, "session_id": "sess-n", "result": "error, no turn count"}, 1)
+if mode == "error_with_block":
+    out({"is_error": True, "num_turns": 9, "session_id": "sess-e", "result": block({"note": "looks fine"})}, 1)
 if mode == "zero_turns":
     out({"is_error": True, "num_turns": 0, "session_id": "sess-z", "result": "failed before any turn"}, 1)
 if mode == "crash_late":
@@ -596,3 +600,57 @@ def test_a_child_holding_the_pipes_cannot_hang_the_dispatcher(env, monkeypatch, 
                 os.kill(int(pid_file.read_text()), _signal.SIGKILL)
             except ProcessLookupError:
                 pass
+
+
+def test_a_dead_dispatchers_run_is_killed_before_anything_else(env, tmp_path):
+    import subprocess as _sp
+    report(env)
+    inbox.claim_all(env["state"], "dead-run")
+    orphan = _sp.Popen(["sleep", "60"], env={**os.environ, "ALERT_WATCH_RUN_ID": "dead-run"})
+    try:
+        go(env)
+        assert orphan.wait(timeout=5) != 0
+    finally:
+        if orphan.poll() is None:
+            orphan.kill()
+    assert (env["state"] / "failed" / "dead-run").exists()
+
+
+def test_a_finished_run_whose_batch_was_not_moved_is_completed_not_failed(env):
+    report(env)
+    inbox.claim_all(env["state"], "done-run")
+    ledger.write_run(env["state"], {"run_id": "done-run", "started_at": time.time() - 60, "status": "ok",
+                                    "dest": "done", "ended_at": time.time() - 30,
+                                    "result": {"note": "x", "pending_checks": [{"due_at": "2099-01-01T00:00:00Z"}]}})
+    go(env)
+    assert (env["state"] / "done" / "done-run").exists()
+    assert not any("failed" in n["text"] for n in sent(env))
+    assert runs(env)[0]["result"]["pending_checks"]  # kept
+
+
+def test_a_note_is_in_the_outbox_before_it_is_sent(env, monkeypatch):
+    def crash(cfg, text):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(dispatch.notes, "send", crash)
+    report(env)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    st = json.loads((env["state"] / "state.json").read_text())
+    assert st["unsent_notes"] and st["unsent_notes"][0]["text"].startswith("alert-watch: restarted the writer")
+
+
+def test_no_turn_count_is_not_proof_of_idle(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "no_turn_count")
+    report(env)
+    go(env)
+    assert not list((env["state"] / "inbox").glob("*.json"))
+    assert list((env["state"] / "failed").iterdir())
+
+
+def test_a_result_block_from_a_failed_run_is_not_a_success(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "error_with_block")
+    report(env)
+    go(env)
+    (rec,) = runs(env)
+    assert rec["status"] == "failed" and "ignored" in rec["reason"]
+    assert list((env["state"] / "failed").iterdir())

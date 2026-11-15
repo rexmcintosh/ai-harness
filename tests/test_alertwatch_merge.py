@@ -374,3 +374,27 @@ def test_a_file_moved_out_of_a_denied_folder_is_refused(world, capsys):
     git(wt, "commit", "-qm", "move it out")
     assert run(world, "merge", "repo", str(wt)) == 2
     assert "web/page.ts" in capsys.readouterr().err
+
+
+def test_a_denied_file_changed_in_a_middle_commit_is_refused(world, capsys):
+    before = git(world["origin"], "rev-parse", "main")
+    git(world["repo"], "fetch", "-q", "origin")
+    wt = world["state"] / "worktrees" / "mid"
+    git(world["repo"], "worktree", "add", "-q", "-b", "alertwatch/run-test-mid", str(wt), "origin/main")
+    (wt / "web" / "page.ts").write_text("secret\n")
+    git(wt, "commit", "-qam", "touch web")
+    (wt / "web" / "page.ts").write_text("a\n")
+    (wt / "app.py").write_text("x = 9\n")
+    git(wt, "commit", "-qam", "restore web, real fix")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert "web/page.ts" in capsys.readouterr().err
+    assert git(world["origin"], "rev-parse", "main") == before
+
+
+def test_an_untracked_file_with_an_odd_name_in_the_way_is_refused(world):
+    before = git(world["origin"], "rev-parse", "main")
+    name = "nova p\u00e1gina.py"
+    wt = fix_worktree(world, change=(name, "y = 1\n"))
+    (world["repo"] / name).write_text("scratch\n")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert git(world["origin"], "rev-parse", "main") == before

@@ -44,6 +44,9 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
     ap.add_argument("job")
     args = ap.parse_args(argv)
     cfg = cfg or load_config()
+    if cfg.mode != "act":
+        print(f"rerun: mode is {cfg.mode}; reruns need mode = act", file=sys.stderr)
+        return 2
     job = cfg.rerun.get(args.job)
     if job is None:
         print(f"rerun: {args.job!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
