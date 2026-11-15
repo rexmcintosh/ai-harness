@@ -73,36 +73,55 @@ def _visible_json(folder: Path) -> list[Path]:
 
 
 UNREADABLE_AGE_S = 3600
+# The chat id of the dispatcher's own check entries (add_entry). tg-send always
+# records the real chat, so only an alert-watch-check entry may carry it.
+INTERNAL_CHAT = "alert-watch-internal"
+CHECK_SOURCE = "alert-watch-check"
 
 
 def _eligibility(path: Path, watch_chats) -> str:
-    """watched | other | unknown. Unknown (the file cannot be read or parsed) is never
-    treated as watched: its chat is not proven, so its text is never claimed."""
+    """watched | other | unknown. Only a proven watched destination is watched: a chat
+    in watch_chats, or the dispatcher's own check entry. A missing or empty chat, or a
+    file that cannot be read or parsed, is unknown, and unknown is never claimed."""
     try:
-        chat = str(json.loads(path.read_text(encoding="utf-8")).get("chat_id") or "")
+        entry = json.loads(path.read_text(encoding="utf-8"))
+        chat = str(entry.get("chat_id") or "")
     except (OSError, ValueError, AttributeError):
         return "unknown"
-    return "other" if chat and chat not in watch_chats else "watched"
+    if chat in watch_chats:
+        return "watched"
+    if chat == INTERNAL_CHAT and entry.get("source") == CHECK_SOURCE:
+        return "watched"
+    return "other" if chat else "unknown"
 
 
-def purge_other_chats(state: Path, watch_chats, now: float | None = None) -> list[str]:
+def purge_other_chats(state: Path, watch_chats) -> int:
     """Delete inbox messages sent to a chat alert-watch does not watch (tg-send skips
-    them; this is the second guard), and captures that stayed unreadable for an hour
-    (their chat cannot be proven). One that cannot be deleted stays in the inbox and is
-    never claimed. Returns the names of the unreadable files deleted (names only)."""
-    now = time.time() if now is None else now
-    gone_unreadable = []
+    them; this is the second guard). One that cannot be deleted stays in the inbox and
+    is never claimed."""
+    removed = 0
     for p in _visible_json(Path(state) / "inbox"):
-        kind = _eligibility(p, watch_chats)
+        if _eligibility(p, watch_chats) == "other":
+            try:
+                p.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
+
+def stale_unknown(state: Path, watch_chats, now: float) -> list[Path]:
+    """Captures whose chat has stayed unproven (unreadable, or no chat) for an hour.
+    The caller queues a names-only note before it deletes them."""
+    out = []
+    for p in _visible_json(Path(state) / "inbox"):
         try:
-            if kind == "other":
-                p.unlink()
-            elif kind == "unknown" and p.stat().st_mtime < now - UNREADABLE_AGE_S:
-                p.unlink()
-                gone_unreadable.append(p.name)
+            old = p.stat().st_mtime < now - UNREADABLE_AGE_S
         except OSError:
-            pass
-    return gone_unreadable
+            continue
+        if old and _eligibility(p, watch_chats) == "unknown":
+            out.append(p)
+    return out
 
 
 def claim_all(state: Path, run_id: str, limit: int | None = None,
@@ -263,10 +282,11 @@ def clean_tmp(state: Path, now: float, age_s: int = 3600) -> int:
     return removed
 
 
-def add_entry(state: Path, text: str, source: str, eid: str | None = None) -> str:
+def add_entry(state: Path, text: str, source: str, eid: str | None = None,
+              chat_id: str = INTERNAL_CHAT) -> str:
     now = dt.datetime.now(dt.timezone.utc)
     eid = eid or now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)
-    entry = {"version": 1, "id": eid, "captured_at": now.strftime(_TS_FMT), "chat_id": "",
+    entry = {"version": 1, "id": eid, "captured_at": now.strftime(_TS_FMT), "chat_id": chat_id,
              "text": text, "source": source, "cwd": "", "attempts": 0}
     _write_json(Path(state) / "inbox" / f"{eid}.json", entry)
     _fsync_dir(Path(state) / "inbox")  # on disk before the caller records it as enqueued

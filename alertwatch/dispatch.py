@@ -605,6 +605,11 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     if not dry_run:
         if not (state / "PAUSED").exists() and _streak(cfg, st) >= cfg.fail_streak_pause:
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
+    if not dry_run and t - float(st.get("pruned_at") or 0) >= 3600:
+        inbox.prune(state, t)  # retention holds on idle, paused and capped passes too
+        ledger.prune_runs(state, t)
+        st["pruned_at"] = t
+        _save_state(state, st)
     if (state / "PAUSED").exists():
         return 0
     if float(st.get("limit_until") or 0) > t:
@@ -631,10 +636,24 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         _save_state(state, st)
         return 0
 
-    unreadable = inbox.purge_other_chats(state, cfg.watch_chats, t)
-    if unreadable:  # names only: the chat of these could not be proven
-        _send_note(cfg, st, "", notes.broken_note(
-            "inbox", [(n, "unreadable for an hour; deleted") for n in unreadable], state))
+    inbox.purge_other_chats(state, cfg.watch_chats)
+    stale = inbox.stale_unknown(state, cfg.watch_chats, t)
+    if stale:
+        # names only, and queued before the delete, so the notice can never be lost
+        noted = set(st.get("unknown_noted") or [])
+        fresh = [p for p in stale if p.name not in noted]
+        if fresh:
+            item = _queue_note(cfg, st, "", notes.broken_note(
+                "inbox", [(p.name, "its chat could not be proven for an hour; deleted") for p in fresh], state))
+            st["unknown_noted"] = sorted(noted | {p.name for p in fresh})[-500:]
+            _save_state(state, st)
+        for p in stale:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        if fresh:
+            _deliver(cfg, st, item, t)
     run_id = ledger.new_run_id(t)
     entries, broken = inbox.claim_all(state, run_id, limit=BATCH_MAX, watch_chats=cfg.watch_chats)
     for name, reason in broken:
@@ -746,8 +765,6 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())
     if record["status"] == "failed" and _streak(cfg, st) >= cfg.fail_streak_pause:
         _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", ended)
-    inbox.prune(state, ended)
-    ledger.prune_runs(state, ended)
     _save_state(state, st)
     return 0
 

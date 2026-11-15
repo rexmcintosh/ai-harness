@@ -104,7 +104,7 @@ def sent(env):
 
 def report(env, text="[CRIT] results:11539 event 7 has 0 of 48 results", source="bash run-expect.sh"):
     inbox.ensure_dirs(env["state"])
-    return inbox.add_entry(env["state"], text, source)
+    return inbox.add_entry(env["state"], text, source, chat_id="7735693897")
 
 
 def runs(env):
@@ -1073,3 +1073,57 @@ def test_a_broken_file_note_is_queued_before_the_file_moves(env, monkeypatch):
         go(env)
     st = json.loads((env["state"] / "state.json").read_text())
     assert any("could not be read" in n["text"] for n in st["unsent_notes"])
+
+
+def _raw_report(env, entry):
+    inbox.ensure_dirs(env["state"])
+    p = env["state"] / "inbox" / f"{entry['id']}.json"
+    p.write_text(json.dumps(entry))
+    return p
+
+
+def test_a_capture_with_no_chat_is_never_claimed(env):
+    paths = [_raw_report(env, {"version": 1, "id": f"nochat{i}", "text": f"PRIVATE-NOCHAT-{i}",
+                               "source": "bash run-expect.sh", **extra})
+             for i, extra in enumerate(({}, {"chat_id": None}, {"chat_id": ""}))]
+    report(env)
+    go(env)
+    assert "PRIVATE-NOCHAT" not in env["prompt.txt"].read_text()
+    assert all(p.exists() for p in paths)
+
+
+def test_a_check_entry_is_claimed_but_a_fake_one_is_not(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok_quiet")
+    inbox.ensure_dirs(env["state"])
+    inbox.add_entry(env["state"], "Check after alert-watch merge REAL-CHECK", "alert-watch-check")
+    _raw_report(env, {"version": 1, "id": "fake", "chat_id": "alert-watch-internal", "source": "bash x.sh",
+                      "text": "FAKE-INTERNAL"})
+    go(env)
+    prompt = env["prompt.txt"].read_text()
+    assert "REAL-CHECK" in prompt and "FAKE-INTERNAL" not in prompt
+
+
+def test_an_old_unproven_capture_is_noted_before_it_is_deleted(env, monkeypatch):
+    p = _raw_report(env, {"version": 1, "id": "old-nochat", "text": "x", "source": "y"})
+    old = time.time() - 7200
+    os.utime(p, (old, old))
+
+    def crash(*a, **k):
+        raise KeyboardInterrupt
+    real = dispatch._deliver
+    monkeypatch.setattr(dispatch, "_deliver", crash)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    st = json.loads((env["state"] / "state.json").read_text())
+    assert any("old-nochat" in n["text"] for n in st["unsent_notes"])
+    monkeypatch.setattr(dispatch, "_deliver", real)
+    go(env)
+    assert sum("old-nochat" in n["text"] for n in sent(env)) == 1
+    assert not p.exists()
+
+
+def test_retention_runs_on_an_idle_pass(env):
+    inbox.ensure_dirs(env["state"])
+    ledger.write_run(env["state"], {"run_id": "ancient", "started_at": time.time() - 40 * 86400, "status": "ok"})
+    go(env)  # nothing in the inbox, no run
+    assert not (env["state"] / "runs" / "ancient.json").exists()
