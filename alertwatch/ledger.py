@@ -6,6 +6,7 @@ skipped), reason, mode, entries, session_id, rc, timed_out, result, note_status.
 from __future__ import annotations
 
 import datetime as dt
+import fcntl
 import json
 import os
 import secrets
@@ -88,3 +89,43 @@ def fail_streak(state: Path) -> int:
         elif status == "ok":
             break
     return streak
+
+
+# --- the actions ledger: every merge, revert and restart a helper made ---------
+# <state>/actions.jsonl, appended under a lock by trusted helper code (merge.py,
+# restart.py), never by the model. It is the authority for the merge cap and for
+# "which writers did alert-watch restart".
+
+
+def append_action(state: Path, action: dict) -> None:
+    path = Path(state) / "actions.jsonl"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        fh.write(json.dumps(action, ensure_ascii=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def actions(state: Path) -> list[dict]:
+    path = Path(state) / "actions.jsonl"
+    out = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(item, dict):
+            out.append(item)
+    return out
+
+
+def merges_in_window(state: Path, now: float, hours: float = 24) -> int:
+    """Merges (not reverts) the merge helper made in the window: the merge cap."""
+    cutoff = now - hours * 3600
+    return sum(1 for a in actions(state)
+               if a.get("kind") == "merge" and float(a.get("at") or 0) >= cutoff)

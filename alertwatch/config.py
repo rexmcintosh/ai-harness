@@ -40,6 +40,9 @@ class Config:
     rerun: dict[str, RerunJob]
     tg_send: str
     claude_bin: str
+    worktrees_dir: Path
+    meettrack_run_dir: Path
+    restart_max_attempts: int
 
 
 def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) -> Config:
@@ -71,4 +74,7 @@ def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) 
         rerun=rerun,
         tg_send=env.get("ALERT_WATCH_TG_SEND") or str(raw["tg_send"]),
         claude_bin=env.get("ALERT_WATCH_CLAUDE") or "claude",
+        worktrees_dir=Path(state) / "worktrees",
+        meettrack_run_dir=Path(str(raw["meettrack_run_dir"])),
+        restart_max_attempts=int(raw["restart_max_attempts"]),
     )

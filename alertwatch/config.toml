@@ -24,6 +24,13 @@ limit_backoff_s = 3600
 # A job is rerun at most once in this window.
 rerun_window_s = 21600
 
+# The run makes its fix worktrees in <state>/worktrees/, never inside a main
+# checkout (cron runs from those). The merge helper refuses a worktree elsewhere.
+# Meet writer PID files, and the restart rule: restart only at this many
+# poller_attempts or fewer (the supervisor marks a meet failed at 5).
+meettrack_run_dir = "/home/dev/.local/state/meettrack/run"
+restart_max_attempts = 3
+
 # The only repositories whose code the run may change and merge.
 repos = ["splash_poller", "ai-harness"]
 

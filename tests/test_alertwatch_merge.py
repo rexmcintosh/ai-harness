@@ -1,0 +1,177 @@
+"""The merge helper on throwaway git repos: a bare origin, a main checkout, a fix worktree."""
+import dataclasses
+import json
+import subprocess
+import time
+from pathlib import Path
+
+import pytest
+
+from alertwatch import ledger, merge
+from alertwatch.config import load_config
+
+
+def git(cwd, *args):
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture
+def world(tmp_path, monkeypatch):
+    for k, v in {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+                 "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
+                 "ALERT_WATCH_RUN_ID": "run-test"}.items():
+        monkeypatch.setenv(k, v)
+    origin = tmp_path / "origin.git"
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    projects = tmp_path / "projects"
+    repo = projects / "repo"
+    git(tmp_path, "clone", "-q", str(origin), str(repo))
+    git(repo, "checkout", "-q", "-b", "main")
+    (repo / "app.py").write_text("x = 1\n")
+    (repo / "web").mkdir()
+    (repo / "web" / "page.ts").write_text("a\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "init")
+    git(repo, "push", "-q", "origin", "main")
+    state = tmp_path / "state"
+    cfg = load_config(env={"ALERT_WATCH_STATE": str(state)})
+    cfg = dataclasses.replace(cfg, mode="act", projects_dir=projects, repos=("repo",))
+    state.mkdir()
+    (state / "worktrees").mkdir()
+    return {"cfg": cfg, "repo": repo, "origin": origin, "state": state, "tmp": tmp_path}
+
+
+def fix_worktree(w, name="alertwatch/run-test-fix", change=("app.py", "x = 2\n"), base="origin/main"):
+    wt = w["state"] / "worktrees" / name.replace("/", "-")
+    git(w["repo"], "fetch", "-q", "origin")
+    git(w["repo"], "worktree", "add", "-q", "-b", name, str(wt), base)
+    path, text = change
+    (wt / path).parent.mkdir(parents=True, exist_ok=True)
+    (wt / path).write_text(text)
+    git(wt, "add", "-A")
+    git(wt, "commit", "-q", "-m", "fix")
+    return wt
+
+
+def run(w, *argv, cfg=None):
+    return merge.main(list(argv), cfg=cfg or w["cfg"])
+
+
+def test_merge_ok(world, capsys):
+    wt = fix_worktree(world)
+    head = git(wt, "rev-parse", "HEAD")
+    base = git(world["repo"], "rev-parse", "origin/main")
+    assert run(world, "merge", "repo", str(wt)) == 0
+    assert git(world["origin"], "rev-parse", "main") == head
+    assert git(world["repo"], "rev-parse", "main") == head
+    (act,) = ledger.actions(world["state"])
+    assert act["kind"] == "merge" and act["repo"] == "repo" and act["to_sha"] == head
+    assert act["from_sha"] == base and act["run_id"] == "run-test" and act["files"] == ["app.py"]
+    assert json.loads(capsys.readouterr().out)["status"] == "merged"
+
+
+def test_refused_in_diagnose_mode(world):
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt), cfg=dataclasses.replace(world["cfg"], mode="diagnose")) == 2
+    assert ledger.actions(world["state"]) == []
+
+
+def test_refused_repo_not_listed(world):
+    wt = fix_worktree(world)
+    assert run(world, "merge", "other", str(wt)) == 2
+
+
+def test_refused_worktree_outside_state(world):
+    wt = world["tmp"] / "elsewhere"
+    git(world["repo"], "worktree", "add", "-q", "-b", "alertwatch/x", str(wt), "origin/main")
+    (wt / "app.py").write_text("x = 3\n")
+    git(wt, "commit", "-qam", "fix")
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_refused_branch_not_alertwatch(world):
+    wt = fix_worktree(world, name="claude/fix")
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_refused_dirty_main_checkout(world):
+    wt = fix_worktree(world)
+    (world["repo"] / "app.py").write_text("local edit\n")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert git(world["origin"], "rev-parse", "main") != git(wt, "rev-parse", "HEAD")
+
+
+def test_refused_dirty_worktree(world):
+    wt = fix_worktree(world)
+    (wt / "app.py").write_text("uncommitted\n")
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_refused_when_not_a_fast_forward(world):
+    wt = fix_worktree(world)
+    other = world["tmp"] / "other-clone"
+    git(world["tmp"], "clone", "-q", str(world["origin"]), str(other))
+    (other / "new.py").write_text("y\n")
+    git(other, "add", "-A")
+    git(other, "commit", "-qm", "someone else")
+    git(other, "push", "-q", "origin", "main")
+    git(world["repo"], "pull", "-q", "--ff-only", "origin", "main")
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_refused_main_checkout_behind_origin(world):
+    wt = fix_worktree(world)
+    other = world["tmp"] / "other-clone"
+    git(world["tmp"], "clone", "-q", str(world["origin"]), str(other))
+    (other / "new.py").write_text("y\n")
+    git(other, "add", "-A")
+    git(other, "commit", "-qm", "someone else")
+    git(other, "push", "-q", "origin", "main")
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_refused_denied_path(world, capsys):
+    wt = fix_worktree(world, change=("web/page.ts", "b\n"))
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert "web/page.ts" in capsys.readouterr().err
+
+
+def test_refused_when_daily_cap_reached(world):
+    for i in range(3):
+        ledger.append_action(world["state"], {"kind": "merge", "at": time.time() - 60, "repo": "repo"})
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 2
+
+
+def test_old_merges_and_reverts_do_not_count(world):
+    for i in range(3):
+        ledger.append_action(world["state"], {"kind": "merge", "at": time.time() - 90000})
+        ledger.append_action(world["state"], {"kind": "revert", "at": time.time() - 60})
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 0
+
+
+def test_revert_own_merge(world):
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 0
+    head = git(wt, "rev-parse", "HEAD")
+    assert run(world, "revert", "repo", head) == 0
+    assert (world["repo"] / "app.py").read_text() == "x = 1\n"
+    assert git(world["origin"], "rev-parse", "main") == git(world["repo"], "rev-parse", "main")
+    kinds = [a["kind"] for a in ledger.actions(world["state"])]
+    assert kinds == ["merge", "revert"]
+    assert ledger.actions(world["state"])[1]["reverts"] == head
+    assert run(world, "revert", "repo", head) == 2  # never twice
+
+
+def test_revert_refuses_a_commit_alert_watch_did_not_merge(world):
+    sha = git(world["repo"], "rev-parse", "HEAD")
+    assert run(world, "revert", "repo", sha) == 2
+
+
+def test_denied_matching():
+    rules = ("web/", ".env", "watchdog/", ".sql")
+    assert merge.denied(["web/a.ts", "x/.env.local", "watchdog/run.py", "db/m.sql", "db.py"], rules) == [
+        "web/a.ts", "x/.env.local", "watchdog/run.py", "db/m.sql"]
+    assert merge.denied(["src/web/a.ts"], ("web/",)) == []
