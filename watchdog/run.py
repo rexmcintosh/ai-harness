@@ -319,10 +319,12 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
 
 
 def alertwatch_status(now_epoch: float) -> CheckStatus | None:
-    """The alert-watch check, or None when alert-watch is not installed on this host."""
+    """The alert-watch check, or None until alert-watch is switched on here. Capture
+    in tg-send creates the state dir and fills the inbox before any dispatcher runs,
+    so only the ENABLED file (written when the cron line is installed) turns it on."""
     state = Path(os.environ.get("ALERT_WATCH_STATE")
                  or Path.home() / ".local" / "state" / "alert-watch")
-    if not state.is_dir():
+    if not (state / "ENABLED").exists():
         return None
     try:
         from alertwatch import inbox as aw_inbox, ledger as aw_ledger

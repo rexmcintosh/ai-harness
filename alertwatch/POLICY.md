@@ -25,18 +25,22 @@ tokens. Never scrape www.swimrankings.net or fpnatacao.pt.
 ## Mode
 
 - `diagnose`: read, investigate and explain only. Every action you would take becomes
-  one `needs_rex` line with the exact step. Edits, commits, kills and reruns are denied.
-- `act`: you may take the actions below.
+  one `needs_rex` line with the exact step. Only read-only tools are allowed: Read,
+  Grep, Glob, read-only shell commands, and `python3 -m alertwatch.dbread` for the
+  database (`python3 -m alertwatch.dbread meet_registry "sr_meet_id=eq.11539"
+  --select sr_meet_id,poller_attempts,status`).
+- `act`: you may take the actions below. Pushes, merges, reverts and kills are
+  denied as shell commands; the checked helpers below are the only way to do them.
+  They refuse (exit 2, with the reason) when a rule is not met: then it is `needs_rex`.
 
 ## What you may do alone (act mode)
 
-1. **Restart a meet writer** that is stuck or has crashed. Read its PID from
-   `~/.local/state/meettrack/run/poller-<key>.pid`. First read the meet's
-   `poller_attempts` in `meet_registry` (a read). Restart only when it is 3 or less;
-   otherwise put the meet in `needs_rex` (the supervisor marks a meet `failed` at 5,
-   and only a database write undoes that). Restart with `kill -TERM <pid>`. Never
-   start a writer yourself: the supervisor cron starts it again within 5 minutes.
-   Then wait for the relaunch and check its first pass in
+1. **Restart a meet writer** that is stuck or has crashed:
+   `python3 -m alertwatch.restart restart <key>`. It checks the PID file, that the
+   process is that meet's writer, and that `poller_attempts` is 3 or less (the
+   supervisor marks a meet `failed` at 5, and only a database write undoes that),
+   then sends SIGTERM. Never start a writer yourself: the supervisor cron starts it
+   again within 5 minutes. Then wait for the relaunch and check its first pass in
    `~/projects/splash_poller/logs/poller-<key>.log`.
 2. **Run a failed job again, once**, only with `python3 -m alertwatch.rerun <job>`
    from `~/projects/ai-harness`. The jobs are listed below. It refuses a second rerun
@@ -45,8 +49,9 @@ tokens. Never scrape www.swimrankings.net or fpnatacao.pt.
    has stopped.
 4. **Fix code** in the listed repositories, and **merge and push** it, only by the
    merge procedure below.
-5. **Revert an alert-watch merge** (one listed in the recent runs below, or the one
-   named by a check report) when its check fails. Never revert anyone else's commits.
+5. **Revert an alert-watch merge** when its check fails:
+   `python3 -m alertwatch.merge revert <repo> <merged sha>`. It reverts only merges
+   the merge helper made, once each.
 
 ## What you must hand to Rex (always)
 
@@ -65,22 +70,21 @@ session, for example `do it: write the 3 club rows`.
 
 ## Merge procedure (the only way you merge)
 
-1. Make a new worktree off `origin/main` on branch `alertwatch/<run-id>-<slug>`,
-   under the repository's `.claude/worktrees/`. Never edit a main checkout: cron runs
-   from it.
+1. Make a new worktree off `origin/main` on branch `alertwatch/<run-id>-<slug>`, in
+   `~/.local/state/alert-watch/worktrees/` (for example
+   `git -C ~/projects/splash_poller worktree add -b alertwatch/<run-id>-<slug>
+   ~/.local/state/alert-watch/worktrees/<slug> origin/main`). Never edit a main
+   checkout: cron runs from it, and edits there are denied.
 2. Write a failing test that shows the problem, then the fix. The repository's full
    test suite must pass.
 3. Run `venice-delegate council-review --diff`. Fix the valid findings, then review
    again. At most 3 rounds. Findings still open after that: no merge, `needs_rex`.
-4. Merge only when all of these hold:
-   - the main checkout is clean and on `main`, and `main` equals `origin/main`;
-   - your branch rebases onto `origin/main` and the full suite passes again after it;
-   - `git diff --name-only origin/main...HEAD` touches no denied path (listed below;
-     an entry ending in `/` is a path prefix, any other entry matches anywhere in the
-     path). A fix that needs a denied path ends as a branch and `needs_rex`;
-   - fewer merges than the daily limit (listed below) were made in the last 24 hours.
-5. Fast-forward `main` in the main checkout, `git push origin main`, and check that
-   `git status -sb` shows `## main...origin/main` with no `[ahead N]`.
+4. Rebase your branch onto `origin/main` and run the full suite again. A fix that
+   needs a denied path (listed below) ends as a branch and `needs_rex`.
+5. Commit, then `python3 -m alertwatch.merge merge <repo> <worktree path>`. It checks
+   the rules (main clean and equal to `origin/main`, a fast forward, no denied path,
+   the daily merge limit), pushes `main` without force and moves the main checkout.
+   If it refuses, do not try another way: `needs_rex` with its reason.
 6. Restart every live meet writer that runs the changed code, not only the broken
    meet (Rex, 2026-11-15). The broken meet first; when its first pass is good, the
    others one by one, each checked the same way. If the broken meet's first pass is
@@ -89,9 +93,11 @@ session, for example `do it: write the 3 club rows`.
    event's results, the 07:00 coverage check, the next hourly discover), add a
    `pending_checks` item (at most 24 hours after the merge). The dispatcher will
    start a run with a check report at that time.
-8. If a check fails because of the merge: `git revert` it, push, restart again, and
-   add it to `needs_rex`.
-9. Delete your worktree and branch. Never push the branch itself.
+8. If a check fails because of the merge: revert it with the helper, then restart
+   again every writer restarted for it (`python3 -m alertwatch.restart history`
+   lists them), and add it to `needs_rex`.
+9. Remove your worktree (`git -C <repo> worktree remove <path>`) and delete the
+   branch. Never push the branch itself.
 
 ## Repeats
 

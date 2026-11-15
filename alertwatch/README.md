@@ -24,6 +24,9 @@ All state is under `~/.local/state/alert-watch/` (mode 700; override `ALERT_WATC
 | `runs/<run-id>.json` | one record per run: messages, status, Claude session id, result |
 | `state.json` | usage-limit backoff, cap notes, enqueued checks |
 | `reruns.json` | when each job was last rerun |
+| `actions.jsonl` | every merge, revert and restart a helper made (the merge cap counts these) |
+| `worktrees/` | the runs' fix worktrees (never inside a main checkout) |
+| `ENABLED` | present = the dispatcher is installed; turns on the watchdog check |
 | `PAUSED` | present = no new runs |
 | `dispatch.log` | the dispatcher's own log (from cron) |
 
@@ -36,7 +39,16 @@ that line.
 python3 -m alertwatch.dispatch --dry-run   # list the inbox and how each message is sorted
 python3 -m alertwatch.dispatch             # one dispatcher pass (cron does this)
 python3 -m alertwatch.rerun <job>          # rerun a listed job once (the run uses this)
+python3 -m alertwatch.restart restart <key> # stop a meet writer; the supervisor relaunches it
+python3 -m alertwatch.restart history       # restarts in the last 24 hours
+python3 -m alertwatch.merge merge <repo> <worktree>   # checked fast-forward merge and push
+python3 -m alertwatch.merge revert <repo> <sha>       # revert an alert-watch merge
+python3 -m alertwatch.dbread <table> [filters]        # read-only database rows
 ```
+
+The run never pushes, merges, reverts or kills by itself (those shell commands are
+denied). The helpers check every rule at the moment of the action and refuse with
+the reason when one fails.
 
 Pause: `touch ~/.local/state/alert-watch/PAUSED`. Start again: delete the file.
 The dispatcher pauses itself after 3 failed runs in a row and says so in Telegram.
@@ -48,8 +60,9 @@ Capture off for one command: `ALERT_INBOX_DIR=off`.
    `~/projects/ai-harness/bin/tg-send` from the main checkout. Let the inbox fill for
    a day, then check the sorting with `--dry-run`.
 2. **Diagnose for 48 hours.** Install the cron line below with `mode = "diagnose"`
-   (the committed default). Runs read and explain only; every action is a
-   "Needs you" line.
+   (the committed default), and `touch ~/.local/state/alert-watch/ENABLED` so the
+   watchdog check starts. A diagnose run has read-only tools only (an allowlist, not
+   `--dangerously-skip-permissions`); every action is a "Needs you" line.
 3. **Act.** After Rex approves, add the section below to `~/.claude/CLAUDE.md`,
    set `mode = "act"` in `config.toml`, and merge that change.
 
@@ -70,7 +83,8 @@ crontab ~/.local/state/alert-watch/crontab.new
 crontab -l | diff ~/.local/state/alert-watch/crontab.before - # shows only the new line
 ```
 
-Rollback: `crontab ~/.local/state/alert-watch/crontab.before`.
+Rollback: `crontab ~/.local/state/alert-watch/crontab.before`, then
+`rm ~/.local/state/alert-watch/ENABLED`.
 
 ### `~/.claude/CLAUDE.md` section (stage 3, needs Rex's approval of the words)
 
@@ -84,14 +98,20 @@ standing rule for those runs only. Every other session keeps the merge protocol.
 
 ## Guard rails
 
-- Deny rules passed with `--settings` (proved on 2026-11-15 to hold under
-  `--dangerously-skip-permissions`): no crontab, systemctl, sudo, curl, wget, ssh,
-  deploy CLIs, `tg-send`, force or delete pushes, `.env` reads, or
-  `supervise_meets.py`. In `diagnose` mode also no Edit, Write, commit, push, merge,
-  revert, kill or rerun.
+- `diagnose` mode: an allowlist of read-only tools (Read, Grep, Glob, read-only shell
+  commands, `alertwatch.dbread`); everything else is refused. Proved with real runs
+  on 2026-11-15.
+- `act` mode: `--dangerously-skip-permissions` with deny rules passed by `--settings`
+  (proved on 2026-11-15 to hold): no push, merge, revert or kill as shell commands
+  (only the helpers), no Edit or Write inside `~/projects` (fixes are made in
+  `<state>/worktrees/`), no crontab, systemctl, sudo, curl, wget, ssh, deploy CLIs,
+  `tg-send`, `.env` reads, or `supervise_meets.py`. A shell command can still change
+  files; the deny rules stop mistakes and obvious misuse, not a determined agent.
 - `MEETTRACK_DB_READ_ONLY=1` for the run: splash_poller's `db.py` refuses writes.
   It stops a mistake, not a determined agent; the database rule is still a policy rule.
-- Caps: 30 runs a day, 6 an hour, 3 merges a day. One run at a time, 60 minutes each.
+- Caps: 30 runs a day, 6 an hour (the dispatcher), 3 merges a day (the merge helper,
+  from `actions.jsonl`). One run at a time, 60 minutes each; at the end every process
+  that carries the run's `ALERT_WATCH_RUN_ID` is killed.
 - The watcher's own notes and reruns are tagged (`ALERT_SOURCE=alert-watch...`) and
   dropped, so it never reacts to itself.
 - The watchdog's `alertwatch` check warns when the inbox stops moving or a run fails.

@@ -28,23 +28,37 @@ from backlogrun.cli import DENY_RULES
 HERE = Path(__file__).resolve().parent
 REPORT_MAX = 4000
 CHECK_SOURCE = "alert-watch-check"
+CHECK_MAX_DELAY_S = 24 * 3600
+VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
 
-_PUSH_RULES = {r for r in DENY_RULES if "push" in r}
+# Always denied, in both modes. backlog-run's DENY_RULES (pushes, remotes, gh,
+# deploy CLIs, curl, wget, ssh, crontab, systemctl, sudo, docker, tg-send, mail,
+# pipx) come first. A run never pushes, merges, reverts or kills by itself: the
+# checked helpers (alertwatch.merge, alertwatch.restart, alertwatch.rerun) do.
 _ALWAYS_DENY = [
-    "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push * --force*)",
-    "Bash(git push * -f*)", "Bash(git * push --force*)", "Bash(git * push -f*)",
-    "Bash(git * push * --force*)", "Bash(git * push * -f*)",
-    "Bash(git push * --delete*)", "Bash(git * push * --delete*)",
-    "Bash(git push * :*)", "Bash(git * push * :*)",
     "Bash(*supervise_meets.py*)",
+    "Bash(kill*)", "Bash(pkill*)", "Bash(killall*)",
+    "Bash(git merge*)", "Bash(git * merge*)", "Bash(git revert*)", "Bash(git * revert*)",
+    "Bash(git reset --hard*)", "Bash(git * reset --hard*)",
     "Read(**/.env)", "Read(**/.env.*)", "Bash(*/.env*)", "Bash(* .env*)",
 ]
-_DIAGNOSE_DENY = [
-    "Edit", "Write", "NotebookEdit",
-    "Bash(git commit*)", "Bash(git * commit*)", "Bash(git merge*)", "Bash(git * merge*)",
-    "Bash(git revert*)", "Bash(git * revert*)", "Bash(git rebase*)", "Bash(git * rebase*)",
-    "Bash(kill*)", "Bash(pkill*)", "Bash(*alertwatch.rerun*)",
+# act mode: the run edits only in its worktrees under the state dir, never in a
+# main checkout (cron runs from those).
+_ACT_DENY = ["Edit(~/projects/**)", "Write(~/projects/**)", "NotebookEdit(~/projects/**)"]
+# diagnose mode runs without --dangerously-skip-permissions: a headless run is
+# refused every tool call these rules do not allow. Read-only tools only.
+DIAGNOSE_ALLOW = [
+    "Read", "Grep", "Glob",
+    "Bash(ls*)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(grep *)", "Bash(rg *)",
+    "Bash(wc *)", "Bash(sort*)", "Bash(uniq*)", "Bash(cut *)", "Bash(jq *)", "Bash(sed -n *)",
+    "Bash(ps *)", "Bash(date*)", "Bash(stat *)",
+    "Bash(git log*)", "Bash(git status*)", "Bash(git diff*)", "Bash(git show*)",
+    "Bash(git -C * log*)", "Bash(git -C * status*)", "Bash(git -C * diff*)", "Bash(git -C * show*)",
+    "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
 ]
+_DIAGNOSE_DENY = ["Edit", "Write", "NotebookEdit", "Bash(git commit*)", "Bash(git * commit*)",
+                  "Bash(*alertwatch.rerun*)", "Bash(*alertwatch.merge*)",
+                  "Bash(*alertwatch.restart restart*)"]
 
 
 def _iso(epoch: float) -> str:
@@ -56,29 +70,58 @@ def _log(now: float, msg: str) -> None:
 
 
 def session_settings(cfg: Config) -> dict:
-    """Deny rules for the run. backlog-run verified on 2026-09-03 that `--settings`
-    deny rules hold under --dangerously-skip-permissions. In "act" mode a plain push
-    is allowed (the run merges and pushes main); force and delete pushes never are."""
-    if cfg.mode == "act":
-        base = [r for r in DENY_RULES if r not in _PUSH_RULES]
-        extra = []
-    else:
-        base = list(DENY_RULES)
-        extra = _DIAGNOSE_DENY
+    """Deny rules for the run (deny always wins). backlog-run verified on 2026-09-03,
+    and alert-watch on 2026-11-15, that `--settings` deny rules hold under
+    --dangerously-skip-permissions."""
     deny = []
-    for rule in base + _ALWAYS_DENY + extra:
+    extra = _ACT_DENY if cfg.mode == "act" else _DIAGNOSE_DENY
+    for rule in [*DENY_RULES, *_ALWAYS_DENY, *extra]:
         if rule not in deny:
             deny.append(rule)
     return {"permissions": {"deny": deny}}
 
 
-def run_env(cfg: Config) -> dict:
+def permission_argv(cfg: Config) -> list[str]:
+    """act: every tool except the deny rules. diagnose: only DIAGNOSE_ALLOW."""
+    if cfg.mode == "act":
+        return ["--dangerously-skip-permissions"]
+    # Reads outside the working dir (~/projects) need --add-dir: the writer PID files
+    # and alert-watch's own state.
+    return ["--permission-mode", "default",
+            "--add-dir", str(cfg.meettrack_run_dir.parent), "--add-dir", str(cfg.state_dir),
+            "--allowedTools", *DIAGNOSE_ALLOW]
+
+
+def run_env(cfg: Config, run_id: str = "") -> dict:
     env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
     local_bin = str(Path.home() / ".local" / "bin")
     parts = [local_bin] + [p for p in env.get("PATH", "/usr/bin:/bin").split(":") if p and p != local_bin]
     env.update({"PATH": ":".join(parts), "ALERT_WATCH_RUN": "1", "ALERT_SOURCE": "alert-watch",
-                "MEETTRACK_DB_READ_ONLY": "1"})
+                "MEETTRACK_DB_READ_ONLY": "1", "ALERT_WATCH_RUN_ID": run_id,
+                "ALERT_WATCH_STATE": str(cfg.state_dir), "ALERT_WATCH_PROJECTS": str(cfg.projects_dir),
+                "PYTHONPATH": ":".join(p for p in (str(HERE.parent), env.get("PYTHONPATH", "")) if p)})
     return env
+
+
+def _kill_marked(run_id: str) -> int:
+    """SIGKILL every process left over from this run, found by the run id in its
+    environment. A process the run started in a new session escapes the process
+    group kill; it cannot escape its inherited environment this way. Writers the
+    supervisor relaunches come from cron and never carry the marker."""
+    if not run_id:
+        return 0
+    marker = f"ALERT_WATCH_RUN_ID={run_id}".encode()
+    killed = 0
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit() or int(proc.name) == os.getpid():
+            continue
+        try:
+            if marker in (proc / "environ").read_bytes().split(b"\0"):
+                os.kill(int(proc.name), signal.SIGKILL)
+                killed += 1
+        except (OSError, ValueError):
+            continue
+    return killed
 
 
 def _first_line(text: str, limit: int = 120) -> str:
@@ -86,7 +129,16 @@ def _first_line(text: str, limit: int = 120) -> str:
     return line[:limit]
 
 
-def _recent_lines(recent: list[dict]) -> str:
+def _helper_line(a: dict) -> str:
+    kind = a.get("kind")
+    if kind == "restart":
+        return f"restart {a.get('key')} (attempts {a.get('attempts')})"
+    if kind == "revert":
+        return f"revert in {a.get('repo')} of {str(a.get('reverts', ''))[:10]}"
+    return f"merge in {a.get('repo')} {str(a.get('from_sha', ''))[:10]}..{str(a.get('to_sha', ''))[:10]}"
+
+
+def _recent_lines(recent: list[dict], acts: list[dict]) -> str:
     if not recent:
         return "(none)"
     out = []
@@ -95,22 +147,23 @@ def _recent_lines(recent: list[dict]) -> str:
         firsts = "; ".join(e.get("first_line", "") for e in r.get("entries") or [])[:300]
         verdicts = ", ".join(f"{e.get('id')}={e.get('verdict')}" for e in result.get("entries") or []
                              if isinstance(e, dict))
-        merges = ", ".join(f"{m.get('repo')} {str(m.get('from_sha', ''))[:10]}..{str(m.get('to_sha', ''))[:10]}"
-                           f"{' (reverted)' if m.get('reverted') else ''}"
-                           for m in result.get("merges") or [] if isinstance(m, dict))
+        done = ", ".join(_helper_line(a) for a in acts if a.get("run_id") == r.get("run_id"))
         needs = " | ".join(str(n) for n in result.get("needs_rex") or [])
         out.append(f"- {r.get('run_id')} {_iso(float(r['started_at']))} status={r.get('status')}"
-                   f" reports: {firsts or '-'}; verdicts: {verdicts or '-'}; merges: {merges or '-'};"
+                   f" reports: {firsts or '-'}; verdicts: {verdicts or '-'}; helper actions: {done or '-'};"
                    f" needs_rex: {needs or '-'}")
     return "\n".join(out)
 
 
 def build_prompt(cfg: Config, entries: list[dict], recent: list[dict], counts: dict, now: float) -> str:
     template = (HERE / "prompt.md").read_text(encoding="utf-8")
+    def safe(text: str) -> str:  # a report cannot fake the markers around it
+        return str(text).replace("<<<", "< < <").replace(">>>", "> > >")
+
     reports = "\n\n".join(
-        f"<<<REPORT id={e['id']} source={str(e.get('source') or '')[:300]} "
+        f"<<<REPORT id={e['id']} source={safe(str(e.get('source') or '')[:300])} "
         f"captured_at={e.get('captured_at', '')} attempts={e.get('attempts', 0)}>>>\n"
-        f"{str(e['text'])[:REPORT_MAX]}\n<<<END REPORT>>>"
+        f"{safe(str(e['text'])[:REPORT_MAX])}\n<<<END REPORT>>>"
         for e in entries)
     fills = {
         "{{POLICY}}": (HERE / "POLICY.md").read_text(encoding="utf-8"),
@@ -121,7 +174,7 @@ def build_prompt(cfg: Config, entries: list[dict], recent: list[dict], counts: d
         "{{RERUN_JOBS}}": ", ".join(sorted(cfg.rerun)),
         "{{MERGES_DAY}}": str(counts.get("merges_day", 0)),
         "{{MAX_MERGES_DAY}}": str(cfg.max_merges_day),
-        "{{RECENT}}": _recent_lines(recent),
+        "{{RECENT}}": _recent_lines(recent, ledger.actions(cfg.state_dir)),
     }
     for key, value in fills.items():
         template = template.replace(key, value)
@@ -137,9 +190,9 @@ def run_claude(cfg: Config, prompt: str, env: dict) -> dict:
     settings, mcp = state / "session-settings.json", state / "mcp-empty.json"
     settings.write_text(json.dumps(session_settings(cfg), indent=1), encoding="utf-8")
     mcp.write_text(json.dumps({"mcpServers": {}}), encoding="utf-8")
-    argv = [_claude_path(cfg, env), "-p", "-", "--output-format", "json",
-            "--dangerously-skip-permissions", "--settings", str(settings),
-            "--strict-mcp-config", "--mcp-config", str(mcp), "--model", cfg.model]
+    argv = [_claude_path(cfg, env), "-p", "-", "--output-format", "json", *permission_argv(cfg),
+            "--settings", str(settings), "--strict-mcp-config", "--mcp-config", str(mcp),
+            "--model", cfg.model]
     proc = subprocess.Popen(argv, cwd=str(cfg.projects_dir), env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                             start_new_session=True)
@@ -160,6 +213,7 @@ def run_claude(cfg: Config, prompt: str, env: dict) -> dict:
             except ProcessLookupError:
                 pass
             out, err = proc.communicate()
+    leftovers = _kill_marked(env.get("ALERT_WATCH_RUN_ID", ""))
     data = None
     for candidate in (out or "", *reversed((out or "").splitlines())):
         candidate = candidate.strip()
@@ -172,7 +226,7 @@ def run_claude(cfg: Config, prompt: str, env: dict) -> dict:
                 data = parsed
                 break
     return {"rc": proc.returncode, "timed_out": timed_out, "stdout": out or "",
-            "stderr": err or "", "data": data}
+            "stderr": err or "", "data": data, "leftovers_killed": leftovers}
 
 
 def _load_state(state: Path) -> dict:
@@ -202,6 +256,8 @@ def _parse_due(value) -> float | None:
 
 
 def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
+    """A pending check becomes an inbox entry once it is due. Its id is fixed
+    (check-<run>-<n>), so a crash before state.json is saved cannot enqueue it twice."""
     done = st.setdefault("checks_enqueued", [])
     added = 0
     for rec in ledger.recent_runs(cfg.state_dir, now, 48):
@@ -215,16 +271,27 @@ def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
                 _log(now, f"pending check {key}: unreadable due_at {chk.get('due_at')!r}; skipped")
                 done.append(key)
                 continue
+            latest = float(rec.get("ended_at") or rec["started_at"]) + CHECK_MAX_DELAY_S
+            if due > latest:
+                due = latest  # the policy allows at most 24 hours
             if due > now:
                 continue
-            text = (f"Check after alert-watch merge in {chk.get('repo')} "
-                    f"{chk.get('from_sha', '?')}..{chk.get('to_sha', '?')} (run {rec.get('run_id')}): "
-                    f"{chk.get('what', '')}")
-            inbox.add_entry(cfg.state_dir, text, CHECK_SOURCE)
+            eid = f"check-{rec.get('run_id')}-{i}"
+            if not inbox.seen(cfg.state_dir, eid):
+                text = (f"Check after alert-watch merge in {chk.get('repo')} "
+                        f"{chk.get('from_sha', '?')}..{chk.get('to_sha', '?')} (run {rec.get('run_id')}): "
+                        f"{chk.get('what', '')}")
+                inbox.add_entry(cfg.state_dir, text, CHECK_SOURCE, eid=eid)
+                added += 1
             done.append(key)
-            added += 1
     st["checks_enqueued"] = done[-500:]
     return added
+
+
+def check_result(result: dict, ids: list[str]) -> list[str]:
+    """Problems with a run's result, as lines for Rex: a report with no valid verdict."""
+    got = {e.get("id"): e.get("verdict") for e in result.get("entries") or [] if isinstance(e, dict)}
+    return [f"report {i} got no valid verdict; check the run" for i in ids if got.get(i) not in VERDICTS]
 
 
 def _cap_reached(cfg: Config, st: dict, now: float) -> bool:
@@ -301,6 +368,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         notes.send(cfg, notes.failure_note(
             {"run_id": dead, "reason": "the dispatcher stopped during this run"}, []))
 
+    inbox.clean_tmp(state, t)
     enqueue_due_checks(cfg, st, t)
     if _cap_reached(cfg, st, t):
         _save_state(state, st)
@@ -331,19 +399,22 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         return 0
 
     ledger.write_run(state, record)
-    counts = ledger.counts(state, t)
+    counts = {"merges_day": ledger.merges_in_window(state, t)}
     recent = [r for r in ledger.recent_runs(state, t, 24) if r.get("run_id") != run_id]
     prompt = build_prompt(cfg, looks, recent, counts, t)
     _log(t, f"{run_id}: starting a {cfg.mode} run for {len(looks)} report(s)")
-    run = run_claude(cfg, prompt, run_env(cfg))
+    run = run_claude(cfg, prompt, run_env(cfg, run_id))
     data = run["data"]
     ended = now()
     record.update(ended_at=ended, rc=run["rc"], timed_out=run["timed_out"],
-                  session_id=str((data or {}).get("session_id") or ""))
+                  session_id=str((data or {}).get("session_id") or ""),
+                  leftovers_killed=run.get("leftovers_killed", 0),
+                  helper_actions=[a for a in ledger.actions(state) if a.get("run_id") == run_id])
     parsed = parse_result(str((data or {}).get("result") or "")) if data else None
     hit, until = (False, None) if parsed else usage_limit(data, run["stdout"], run["stderr"])
 
     if parsed:
+        parsed["needs_rex"] = [*parsed["needs_rex"], *check_result(parsed, [e["id"] for e in looks])]
         record.update(status="ok", result=parsed)
         text = notes.run_note(record)
         record["note_text"] = text

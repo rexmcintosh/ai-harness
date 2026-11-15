@@ -34,6 +34,8 @@ tmp = os.path.join(inbox, f".tmp-{eid}.json")
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, "w", encoding="utf-8") as fh:
     json.dump(entry, fh, ensure_ascii=False)
+    fh.flush()
+    os.fsync(fh.fileno())
 os.replace(tmp, os.path.join(inbox, f"{eid}.json"))
 PY
 

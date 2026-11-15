@@ -386,3 +386,36 @@ session, for example `do it: write the 3 club rows`.
   `POLICY.md`.
 - Whether the watchdog check lives in `watchdog/run.py` or as a `monitors.toml` entry.
 - How the dispatcher reads the Claude session id from the JSON output.
+
+## Changes after the council review (2026-11-15)
+
+The first council review asked for limits enforced by code, not only by the prompt.
+The build now has:
+
+- **Checked helpers for every outward action.** `alertwatch/merge.py` (merge and
+  revert), `alertwatch/restart.py` (writer restarts) and `alertwatch/rerun.py` check
+  their rules at the moment of the action. Merges: act mode, a listed repository, a
+  fix worktree under `<state>/worktrees/` on an `alertwatch/` branch, clean trees,
+  `main` equal to `origin/main`, a fast forward, no denied path, and the daily cap.
+  Restarts: the PID file's start time matches a live meet writer, and
+  `poller_attempts` is 3 or less. Merges, reverts and restarts are logged in an
+  append-only `actions.jsonl`, which is the authority for the merge cap and for
+  which writers to restart again after a revert. The run's deny rules block push,
+  merge, revert and kill as shell commands, and Edit or Write inside `~/projects`.
+- **Diagnose mode is an allowlist.** It runs without `--dangerously-skip-permissions`;
+  only read-only tools and `alertwatch/dbread.py` are allowed. Real runs proved both
+  modes' rules on 2026-11-15.
+- **Leftover processes** that carry the run's `ALERT_WATCH_RUN_ID` are killed when a
+  run ends, even if they left the process group.
+- **The watchdog check** turns on only when `<state>/ENABLED` exists, so the
+  capture-only stage raises no false alarm.
+- **Smaller fixes:** a rerun that never started gives its 6-hour window back; check
+  entries have fixed ids, so a crash cannot enqueue one twice; a check is due at most
+  24 hours after its run; a report with no valid verdict is named for Rex; report text
+  cannot fake the prompt's report markers; capture syncs to disk, and half-written
+  capture files are cleaned up.
+
+Still policy, not enforced by code (a gate for Rex before `mode = "act"`): the run
+holds the normal database key behind `MEETTRACK_DB_READ_ONLY`, and in act mode a
+shell command can still change files. A read-only database key for the run, or an
+OS sandbox, would close these.

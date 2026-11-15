@@ -70,3 +70,28 @@ def test_supervisor_never_listed():
     cfg = load_config(env={})
     assert "supervise_meets" not in cfg.rerun
     assert all("supervise_meets.py" not in job.cmd for job in cfg.rerun.values())
+
+
+def test_busy_lock_gives_the_rerun_back(tmp_path):
+    import fcntl
+    lock = tmp_path / "job.lock"
+    cfg = cfg_with(tmp_path, "true", lock=str(lock))
+    with open(lock, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert rerun.main(["demo"], cfg=cfg) == 1
+    assert rerun.main(["demo"], cfg=cfg) == 0
+
+
+def test_spawn_failure_gives_the_rerun_back(tmp_path):
+    cfg = cfg_with(tmp_path, "true")
+    cfg = dataclasses.replace(cfg, rerun={"demo": dataclasses.replace(cfg.rerun["demo"],
+                                                                      cwd=str(tmp_path / "missing"))})
+    assert rerun.main(["demo"], cfg=cfg) == 1
+    good = dataclasses.replace(cfg, rerun={"demo": dataclasses.replace(cfg.rerun["demo"], cwd=str(tmp_path))})
+    assert rerun.main(["demo"], cfg=good) == 0
+
+
+def test_a_failed_job_keeps_its_reservation(tmp_path):
+    cfg = cfg_with(tmp_path, "exit 3")
+    assert rerun.main(["demo"], cfg=cfg) == 3
+    assert rerun.main(["demo"], cfg=cfg) == 2

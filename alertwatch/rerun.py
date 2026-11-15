@@ -9,6 +9,7 @@ ALERT_SOURCE tags any Telegram message it sends, so the dispatcher drops the cop
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import signal
@@ -48,16 +49,32 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         print(f"rerun: {args.job!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
               file=sys.stderr)
         return 2
+    cfg.state_dir.mkdir(parents=True, exist_ok=True)
     marks_path = cfg.state_dir / "reruns.json"
-    marks = _load(marks_path)
-    t = now()
-    last = float(marks.get(args.job) or 0)
-    if t - last < cfg.rerun_window_s:
-        print(f"rerun: {args.job} was already rerun {int((t - last) / 60)} min ago; "
-              f"one rerun per {cfg.rerun_window_s // 3600} h", file=sys.stderr)
-        return 2
-    marks[args.job] = t
-    _save(marks_path, marks)
+    # Reserve the rerun under a lock; a rerun that never started (lock busy,
+    # spawn failure) gives its reservation back, one that started keeps it.
+    with open(cfg.state_dir / "reruns.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        marks = _load(marks_path)
+        t = now()
+        last = float(marks.get(args.job) or 0)
+        if t - last < cfg.rerun_window_s:
+            print(f"rerun: {args.job} was already rerun {int((t - last) / 60)} min ago; "
+                  f"one rerun per {cfg.rerun_window_s // 3600} h", file=sys.stderr)
+            return 2
+        marks[args.job] = t
+        _save(marks_path, marks)
+
+    def give_back() -> None:
+        with open(cfg.state_dir / "reruns.lock", "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            current = _load(marks_path)
+            if current.get(args.job) == t:
+                if last:
+                    current[args.job] = last
+                else:
+                    current.pop(args.job, None)
+                _save(marks_path, current)
 
     env = {k: v for k, v in os.environ.items() if k != "MEETTRACK_DB_READ_ONLY"}
     env["ALERT_SOURCE"] = f"alert-watch-rerun:{args.job}"
@@ -69,8 +86,13 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
                    .encode())
         logf.flush()
-        proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
-                                stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
+                                    stderr=subprocess.STDOUT, start_new_session=True)
+        except OSError as e:
+            give_back()
+            print(f"rerun {args.job}: could not start ({e.__class__.__name__}); not counted")
+            return 1
         try:
             rc = proc.wait(timeout=job.timeout_s)
         except subprocess.TimeoutExpired:
@@ -83,7 +105,8 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
             print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
             return 124
     if job.lock and rc == 75:
-        print(f"rerun {args.job}: lock busy (the job is running now) log={job.log}")
+        give_back()
+        print(f"rerun {args.job}: lock busy (the job is running now); not counted log={job.log}")
         return 1
     print(f"rerun {args.job}: rc={rc} log={job.log}")
     return rc

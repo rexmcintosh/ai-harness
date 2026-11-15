@@ -156,9 +156,30 @@ def recover_stale(state: Path) -> list[str]:
     return stale
 
 
-def add_entry(state: Path, text: str, source: str) -> str:
+def seen(state: Path, eid: str) -> bool:
+    """An entry with this id is in the inbox, a batch, done/ or failed/."""
+    state = Path(state)
+    name = f"{eid}.json"
+    return (state / "inbox" / name).exists() or any(
+        True for sub in ("batch", "done", "failed") for _ in (state / sub).glob(f"*/{name}"))
+
+
+def clean_tmp(state: Path, now: float, age_s: int = 3600) -> int:
+    """Remove half-written .tmp- capture files that a killed tg-send left behind."""
+    removed = 0
+    for p in (Path(state) / "inbox").glob(".tmp-*"):
+        try:
+            if p.stat().st_mtime < now - age_s:
+                p.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def add_entry(state: Path, text: str, source: str, eid: str | None = None) -> str:
     now = dt.datetime.now(dt.timezone.utc)
-    eid = now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)
+    eid = eid or now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)
     entry = {"version": 1, "id": eid, "captured_at": now.strftime(_TS_FMT), "chat_id": "",
              "text": text, "source": source, "cwd": "", "attempts": 0}
     _write_json(Path(state) / "inbox" / f"{eid}.json", entry)

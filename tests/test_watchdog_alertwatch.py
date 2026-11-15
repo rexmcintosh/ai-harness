@@ -38,6 +38,7 @@ def test_status_reads_inbox_and_runs(tmp_path, monkeypatch):
     state = tmp_path / "state"
     monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
     inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
     now = time.time()
     ledger.write_run(state, {"run_id": "a", "started_at": now - 60, "status": "failed"})
     ledger.write_run(state, {"run_id": "b", "started_at": now - 30, "status": "skipped"})
@@ -49,5 +50,14 @@ def test_status_with_paused_file(tmp_path, monkeypatch):
     state = tmp_path / "state"
     monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
     inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
     (state / "PAUSED").write_text("x")
     assert run.alertwatch_status(time.time()).level == "ok"
+
+
+def test_capture_only_stage_adds_no_check(tmp_path, monkeypatch):
+    state = tmp_path / "state"
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
+    inbox.ensure_dirs(state)
+    inbox.add_entry(state, "old report", "job")
+    assert run.alertwatch_status(time.time() + 99999) is None
