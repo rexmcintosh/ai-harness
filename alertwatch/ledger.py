@@ -192,3 +192,25 @@ def merges_in_window(state: Path, now: float, hours: float = 24) -> int:
     intent with no outcome counts, so a crash cannot hide a merge from the cap."""
     cutoff = now - hours * 3600
     return sum(1 for a in merged(state) if float(a.get("at") or 0) >= cutoff)
+
+
+def prune_runs(state: Path, now: float, days: int = 30) -> int:
+    """Remove run records older than `days` (they hold report first lines and run
+    results; batches are pruned at the same age, and checks look back as far)."""
+    cutoff = now - days * 86400
+    removed = 0
+    for p in (Path(state) / "runs").glob("*.json"):
+        try:
+            started = float(json.loads(p.read_text(encoding="utf-8"))["started_at"])
+        except (OSError, ValueError, KeyError, TypeError):
+            try:
+                started = p.stat().st_mtime
+            except OSError:
+                continue
+        if started < cutoff:
+            try:
+                p.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed

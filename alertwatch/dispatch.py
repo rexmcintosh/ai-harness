@@ -631,13 +631,19 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         _save_state(state, st)
         return 0
 
-    inbox.purge_other_chats(state, cfg.watch_chats)
+    unreadable = inbox.purge_other_chats(state, cfg.watch_chats, t)
+    if unreadable:  # names only: the chat of these could not be proven
+        _send_note(cfg, st, "", notes.broken_note(
+            "inbox", [(n, "unreadable for an hour; deleted") for n in unreadable], state))
     run_id = ledger.new_run_id(t)
     entries, broken = inbox.claim_all(state, run_id, limit=BATCH_MAX, watch_chats=cfg.watch_chats)
     for name, reason in broken:
         _log(t, f"{run_id}: broken inbox file {name}: {reason}")
     if broken:
-        _send_note(cfg, st, run_id, notes.broken_note(run_id, broken, state))
+        # queued first, so a crash before the move cannot lose the note
+        item = _queue_note(cfg, st, run_id, notes.broken_note(run_id, broken, state))
+        inbox.move_broken(state, run_id, broken)
+        _deliver(cfg, st, item, t)
     if not entries and not broken:
         _save_state(state, st)
         return 0
@@ -741,6 +747,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     if record["status"] == "failed" and _streak(cfg, st) >= cfg.fail_streak_pause:
         _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", ended)
     inbox.prune(state, ended)
+    ledger.prune_runs(state, ended)
     _save_state(state, st)
     return 0
 

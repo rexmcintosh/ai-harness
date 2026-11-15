@@ -73,6 +73,7 @@ def test_broken_entry_goes_to_failed_with_reason(tmp_path):
     entries, broken = inbox.claim_all(tmp_path, "run1")
     assert [e["id"] for e in entries] == ["ok"]
     assert sorted(name for name, _ in broken) == ["x.json", "y.json", "z.json"]
+    inbox.move_broken(tmp_path, "run1", broken)
     failed = tmp_path / "failed" / "run1"
     assert (failed / "x.json").exists() and (failed / "x.json.reason").read_text().strip()
 
@@ -144,6 +145,7 @@ def test_bad_id_is_broken(tmp_path):
     put(tmp_path, "evil.json", good("../../etc"))
     entries, broken = inbox.claim_all(tmp_path, "run1")
     assert entries == [] and broken == [("evil.json", "bad id")]
+    inbox.move_broken(tmp_path, "run1", broken)
 
 
 def test_recover_stale_moves_old_batches_to_failed(tmp_path):

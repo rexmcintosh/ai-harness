@@ -106,3 +106,11 @@ def test_fail_streak_counts_only_after_the_reset_point(tmp_path):
     assert ledger.fail_streak(tmp_path) == 3
     assert ledger.fail_streak(tmp_path, since=NOW - 98.5) == 1
     assert ledger.fail_streak(tmp_path, since=NOW) == 0
+
+
+def test_old_run_records_are_pruned(tmp_path):
+    inbox.ensure_dirs(tmp_path)
+    ledger.write_run(tmp_path, rec("old", NOW - 31 * 86400))
+    ledger.write_run(tmp_path, rec("new", NOW - 86400))
+    assert ledger.prune_runs(tmp_path, NOW) == 1
+    assert [r["run_id"] for r in ledger.recent_runs(tmp_path, NOW, 24 * 40)] == ["new"]

@@ -442,7 +442,7 @@ def test_broken_inbox_file_does_not_stop_the_batch(env):
     (env["state"] / "inbox" / "junk.json").write_text("not json")
     go(env)
     assert runs(env)[0]["status"] == "ok"
-    assert runs(env)[0]["broken"] == [["junk.json", "unreadable: JSONDecodeError"]]
+    assert (env["state"] / "inbox" / "junk.json").exists()  # chat not proven: never claimed
 
 
 def test_usage_limit_part_way_is_not_replayed(env, monkeypatch, tmp_path):
@@ -519,7 +519,10 @@ def test_cap_note_that_fails_is_kept_for_retry(env, tmp_path):
 
 def test_broken_inbox_files_are_reported_even_in_a_skipped_batch(env):
     report(env, "[OK] RESOLVED x after 5 min")
-    (env["state"] / "inbox" / "junk.json").write_text("not json")
+    junk = env["state"] / "inbox" / "junk.json"
+    junk.write_text("not json")
+    old = time.time() - 7200
+    os.utime(junk, (old, old))
     go(env)
     assert not env["prompt.txt"].exists()
     (note,) = sent(env)
@@ -1020,3 +1023,53 @@ def test_dry_run_does_not_show_another_chats_text(env, capsys):
     _other_chat_report(env, "[CRIT] PRIVATE-DRY")
     dispatch.main(["--dry-run"], cfg=env["cfg"])
     assert "PRIVATE-DRY" not in capsys.readouterr().out
+
+
+def test_a_capture_whose_chat_cannot_be_read_is_never_claimed(env, monkeypatch):
+    inbox.ensure_dirs(env["state"])
+    _other_chat_report(env, "[CRIT] PRIVATE-FLAKY")
+    real = inbox._eligibility
+    calls = {"n": 0}
+
+    def flaky(path, watch):
+        calls["n"] += 1
+        if "PRIVATE-FLAKY" in path.read_text():
+            return "unknown" if calls["n"] < 3 else real(path, watch)
+        return real(path, watch)
+    monkeypatch.setattr(inbox, "_eligibility", flaky)
+    report(env)
+    go(env)
+    assert "PRIVATE-FLAKY" not in env["prompt.txt"].read_text()
+    for sub in ("batch", "done", "failed", "runs"):
+        for f in (env["state"] / sub).rglob("*"):
+            if f.is_file():
+                assert "PRIVATE-FLAKY" not in f.read_text(errors="replace"), f
+
+
+def test_a_truncated_capture_is_never_moved_and_is_deleted_after_an_hour(env):
+    inbox.ensure_dirs(env["state"])
+    torn = env["state"] / "inbox" / "20261115T000000.000000Z-torn.json"
+    torn.write_text('{"version": 1, "chat_id": "999", "text": "PRIVATE-TORN')
+    go(env)
+    assert torn.exists()  # its chat cannot be proven: left alone, not claimed
+    assert not any("PRIVATE-TORN" in f.read_text(errors="replace")
+                   for f in (env["state"] / "failed").rglob("*") if f.is_file())
+    old = time.time() - 7200
+    os.utime(torn, (old, old))
+    go(env)
+    assert not torn.exists()
+    (note,) = [n for n in sent(env) if "could not be read" in n["text"]]
+    assert "torn.json" in note["text"] and "PRIVATE-TORN" not in note["text"]
+
+
+def test_a_broken_file_note_is_queued_before_the_file_moves(env, monkeypatch):
+    report(env)
+    (env["state"] / "inbox" / "bad.json").write_text(json.dumps({"version": 2, "id": "bad", "chat_id": "7735693897"}))
+
+    def crash(*a, **k):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(inbox, "move_broken", crash)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    st = json.loads((env["state"] / "state.json").read_text())
+    assert any("could not be read" in n["text"] for n in st["unsent_notes"])

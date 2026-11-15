@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import shutil
+import time
 from pathlib import Path
 
 SUBDIRS = ("inbox", "batch", "done", "failed", "runs")
@@ -71,27 +72,37 @@ def _visible_json(folder: Path) -> list[Path]:
     return sorted(p for p in folder.glob("*.json") if not p.name.startswith("."))
 
 
-def _other_chat(path: Path, watch_chats) -> bool:
+UNREADABLE_AGE_S = 3600
+
+
+def _eligibility(path: Path, watch_chats) -> str:
+    """watched | other | unknown. Unknown (the file cannot be read or parsed) is never
+    treated as watched: its chat is not proven, so its text is never claimed."""
     try:
         chat = str(json.loads(path.read_text(encoding="utf-8")).get("chat_id") or "")
     except (OSError, ValueError, AttributeError):
-        return False
-    return bool(chat) and chat not in watch_chats
+        return "unknown"
+    return "other" if chat and chat not in watch_chats else "watched"
 
 
-def purge_other_chats(state: Path, watch_chats) -> int:
+def purge_other_chats(state: Path, watch_chats, now: float | None = None) -> list[str]:
     """Delete inbox messages sent to a chat alert-watch does not watch (tg-send skips
-    them; this is the second guard). One that cannot be deleted stays in the inbox
-    and is never claimed, so its text never reaches a batch, a prompt or a record."""
-    removed = 0
+    them; this is the second guard), and captures that stayed unreadable for an hour
+    (their chat cannot be proven). One that cannot be deleted stays in the inbox and is
+    never claimed. Returns the names of the unreadable files deleted (names only)."""
+    now = time.time() if now is None else now
+    gone_unreadable = []
     for p in _visible_json(Path(state) / "inbox"):
-        if _other_chat(p, watch_chats):
-            try:
+        kind = _eligibility(p, watch_chats)
+        try:
+            if kind == "other":
                 p.unlink()
-                removed += 1
-            except OSError:
-                pass
-    return removed
+            elif kind == "unknown" and p.stat().st_mtime < now - UNREADABLE_AGE_S:
+                p.unlink()
+                gone_unreadable.append(p.name)
+        except OSError:
+            pass
+    return gone_unreadable
 
 
 def claim_all(state: Path, run_id: str, limit: int | None = None,
@@ -106,8 +117,8 @@ def claim_all(state: Path, run_id: str, limit: int | None = None,
     for src in _visible_json(state / "inbox"):
         if limit is not None and len(entries) >= limit:
             break
-        if watch_chats is not None and _other_chat(src, watch_chats):
-            continue  # never claimed: purge_other_chats deletes it
+        if watch_chats is not None and _eligibility(src, watch_chats) != "watched":
+            continue  # never claimed: another chat's, or its chat cannot be proven yet
         batch.mkdir(parents=True, exist_ok=True)
         dst = batch / src.name
         try:
@@ -120,17 +131,27 @@ def claim_all(state: Path, run_id: str, limit: int | None = None,
         except (OSError, ValueError) as e:
             entry, reason = None, f"unreadable: {e.__class__.__name__}"
         if reason:
-            failed = state / "failed" / run_id
-            failed.mkdir(parents=True, exist_ok=True)
-            os.rename(dst, failed / src.name)
-            (failed / f"{src.name}.reason").write_text(reason + "\n", encoding="utf-8")
-            broken.append((src.name, reason))
+            broken.append((src.name, reason))  # moved by move_broken, after its note is queued
             continue
         entry["_file"] = src.name
         entries.append(entry)
     if batch.exists() and not any(batch.iterdir()):
         batch.rmdir()
     return entries, broken
+
+
+def move_broken(state: Path, run_id: str, broken: list[tuple[str, str]]) -> None:
+    state = Path(state)
+    failed = state / "failed" / run_id
+    for name, reason in broken:
+        src = state / "batch" / run_id / name
+        if src.exists():
+            failed.mkdir(parents=True, exist_ok=True)
+            os.rename(src, failed / name)
+            (failed / f"{name}.reason").write_text(reason + "\n", encoding="utf-8")
+    batch = state / "batch" / run_id
+    if batch.exists() and not any(batch.iterdir()):
+        batch.rmdir()
 
 
 def finish(state: Path, run_id: str, to: str) -> None:
