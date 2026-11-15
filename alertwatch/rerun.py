@@ -1,0 +1,93 @@
+"""Run a listed job once more, as its cron line does: `python3 -m alertwatch.rerun <job>`.
+
+The only way an alert-watch run may start a job. The job list, with each job's
+exact command, lock and log, is `[rerun.*]` in alertwatch/config.toml. A job is
+rerun at most once per `rerun_window_s`. It runs with its normal environment:
+MEETTRACK_DB_READ_ONLY is removed, because a rerun is the job doing its usual work.
+ALERT_SOURCE tags any Telegram message it sends, so the dispatcher drops the copy.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Callable
+
+from alertwatch.config import Config, load_config
+
+
+def _load(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _save(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".tmp-{path.name}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.replace(tmp, path)
+
+
+def main(argv: list[str] | None = None, *, cfg: Config | None = None,
+         now: Callable[[], float] = time.time) -> int:
+    ap = argparse.ArgumentParser(prog="alertwatch.rerun")
+    ap.add_argument("job")
+    args = ap.parse_args(argv)
+    cfg = cfg or load_config()
+    job = cfg.rerun.get(args.job)
+    if job is None:
+        print(f"rerun: {args.job!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
+              file=sys.stderr)
+        return 2
+    marks_path = cfg.state_dir / "reruns.json"
+    marks = _load(marks_path)
+    t = now()
+    last = float(marks.get(args.job) or 0)
+    if t - last < cfg.rerun_window_s:
+        print(f"rerun: {args.job} was already rerun {int((t - last) / 60)} min ago; "
+              f"one rerun per {cfg.rerun_window_s // 3600} h", file=sys.stderr)
+        return 2
+    marks[args.job] = t
+    _save(marks_path, marks)
+
+    env = {k: v for k, v in os.environ.items() if k != "MEETTRACK_DB_READ_ONLY"}
+    env["ALERT_SOURCE"] = f"alert-watch-rerun:{args.job}"
+    argv_job = ["/bin/sh", "-c", job.cmd]
+    if job.lock:
+        argv_job = ["/usr/bin/flock", "-n", "-E", "75", job.lock] + argv_job
+    Path(job.log).parent.mkdir(parents=True, exist_ok=True)
+    with open(job.log, "ab") as logf:
+        logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
+                   .encode())
+        logf.flush()
+        proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
+                                stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            rc = proc.wait(timeout=job.timeout_s)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+            print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
+            return 124
+    if job.lock and rc == 75:
+        print(f"rerun {args.job}: lock busy (the job is running now) log={job.log}")
+        return 1
+    print(f"rerun {args.job}: rc={rc} log={job.log}")
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())
