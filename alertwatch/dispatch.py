@@ -522,31 +522,43 @@ def _streak(cfg: Config, st: dict) -> int:
 
 
 def _pause(cfg: Config, st: dict, reason: str, now: float) -> None:
-    """Pause, and set the streak's reset point to now: deleting PAUSED resumes, and the
-    failures that caused this pause never count again. The reset point is also in the
-    PAUSED file, so a crash before state.json is saved still keeps it."""
-    (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\nstreak_reset_at={now}\n", encoding="utf-8")
+    """Pause as one recoverable step. 1: the reset point (the failures behind this
+    pause never count again), the pause note in the outbox, and a pending-pause mark,
+    in one state.json save. 2: write PAUSED. 3: clear the mark. 4: send the note.
+    A crash anywhere is finished by _finish_pause on the next pass, and the note is
+    never lost."""
+    text = notes.pause_note(reason, cfg.state_dir)
     st["streak_reset_at"] = now
+    st["pending_pause"] = {"reason": reason, "at": now}
+    item = _queue_note(cfg, st, "", text)  # saves state.json with all of the above
+    _write_paused(cfg, reason, now)
+    st.pop("pending_pause", None)
     _save_state(cfg.state_dir, st)
-    _send_note(cfg, st, "", notes.pause_note(reason, cfg.state_dir))
+    _deliver(cfg, st, item, now)
     _log(now, f"paused: {reason}")
 
 
-def _sync_pause_marker(cfg: Config, st: dict) -> None:
-    """Copy a self-pause's reset point from the PAUSED file into state.json."""
-    try:
-        text = (cfg.state_dir / "PAUSED").read_text(encoding="utf-8")
-    except OSError:
+def _write_paused(cfg: Config, reason: str, now: float) -> None:
+    path = cfg.state_dir / "PAUSED"
+    tmp = path.with_name(".tmp-PAUSED")
+    tmp.write_text(f"{_iso(now)} {reason}\nstreak_reset_at={now}\n", encoding="utf-8")
+    os.replace(tmp, path)
+    ledger.fsync_dir(cfg.state_dir)
+
+
+def _finish_pause(cfg: Config, st: dict, now: float) -> None:
+    """A pause a crash interrupted. If PAUSED is missing, either it was never written
+    or Rex deleted it before this pass; the two cannot be told apart, so it is written
+    (fail closed). The note is already in the outbox, and the reset point is set, so
+    deleting PAUSED again resumes."""
+    pending = st.get("pending_pause")
+    if not pending:
         return
-    for line in text.splitlines():
-        if line.startswith("streak_reset_at="):
-            try:
-                value = float(line.split("=", 1)[1])
-            except ValueError:
-                return
-            if float(st.get("streak_reset_at") or 0) < value:
-                st["streak_reset_at"] = value
-                _save_state(cfg.state_dir, st)
+    if not (cfg.state_dir / "PAUSED").exists():
+        _write_paused(cfg, str(pending.get("reason") or "paused"), float(pending.get("at") or now))
+    st.pop("pending_pause", None)
+    _save_state(cfg.state_dir, st)
+    _log(now, "finished a pause a crash interrupted")
 
 
 def main(argv: list[str] | None = None, *, now: Callable[[], float] = time.time,
@@ -586,7 +598,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     # Before any new run: a crash between a third failure and its pause must not let
     # the next pass carry on.
     if not dry_run:
-        _sync_pause_marker(cfg, st)
+        _finish_pause(cfg, st, t)
         if not (state / "PAUSED").exists() and _streak(cfg, st) >= cfg.fail_streak_pause:
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
     if (state / "PAUSED").exists():

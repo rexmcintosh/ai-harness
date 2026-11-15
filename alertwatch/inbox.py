@@ -222,6 +222,7 @@ def add_entry(state: Path, text: str, source: str, eid: str | None = None) -> st
     entry = {"version": 1, "id": eid, "captured_at": now.strftime(_TS_FMT), "chat_id": "",
              "text": text, "source": source, "cwd": "", "attempts": 0}
     _write_json(Path(state) / "inbox" / f"{eid}.json", entry)
+    _fsync_dir(Path(state) / "inbox")  # on disk before the caller records it as enqueued
     return eid
 
 

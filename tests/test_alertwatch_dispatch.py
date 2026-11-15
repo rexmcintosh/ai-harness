@@ -890,15 +890,66 @@ def test_pause_then_resume_then_a_new_run(env, monkeypatch):
     assert env["prompt.txt"].exists() and runs(env)[0]["status"] == "ok"
 
 
-def test_the_reset_point_survives_a_crash_before_state_is_saved(env, monkeypatch):
+def _three_failures_then_crash_in_pause(env, monkeypatch, at):
+    """Three failing passes; the third one's pause crashes at `at`: before_paused,
+    after_paused (PAUSED written, pending mark not yet cleared) or at_note."""
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "crash_late")
-    for _ in range(3):
+    for _ in range(2):
         report(env)
         go(env)
-    st = json.loads((env["state"] / "state.json").read_text())
-    st.pop("streak_reset_at")  # as if state.json was not saved after PAUSED was written
-    (env["state"] / "state.json").write_text(json.dumps(st))
-    go(env)  # still paused: copies the reset point from PAUSED
+    real_write, real_deliver = dispatch._write_paused, dispatch._deliver
+
+    def write(*a, **k):
+        if at == "after_paused":
+            real_write(*a, **k)
+        raise KeyboardInterrupt
+
+    def deliver(*a, **k):
+        if a[2]["text"].startswith("alert-watch paused itself"):
+            raise KeyboardInterrupt
+        return real_deliver(*a, **k)
+    if at in ("before_paused", "after_paused"):
+        monkeypatch.setattr(dispatch, "_write_paused", write)
+    else:
+        monkeypatch.setattr(dispatch, "_deliver", deliver)
+    report(env)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    monkeypatch.setattr(dispatch, "_write_paused", real_write)
+    monkeypatch.setattr(dispatch, "_deliver", real_deliver)
+
+
+def pause_notes(env):
+    return sum(n["text"].startswith("alert-watch paused itself") for n in sent(env))
+
+
+def test_a_crash_before_paused_is_written_still_pauses_and_tells_rex(env, monkeypatch):
+    _three_failures_then_crash_in_pause(env, monkeypatch, "before_paused")
+    assert not (env["state"] / "PAUSED").exists()
+    go(env)
+    assert (env["state"] / "PAUSED").exists() and pause_notes(env) == 1
+    (env["state"] / "PAUSED").unlink()
+    go(env)
+    assert not (env["state"] / "PAUSED").exists()  # resumes
+
+
+def test_a_crash_right_after_paused_then_a_quick_delete_fails_closed_then_resumes(env, monkeypatch):
+    _three_failures_then_crash_in_pause(env, monkeypatch, "after_paused")
+    assert (env["state"] / "PAUSED").exists()
+    (env["state"] / "PAUSED").unlink()  # Rex deletes it before any pass ran
+    go(env)
+    assert (env["state"] / "PAUSED").exists() and pause_notes(env) == 1  # cannot tell: stays paused
     (env["state"] / "PAUSED").unlink()
     go(env)
     assert not (env["state"] / "PAUSED").exists()
+
+
+def test_a_crash_before_the_pause_note_is_sent_still_delivers_it(env, monkeypatch):
+    _three_failures_then_crash_in_pause(env, monkeypatch, "at_note")
+    assert (env["state"] / "PAUSED").exists() and pause_notes(env) == 0
+    go(env)  # still paused; the queued note goes out
+    assert pause_notes(env) == 1
+    (env["state"] / "PAUSED").unlink()
+    go(env)
+    assert not (env["state"] / "PAUSED").exists()  # the reset point was saved first
+    assert pause_notes(env) == 1
