@@ -216,13 +216,14 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
     """alert-watch turns captured Telegram reports into fix runs. Warn when its inbox
     stops moving or its newest run failed. A paused watcher is a choice, not a fault
     (it sends its own note when it pauses itself). A usage-limit run is not a failure."""
+    if note_status in ("failed", "uncertain"):  # first: the pause note itself may be the one lost
+        return CheckStatus("alertwatch", "warn",
+                           f"alert-watch: a note to Rex {note_status}; see its runs/ record and state.json"
+                           + (" (alert-watch is paused)" if paused else ""))
     if paused:
         return CheckStatus("alertwatch", "ok", "alert-watch is paused")
     if newest_run_status == "failed":
         return CheckStatus("alertwatch", "warn", "alert-watch: the newest run failed; see its runs/ record")
-    if note_status in ("failed", "uncertain"):
-        return CheckStatus("alertwatch", "warn",
-                           f"alert-watch: the newest run's note to Rex {note_status}; see its runs/ record")
     if oldest_inbox_age_s is not None and oldest_inbox_age_s > max_age_s:
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a report has waited {int(oldest_inbox_age_s // 60)} min in the inbox")

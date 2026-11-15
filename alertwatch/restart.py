@@ -120,15 +120,18 @@ def do_restart(cfg: Config, key: str, select, send, now: float) -> dict:
         if attempts > cfg.restart_max_attempts:
             raise Refused(f"{key} has poller_attempts={attempts} (restart only at "
                           f"{cfg.restart_max_attempts} or less; the supervisor gives up at 5)")
+        # Journal first, so a restart can never be missing from the history a revert reads.
+        action = {"kind": "restart", "id": f"{os.environ.get('ALERT_WATCH_RUN_ID') or 'manual'}-{pid}-{int(now)}",
+                  "at": now, "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""), "key": key, "pid": pid,
+                  "attempts": attempts, "ingest_status": rows[0].get("ingest_status")}
+        ledger.append_action(cfg.state_dir, action)
         try:
             send(pidfd, signal.SIGTERM)
         except ProcessLookupError:
+            ledger.append_action(cfg.state_dir, {"kind": "restart_failed", "intent": action["id"], "at": now})
             raise Refused(f"writer {pid} for {key} stopped by itself") from None
     finally:
         os.close(pidfd)
-    action = {"kind": "restart", "at": now, "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""),
-              "key": key, "pid": pid, "attempts": attempts, "ingest_status": rows[0].get("ingest_status")}
-    ledger.append_action(cfg.state_dir, action)
     return {"status": "restarted", **action}
 
 
@@ -143,8 +146,10 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None, select=Non
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
     if args.cmd == "history":
         cutoff = now() - 86400
-        for a in ledger.actions(cfg.state_dir):
-            if a.get("kind") == "restart" and float(a.get("at") or 0) >= cutoff:
+        acts = ledger.actions(cfg.state_dir)
+        failed = {a.get("intent") for a in acts if a.get("kind") == "restart_failed"}
+        for a in acts:
+            if a.get("kind") == "restart" and float(a.get("at") or 0) >= cutoff and a.get("id") not in failed:
                 print(json.dumps(a))
         return 0
     try:

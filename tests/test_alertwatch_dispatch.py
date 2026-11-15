@@ -46,6 +46,15 @@ if mode == "limit":
          "result": "Claude AI usage limit reached|" + os.environ["FAKE_LIMIT_EPOCH"]}, 1)
 if mode == "sleep":
     time.sleep(30)
+if mode == "detached":
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "ALERT_WATCH_RUN_ID"}  # escapes the marker kill
+    child = subprocess.Popen(["setsid", "sleep", "60"], env=env)
+    open(os.environ["FAKE_CHILD_PID"], "w").write(str(child.pid))
+    time.sleep(30)
+if mode == "limit_no_json":
+    sys.stderr.write("Error: Claude AI usage limit reached|" + os.environ["FAKE_LIMIT_EPOCH"] + "\\n")
+    sys.exit(1)
 '''
 
 FAKE_TG = r'''#!/usr/bin/env python3
@@ -548,3 +557,42 @@ def test_a_check_due_after_a_long_pause_is_still_enqueued(env, monkeypatch):
                                         {"repo": "splash_poller", "from_sha": "a" * 40, "to_sha": "b" * 40,
                                          "due_at": "2020-01-01T00:00:00Z", "what": "x"}]}})
     assert dispatch.enqueue_due_checks(env["cfg"], {}, time.time()) == 1
+
+
+def test_diagnose_allowlist_has_no_command_that_writes_by_itself(env):
+    allowed = dispatch.DIAGNOSE_ALLOW
+    for cmd in ("sort", "uniq", "sed", "rg", "find", "awk", "tee", "xargs"):
+        assert not any(a.startswith(f"Bash({cmd}") for a in allowed), cmd
+    deny = dispatch.session_settings(env["cfg"])["permissions"]["deny"]
+    for rule in ("Bash(*--output*)", "Bash(*--ext-diff*)", "Bash(*--textconv*)"):
+        assert rule in deny
+
+
+def test_usage_limit_with_no_json_is_never_replayed(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "limit_no_json")
+    monkeypatch.setenv("FAKE_LIMIT_EPOCH", str(int(time.time()) + 3000))
+    report(env)
+    go(env)
+    assert runs(env)[0]["status"] == "limit"
+    assert not list((env["state"] / "inbox").glob("*.json"))
+    assert list((env["state"] / "failed").iterdir())
+
+
+def test_a_child_holding_the_pipes_cannot_hang_the_dispatcher(env, monkeypatch, tmp_path):
+    import signal as _signal
+    pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "detached")
+    monkeypatch.setenv("FAKE_CHILD_PID", str(pid_file))
+    monkeypatch.setattr(dispatch, "PIPE_DRAIN_S", 1)
+    report(env)
+    t0 = time.time()
+    try:
+        go(env, run_timeout_s=1, kill_after_s=1)
+        assert time.time() - t0 < 20
+        assert runs(env)[0]["status"] == "failed" and runs(env)[0]["timed_out"] is True
+    finally:
+        if pid_file.exists():
+            try:
+                os.kill(int(pid_file.read_text()), _signal.SIGKILL)
+            except ProcessLookupError:
+                pass

@@ -364,3 +364,13 @@ def test_untracked_parent_or_child_in_the_way_is_refused_before_the_push(world):
     assert run(world, "merge", "repo", str(wt2)) == 2
     assert git(world["origin"], "rev-parse", "main") == before
     assert ledger.actions(world["state"]) == []
+
+
+def test_a_file_moved_out_of_a_denied_folder_is_refused(world, capsys):
+    git(world["repo"], "fetch", "-q", "origin")
+    wt = world["state"] / "worktrees" / "mv"
+    git(world["repo"], "worktree", "add", "-q", "-b", "alertwatch/run-test-mv", str(wt), "origin/main")
+    git(wt, "mv", "web/page.ts", "page.ts")
+    git(wt, "commit", "-qm", "move it out")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert "web/page.ts" in capsys.readouterr().err

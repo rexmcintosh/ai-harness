@@ -161,7 +161,13 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
         _git(repo, "merge-base", "--is-ancestor", base, head)
     except subprocess.CalledProcessError:
         raise Refused("the branch is not a fast forward of origin/main; rebase it first") from None
-    files = [f for f in _git(repo, "diff", "--name-only", f"{base}...{head}").splitlines() if f]
+    # --no-renames: a moved file shows as its old path and its new path, so a file
+    # moved out of a denied folder is still caught. -z: any file name, unquoted.
+    proc = subprocess.run(["git", "diff", "--name-only", "--no-renames", "-z", f"{base}...{head}"],
+                          cwd=str(repo), capture_output=True, timeout=300)
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, ["git", "diff"], proc.stdout, proc.stderr)
+    files = [f for f in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
     untracked = {line[3:] for line in _git(repo, "status", "--porcelain", "--untracked-files=all").splitlines()
                  if line.startswith("?? ")}
     blocking = sorted({u for u in untracked for f in files

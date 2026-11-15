@@ -80,3 +80,8 @@ def test_a_dropped_note_warns_for_a_day(tmp_path, monkeypatch):
     (state / "state.json").write_text(json.dumps({"note_dropped_at": now - 3600}))
     assert run.alertwatch_status(now).level == "warn"
     assert run.alertwatch_status(now + 90000).level == "ok"
+
+
+def test_a_lost_pause_note_warns_even_while_paused():
+    s = check_alertwatch(None, paused=True, newest_run_status="failed", note_status="failed")
+    assert s.level == "warn" and "paused" in s.summary

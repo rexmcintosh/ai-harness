@@ -31,6 +31,7 @@ REPORT_MAX = 4000
 CHECK_SOURCE = "alert-watch-check"
 CHECK_MAX_DELAY_S = 24 * 3600
 CHECK_LOOKBACK_H = 30 * 24
+PIPE_DRAIN_S = 10
 VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
 
 # Always denied, in both modes. backlog-run's DENY_RULES (pushes, remotes, gh,
@@ -78,16 +79,21 @@ def _path_rules(cfg: Config) -> tuple[list[str], list[str]]:
 
 # diagnose mode runs without --dangerously-skip-permissions: a headless run is
 # refused every tool call these rules do not allow. Read-only tools only.
+# Left out on purpose, because one of them alone can write a file or run another
+# command: sort (-o), uniq (an output file argument), sed (w and e), rg (--pre),
+# find (-exec, -delete), awk, tee, xargs.
 DIAGNOSE_ALLOW = [
     "Read", "Grep", "Glob",
-    "Bash(ls*)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(grep *)", "Bash(rg *)",
-    "Bash(wc *)", "Bash(sort*)", "Bash(uniq*)", "Bash(cut *)", "Bash(jq *)", "Bash(sed -n *)",
-    "Bash(ps *)", "Bash(date*)", "Bash(stat *)",
+    "Bash(ls*)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(grep *)",
+    "Bash(wc *)", "Bash(cut *)", "Bash(jq *)",
+    "Bash(ps *)", "Bash(date)", "Bash(date -u*)", "Bash(date +*)", "Bash(stat *)",
     "Bash(git log*)", "Bash(git status*)", "Bash(git diff*)", "Bash(git show*)",
     "Bash(git -C * log*)", "Bash(git -C * status*)", "Bash(git -C * diff*)", "Bash(git -C * show*)",
     "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
 ]
 _DIAGNOSE_DENY = ["Edit", "Write", "NotebookEdit", "Bash(git commit*)", "Bash(git * commit*)",
+                  # git log, diff and show can write a file or run a configured program
+                  "Bash(*--output*)", "Bash(*--ext-diff*)", "Bash(*--textconv*)",
                   "Bash(*alertwatch.rerun*)", "Bash(*alertwatch.merge*)",
                   "Bash(*alertwatch.restart restart*)"]
 
@@ -252,7 +258,18 @@ def run_claude(cfg: Config, prompt: str, env: dict) -> dict:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            out, err = proc.communicate()
+            # A child that left the process group may still hold the pipes open:
+            # kill it by its run id first, and never wait for the pipes forever.
+            _kill_marked(env.get("ALERT_WATCH_RUN_ID", ""))
+            try:
+                out, err = proc.communicate(timeout=PIPE_DRAIN_S)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                for pipe in (proc.stdout, proc.stderr):
+                    if pipe:
+                        pipe.close()
+                proc.wait()
+                out, err = "", "alert-watch: output pipes stayed open after the kill; output lost"
     leftovers = _kill_marked(env.get("ALERT_WATCH_RUN_ID", ""))
     data = None
     for candidate in (out or "", *reversed((out or "").splitlines())):
@@ -502,12 +519,13 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         record.update(status="limit", reason="Claude usage limit")
         st["limit_until"] = until
         _save_state(state, st)  # before the release, so a crash cannot retry at once
-        if started(data):
+        # Only JSON that shows zero turns proves the run did nothing.
+        part_way = data is None or started(data)
+        if part_way:
             inbox.finish(state, run_id, "failed")  # it may have acted: never replayed
-            record["reason"] = "Claude usage limit, part way through the run"
+            record["reason"] = "Claude usage limit, part way through the run (or no JSON)"
         else:
             inbox.release(state, run_id, looks, count_attempt=False)
-        part_way = started(data)
         if part_way or float(st.get("limit_noted_until") or 0) != until:
             record["note_text"] = notes.limit_note(until, part_way=part_way)
             record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])

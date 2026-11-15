@@ -149,7 +149,7 @@ def test_writer_that_exits_during_the_checks_is_refused_not_mistargeted(world):
         p.wait()
         return registry(0)(*a)
     assert restart.main(["restart", "11539"], cfg=world["cfg"], select=select_then_writer_dies) == 2
-    assert ledger.actions(world["state"]) == []
+    assert [a["kind"] for a in ledger.actions(world["state"])] in ([], ["restart", "restart_failed"])
 
 
 def test_reads_only_real_registry_columns(world):
@@ -186,3 +186,22 @@ def test_every_supervisor_writer_form_names_its_meet():
             assert not restart._writes_meet(argv, "11600", None), argv
     argv = sup._poller_argv("11539", backfill=True, python="/usr/bin/python3")
     assert restart._is_writer(argv) and restart._writes_meet(argv, "11539", None)
+
+
+def test_the_restart_is_journaled_before_the_signal(world, monkeypatch):
+    p = world["writer"]("11539")
+
+    def disk_full(state, action):
+        raise OSError("disk full")
+    monkeypatch.setattr(ledger, "append_action", disk_full)
+    with pytest.raises(OSError):
+        restart.main(["restart", "11539"], cfg=world["cfg"], select=registry(0))
+    assert p.poll() is None  # no journal line, so no signal
+
+
+def test_history_leaves_out_a_restart_that_failed(world, capsys):
+    ledger.append_action(world["state"], {"kind": "restart", "id": "a", "at": time.time(), "key": "1"})
+    ledger.append_action(world["state"], {"kind": "restart_failed", "intent": "a", "at": time.time()})
+    ledger.append_action(world["state"], {"kind": "restart", "id": "b", "at": time.time(), "key": "2"})
+    assert restart.main(["history"], cfg=world["cfg"], select=registry(0)) == 0
+    assert [json.loads(l)["key"] for l in capsys.readouterr().out.splitlines()] == ["2"]
