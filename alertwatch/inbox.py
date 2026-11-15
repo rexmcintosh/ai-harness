@@ -56,14 +56,17 @@ def _visible_json(folder: Path) -> list[Path]:
     return sorted(p for p in folder.glob("*.json") if not p.name.startswith("."))
 
 
-def claim_all(state: Path, run_id: str) -> tuple[list[dict], list[tuple[str, str]]]:
-    """Claim every inbox entry into batch/<run_id>/. Returns (valid entries,
-    [(file name, reason)]); broken files go to failed/<run_id>/ with a .reason file."""
+def claim_all(state: Path, run_id: str, limit: int | None = None) -> tuple[list[dict], list[tuple[str, str]]]:
+    """Claim inbox entries (the oldest first, at most `limit` valid ones) into
+    batch/<run_id>/. Returns (valid entries, [(file name, reason)]); broken files go
+    to failed/<run_id>/ with a .reason file."""
     state = Path(state)
     batch = state / "batch" / run_id
     entries: list[dict] = []
     broken: list[tuple[str, str]] = []
     for src in _visible_json(state / "inbox"):
+        if limit is not None and len(entries) >= limit:
+            break
         batch.mkdir(parents=True, exist_ok=True)
         dst = batch / src.name
         try:

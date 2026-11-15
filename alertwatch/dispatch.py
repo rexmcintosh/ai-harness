@@ -32,6 +32,7 @@ CHECK_SOURCE = "alert-watch-check"
 CHECK_MAX_DELAY_S = 24 * 3600
 CHECK_LOOKBACK_H = 30 * 24
 PIPE_DRAIN_S = 10
+BATCH_MAX = 20  # reports per run (each cut to REPORT_MAX); the rest wait for the next pass
 VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
 
 # Always denied, in both modes. backlog-run's DENY_RULES (pushes, remotes, gh,
@@ -49,7 +50,10 @@ _ALWAYS_DENY = [
     "Read(~/.config/gh/**)", "Read(~/.git-credentials)", "Read(**/*.pem)", "Read(**/*.key)",
     "Read(**/*credentials*)", "Read(**/*secret*)",
     "Bash(*.ssh/*)", "Bash(*.gnupg*)", "Bash(*channels/telegram*)", "Bash(*.credentials*)",
-    "Bash(*git-credentials*)", "Bash(*.pem*)", "Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*config/gh*)",
+    "Bash(*git-credentials*)", "Bash(*.pem*)", "Bash(*.key*)", "Bash(*id_rsa*)", "Bash(*id_ed25519*)",
+    "Bash(*config/gh*)",
+    # another process's environment (and this one's) can hold credentials
+    "Read(//proc/**)", "Bash(*environ*)", "Bash(ps *e*)",
 ]
 # act mode: the run edits only in its worktrees under the state dir, never in a
 # main checkout (cron runs from those).
@@ -84,14 +88,15 @@ def _path_rules(cfg: Config) -> tuple[list[str], list[str]]:
 
 # diagnose mode runs without --dangerously-skip-permissions: a headless run is
 # refused every tool call these rules do not allow. Read-only tools only.
-# Left out on purpose, because one of them alone can write a file or run another
-# command: sort (-o), uniq (an output file argument), sed (w and e), rg (--pre),
-# find (-exec, -delete), awk, tee, xargs.
+# Left out on purpose: cat, head, tail, grep, jq and ps can read any file or another
+# process's environment without naming a denied path (grep -r, ps e); sort (-o),
+# uniq (an output file), sed (w and e), rg (--pre), find (-exec, -delete), awk, tee
+# and xargs can write a file or run another command by themselves.
 DIAGNOSE_ALLOW = [
+    # File contents only through these tools: they honor the Read deny rules (the
+    # credential and .env rules), which shell commands such as cat or grep -r do not.
     "Read", "Grep", "Glob",
-    "Bash(ls*)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(grep *)",
-    "Bash(wc *)", "Bash(cut *)", "Bash(jq *)",
-    "Bash(ps *)", "Bash(date)", "Bash(date -u*)", "Bash(date +*)", "Bash(stat *)",
+    "Bash(ls*)", "Bash(wc *)", "Bash(stat *)", "Bash(date)", "Bash(date -u*)", "Bash(date +*)",
     "Bash(git log*)", "Bash(git status*)", "Bash(git diff*)", "Bash(git show*)",
     "Bash(git -C * log*)", "Bash(git -C * status*)", "Bash(git -C * diff*)", "Bash(git -C * show*)",
     "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
@@ -137,8 +142,14 @@ def permission_argv(cfg: Config) -> list[str]:
             "--allowedTools", *DIAGNOSE_ALLOW]
 
 
+# The run gets only these variables from the dispatcher (cron's environment, or a
+# shell's when run by hand), so no credential in it reaches the run.
+_ENV_KEEP = ("HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SHELL", "TZ",
+             "PATH", "TMPDIR", "XDG_RUNTIME_DIR", "SSH_AUTH_SOCK")
+
+
 def run_env(cfg: Config, run_id: str = "") -> dict:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
+    env = {k: os.environ[k] for k in _ENV_KEEP if os.environ.get(k)}
     local_bin = str(Path.home() / ".local" / "bin")
     parts = [local_bin] + [p for p in env.get("PATH", "/usr/bin:/bin").split(":") if p and p != local_bin]
     env.update({"PATH": ":".join(parts), "ALERT_WATCH_RUN": "1", "ALERT_SOURCE": "alert-watch",
@@ -482,6 +493,8 @@ def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
             pass
         _send_note(cfg, st, "", notes.failure_note(
             {"run_id": run_id, "reason": "the dispatcher stopped during this run"}, []))
+        if ledger.fail_streak(state) >= cfg.fail_streak_pause and not (state / "PAUSED").exists():
+            _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", now)
     _log(now, f"batch {run_id} was left by a dispatcher that stopped; finished as {dest or 'failed'}")
     return True
 
@@ -549,7 +562,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         return 0
 
     run_id = ledger.new_run_id(t)
-    entries, broken = inbox.claim_all(state, run_id)
+    entries, broken = inbox.claim_all(state, run_id, limit=BATCH_MAX)
     for name, reason in broken:
         _log(t, f"{run_id}: broken inbox file {name}: {reason}")
     if broken:

@@ -86,6 +86,10 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE_ENV", str(files["env.json"]))
     monkeypatch.setenv("FAKE_TG_LOG", str(files["tg.jsonl"]))
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok")
+    # the run's environment is a whitelist: let the fakes' settings through
+    monkeypatch.setattr(dispatch, "_ENV_KEEP", dispatch._ENV_KEEP + (
+        "FAKE_CLAUDE_PROMPT", "FAKE_CLAUDE_ARGV", "FAKE_CLAUDE_ENV", "FAKE_TG_LOG", "FAKE_CLAUDE_MODE",
+        "FAKE_LIMIT_EPOCH", "FAKE_TURNS", "FAKE_VERDICT", "FAKE_CHILD_PID"))
     state = tmp_path / "state"
     cfg = load_config(env={"ALERT_WATCH_STATE": str(state), "ALERT_WATCH_TG_SEND": str(tg),
                            "ALERT_WATCH_CLAUDE": str(claude)})
@@ -753,3 +757,39 @@ def test_credential_files_are_never_read(env):
         deny = dispatch.session_settings(dataclasses.replace(env["cfg"], mode=mode))["permissions"]["deny"]
         for rule in ("Read(~/.ssh/**)", "Read(~/.claude/channels/**)", "Bash(*.ssh/*)", "Bash(*id_ed25519*)"):
             assert rule in deny, (mode, rule)
+
+
+def test_the_run_gets_a_minimal_environment(env, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "should-not-pass")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "should-not-pass")
+    e = dispatch.run_env(env["cfg"], "r")
+    assert "TELEGRAM_BOT_TOKEN" not in e and "SUPABASE_SERVICE_ROLE_KEY" not in e
+    assert e["HOME"] and e["PATH"].startswith(str(Path.home() / ".local" / "bin"))
+
+
+def test_diagnose_has_no_shell_file_readers(env):
+    for cmd in ("cat", "head", "tail", "grep", "jq", "ps"):
+        assert not any(a.startswith(f"Bash({cmd}") for a in dispatch.DIAGNOSE_ALLOW), cmd
+    deny = dispatch.session_settings(env["cfg"])["permissions"]["deny"]
+    for rule in ("Read(//proc/**)", "Bash(*environ*)", "Bash(*.key*)"):
+        assert rule in deny
+
+
+def test_a_batch_holds_at_most_twenty_reports(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok_quiet")
+    for i in range(25):
+        report(env, f"[CRIT] report {i}")
+    go(env)
+    assert env["prompt.txt"].read_text().count("<<<REPORT id=") == 20
+    assert len(list((env["state"] / "inbox").glob("*.json"))) == 5
+
+
+def test_crash_recovered_failures_count_toward_the_pause(env):
+    inbox.ensure_dirs(env["state"])
+    for i in range(3):
+        report(env)
+        inbox.claim_all(env["state"], f"dead{i}")
+        ledger.write_run(env["state"], {"run_id": f"dead{i}", "started_at": time.time() - 100 + i,
+                                        "status": "running"})
+    go(env)
+    assert (env["state"] / "PAUSED").exists()

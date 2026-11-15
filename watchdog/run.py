@@ -339,10 +339,11 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
             dropped = 0.0
         if now_epoch - dropped < 86400:
             note = "failed"
+        newest = counted[0].get("status") if counted else None
+        if newest == "running" and now_epoch - float(counted[0]["started_at"]) > 3600 + 900:
+            newest = "failed"  # past the run's time limit plus a margin: it is stuck
         return check_alertwatch(aw_inbox.oldest_age_s(state, now_epoch),
-                                (state / "PAUSED").exists(),
-                                counted[0].get("status") if counted else None,
-                                note_status=note)
+                                (state / "PAUSED").exists(), newest, note_status=note)
     except Exception as e:  # a broken alert-watch must not blind the watchdog
         return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
 

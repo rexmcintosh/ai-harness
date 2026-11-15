@@ -96,3 +96,15 @@ def test_an_unsure_note_on_an_earlier_run_still_warns(tmp_path, monkeypatch):
     ledger.write_run(state, {"run_id": "a", "started_at": now - 600, "status": "ok", "note_status": "uncertain"})
     ledger.write_run(state, {"run_id": "b", "started_at": now - 60, "status": "ok", "note_status": "accepted"})
     assert run.alertwatch_status(now).level == "warn"
+
+
+def test_a_run_stuck_in_running_warns(tmp_path, monkeypatch):
+    state = tmp_path / "state"
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
+    inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
+    now = time.time()
+    ledger.write_run(state, {"run_id": "a", "started_at": now - 2 * 3600, "status": "running"})
+    assert run.alertwatch_status(now).level == "warn"
+    ledger.write_run(state, {"run_id": "b", "started_at": now - 60, "status": "running"})
+    assert run.alertwatch_status(now).level == "ok"
