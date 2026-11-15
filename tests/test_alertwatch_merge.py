@@ -240,3 +240,68 @@ def test_a_lost_push_reply_counts_as_pushed(world, monkeypatch):
     monkeypatch.setattr(merge, "_git", lost_reply)
     assert run(world, "merge", "repo", str(wt)) == 0
     assert git(world["repo"], "rev-parse", "main") == head
+
+
+def test_untracked_file_in_the_way_is_refused_before_the_push(world):
+    wt = fix_worktree(world, change=("new_module.py", "y = 1\n"))
+    (world["repo"] / "new_module.py").write_text("someone's scratch\n")
+    before = git(world["origin"], "rev-parse", "main")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    assert git(world["origin"], "rev-parse", "main") == before
+    assert ledger.actions(world["state"]) == []
+
+
+def test_revert_crash_before_push_is_recovered(world, monkeypatch):
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 0
+    head = git(wt, "rev-parse", "HEAD")
+    real = merge._git
+
+    def die_on_push(cwd, *args):
+        if args and args[0] == "push":
+            raise KeyboardInterrupt  # the process dies; nothing reached origin
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", die_on_push)
+    with pytest.raises(KeyboardInterrupt):
+        run(world, "revert", "repo", head)
+    monkeypatch.setattr(merge, "_git", real)
+    assert git(world["repo"], "rev-parse", "main") != git(world["origin"], "rev-parse", "main")
+    assert run(world, "revert", "repo", head) == 0
+    assert (world["repo"] / "app.py").read_text() == "x = 1\n"
+    assert git(world["repo"], "rev-parse", "main") == git(world["origin"], "rev-parse", "main")
+    kinds = [a["kind"] for a in ledger.actions(world["state"])]
+    assert kinds == ["merge_intent", "merge", "revert_intent", "revert_abandoned", "revert_intent", "revert"]
+
+
+def test_revert_crash_after_push_counts_as_reverted(world, monkeypatch):
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 0
+    head = git(wt, "rev-parse", "HEAD")
+    real = ledger.append_action
+
+    def die_after_push(state, action):
+        if action["kind"] == "revert":
+            raise KeyboardInterrupt
+        real(state, action)
+    monkeypatch.setattr(ledger, "append_action", die_after_push)
+    with pytest.raises(KeyboardInterrupt):
+        run(world, "revert", "repo", head)
+    monkeypatch.setattr(ledger, "append_action", real)
+    assert run(world, "revert", "repo", head) == 2  # already reverted on origin
+
+
+def test_merge_intent_that_never_reached_origin_stops_counting(world, monkeypatch):
+    wt = fix_worktree(world)
+    real = merge._git
+
+    def die_on_push(cwd, *args):
+        if args and args[0] == "push":
+            raise KeyboardInterrupt
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", die_on_push)
+    with pytest.raises(KeyboardInterrupt):
+        run(world, "merge", "repo", str(wt))
+    monkeypatch.setattr(merge, "_git", real)
+    assert ledger.merges_in_window(world["state"], time.time()) == 1  # counted until settled
+    assert run(world, "merge", "repo", str(wt)) == 0
+    assert ledger.merges_in_window(world["state"], time.time()) == 1

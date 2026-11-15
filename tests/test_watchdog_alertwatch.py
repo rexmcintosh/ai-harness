@@ -68,3 +68,15 @@ def test_a_note_that_may_not_have_arrived_warns():
         s = check_alertwatch(None, paused=False, newest_run_status="ok", note_status=status)
         assert s.level == "warn" and status in s.summary
     assert check_alertwatch(None, paused=False, newest_run_status="ok", note_status="accepted").level == "ok"
+
+
+def test_a_dropped_note_warns_for_a_day(tmp_path, monkeypatch):
+    import json
+    state = tmp_path / "state"
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
+    inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
+    now = time.time()
+    (state / "state.json").write_text(json.dumps({"note_dropped_at": now - 3600}))
+    assert run.alertwatch_status(now).level == "warn"
+    assert run.alertwatch_status(now + 90000).level == "ok"

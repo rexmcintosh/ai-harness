@@ -40,6 +40,12 @@ def failure_note(record: dict, failed_ids: list[str]) -> str:
     return "\n".join(lines)
 
 
+def broken_note(run_id: str, broken: list) -> str:
+    names = ", ".join(str(name) for name, _ in broken[:5]) + (" and more" if len(broken) > 5 else "")
+    return (f"alert-watch: {len(broken)} captured report(s) could not be read and were not handled "
+            f"(run {run_id}): {names}. They are in ~/.local/state/alert-watch/failed/{run_id}/.")
+
+
 def cap_note(cap: str, value: int, limit: int) -> str:
     what = {"runs_hour": "runs this hour", "runs_day": "runs in 24 hours",
             "merges_day": "merges in 24 hours"}.get(cap, cap)

@@ -11,6 +11,7 @@ import datetime as dt
 import fcntl
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -144,6 +145,11 @@ def _helper_line(a: dict) -> str:
     return f"merge in {a.get('repo')} {str(a.get('from_sha', ''))[:10]}..{str(a.get('to_sha', ''))[:10]}"
 
 
+def _safe(text) -> str:
+    """Report text, and anything derived from it, cannot fake the prompt's markers."""
+    return str(text).replace("<<<", "< < <").replace(">>>", "> > >")
+
+
 def _recent_lines(recent: list[dict], acts: list[dict]) -> str:
     if not recent:
         return "(none)"
@@ -155,36 +161,33 @@ def _recent_lines(recent: list[dict], acts: list[dict]) -> str:
                              if isinstance(e, dict))
         done = ", ".join(_helper_line(a) for a in acts if a.get("run_id") == r.get("run_id"))
         needs = " | ".join(str(n) for n in result.get("needs_rex") or [])
-        out.append(f"- {r.get('run_id')} {_iso(float(r['started_at']))} status={r.get('status')}"
-                   f" reports: {firsts or '-'}; verdicts: {verdicts or '-'}; helper actions: {done or '-'};"
-                   f" needs_rex: {needs or '-'}")
+        out.append(_safe(f"- {r.get('run_id')} {_iso(float(r['started_at']))} status={r.get('status')}"
+                         f" reports (data): {firsts or '-'}; verdicts: {verdicts or '-'};"
+                         f" helper actions: {done or '-'}; needs_rex: {needs or '-'}"))
     return "\n".join(out)
 
 
 def build_prompt(cfg: Config, entries: list[dict], recent: list[dict], counts: dict, now: float) -> str:
     template = (HERE / "prompt.md").read_text(encoding="utf-8")
-    def safe(text: str) -> str:  # a report cannot fake the markers around it
-        return str(text).replace("<<<", "< < <").replace(">>>", "> > >")
-
     reports = "\n\n".join(
-        f"<<<REPORT id={e['id']} source={safe(str(e.get('source') or '')[:300])} "
+        f"<<<REPORT id={e['id']} source={_safe(str(e.get('source') or '')[:300])} "
         f"captured_at={e.get('captured_at', '')} attempts={e.get('attempts', 0)}>>>\n"
-        f"{safe(str(e['text'])[:REPORT_MAX])}\n<<<END REPORT>>>"
+        f"{_safe(str(e['text'])[:REPORT_MAX])}\n<<<END REPORT>>>"
         for e in entries)
     fills = {
-        "{{POLICY}}": (HERE / "POLICY.md").read_text(encoding="utf-8"),
-        "{{NOW}}": _iso(now),
-        "{{MODE}}": cfg.mode,
-        "{{REPOS}}": ", ".join(cfg.repos),
-        "{{DENIED}}": ", ".join(cfg.denied_paths),
-        "{{RERUN_JOBS}}": ", ".join(sorted(cfg.rerun)),
-        "{{MERGES_DAY}}": str(counts.get("merges_day", 0)),
-        "{{MAX_MERGES_DAY}}": str(cfg.max_merges_day),
-        "{{RECENT}}": _recent_lines(recent, ledger.actions(cfg.state_dir)),
+        "POLICY": (HERE / "POLICY.md").read_text(encoding="utf-8"),
+        "NOW": _iso(now),
+        "MODE": cfg.mode,
+        "REPOS": ", ".join(cfg.repos),
+        "DENIED": ", ".join(cfg.denied_paths),
+        "RERUN_JOBS": ", ".join(sorted(cfg.rerun)),
+        "MERGES_DAY": str(counts.get("merges_day", 0)),
+        "MAX_MERGES_DAY": str(cfg.max_merges_day),
+        "RECENT": _recent_lines(recent, ledger.actions(cfg.state_dir)),
+        "ENTRIES": reports,
     }
-    for key, value in fills.items():
-        template = template.replace(key, value)
-    return template.replace("{{ENTRIES}}", reports)  # last: report text is never expanded
+    # One pass: text placed by one fill is never read as another placeholder.
+    return re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: fills.get(m.group(1), m.group(0)), template)
 
 
 def _claude_path(cfg: Config, env: dict) -> str:
@@ -307,7 +310,7 @@ def _cap_reached(cfg: Config, st: dict, now: float) -> bool:
         if c[cap] >= limit:
             noted = st.setdefault("cap_noted", {})
             if now - float(noted.get(cap, 0)) >= window:
-                notes.send(cfg, notes.cap_note(cap, c[cap], limit))
+                _send_note(cfg, st, "", notes.cap_note(cap, c[cap], limit))
                 noted[cap] = now
             _log(now, f"cap {cap} reached ({c[cap]} of {limit}); waiting")
             return True
@@ -341,6 +344,7 @@ def retry_notes(cfg: Config, st: dict, now: float) -> None:
             continue
         if status == "failed":
             _log(now, f"note for {item.get('run_id')} dropped after {NOTE_TRIES} failed sends")
+            st["note_dropped_at"] = now  # the watchdog check reads this
         try:
             if item.get("run_id"):
                 ledger.update_run(cfg.state_dir, item["run_id"], note_status=status)
@@ -349,9 +353,9 @@ def retry_notes(cfg: Config, st: dict, now: float) -> None:
     st["unsent_notes"] = keep
 
 
-def _pause(cfg: Config, reason: str, now: float) -> None:
+def _pause(cfg: Config, st: dict, reason: str, now: float) -> None:
     (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\n", encoding="utf-8")
-    notes.send(cfg, notes.pause_note(reason))
+    _send_note(cfg, st, "", notes.pause_note(reason))
     _log(now, f"paused: {reason}")
 
 
@@ -377,9 +381,12 @@ def main(argv: list[str] | None = None, *, now: Callable[[], float] = time.time,
 def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     state = cfg.state_dir
     t = now()
+    st = _load_state(state)
+    if st.get("unsent_notes") and not dry_run:
+        retry_notes(cfg, st, t)  # even while paused: Rex must still get the notes
+        _save_state(state, st)
     if (state / "PAUSED").exists():
         return 0
-    st = _load_state(state)
     if float(st.get("limit_until") or 0) > t:
         return 0
     rules = load_rules()
@@ -400,11 +407,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             ledger.update_run(state, dead, status="failed", reason="the dispatcher stopped during this run")
         except (OSError, ValueError):
             pass
-        notes.send(cfg, notes.failure_note(
+        _send_note(cfg, st, "", notes.failure_note(
             {"run_id": dead, "reason": "the dispatcher stopped during this run"}, []))
 
     inbox.clean_tmp(state, t)
-    retry_notes(cfg, st, t)
     enqueue_due_checks(cfg, st, t)
     if _cap_reached(cfg, st, t):
         _save_state(state, st)
@@ -414,6 +420,8 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     entries, broken = inbox.claim_all(state, run_id)
     for name, reason in broken:
         _log(t, f"{run_id}: broken inbox file {name}: {reason}")
+    if broken:
+        _send_note(cfg, st, run_id, notes.broken_note(run_id, broken))
     if not entries and not broken:
         _save_state(state, st)
         return 0
@@ -491,7 +499,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())
     if record["status"] == "failed" and ledger.fail_streak(state) >= cfg.fail_streak_pause:
-        _pause(cfg, f"{cfg.fail_streak_pause} failed runs in a row", ended)
+        _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", ended)
     inbox.prune(state, ended)
     _save_state(state, st)
     return 0

@@ -330,10 +330,17 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
         from alertwatch import inbox as aw_inbox, ledger as aw_ledger
         counted = [r for r in aw_ledger.recent_runs(state, now_epoch, 24 * 7)
                    if r.get("status") != "skipped"]
+        note = counted[0].get("note_status") if counted else None
+        try:
+            dropped = float(json.loads((state / "state.json").read_text()).get("note_dropped_at") or 0)
+        except (OSError, ValueError):
+            dropped = 0.0
+        if now_epoch - dropped < 86400:
+            note = "failed"
         return check_alertwatch(aw_inbox.oldest_age_s(state, now_epoch),
                                 (state / "PAUSED").exists(),
                                 counted[0].get("status") if counted else None,
-                                note_status=counted[0].get("note_status") if counted else None)
+                                note_status=note)
     except Exception as e:  # a broken alert-watch must not blind the watchdog
         return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
 
