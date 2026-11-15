@@ -342,3 +342,20 @@ def test_broken_inbox_file_does_not_stop_the_batch(env):
     go(env)
     assert runs(env)[0]["status"] == "ok"
     assert runs(env)[0]["broken"] == [["junk.json", "unreadable: JSONDecodeError"]]
+
+
+def test_usage_limit_part_way_is_not_replayed(env, monkeypatch, tmp_path):
+    fake = Path(env["cfg"].claude_bin)
+    fake.write_text(fake.read_text().replace(
+        'out({"is_error": True, "num_turns": 0, "session_id": "sess-l",',
+        'out({"is_error": True, "num_turns": int(os.environ.get("FAKE_TURNS", "0")), "session_id": "sess-l",'))
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "limit")
+    monkeypatch.setenv("FAKE_TURNS", "6")
+    monkeypatch.setenv("FAKE_LIMIT_EPOCH", str(int(time.time()) + 3000))
+    report(env)
+    go(env)
+    assert not list((env["state"] / "inbox").glob("*.json"))
+    assert list((env["state"] / "failed").iterdir())
+    (note,) = sent(env)
+    assert "part way" in note["text"]
+    assert runs(env)[0]["note_text"] == note["text"]

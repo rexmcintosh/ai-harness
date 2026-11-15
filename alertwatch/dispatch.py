@@ -346,6 +346,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     if parsed:
         record.update(status="ok", result=parsed)
         text = notes.run_note(record)
+        record["note_text"] = text
         record["note_status"] = notes.send(cfg, text) if text else "none"
         inbox.finish(state, run_id, "done")
     elif hit:
@@ -357,8 +358,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             record["reason"] = "Claude usage limit, part way through the run"
         else:
             inbox.release(state, run_id, looks, count_attempt=False)
-        if float(st.get("limit_noted_until") or 0) != until:
-            record["note_status"] = notes.send(cfg, notes.limit_note(until))
+        part_way = started(data)
+        if part_way or float(st.get("limit_noted_until") or 0) != until:
+            record["note_text"] = notes.limit_note(until, part_way=part_way)
+            record["note_status"] = notes.send(cfg, record["note_text"])
             st["limit_noted_until"] = until
     else:
         if run["timed_out"]:
@@ -374,7 +377,8 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         else:
             inbox.finish(state, run_id, "failed")
             failed_ids = [e["id"] for e in looks]
-        record["note_status"] = notes.send(cfg, notes.failure_note(record, failed_ids))
+        record["note_text"] = notes.failure_note(record, failed_ids)
+        record["note_status"] = notes.send(cfg, record["note_text"])
 
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())

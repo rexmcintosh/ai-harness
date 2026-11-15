@@ -82,3 +82,18 @@ def test_send_reports_failure_and_uncertain(tmp_path):
 def test_send_missing_sender_is_failed(tmp_path):
     cfg = load_config(env={"ALERT_WATCH_TG_SEND": str(tmp_path / "nope")})
     assert notes.send(cfg, "x") == "failed"
+
+
+def test_send_turns_capture_off(tmp_path):
+    log = tmp_path / "env.txt"
+    fake = tmp_path / "tg-send"
+    fake.write_text(f"#!/usr/bin/env bash\ncat >/dev/null\necho \"$ALERT_INBOX_DIR\" > '{log}'\n")
+    fake.chmod(0o755)
+    cfg = load_config(env={"ALERT_WATCH_TG_SEND": str(fake)})
+    notes.send(cfg, "x")
+    assert log.read_text().strip() == "off"
+
+
+def test_limit_note_part_way_says_no_retry():
+    text = notes.limit_note(1794738000.0, part_way=True)
+    assert "part way" in text and "will not be tried again" in text and "—" not in text

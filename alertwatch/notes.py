@@ -1,7 +1,7 @@
 """The Telegram notes alert-watch sends to Rex. Plain short sentences, no em dashes.
 
-Every note goes through bin/tg-send with ALERT_SOURCE=alert-watch, so its capture
-is dropped and the watcher never reacts to its own notes.
+Every note goes through bin/tg-send with capture off (ALERT_INBOX_DIR=off) and
+ALERT_SOURCE=alert-watch, so the watcher never reacts to its own notes.
 """
 from __future__ import annotations
 
@@ -47,8 +47,12 @@ def cap_note(cap: str, value: int, limit: int) -> str:
             "New reports wait in the inbox until the limit resets.")
 
 
-def limit_note(until_epoch: float) -> str:
+def limit_note(until_epoch: float, *, part_way: bool = False) -> str:
     when = dt.datetime.fromtimestamp(until_epoch, dt.timezone.utc).strftime("%H:%M UTC")
+    if part_way:
+        return (f"alert-watch: the Claude usage limit stopped a run part way. It may have acted, "
+                f"so its reports will not be tried again; check the run. "
+                f"New runs start again after {when}.")
     return (f"alert-watch: the Claude usage limit stopped a run. "
             f"Reports wait in the inbox. It starts again after {when}.")
 
@@ -60,7 +64,9 @@ def pause_note(reason: str) -> str:
 
 def send(cfg, text: str) -> str:
     """accepted | failed | uncertain, from tg-send's exit code (0, 1, anything else)."""
-    env = {**os.environ, "ALERT_SOURCE": "alert-watch", "TG_SEND_RECEIPT_OUTPUT": "1"}
+    # Not captured at all (the run record keeps the text); the tag is a second guard.
+    env = {**os.environ, "ALERT_SOURCE": "alert-watch", "ALERT_INBOX_DIR": "off",
+           "TG_SEND_RECEIPT_OUTPUT": "1"}
     try:
         proc = subprocess.run([cfg.tg_send, cfg.chat_id, "-"], input=text, text=True,
                               capture_output=True, env=env, timeout=60)
