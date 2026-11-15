@@ -11,6 +11,16 @@ def _isolate_venice_usage_ledger(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_alert_watch(tmp_path, monkeypatch):
+    """No test may write to the live alert-watch inbox or state. bin/tg-send copies
+    every message into the inbox, and the dispatcher and the watchdog check read the
+    state dir, so both point at temp paths for every test."""
+    monkeypatch.setenv("ALERT_INBOX_DIR", str(tmp_path / "alert-watch-inbox"))
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(tmp_path / "alert-watch-state"))
+    monkeypatch.delenv("ALERT_SOURCE", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _no_live_jev_shadow(tmp_path, monkeypatch):
     """No test may reach the real TypeSafe API or write the live watchdog shadow log.
     watchdog.run.main() runs the Jev shadow pass whenever monitors.toml enables it and

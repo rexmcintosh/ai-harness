@@ -11,6 +11,53 @@ CHAT_ID="${1:?usage: tg-send <chat_id> [text|-]}"
 shift || true
 if [ $# -gt 0 ] && [ "${1}" != "-" ]; then TEXT="$1"; else TEXT="$(cat)"; fi
 
+# alert-watch: copy each message to the local inbox before any send attempt, so
+# a failure report is kept even when Telegram or the token is down. Best effort:
+# a capture error prints one line and the send goes on exactly as before.
+# Inbox: ALERT_INBOX_DIR, default ~/.local/state/alert-watch/inbox; "off" disables.
+# Source: ALERT_SOURCE, else up to 4 parent command lines (the job that spoke).
+read -r -d '' CAPTURE_PY <<'PY'
+import datetime as dt, json, os, secrets, sys
+inbox, chat, source, cwd = sys.argv[1:5]
+text = sys.stdin.buffer.read().decode("utf-8", "replace")
+parent = os.path.dirname(os.path.abspath(inbox))
+os.makedirs(os.path.dirname(parent), exist_ok=True)
+for d in (parent, inbox):
+    if not os.path.isdir(d):
+        os.mkdir(d, 0o700)
+        os.chmod(d, 0o700)
+now = dt.datetime.now(dt.timezone.utc)
+eid = now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)
+entry = {"version": 1, "id": eid, "captured_at": now.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+         "chat_id": chat, "text": text, "source": source, "cwd": cwd, "attempts": 0}
+tmp = os.path.join(inbox, f".tmp-{eid}.json")
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    json.dump(entry, fh, ensure_ascii=False)
+os.replace(tmp, os.path.join(inbox, f"{eid}.json"))
+PY
+
+capture_message() {
+  local inbox="${ALERT_INBOX_DIR:-$HOME/.local/state/alert-watch/inbox}" source="${ALERT_SOURCE:-}"
+  local pid="$PPID" n=0 args err
+  [ "$inbox" = "off" ] && return 0
+  if [ -z "$source" ]; then
+    while [ -n "$pid" ] && [ "$pid" -gt 1 ] 2>/dev/null && [ "$n" -lt 4 ]; do
+      args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
+      args="${args% }"
+      [ -n "$args" ] && source="${source:+$source < }$args"
+      pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+      n=$((n + 1))
+    done
+  fi
+  if ! err="$(printf '%s' "$TEXT" | timeout 5 python3 -c "$CAPTURE_PY" "$inbox" "$CHAT_ID" "$source" "$PWD" 2>&1)"; then
+    err="${err##*$'\n'}"
+    echo "tg-send: capture failed (${err:-timed out}); sending anyway" >&2
+  fi
+  return 0
+}
+[ -n "$TEXT" ] && capture_message
+
 TG_ENV="${TG_ENV:-$HOME/.claude/channels/telegram/.env}"
 if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && [ -f "$TG_ENV" ]; then
   TELEGRAM_BOT_TOKEN="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$TG_ENV" | head -1)"
