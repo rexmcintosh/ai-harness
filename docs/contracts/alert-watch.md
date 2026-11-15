@@ -6,7 +6,7 @@
 
 Every `tg-send` message is copied to `~/.local/state/alert-watch/inbox/` before it is sent. The dispatcher sorts new messages with `alertwatch/rules.toml` and starts one `claude -p` run for the ones worth a look. The run's authority is `alertwatch/POLICY.md`, approved by Rex on 2026-11-14 and 2026-11-15:
 
-- alone: restart a stuck or crashed meet writer (`kill -TERM`; the supervisor relaunches), rerun a listed job once, clear a stale lock, fix code in `splash_poller` or `ai-harness` and merge and push it after tests and the council review, revert an alert-watch merge whose check failed;
+- alone: restart a stuck or crashed meet writer (the restart helper sends SIGTERM; the supervisor relaunches), rerun a listed job once, clear a stale lock, fix code in `splash_poller` or `ai-harness` and merge and push it after tests and the council review, revert an alert-watch merge whose check failed;
 - never alone: database writes, crontab, units, config or `.env` changes, messages to anyone, merges outside the procedure or on denied paths.
 
 Merges, reverts and restarts go only through checked helpers (`alertwatch/merge.py`, `alertwatch/restart.py`), which apply the rules at the moment of the action and append to `~/.local/state/alert-watch/actions.jsonl`; the run's deny rules block doing them directly. In `mode = "diagnose"` (the committed default) the run only reads and explains, with an allowlist of read-only tools. `mode = "act"` needs Rex's go and the dated section in `~/.claude/CLAUDE.md` (`alertwatch/README.md`).
@@ -15,7 +15,7 @@ It owns `~/.local/state/alert-watch/`. **Secrets, names only:** none of its own.
 
 ## Success and evidence
 
-Success for a message: its run record in `runs/<run-id>.json` has `status: ok` and a parsed result whose entry verdicts cover it, and Rex got the note (`note_status: accepted`) when the run found something real. For a merge: the result's `merges` SHAs are on `origin/main`, and any `pending_checks` item later produced a check run. Inspect `runs/`, `done/`, `failed/` and `dispatch.log`.
+Success for a message: its run record in `runs/<run-id>.json` has `status: ok` and a parsed result whose entry verdicts cover it, and Rex got the note (`note_status: accepted`) when the run found something real. For a merge: its `actions.jsonl` line names SHAs that are on `origin/main`, and any `pending_checks` item later produced a check run. Inspect `runs/`, `done/`, `failed/` and `dispatch.log`.
 
 ## Failure, escalation, and gaps
 
