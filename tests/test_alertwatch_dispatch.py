@@ -977,3 +977,25 @@ def test_a_report_to_another_chat_never_reaches_a_run(env):
     go(env)
     assert not env["prompt.txt"].exists()
     assert runs(env)[0]["entries"][0]["rule"] == "other-chat"
+
+
+def _other_chat_report(env, text):
+    eid = inbox.add_entry(env["state"], text, "bash run-expect.sh")
+    path = env["state"] / "inbox" / f"{eid}.json"
+    entry = json.loads(path.read_text())
+    entry["chat_id"] = "999"
+    path.write_text(json.dumps(entry))
+
+
+def test_another_chats_text_never_reaches_a_later_prompt_or_any_file(env):
+    inbox.ensure_dirs(env["state"])
+    _other_chat_report(env, "[CRIT] PRIVATE-OTHER-CHAT line")
+    report(env)  # a watched report in the same batch
+    go(env)
+    report(env, "[CRIT] a later watched report")
+    env["prompt.txt"].unlink()
+    go(env)
+    assert "PRIVATE-OTHER-CHAT" not in env["prompt.txt"].read_text()
+    for f in env["state"].rglob("*"):
+        if f.is_file():
+            assert "PRIVATE-OTHER-CHAT" not in f.read_text(errors="replace"), f

@@ -215,7 +215,8 @@ def _recent_lines(recent: list[dict], acts: list[dict]) -> str:
     out = []
     for r in recent:
         result = r.get("result") if isinstance(r.get("result"), dict) else {}
-        firsts = "; ".join(e.get("first_line", "") for e in r.get("entries") or [])[:300]
+        firsts = "; ".join(e.get("first_line", "") for e in r.get("entries") or []
+                           if e.get("rule") != "other-chat")[:300]
         verdicts = ", ".join(f"{e.get('id')}={e.get('verdict')}" for e in result.get("entries") or []
                              if isinstance(e, dict))
         done = ", ".join(_helper_line(a) for a in acts if a.get("run_id") == r.get("run_id"))
@@ -407,6 +408,8 @@ def _cap_reached(cfg: Config, st: dict, now: float) -> bool:
 
 
 def _summary(entry: dict) -> dict:
+    if entry.get("_rule") == "other-chat":
+        return {"id": entry["id"], "source": "", "first_line": "", "rule": "other-chat", "action": "drop"}
     return {"id": entry["id"], "source": str(entry.get("source") or "")[:300],
             "first_line": _first_line(entry.get("text", "")), "rule": entry.get("_rule"),
             "action": entry.get("_action")}
@@ -638,8 +641,15 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         entry["_run_id"] = run_id
         entry["_action"], entry["_rule"] = classify(entry, rules)
         chat = str(entry.get("chat_id") or "")
-        if entry["_action"] == "look" and chat and chat not in cfg.watch_chats:
-            entry["_action"], entry["_rule"] = "ignore", "other-chat"  # never in a prompt or a note
+        if chat and chat not in cfg.watch_chats:
+            # A message to another chat is deleted at once: its text is never kept,
+            # summarised, put in a prompt or a note, now or in a later run's history.
+            entry["_action"], entry["_rule"] = "drop", "other-chat"
+            entry["text"] = entry["source"] = ""
+            try:
+                (state / "batch" / run_id / entry["_file"]).unlink()
+            except OSError:
+                pass
         (looks if entry["_action"] == "look" else quiet).append(entry)
     record = {"run_id": run_id, "started_at": t, "ended_at": None, "status": "running",
               "reason": "", "mode": cfg.mode, "entries": [_summary(e) for e in entries],
