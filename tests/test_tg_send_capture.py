@@ -14,6 +14,12 @@ ACCEPTED = '{"ok":true,"result":{"message_id":91,"chat":{"id":123}}}\n200'
 REJECTED = '{"ok":false,"error_code":400,"description":"Bad Request"}\n200'
 
 
+def _watch_config(tmp_path):
+    conf = tmp_path / "watch.toml"
+    conf.write_text('chat_id = "123"\nwatch_chats = ["123"]\n')
+    return conf
+
+
 def _env(tmp_path, *responses, inbox=None, token=True, **extra):
     bindir, calls = fake_tools(tmp_path)
     env = os.environ.copy()
@@ -24,6 +30,7 @@ def _env(tmp_path, *responses, inbox=None, token=True, **extra):
         "TG_SEND_RECEIPT_OUTPUT": "1",
         "ALERT_INBOX_DIR": str(inbox if inbox is not None else tmp_path / "inbox"),
         "TG_ENV": str(tmp_path / "missing.env"),
+        "ALERT_WATCH_CONFIG": str(_watch_config(tmp_path)),
     })
     if token:
         env["TELEGRAM_BOT_TOKEN"] = "test-token-not-secret"
@@ -172,3 +179,21 @@ def test_source_from_a_cron_style_sh_c_line(tmp_path):
     source = _entries(tmp_path / "inbox")[0]["source"]
     assert source.startswith("python3 coverage_check.py < sh coverage_check.py")
     assert "hidden" not in source and "s3cr3t" not in source
+
+
+def test_a_message_to_an_unwatched_chat_is_not_captured(tmp_path):
+    conf = tmp_path / "config.toml"
+    conf.write_text('chat_id = "1"\nwatch_chats = ["1"]\n')
+    env, _ = _env(tmp_path, ACCEPTED, ACCEPTED, ALERT_WATCH_CONFIG=str(conf))
+    assert subprocess.run([str(SCRIPT), "999", "private"], env=env, text=True,
+                          capture_output=True, timeout=60).returncode == 0
+    assert not (tmp_path / "inbox").exists() or not list((tmp_path / "inbox").glob("*.json"))
+    assert subprocess.run([str(SCRIPT), "1", "watched"], env=env, text=True,
+                          capture_output=True, timeout=60).returncode == 0
+    assert [e["text"] for e in _entries(tmp_path / "inbox")] == ["watched"]
+
+
+def test_the_real_config_watches_the_chat_the_senders_use():
+    import tomllib
+    raw = tomllib.loads((SCRIPT.parent.parent / "alertwatch" / "config.toml").read_text())
+    assert raw["watch_chats"] == ["7735693897"]

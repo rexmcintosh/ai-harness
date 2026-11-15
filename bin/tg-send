@@ -75,6 +75,20 @@ def ancestry(pid):
     return " < ".join(parts)
 
 
+# Only messages to the chats alert-watch watches are kept (alertwatch/config.toml
+# watch_chats). A message to any other chat is never written to disk. If the config
+# cannot be read, the message is kept and the dispatcher filters it instead.
+try:
+    import tomllib
+    here = os.path.dirname(os.path.realpath(os.environ.get("TG_SEND_PATH", "")))
+    cfg_path = os.environ.get("ALERT_WATCH_CONFIG") or os.path.join(here, "..", "alertwatch", "config.toml")
+    with open(cfg_path, "rb") as fh:
+        raw = tomllib.load(fh)
+    watched = {str(c) for c in raw.get("watch_chats") or [raw.get("chat_id")] if c}
+except Exception:
+    watched = None
+if watched is not None and str(chat) not in watched:
+    sys.exit(0)
 if not source:
     source = ancestry(int(ppid))
 parent = os.path.dirname(os.path.abspath(inbox))
@@ -99,8 +113,8 @@ PY
 capture_message() {
   local inbox="${ALERT_INBOX_DIR:-$HOME/.local/state/alert-watch/inbox}" err
   [ "$inbox" = "off" ] && return 0
-  if ! err="$(printf '%s' "$TEXT" | timeout 5 python3 -c "$CAPTURE_PY" "$inbox" "$CHAT_ID" \
-                "${ALERT_SOURCE:-}" "$PWD" "$PPID" 2>&1)"; then
+  if ! err="$(printf '%s' "$TEXT" | TG_SEND_PATH="${BASH_SOURCE[0]}" timeout 5 python3 -c "$CAPTURE_PY" \
+                "$inbox" "$CHAT_ID" "${ALERT_SOURCE:-}" "$PWD" "$PPID" 2>&1)"; then
     err="${err##*$'\n'}"
     echo "tg-send: capture failed (${err:-timed out}); sending anyway" >&2
   fi

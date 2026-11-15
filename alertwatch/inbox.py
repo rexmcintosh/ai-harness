@@ -71,7 +71,31 @@ def _visible_json(folder: Path) -> list[Path]:
     return sorted(p for p in folder.glob("*.json") if not p.name.startswith("."))
 
 
-def claim_all(state: Path, run_id: str, limit: int | None = None) -> tuple[list[dict], list[tuple[str, str]]]:
+def _other_chat(path: Path, watch_chats) -> bool:
+    try:
+        chat = str(json.loads(path.read_text(encoding="utf-8")).get("chat_id") or "")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return bool(chat) and chat not in watch_chats
+
+
+def purge_other_chats(state: Path, watch_chats) -> int:
+    """Delete inbox messages sent to a chat alert-watch does not watch (tg-send skips
+    them; this is the second guard). One that cannot be deleted stays in the inbox
+    and is never claimed, so its text never reaches a batch, a prompt or a record."""
+    removed = 0
+    for p in _visible_json(Path(state) / "inbox"):
+        if _other_chat(p, watch_chats):
+            try:
+                p.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
+
+def claim_all(state: Path, run_id: str, limit: int | None = None,
+              watch_chats=None) -> tuple[list[dict], list[tuple[str, str]]]:
     """Claim inbox entries (the oldest first, at most `limit` valid ones) into
     batch/<run_id>/. Returns (valid entries, [(file name, reason)]); broken files go
     to failed/<run_id>/ with a .reason file."""
@@ -82,6 +106,8 @@ def claim_all(state: Path, run_id: str, limit: int | None = None) -> tuple[list[
     for src in _visible_json(state / "inbox"):
         if limit is not None and len(entries) >= limit:
             break
+        if watch_chats is not None and _other_chat(src, watch_chats):
+            continue  # never claimed: purge_other_chats deletes it
         batch.mkdir(parents=True, exist_ok=True)
         dst = batch / src.name
         try:

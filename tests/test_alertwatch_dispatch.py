@@ -976,7 +976,7 @@ def test_a_report_to_another_chat_never_reaches_a_run(env):
     path.write_text(json.dumps(entry))
     go(env)
     assert not env["prompt.txt"].exists()
-    assert runs(env)[0]["entries"][0]["rule"] == "other-chat"
+    assert not path.exists()  # deleted from the inbox, never claimed
 
 
 def _other_chat_report(env, text):
@@ -999,3 +999,24 @@ def test_another_chats_text_never_reaches_a_later_prompt_or_any_file(env):
     for f in env["state"].rglob("*"):
         if f.is_file():
             assert "PRIVATE-OTHER-CHAT" not in f.read_text(errors="replace"), f
+
+
+def test_another_chats_message_that_cannot_be_deleted_is_never_claimed(env, monkeypatch):
+    inbox.ensure_dirs(env["state"])
+    _other_chat_report(env, "[CRIT] PRIVATE-STUCK")
+    monkeypatch.setattr(dispatch.inbox, "purge_other_chats", lambda *a, **k: 0)  # the delete failed
+    report(env)
+    go(env)
+    assert "PRIVATE-STUCK" not in env["prompt.txt"].read_text()
+    for sub in ("batch", "done", "failed", "runs"):
+        for f in (env["state"] / sub).rglob("*"):
+            if f.is_file():
+                assert "PRIVATE-STUCK" not in f.read_text(errors="replace"), f
+    assert any("PRIVATE-STUCK" in f.read_text() for f in (env["state"] / "inbox").glob("*.json"))
+
+
+def test_dry_run_does_not_show_another_chats_text(env, capsys):
+    inbox.ensure_dirs(env["state"])
+    _other_chat_report(env, "[CRIT] PRIVATE-DRY")
+    dispatch.main(["--dry-run"], cfg=env["cfg"])
+    assert "PRIVATE-DRY" not in capsys.readouterr().out

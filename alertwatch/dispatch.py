@@ -616,6 +616,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
                 continue
             try:
                 entry = json.loads(p.read_text(encoding="utf-8"))
+                chat = str(entry.get("chat_id") or "")
+                if chat and chat not in cfg.watch_chats:
+                    print(p.name, "other-chat (not shown; deleted on the next pass)")
+                    continue
                 print(p.name, *classify(entry, rules), _first_line(entry.get("text", "")))
             except (OSError, ValueError):
                 print(p.name, "unreadable")
@@ -627,8 +631,9 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         _save_state(state, st)
         return 0
 
+    inbox.purge_other_chats(state, cfg.watch_chats)
     run_id = ledger.new_run_id(t)
-    entries, broken = inbox.claim_all(state, run_id, limit=BATCH_MAX)
+    entries, broken = inbox.claim_all(state, run_id, limit=BATCH_MAX, watch_chats=cfg.watch_chats)
     for name, reason in broken:
         _log(t, f"{run_id}: broken inbox file {name}: {reason}")
     if broken:
@@ -640,16 +645,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     for entry in entries:
         entry["_run_id"] = run_id
         entry["_action"], entry["_rule"] = classify(entry, rules)
-        chat = str(entry.get("chat_id") or "")
-        if chat and chat not in cfg.watch_chats:
-            # A message to another chat is deleted at once: its text is never kept,
-            # summarised, put in a prompt or a note, now or in a later run's history.
-            entry["_action"], entry["_rule"] = "drop", "other-chat"
-            entry["text"] = entry["source"] = ""
-            try:
-                (state / "batch" / run_id / entry["_file"]).unlink()
-            except OSError:
-                pass
+
         (looks if entry["_action"] == "look" else quiet).append(entry)
     record = {"run_id": run_id, "started_at": t, "ended_at": None, "status": "running",
               "reason": "", "mode": cfg.mode, "entries": [_summary(e) for e in entries],
