@@ -124,8 +124,30 @@ def actions(state: Path) -> list[dict]:
     return out
 
 
+def _outcomes(acts: list[dict]) -> set[str]:
+    return {str(a.get("intent")) for a in acts
+            if a.get("kind") in ("merge", "revert", "merge_abandoned", "revert_abandoned") and a.get("intent")}
+
+
+def merged(state: Path) -> list[dict]:
+    """Every alert-watch merge: completed ones, and intents with no outcome (a crash
+    after the push may have left one; callers check origin for those)."""
+    acts = actions(state)
+    done = _outcomes(acts)
+    return [a for a in acts if a.get("kind") == "merge"
+            or (a.get("kind") == "merge_intent" and a.get("id") not in done)]
+
+
+def reverted(state: Path) -> set[str]:
+    """to_sha of every merge that was reverted, or whose revert may have been pushed."""
+    acts = actions(state)
+    abandoned = {str(a.get("intent")) for a in acts if a.get("kind") == "revert_abandoned"}
+    return {str(a.get("reverts")) for a in acts
+            if a.get("kind") == "revert" or (a.get("kind") == "revert_intent" and a.get("id") not in abandoned)}
+
+
 def merges_in_window(state: Path, now: float, hours: float = 24) -> int:
-    """Merges (not reverts) the merge helper made in the window: the merge cap."""
+    """Merges (not reverts) the merge helper made in the window: the merge cap. An
+    intent with no outcome counts, so a crash cannot hide a merge from the cap."""
     cutoff = now - hours * 3600
-    return sum(1 for a in actions(state)
-               if a.get("kind") == "merge" and float(a.get("at") or 0) >= cutoff)
+    return sum(1 for a in merged(state) if float(a.get("at") or 0) >= cutoff)

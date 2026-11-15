@@ -27,8 +27,12 @@ def world(tmp_path, monkeypatch):
     cfg = dataclasses.replace(cfg, mode="act", meettrack_run_dir=run_dir)
     procs = []
 
-    def writer(key, script="poller.py", record_start=True):
-        p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", script, "--meet", key])
+    def writer(key, script="poller.py", record_start=True, spoof=False):
+        path = tmp_path / script
+        path.write_text("import time\ntime.sleep(60)\n")
+        argv = ([sys.executable, "-c", "import time; time.sleep(60)", script] if spoof
+                else [sys.executable, str(path), "--meet", key])
+        p = subprocess.Popen(argv)
         procs.append(p)
         time.sleep(0.05)
         (run_dir / f"poller-{key}.pid").write_text(f"{p.pid} {starttime(p.pid)}" if record_start else str(p.pid))
@@ -111,3 +115,26 @@ def test_history_lists_restarts(world, capsys):
     assert restart.main(["history"], cfg=world["cfg"], select=registry(1)) == 0
     (line,) = capsys.readouterr().out.strip().splitlines()
     assert json.loads(line)["key"] == "11539"
+
+
+def test_refused_when_a_writer_name_is_only_an_argument(world):
+    p = world["writer"]("11539", spoof=True)
+    assert restart.main(["restart", "11539"], cfg=world["cfg"], select=registry(0)) == 2
+    assert p.poll() is None
+
+
+def test_refused_without_a_start_time_in_the_pid_file(world):
+    p = world["writer"]("11539", record_start=False)
+    assert restart.main(["restart", "11539"], cfg=world["cfg"], select=registry(0)) == 2
+    assert p.poll() is None
+
+
+def test_writer_that_exits_during_the_checks_is_refused_not_mistargeted(world):
+    p = world["writer"]("11539")
+
+    def select_then_writer_dies(*a):
+        p.kill()
+        p.wait()
+        return registry(0)(*a)
+    assert restart.main(["restart", "11539"], cfg=world["cfg"], select=select_then_writer_dies) == 2
+    assert ledger.actions(world["state"]) == []

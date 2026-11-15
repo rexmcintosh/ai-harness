@@ -65,7 +65,8 @@ def test_merge_ok(world, capsys):
     assert run(world, "merge", "repo", str(wt)) == 0
     assert git(world["origin"], "rev-parse", "main") == head
     assert git(world["repo"], "rev-parse", "main") == head
-    (act,) = ledger.actions(world["state"])
+    intent, act = ledger.actions(world["state"])
+    assert intent["kind"] == "merge_intent" and act["intent"] == intent["id"]
     assert act["kind"] == "merge" and act["repo"] == "repo" and act["to_sha"] == head
     assert act["from_sha"] == base and act["run_id"] == "run-test" and act["files"] == ["app.py"]
     assert json.loads(capsys.readouterr().out)["status"] == "merged"
@@ -160,8 +161,8 @@ def test_revert_own_merge(world):
     assert (world["repo"] / "app.py").read_text() == "x = 1\n"
     assert git(world["origin"], "rev-parse", "main") == git(world["repo"], "rev-parse", "main")
     kinds = [a["kind"] for a in ledger.actions(world["state"])]
-    assert kinds == ["merge", "revert"]
-    assert ledger.actions(world["state"])[1]["reverts"] == head
+    assert kinds == ["merge_intent", "merge", "revert_intent", "revert"]
+    assert ledger.actions(world["state"])[3]["reverts"] == head
     assert run(world, "revert", "repo", head) == 2  # never twice
 
 
@@ -175,3 +176,67 @@ def test_denied_matching():
     assert merge.denied(["web/a.ts", "x/.env.local", "watchdog/run.py", "db/m.sql", "db.py"], rules) == [
         "web/a.ts", "x/.env.local", "watchdog/run.py", "db/m.sql"]
     assert merge.denied(["src/web/a.ts"], ("web/",)) == []
+
+
+def test_crash_after_push_still_counts_and_stays_revertable(world, monkeypatch):
+    wt = fix_worktree(world)
+    head = git(wt, "rev-parse", "HEAD")
+    real = ledger.append_action
+    calls = []
+
+    def flaky(state, action):
+        calls.append(action["kind"])
+        if action["kind"] == "merge":
+            raise OSError("disk full")  # the push already happened
+        real(state, action)
+    monkeypatch.setattr(ledger, "append_action", flaky)
+    with pytest.raises(OSError):
+        run(world, "merge", "repo", str(wt))
+    monkeypatch.setattr(ledger, "append_action", real)
+    assert git(world["origin"], "rev-parse", "main") == head
+    assert ledger.merges_in_window(world["state"], time.time()) == 1
+    git(world["repo"], "merge", "-q", "--ff-only", "origin/main")
+    assert run(world, "revert", "repo", head) == 0
+
+
+def test_failed_push_is_abandoned_and_not_counted(world, monkeypatch):
+    wt = fix_worktree(world)
+    real = merge._git
+
+    def no_push(cwd, *args):
+        if args and args[0] == "push":
+            raise subprocess.CalledProcessError(1, ["git", *args], "", "rejected")
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", no_push)
+    assert run(world, "merge", "repo", str(wt)) == 1
+    assert [a["kind"] for a in ledger.actions(world["state"])] == ["merge_intent", "merge_abandoned"]
+    assert ledger.merges_in_window(world["state"], time.time()) == 0
+
+
+def test_pushed_but_main_checkout_did_not_move(world, monkeypatch, capsys):
+    wt = fix_worktree(world)
+    real = merge._git
+
+    def stuck(cwd, *args):
+        if args[:2] == ("merge", "-q"):
+            raise subprocess.CalledProcessError(1, ["git", *args], "", "would overwrite")
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", stuck)
+    assert run(world, "merge", "repo", str(wt)) == 1
+    assert "pushed, needs Rex" in capsys.readouterr().err
+    assert [a["kind"] for a in ledger.actions(world["state"])] == ["merge_intent", "merge"]
+
+
+def test_a_lost_push_reply_counts_as_pushed(world, monkeypatch):
+    wt = fix_worktree(world)
+    head = git(wt, "rev-parse", "HEAD")
+    real = merge._git
+
+    def lost_reply(cwd, *args):
+        if args and args[0] == "push":
+            real(cwd, *args)
+            raise subprocess.CalledProcessError(128, ["git", *args], "", "connection reset")
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", lost_reply)
+    assert run(world, "merge", "repo", str(wt)) == 0
+    assert git(world["repo"], "rev-parse", "main") == head

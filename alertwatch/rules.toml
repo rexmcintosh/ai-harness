@@ -5,13 +5,19 @@
 # Messages from sources starting with "alert-watch" (except "alert-watch-check")
 # are dropped before these rules: the watcher never reacts to its own notes.
 
-# MeetTrack expected-but-missing monitor (watchdog/expect_alerts.py): a RESOLVED
-# line says a problem went away.
+# MeetTrack expected-but-missing monitor (watchdog/expect_alerts.py render()). One
+# message can hold several notices. Any [CRIT] or [WARN] line (NEW or STILL MISSING)
+# is a look; a message of only [OK] RESOLVED and [--] CLOSED notices is not.
 [[rule]]
-name = "expect-resolved"
+name = "expect-alert"
+action = "look"
+source = "run-expect\\.sh|expect_run"
+text = "^\\[(CRIT|WARN)\\] "
+
+[[rule]]
+name = "expect-resolved-or-closed"
 action = "ignore"
 source = "run-expect\\.sh|expect_run"
-text = "^\\s*\\[OK\\] RESOLVED"
 
 # Bebop (retired 2026-10-23 from cron): the briefing itself is not a failure,
 # its failure line is (bebop/run-briefing.sh).

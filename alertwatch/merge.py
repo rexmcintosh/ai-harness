@@ -17,6 +17,7 @@ import argparse
 import fcntl
 import json
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -29,6 +30,32 @@ from alertwatch.config import Config, load_config
 
 class Refused(Exception):
     pass
+
+
+class PushedNotLocal(Exception):
+    """origin/main has the change, but the main checkout did not move."""
+
+
+def _intent_id() -> str:
+    return f"{os.environ.get('ALERT_WATCH_RUN_ID') or 'manual'}-{secrets.token_hex(4)}"
+
+
+def _on_origin(repo: Path, sha: str) -> bool:
+    try:
+        _git(repo, "fetch", "-q", "origin")
+        _git(repo, "merge-base", "--is-ancestor", sha, "origin/main")
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def _push(repo: Path, refspec: str, sha: str) -> None:
+    """Push without force. A failed push that still landed (a lost reply) counts as done."""
+    try:
+        _git(repo, "push", "-q", "origin", refspec)
+    except subprocess.CalledProcessError:
+        if not _on_origin(repo, sha):
+            raise
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -100,27 +127,41 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
     made = ledger.merges_in_window(cfg.state_dir, now)
     if made >= cfg.max_merges_day:
         raise Refused(f"{made} merges in the last 24 hours (limit {cfg.max_merges_day})")
-    _git(repo, "push", "-q", "origin", f"{head}:refs/heads/main")
-    _git(repo, "merge", "-q", "--ff-only", head)
-    if _check_main(repo) != head:
-        raise subprocess.CalledProcessError(1, ["check"], "", "main did not land on the fix")
-    action = {"kind": "merge", "at": now, "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""),
-              "repo": name, "branch": branch, "from_sha": base, "to_sha": head, "files": files}
+    # Journal first: the intent is on disk before origin can change, so a crash at
+    # any later point still counts toward the cap and stays revertable.
+    run_id = os.environ.get("ALERT_WATCH_RUN_ID", "")
+    intent = {"kind": "merge_intent", "id": _intent_id(), "at": now, "run_id": run_id, "repo": name,
+              "branch": branch, "from_sha": base, "to_sha": head, "files": files}
+    ledger.append_action(cfg.state_dir, intent)
+    try:
+        _push(repo, f"{head}:refs/heads/main", head)
+    except subprocess.CalledProcessError:
+        ledger.append_action(cfg.state_dir, {"kind": "merge_abandoned", "intent": intent["id"], "at": now})
+        raise
+    action = {**intent, "kind": "merge", "intent": intent["id"]}
     ledger.append_action(cfg.state_dir, action)
+    try:
+        _git(repo, "merge", "-q", "--ff-only", head)
+        landed = _check_main(repo) == head
+    except (subprocess.CalledProcessError, Refused):
+        landed = False
+    if not landed:
+        raise PushedNotLocal(f"{head[:10]} is on origin/main, but {repo} did not move to it")
     return {"status": "merged", **action}
 
 
 def do_revert(cfg: Config, name: str, sha: str, now: float) -> dict:
     repo = _repo(cfg, name)
-    acts = ledger.actions(cfg.state_dir)
     if len(sha) < 7:
         raise Refused("give at least 7 characters of the merged commit")
-    merged = [a for a in acts if a.get("kind") == "merge" and a.get("repo") == name
-              and str(a.get("to_sha", "")).startswith(sha)]
-    if len(merged) != 1:
+    candidates = [m for m in ledger.merged(cfg.state_dir) if m.get("repo") == name
+                  and str(m.get("to_sha", "")).startswith(sha)]
+    # An intent with no outcome (a crash after its push) counts only if origin has it.
+    candidates = [m for m in candidates if m["kind"] == "merge" or _on_origin(repo, m["to_sha"])]
+    if len(candidates) != 1:
         raise Refused(f"{sha} is not one alert-watch merge in {name}")
-    target = merged[0]
-    if any(a.get("kind") == "revert" and a.get("reverts") == target["to_sha"] for a in acts):
+    target = candidates[0]
+    if target["to_sha"] in ledger.reverted(cfg.state_dir):
         raise Refused(f"{target['to_sha'][:10]} was already reverted")
     before = _check_main(repo)
     try:
@@ -129,13 +170,17 @@ def do_revert(cfg: Config, name: str, sha: str, now: float) -> dict:
         subprocess.run(["git", "revert", "--abort"], cwd=str(repo), capture_output=True)
         raise Refused("the revert does not apply cleanly; it needs Rex") from None
     after = _git(repo, "rev-parse", "HEAD")
+    run_id = os.environ.get("ALERT_WATCH_RUN_ID", "")
+    intent = {"kind": "revert_intent", "id": _intent_id(), "at": now, "run_id": run_id, "repo": name,
+              "reverts": target["to_sha"], "from_sha": before, "to_sha": after}
+    ledger.append_action(cfg.state_dir, intent)
     try:
-        _git(repo, "push", "-q", "origin", "main")
+        _push(repo, "main", after)
     except subprocess.CalledProcessError:
         _git(repo, "reset", "-q", "--keep", before)
+        ledger.append_action(cfg.state_dir, {"kind": "revert_abandoned", "intent": intent["id"], "at": now})
         raise
-    action = {"kind": "revert", "at": now, "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""),
-              "repo": name, "reverts": target["to_sha"], "from_sha": before, "to_sha": after}
+    action = {**intent, "kind": "revert", "intent": intent["id"]}
     ledger.append_action(cfg.state_dir, action)
     return {"status": "reverted", **action}
 
@@ -163,6 +208,9 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         except Refused as e:
             print(f"refused: {e}", file=sys.stderr)
             return 2
+        except PushedNotLocal as e:
+            print(f"pushed, needs Rex: {e}", file=sys.stderr)
+            return 1
         except subprocess.CalledProcessError as e:
             print(f"git failed: {' '.join(e.cmd)}: {(e.stderr or '').strip()[:500]}", file=sys.stderr)
             return 1

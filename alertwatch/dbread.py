@@ -17,6 +17,7 @@ from pathlib import Path
 
 _TABLE_RE = re.compile(r"[a-z_][a-z0-9_]{0,62}")
 _COLS_RE = re.compile(r"[A-Za-z0-9_,.*()!:]+")
+_FILTER_RE = re.compile(r"(?:[a-z_][a-z0-9_]*|or|and|order)=[^&#=\s]+")
 
 
 def _default_select():
@@ -42,9 +43,12 @@ def main(argv: list[str] | None = None, *, select=None) -> int:
     if not 1 <= args.limit <= 1000:
         print("dbread: --limit must be 1 to 1000 (PostgREST pages at 1000)", file=sys.stderr)
         return 2
-    if re.search(r"(^|&)(limit|offset)=", args.filters):
-        print("dbread: use --limit, not limit= in the filters", file=sys.stderr)
-        return 2
+    for part in filter(None, args.filters.split("&")):
+        name = part.split("=", 1)[0]
+        if not _FILTER_RE.fullmatch(part) or name in ("select", "limit", "offset", "on_conflict"):
+            print(f"dbread: bad filter {part!r} (use column=op.value; --select and --limit "
+                  "for those)", file=sys.stderr)
+            return 2
     filters = "&".join(p for p in (args.filters, f"limit={args.limit}") if p)
     rows = (select or _default_select())(args.table, filters, args.select)
     for row in rows:

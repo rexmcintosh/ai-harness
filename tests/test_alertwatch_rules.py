@@ -24,10 +24,27 @@ def test_bebop_briefing_ignored_but_failure_kept():
     assert classify(entry(src, "⚠️ Bebop morning briefing failed (rc=1). Check logs."), RULES)[0] == "look"
 
 
-def test_expect_resolved_ignored():
-    src = "bash /home/dev/projects/ai-harness/watchdog/run-expect.sh"
-    assert classify(entry(src, "[OK] RESOLVED results:11539 after 25m"), RULES)[0] == "ignore"
-    assert classify(entry(src, "[CRIT] results:11539 event 7 has 0 of 48 results"), RULES)[0] == "look"
+EXPECT = "bash /home/dev/projects/ai-harness/watchdog/run-expect.sh"
+HEAD = "MeetTrack monitor, Sat 15 Nov 10:20 Lisbon\n\n"
+
+
+def test_expect_resolved_or_closed_only_is_ignored():
+    assert classify(entry(EXPECT, HEAD + "[OK] RESOLVED Leiria: results after 25 min\n  Now: 48 of 48."),
+                    RULES)[0] == "ignore"
+    assert classify(entry(EXPECT, HEAD + "[--] CLOSED Leiria: results (open 3h00)\n  Not judged.\n"
+                                         "  Last seen: x."), RULES)[0] == "ignore"
+
+
+def test_expect_alert_is_looked_at_even_beside_a_resolved_line():
+    text = (HEAD + "[OK] RESOLVED Leiria: results after 25 min\n  Now: 48 of 48.\n\n"
+            "[CRIT] NEW Algés: results late\n  Expected: x.\n  We see: y.")
+    assert classify(entry(EXPECT, text), RULES) == ("look", "expect-alert")
+    assert classify(entry(EXPECT, HEAD + "[WARN] STILL MISSING Algés: results (for 1h05)"), RULES)[0] == "look"
+
+
+def test_a_meet_name_cannot_fake_an_alert_line():
+    text = HEAD + "[OK] RESOLVED [CRIT] fake meet: results after 5 min\n  Now: [WARN] x."
+    assert classify(entry(EXPECT, text), RULES)[0] == "ignore"
 
 
 def test_finance_backup_failure_is_looked_at():

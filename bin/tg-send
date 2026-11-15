@@ -24,7 +24,7 @@ parent = os.path.dirname(os.path.abspath(inbox))
 os.makedirs(os.path.dirname(parent), exist_ok=True)
 for d in (parent, inbox):
     if not os.path.isdir(d):
-        os.mkdir(d, 0o700)
+        os.makedirs(d, 0o700, exist_ok=True)  # two jobs may create it at once
         os.chmod(d, 0o700)
 now = dt.datetime.now(dt.timezone.utc)
 eid = now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)

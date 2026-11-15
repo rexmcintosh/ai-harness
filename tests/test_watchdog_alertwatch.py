@@ -61,3 +61,10 @@ def test_capture_only_stage_adds_no_check(tmp_path, monkeypatch):
     inbox.ensure_dirs(state)
     inbox.add_entry(state, "old report", "job")
     assert run.alertwatch_status(time.time() + 99999) is None
+
+
+def test_a_note_that_may_not_have_arrived_warns():
+    for status in ("failed", "uncertain"):
+        s = check_alertwatch(None, paused=False, newest_run_status="ok", note_status=status)
+        assert s.level == "warn" and status in s.summary
+    assert check_alertwatch(None, paused=False, newest_run_status="ok", note_status="accepted").level == "ok"

@@ -116,11 +116,17 @@ def _kill_marked(run_id: str) -> int:
         if not proc.name.isdigit() or int(proc.name) == os.getpid():
             continue
         try:
-            if marker in (proc / "environ").read_bytes().split(b"\0"):
-                os.kill(int(proc.name), signal.SIGKILL)
-                killed += 1
-        except (OSError, ValueError):
+            pidfd = os.pidfd_open(int(proc.name))
+        except OSError:
             continue
+        try:  # read the marker after pinning, so the signal reaches this same process
+            if marker in (proc / "environ").read_bytes().split(b"\0"):
+                signal.pidfd_send_signal(pidfd, signal.SIGKILL)
+                killed += 1
+        except OSError:
+            pass
+        finally:
+            os.close(pidfd)
     return killed
 
 
@@ -314,6 +320,35 @@ def _summary(entry: dict) -> dict:
             "action": entry.get("_action")}
 
 
+NOTE_TRIES = 5
+
+
+def _send_note(cfg: Config, st: dict, run_id: str, text: str) -> str:
+    """Send a note. A definite rejection is kept in state.json and retried on later
+    passes; an uncertain send may have arrived, so it is never sent again."""
+    status = notes.send(cfg, text)
+    if status == "failed":
+        st.setdefault("unsent_notes", []).append({"run_id": run_id, "text": text, "tries": 1})
+    return status
+
+
+def retry_notes(cfg: Config, st: dict, now: float) -> None:
+    keep = []
+    for item in st.get("unsent_notes") or []:
+        status = notes.send(cfg, item["text"])
+        if status == "failed" and item.get("tries", 1) + 1 < NOTE_TRIES:
+            keep.append({**item, "tries": item.get("tries", 1) + 1})
+            continue
+        if status == "failed":
+            _log(now, f"note for {item.get('run_id')} dropped after {NOTE_TRIES} failed sends")
+        try:
+            if item.get("run_id"):
+                ledger.update_run(cfg.state_dir, item["run_id"], note_status=status)
+        except (OSError, ValueError):
+            pass
+    st["unsent_notes"] = keep
+
+
 def _pause(cfg: Config, reason: str, now: float) -> None:
     (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\n", encoding="utf-8")
     notes.send(cfg, notes.pause_note(reason))
@@ -369,6 +404,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             {"run_id": dead, "reason": "the dispatcher stopped during this run"}, []))
 
     inbox.clean_tmp(state, t)
+    retry_notes(cfg, st, t)
     enqueue_due_checks(cfg, st, t)
     if _cap_reached(cfg, st, t):
         _save_state(state, st)
@@ -418,12 +454,13 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         record.update(status="ok", result=parsed)
         text = notes.run_note(record)
         record["note_text"] = text
-        record["note_status"] = notes.send(cfg, text) if text else "none"
+        record["note_status"] = _send_note(cfg, st, run_id, text) if text else "none"
         inbox.finish(state, run_id, "done")
     elif hit:
         until = until or ended + cfg.limit_backoff_s
         record.update(status="limit", reason="Claude usage limit")
         st["limit_until"] = until
+        _save_state(state, st)  # before the release, so a crash cannot retry at once
         if started(data):
             inbox.finish(state, run_id, "failed")  # it may have acted: never replayed
             record["reason"] = "Claude usage limit, part way through the run"
@@ -432,7 +469,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         part_way = started(data)
         if part_way or float(st.get("limit_noted_until") or 0) != until:
             record["note_text"] = notes.limit_note(until, part_way=part_way)
-            record["note_status"] = notes.send(cfg, record["note_text"])
+            record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
             st["limit_noted_until"] = until
     else:
         if run["timed_out"]:
@@ -449,7 +486,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             inbox.finish(state, run_id, "failed")
             failed_ids = [e["id"] for e in looks]
         record["note_text"] = notes.failure_note(record, failed_ids)
-        record["note_status"] = notes.send(cfg, record["note_text"])
+        record["note_status"] = _send_note(cfg, st, run_id, record["note_text"])
 
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())

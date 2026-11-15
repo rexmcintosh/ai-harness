@@ -39,3 +39,13 @@ def test_full_page_warns(capsys):
     select, _ = fake([{"id": i} for i in range(3)])
     dbread.main(["meets", "--limit", "3"], select=select)
     assert "there may be more" in capsys.readouterr().err
+
+
+def test_filters_are_postgrest_pairs_only():
+    select, calls = fake([])
+    assert dbread.main(["meets", "id=eq.1&select=secret"], select=select) == 2
+    assert dbread.main(["meets", "on_conflict=id"], select=select) == 2
+    assert dbread.main(["meets", "id=eq.1#frag"], select=select) == 2
+    assert dbread.main(["meets", "not a filter"], select=select) == 2
+    assert calls == []
+    assert dbread.main(["meets", "status=eq.live&order=start_date.desc&or=(a.eq.1,b.eq.2)"], select=select) == 0

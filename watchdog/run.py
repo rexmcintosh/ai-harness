@@ -332,7 +332,8 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
                    if r.get("status") != "skipped"]
         return check_alertwatch(aw_inbox.oldest_age_s(state, now_epoch),
                                 (state / "PAUSED").exists(),
-                                counted[0].get("status") if counted else None)
+                                counted[0].get("status") if counted else None,
+                                note_status=counted[0].get("note_status") if counted else None)
     except Exception as e:  # a broken alert-watch must not blind the watchdog
         return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
 
