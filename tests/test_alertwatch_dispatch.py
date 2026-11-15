@@ -793,3 +793,17 @@ def test_crash_recovered_failures_count_toward_the_pause(env):
                                         "status": "running"})
     go(env)
     assert (env["state"] / "PAUSED").exists()
+
+
+def test_diagnose_has_no_git_content_commands(env):
+    assert not any(a.startswith("Bash(git") for a in dispatch.DIAGNOSE_ALLOW)
+    assert "Bash(python3 -m alertwatch.gitinfo*)" in dispatch.DIAGNOSE_ALLOW
+
+
+def test_a_batch_with_no_run_record_counts_toward_the_pause(env):
+    for i in range(3):
+        report(env)
+        inbox.claim_all(env["state"], f"norec{i}")
+    go(env)
+    assert (env["state"] / "PAUSED").exists()
+    assert sum(1 for r in runs(env) if r["status"] == "failed") >= 3

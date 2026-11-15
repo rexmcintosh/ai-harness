@@ -96,10 +96,12 @@ DIAGNOSE_ALLOW = [
     # File contents only through these tools: they honor the Read deny rules (the
     # credential and .env rules), which shell commands such as cat or grep -r do not.
     "Read", "Grep", "Glob",
+    # No git: log, show and diff print file contents (a credential committed in the
+    # past included), which the Read deny rules cannot filter. gitinfo prints commit
+    # lines and changed file names only.
     "Bash(ls*)", "Bash(wc *)", "Bash(stat *)", "Bash(date)", "Bash(date -u*)", "Bash(date +*)",
-    "Bash(git log*)", "Bash(git status*)", "Bash(git diff*)", "Bash(git show*)",
-    "Bash(git -C * log*)", "Bash(git -C * status*)", "Bash(git -C * diff*)", "Bash(git -C * show*)",
     "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
+    "Bash(python3 -m alertwatch.gitinfo*)",
 ]
 _DIAGNOSE_DENY = ["Edit", "Write", "NotebookEdit", "Bash(git commit*)", "Bash(git * commit*)",
                   # git log, diff and show can write a file or run a configured program,
@@ -487,8 +489,13 @@ def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
         inbox.release(state, run_id, inbox.batch_entries(state, run_id), count_attempt=dest == "release_count")
     else:
         inbox.finish(state, run_id, "failed")
+        reason = "the dispatcher stopped during this run"
         try:
-            ledger.update_run(state, run_id, status="failed", reason="the dispatcher stopped during this run")
+            if rec:
+                ledger.update_run(state, run_id, status="failed", reason=reason)
+            else:  # it died before the record was written: write one, so the pause counts it
+                ledger.write_run(state, {"run_id": run_id, "started_at": now, "ended_at": now,
+                                         "status": "failed", "reason": reason, "entries": []})
         except (OSError, ValueError):
             pass
         _send_note(cfg, st, "", notes.failure_note(
