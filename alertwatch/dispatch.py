@@ -37,6 +37,7 @@ VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
 # pipx) come first. A run never pushes, merges, reverts or kills by itself: the
 # checked helpers (alertwatch.merge, alertwatch.restart, alertwatch.rerun) do.
 _ALWAYS_DENY = [
+    "Bash(git push*)", "Bash(git -C * push*)",
     "Bash(*supervise_meets.py*)",
     "Bash(kill*)", "Bash(pkill*)", "Bash(killall*)",
     "Bash(git merge*)", "Bash(git * merge*)", "Bash(git revert*)", "Bash(git * revert*)",

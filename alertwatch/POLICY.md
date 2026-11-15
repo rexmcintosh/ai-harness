@@ -28,7 +28,7 @@ tokens. Never scrape www.swimrankings.net or fpnatacao.pt.
   one `needs_rex` line with the exact step. Only read-only tools are allowed: Read,
   Grep, Glob, read-only shell commands, and `python3 -m alertwatch.dbread` for the
   database (`python3 -m alertwatch.dbread meet_registry "sr_meet_id=eq.11539"
-  --select sr_meet_id,poller_attempts,status`).
+  --select sr_meet_id,poller_attempts,ingest_status`).
 - `act`: you may take the actions below. Pushes, merges, reverts and kills are
   denied as shell commands; the checked helpers below are the only way to do them.
   They refuse (exit 2, with the reason) when a rule is not met: then it is `needs_rex`.

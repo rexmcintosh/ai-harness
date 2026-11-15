@@ -265,8 +265,10 @@ def test_revert_crash_before_push_is_recovered(world, monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         run(world, "revert", "repo", head)
     monkeypatch.setattr(merge, "_git", real)
-    assert git(world["repo"], "rev-parse", "main") != git(world["origin"], "rev-parse", "main")
+    # the revert was built in a temporary worktree: the main checkout never moved
+    assert git(world["repo"], "rev-parse", "main") == git(world["origin"], "rev-parse", "main") == head
     assert run(world, "revert", "repo", head) == 0
+    assert not list((world["state"] / "worktrees").glob("revert-*"))
     assert (world["repo"] / "app.py").read_text() == "x = 1\n"
     assert git(world["repo"], "rev-parse", "main") == git(world["origin"], "rev-parse", "main")
     kinds = [a["kind"] for a in ledger.actions(world["state"])]
@@ -305,3 +307,11 @@ def test_merge_intent_that_never_reached_origin_stops_counting(world, monkeypatc
     assert ledger.merges_in_window(world["state"], time.time()) == 1  # counted until settled
     assert run(world, "merge", "repo", str(wt)) == 0
     assert ledger.merges_in_window(world["state"], time.time()) == 1
+
+
+def test_never_pushed_intents_do_not_use_up_the_cap(world, monkeypatch):
+    for i in range(3):  # three intents in another repo that never reached its origin
+        ledger.append_action(world["state"], {"kind": "merge_intent", "id": f"x{i}", "at": time.time() - 60,
+                                              "repo": "repo", "to_sha": f"{i}" * 40, "from_sha": "0" * 40})
+    wt = fix_worktree(world)
+    assert run(world, "merge", "repo", str(wt)) == 0

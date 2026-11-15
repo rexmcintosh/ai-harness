@@ -98,24 +98,29 @@ def _repo(cfg: Config, name: str) -> Path:
     return cfg.projects_dir / name
 
 
-def _reconcile(cfg: Config, repo: Path, name: str, now: float) -> None:
-    """Settle intents a crash left without an outcome. A merge or revert that never
-    reached origin is abandoned (a revert's local commit is undone). One that reached
-    origin keeps counting: callers already treat it as done."""
+def reconcile_all(cfg: Config, now: float) -> None:
+    """Settle intents a crash left without an outcome, in every listed repository
+    (the merge cap is shared). One that never reached origin is abandoned; one that
+    did keeps counting, since callers already treat it as done. Also removes revert
+    worktrees a killed helper left behind. Runs before any other check, so a crash
+    can never block its own repair."""
     acts = ledger.actions(cfg.state_dir)
     settled = {str(a.get("intent")) for a in acts if a.get("intent")}
-    for a in acts:
-        if a.get("repo") != name or a.get("id") in settled:
+    for name in cfg.repos:
+        repo = cfg.projects_dir / name
+        if not (repo / ".git").exists():
             continue
-        if a.get("kind") == "merge_intent" and not _on_origin(repo, a["to_sha"]):
-            ledger.append_action(cfg.state_dir, {"kind": "merge_abandoned", "intent": a["id"], "at": now,
-                                                 "why": "never reached origin"})
-        elif a.get("kind") == "revert_intent" and not _on_origin(repo, a["to_sha"]):
-            if _git(repo, "rev-parse", "HEAD") == a["to_sha"] and \
-                    _git(repo, "rev-parse", "origin/main") == a["from_sha"]:
-                _git(repo, "reset", "-q", "--keep", a["from_sha"])
-            ledger.append_action(cfg.state_dir, {"kind": "revert_abandoned", "intent": a["id"], "at": now,
-                                                 "why": "never reached origin"})
+        for a in acts:
+            if a.get("repo") != name or a.get("id") in settled:
+                continue
+            if a.get("kind") in ("merge_intent", "revert_intent") and not _on_origin(repo, a["to_sha"]):
+                kind = "merge_abandoned" if a["kind"] == "merge_intent" else "revert_abandoned"
+                ledger.append_action(cfg.state_dir, {"kind": kind, "intent": a["id"], "at": now,
+                                                     "why": "never reached origin"})
+        for wt in cfg.worktrees_dir.glob("revert-*"):
+            subprocess.run(["git", "worktree", "remove", "--force", str(wt)], cwd=str(repo),
+                           capture_output=True)
+        subprocess.run(["git", "worktree", "prune"], cwd=str(repo), capture_output=True)
 
 
 def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
@@ -149,7 +154,6 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
     bad = denied(files, cfg.denied_paths)
     if bad:
         raise Refused(f"the diff touches denied paths: {', '.join(bad)}")
-    _reconcile(cfg, repo, name, now)
     made = ledger.merges_in_window(cfg.state_dir, now)
     if made >= cfg.max_merges_day:
         raise Refused(f"{made} merges in the last 24 hours (limit {cfg.max_merges_day})")
@@ -177,6 +181,9 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
 
 
 def do_revert(cfg: Config, name: str, sha: str, now: float) -> dict:
+    """Like a merge: the revert is made in a temporary worktree, journaled, pushed,
+    and only then does the main checkout move. A crash at any point leaves the main
+    checkout untouched and the intent settled by reconcile_all."""
     repo = _repo(cfg, name)
     if len(sha) < 7:
         raise Refused("give at least 7 characters of the merged commit")
@@ -187,28 +194,39 @@ def do_revert(cfg: Config, name: str, sha: str, now: float) -> dict:
     if len(candidates) != 1:
         raise Refused(f"{sha} is not one alert-watch merge in {name}")
     target = candidates[0]
-    _reconcile(cfg, repo, name, now)
     if target["to_sha"] in ledger.reverted(cfg.state_dir):
         raise Refused(f"{target['to_sha'][:10]} was already reverted")
     before = _check_main(repo)
+    intent_id = _intent_id()
+    tmp = cfg.worktrees_dir / f"revert-{intent_id}"
+    cfg.worktrees_dir.mkdir(parents=True, exist_ok=True)
+    _git(repo, "worktree", "add", "-q", "--detach", str(tmp), before)
     try:
-        _git(repo, "revert", "--no-edit", f"{target['from_sha']}..{target['to_sha']}")
-    except subprocess.CalledProcessError:
-        subprocess.run(["git", "revert", "--abort"], cwd=str(repo), capture_output=True)
-        raise Refused("the revert does not apply cleanly; it needs Rex") from None
-    after = _git(repo, "rev-parse", "HEAD")
-    run_id = os.environ.get("ALERT_WATCH_RUN_ID", "")
-    intent = {"kind": "revert_intent", "id": _intent_id(), "at": now, "run_id": run_id, "repo": name,
-              "reverts": target["to_sha"], "from_sha": before, "to_sha": after}
-    ledger.append_action(cfg.state_dir, intent)
+        try:
+            _git(tmp, "revert", "--no-edit", f"{target['from_sha']}..{target['to_sha']}")
+        except subprocess.CalledProcessError:
+            raise Refused("the revert does not apply cleanly; it needs Rex") from None
+        after = _git(tmp, "rev-parse", "HEAD")
+        intent = {"kind": "revert_intent", "id": intent_id, "at": now,
+                  "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""), "repo": name,
+                  "reverts": target["to_sha"], "from_sha": before, "to_sha": after}
+        ledger.append_action(cfg.state_dir, intent)
+        try:
+            _push(repo, f"{after}:refs/heads/main", after)
+        except subprocess.CalledProcessError:
+            ledger.append_action(cfg.state_dir, {"kind": "revert_abandoned", "intent": intent_id, "at": now})
+            raise
+        action = {**intent, "kind": "revert", "intent": intent_id}
+        ledger.append_action(cfg.state_dir, action)
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(tmp)], cwd=str(repo), capture_output=True)
     try:
-        _push(repo, "main", after)
-    except subprocess.CalledProcessError:
-        _git(repo, "reset", "-q", "--keep", before)
-        ledger.append_action(cfg.state_dir, {"kind": "revert_abandoned", "intent": intent["id"], "at": now})
-        raise
-    action = {**intent, "kind": "revert", "intent": intent["id"]}
-    ledger.append_action(cfg.state_dir, action)
+        _git(repo, "merge", "-q", "--ff-only", after)
+        landed = _check_main(repo) == after
+    except (subprocess.CalledProcessError, Refused):
+        landed = False
+    if not landed:
+        raise PushedNotLocal(f"the revert {after[:10]} is on origin/main, but {repo} did not move to it")
     return {"status": "reverted", **action}
 
 
@@ -228,6 +246,7 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
     with open(cfg.state_dir / "merge.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
+            reconcile_all(cfg, now())
             if args.cmd == "merge":
                 out = do_merge(cfg, args.repo, args.worktree, now())
             else:

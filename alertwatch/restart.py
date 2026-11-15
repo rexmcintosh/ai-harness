@@ -60,6 +60,31 @@ def _is_writer(argv: list[str]) -> bool:
             and Path(argv[1]).name in WRITER_SCRIPTS)
 
 
+def _flag(argv: list[str], name: str) -> str | None:
+    for i, arg in enumerate(argv):
+        if arg == name and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith(name + "="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _writes_meet(argv: list[str], key: str, meet_url: str | None) -> bool:
+    """The writer's own arguments name this meet: `--sr-meet-id <key>` (reconcile), or
+    `--meet-url` equal to the registry's meet_url, or the default SPLASH folder of the
+    key (supervise_meets._poller_argv)."""
+    sr = _flag(argv, "--sr-meet-id")
+    if sr is not None:
+        return sr == key
+    url = _flag(argv, "--meet-url")
+    if url is None:
+        return False
+    wanted = {f"https://live.swimrankings.net/{key}"}
+    if meet_url:
+        wanted.add(meet_url.rstrip("/"))
+    return url.rstrip("/") in wanted
+
+
 def do_restart(cfg: Config, key: str, select, send, now: float) -> dict:
     if cfg.mode != "act":
         raise Refused(f"mode is {cfg.mode}; restarts need mode = act")
@@ -85,9 +110,11 @@ def do_restart(cfg: Config, key: str, select, send, now: float) -> dict:
         argv = _argv(pid)
         if not _is_writer(argv):
             raise Refused(f"PID {pid} is not a meet writer ({' '.join(argv)[:120]})")
-        rows = select("meet_registry", f"sr_meet_id=eq.{key}", "sr_meet_id,poller_attempts,status")
+        rows = select("meet_registry", f"sr_meet_id=eq.{key}", "sr_meet_id,poller_attempts,ingest_status,meet_url")
         if len(rows) != 1:
             raise Refused(f"{len(rows)} registry rows for {key}")
+        if not _writes_meet(argv, key, rows[0].get("meet_url")):
+            raise Refused(f"PID {pid} writes another meet, not {key} ({' '.join(argv)[:160]})")
         attempts = int(rows[0].get("poller_attempts") or 0)
         if attempts > cfg.restart_max_attempts:
             raise Refused(f"{key} has poller_attempts={attempts} (restart only at "
@@ -99,7 +126,7 @@ def do_restart(cfg: Config, key: str, select, send, now: float) -> dict:
     finally:
         os.close(pidfd)
     action = {"kind": "restart", "at": now, "run_id": os.environ.get("ALERT_WATCH_RUN_ID", ""),
-              "key": key, "pid": pid, "attempts": attempts, "registry_status": rows[0].get("status")}
+              "key": key, "pid": pid, "attempts": attempts, "ingest_status": rows[0].get("ingest_status")}
     ledger.append_action(cfg.state_dir, action)
     return {"status": "restarted", **action}
 

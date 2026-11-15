@@ -71,7 +71,7 @@ def test_send_tags_its_own_source(tmp_path):
 
 
 def test_send_reports_failure_and_uncertain(tmp_path):
-    for rc, want in ((1, "failed"), (3, "uncertain")):
+    for rc, want in ((1, "failed"), (127, "failed"), (3, "uncertain"), (124, "uncertain")):
         fake = tmp_path / f"tg-{rc}"
         fake.write_text(f"#!/usr/bin/env bash\ncat >/dev/null\nexit {rc}\n")
         fake.chmod(0o755)

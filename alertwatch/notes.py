@@ -69,7 +69,9 @@ def pause_note(reason: str) -> str:
 
 
 def send(cfg, text: str) -> str:
-    """accepted | failed | uncertain, from tg-send's exit code (0, 1, anything else)."""
+    """accepted | failed | uncertain, from tg-send's exit code: 0 accepted; 1 (a
+    definite rejection) and 126/127 (it never ran) failed, so safe to retry; anything
+    else, a timeout included, may have been sent."""
     # Not captured at all (the run record keeps the text); the tag is a second guard.
     env = {**os.environ, "ALERT_SOURCE": "alert-watch", "ALERT_INBOX_DIR": "off",
            "TG_SEND_RECEIPT_OUTPUT": "1"}
@@ -80,4 +82,4 @@ def send(cfg, text: str) -> str:
         return "uncertain"
     except OSError:
         return "failed"
-    return {0: "accepted", 1: "failed"}.get(proc.returncode, "uncertain")
+    return {0: "accepted", 1: "failed", 126: "failed", 127: "failed"}.get(proc.returncode, "uncertain")

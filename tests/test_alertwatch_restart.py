@@ -27,15 +27,17 @@ def world(tmp_path, monkeypatch):
     cfg = dataclasses.replace(cfg, mode="act", meettrack_run_dir=run_dir)
     procs = []
 
-    def writer(key, script="poller.py", record_start=True, spoof=False):
+    def writer(key, script="poller.py", record_start=True, spoof=False, url=None, pid_key=None):
         path = tmp_path / script
         path.write_text("import time\ntime.sleep(60)\n")
+        url = url or f"https://live.swimrankings.net/{key}/"
         argv = ([sys.executable, "-c", "import time; time.sleep(60)", script] if spoof
-                else [sys.executable, str(path), "--meet", key])
+                else [sys.executable, str(path), "--meet-url", url, "--live"])
         p = subprocess.Popen(argv)
         procs.append(p)
         time.sleep(0.05)
-        (run_dir / f"poller-{key}.pid").write_text(f"{p.pid} {starttime(p.pid)}" if record_start else str(p.pid))
+        (run_dir / f"poller-{pid_key or key}.pid").write_text(
+            f"{p.pid} {starttime(p.pid)}" if record_start else str(p.pid))
         return p
 
     yield {"cfg": cfg, "state": state, "run_dir": run_dir, "writer": writer}
@@ -44,10 +46,11 @@ def world(tmp_path, monkeypatch):
         p.wait()
 
 
-def registry(attempts, status="polling"):
+def registry(attempts, status="polling", meet_url=None):
     def select(table, filters, cols):
         assert table == "meet_registry" and filters.startswith("sr_meet_id=eq.")
-        return [{"sr_meet_id": filters.split(".", 1)[1], "poller_attempts": attempts, "status": status}]
+        return [{"sr_meet_id": filters.split(".", 1)[1], "poller_attempts": attempts, "ingest_status": status,
+                 "meet_url": meet_url}]
     return select
 
 
@@ -103,9 +106,18 @@ def test_refused_bad_key(world):
 
 def test_each_writer_kind_is_accepted(world):
     for i, script in enumerate(("track_pdf_meet.py", "lastheat_ingest.py")):
-        p = world["writer"](f"sp-k{i}", script=script)
-        assert restart.main(["restart", f"sp-k{i}"], cfg=world["cfg"], select=registry(0)) == 0
+        url = f"https://www.anlisboa.info/results/meet{i}/"
+        p = world["writer"](f"sp-k{i}", script=script, url=url)
+        assert restart.main(["restart", f"sp-k{i}"], cfg=world["cfg"],
+                            select=registry(0, meet_url=url.rstrip("/"))) == 0
         p.wait(timeout=5)
+
+
+def test_refused_when_the_pid_file_points_at_another_meets_writer(world):
+    other = world["writer"]("11600", pid_key="11539")  # a crossed or stale PID file
+    assert restart.main(["restart", "11539"], cfg=world["cfg"], select=registry(0)) == 2
+    assert other.poll() is None
+    assert ledger.actions(world["state"]) == []
 
 
 def test_history_lists_restarts(world, capsys):
@@ -138,3 +150,17 @@ def test_writer_that_exits_during_the_checks_is_refused_not_mistargeted(world):
         return registry(0)(*a)
     assert restart.main(["restart", "11539"], cfg=world["cfg"], select=select_then_writer_dies) == 2
     assert ledger.actions(world["state"]) == []
+
+
+def test_reads_only_real_registry_columns(world):
+    # meet_registry has no `status` column (a live read on 2026-11-15 returned 42703).
+    seen = []
+
+    def select(table, filters, cols):
+        seen.append(cols)
+        return registry(0)(table, filters, cols)
+    world["writer"]("11539")
+    restart.main(["restart", "11539"], cfg=world["cfg"], select=select)
+    real = set("sr_meet_id,nation,feed_type,ingest_status,start_date,end_date,poller_attempts,"
+               "poller_started_at,meet_url,dispatch_paused".split(","))
+    assert set(seen[0].split(",")) <= real
