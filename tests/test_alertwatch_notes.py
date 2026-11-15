@@ -96,4 +96,4 @@ def test_send_turns_capture_off(tmp_path):
 
 def test_limit_note_part_way_says_no_retry():
     text = notes.limit_note(1794738000.0, part_way=True)
-    assert "part way" in text and "will not be tried again" in text and "—" not in text
+    assert "part way" in text and "will not be tried again" in text and "\u2014" not in text
