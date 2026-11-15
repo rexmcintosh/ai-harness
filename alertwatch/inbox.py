@@ -104,6 +104,20 @@ def finish(state: Path, run_id: str, to: str) -> None:
         os.rename(src, dst)
 
 
+def file_away(state: Path, run_id: str, entries: list[dict], to: str) -> None:
+    """Move these entries' files out of batch/<run_id>/ into <to>/<run_id>/ (for the
+    entries the rules dropped or ignored, so a later release() cannot resend them)."""
+    if to not in ("done", "failed"):
+        raise ValueError(to)
+    src_dir = Path(state) / "batch" / run_id
+    dst_dir = Path(state) / to / run_id
+    for entry in entries:
+        src = src_dir / (entry.get("_file") or f"{entry['id']}.json")
+        if src.exists():
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            os.rename(src, dst_dir / src.name)
+
+
 def _clean(entry: dict) -> dict:
     return {k: v for k, v in entry.items() if not k.startswith("_")}
 
