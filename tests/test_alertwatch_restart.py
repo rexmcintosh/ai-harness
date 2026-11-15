@@ -164,3 +164,25 @@ def test_reads_only_real_registry_columns(world):
     real = set("sr_meet_id,nation,feed_type,ingest_status,start_date,end_date,poller_attempts,"
                "poller_started_at,meet_url,dispatch_paused".split(","))
     assert set(seen[0].split(",")) <= real
+
+
+def test_every_supervisor_writer_form_names_its_meet():
+    """Each argv supervise_meets._poller_argv can emit passes the meet check."""
+    import importlib.util
+    path = Path("/home/dev/projects/splash_poller/supervise_meets.py")
+    if not path.exists():
+        pytest.skip("splash_poller is not checked out here")
+    import sys as _sys
+    _sys.path.insert(0, str(path.parent))
+    spec = importlib.util.spec_from_file_location("_aw_supervise", path)
+    sup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sup)
+    other = "https://www.anlisboa.info/results/x/"
+    for feed in ("lenex", "pdf", "fragment"):
+        for meet_url in (None, other):
+            argv = sup._poller_argv("11539", feed, python="/usr/bin/python3", meet_url=meet_url)
+            assert restart._is_writer(argv), argv
+            assert restart._writes_meet(argv, "11539", meet_url), argv
+            assert not restart._writes_meet(argv, "11600", None), argv
+    argv = sup._poller_argv("11539", backfill=True, python="/usr/bin/python3")
+    assert restart._is_writer(argv) and restart._writes_meet(argv, "11539", None)

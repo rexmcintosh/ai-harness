@@ -70,9 +70,10 @@ def _flag(argv: list[str], name: str) -> str | None:
 
 
 def _writes_meet(argv: list[str], key: str, meet_url: str | None) -> bool:
-    """The writer's own arguments name this meet: `--sr-meet-id <key>` (reconcile), or
-    `--meet-url` equal to the registry's meet_url, or the default SPLASH folder of the
-    key (supervise_meets._poller_argv)."""
+    """The writer's own arguments name this meet. supervise_meets._poller_argv always
+    passes one of two flags: `--sr-meet-id <key>` (reconcile_meet.py), or `--meet-url`
+    (every live writer), which is the registry's meet_url or, when that is empty,
+    https://live.swimrankings.net/<key>/. A writer with neither is refused."""
     sr = _flag(argv, "--sr-meet-id")
     if sr is not None:
         return sr == key

@@ -315,3 +315,38 @@ def test_never_pushed_intents_do_not_use_up_the_cap(world, monkeypatch):
                                               "repo": "repo", "to_sha": f"{i}" * 40, "from_sha": "0" * 40})
     wt = fix_worktree(world)
     assert run(world, "merge", "repo", str(wt)) == 0
+
+
+def test_a_failed_fetch_never_settles_an_intent_as_abandoned(world, monkeypatch):
+    wt = fix_worktree(world)
+    head = git(wt, "rev-parse", "HEAD")
+    ledger.append_action(world["state"], {"kind": "merge_intent", "id": "i1", "at": time.time() - 60,
+                                          "repo": "repo", "to_sha": head, "from_sha": "0" * 40})
+    real = merge._git
+
+    def offline(cwd, *args):
+        if args and args[0] == "fetch":
+            raise subprocess.CalledProcessError(128, ["git", *args], "", "could not resolve host")
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", offline)
+    merge.reconcile_all(world["cfg"], time.time())
+    assert [a["kind"] for a in ledger.actions(world["state"])] == ["merge_intent"]
+    assert ledger.merges_in_window(world["state"], time.time()) == 1
+
+
+def test_a_failed_push_with_origin_unreadable_leaves_the_intent_open(world, monkeypatch, capsys):
+    wt = fix_worktree(world)
+    real = merge._git
+    state = {"pushed": False}
+
+    def flaky(cwd, *args):
+        if args and args[0] == "push":
+            state["pushed"] = True
+            raise subprocess.CalledProcessError(128, ["git", *args], "", "connection reset")
+        if args and args[0] == "fetch" and state["pushed"]:
+            raise subprocess.CalledProcessError(128, ["git", *args], "", "could not resolve host")
+        return real(cwd, *args)
+    monkeypatch.setattr(merge, "_git", flaky)
+    assert run(world, "merge", "repo", str(wt)) == 1
+    assert "unknown, needs Rex" in capsys.readouterr().err
+    assert [a["kind"] for a in ledger.actions(world["state"])] == ["merge_intent"]

@@ -79,8 +79,18 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
     env = {k: v for k, v in os.environ.items() if k != "MEETTRACK_DB_READ_ONLY"}
     env["ALERT_SOURCE"] = f"alert-watch-rerun:{args.job}"
     argv_job = ["/bin/sh", "-c", job.cmd]
+    # Take the job's own cron lock here (the same flock(2) lock `flock -n` uses), so
+    # a busy lock is known before the job starts, and the job's exit code is its own.
+    held = None
     if job.lock:
-        argv_job = ["/usr/bin/flock", "-n", "-E", "75", job.lock] + argv_job
+        held = open(job.lock, "a")
+        try:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            held.close()
+            give_back()
+            print(f"rerun {args.job}: lock busy (the job is running now); not counted")
+            return 1
     Path(job.log).parent.mkdir(parents=True, exist_ok=True)
     with open(job.log, "ab") as logf:
         logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
@@ -90,6 +100,8 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
             proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
                                     stderr=subprocess.STDOUT, start_new_session=True)
         except OSError as e:
+            if held:
+                held.close()
             give_back()
             print(f"rerun {args.job}: could not start ({e.__class__.__name__}); not counted")
             return 1
@@ -104,10 +116,8 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
                 proc.wait()
             print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
             return 124
-    if job.lock and rc == 75:
-        give_back()
-        print(f"rerun {args.job}: lock busy (the job is running now); not counted log={job.log}")
-        return 1
+    if held:
+        held.close()
     print(f"rerun {args.job}: rc={rc} log={job.log}")
     return rc
 

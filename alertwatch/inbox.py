@@ -186,19 +186,20 @@ def add_entry(state: Path, text: str, source: str, eid: str | None = None) -> st
     return eid
 
 
-def _captured_epoch(path: Path) -> float:
+def _captured_epoch(path: Path) -> float | None:
     try:
         stamp = json.loads(path.read_text(encoding="utf-8"))["captured_at"]
         return dt.datetime.strptime(stamp, _TS_FMT).replace(tzinfo=dt.timezone.utc).timestamp()
     except (OSError, ValueError, KeyError, TypeError):
-        return path.stat().st_mtime
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return None  # claimed by the dispatcher meanwhile
 
 
 def oldest_age_s(state: Path, now: float) -> float | None:
-    files = _visible_json(Path(state) / "inbox")
-    if not files:
-        return None
-    return now - min(_captured_epoch(p) for p in files)
+    stamps = [t for t in (_captured_epoch(p) for p in _visible_json(Path(state) / "inbox")) if t is not None]
+    return now - min(stamps) if stamps else None
 
 
 def prune(state: Path, now: float, days: int = 30) -> int:

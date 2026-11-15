@@ -40,21 +40,37 @@ def _intent_id() -> str:
     return f"{os.environ.get('ALERT_WATCH_RUN_ID') or 'manual'}-{secrets.token_hex(4)}"
 
 
-def _on_origin(repo: Path, sha: str) -> bool:
+class PushUnknown(Exception):
+    """The push failed and origin could not be read: it may or may not have landed."""
+
+
+def _origin_has(repo: Path, sha: str) -> bool | None:
+    """True or False when origin was read; None when it could not be (a network or
+    fetch failure). Only a False may ever settle an intent as abandoned."""
     try:
         _git(repo, "fetch", "-q", "origin")
-        _git(repo, "merge-base", "--is-ancestor", sha, "origin/main")
-        return True
     except subprocess.CalledProcessError:
-        return False
+        return None
+    proc = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "origin/main"], cwd=str(repo),
+                          capture_output=True, text=True, timeout=300)
+    if proc.returncode in (0, 1):
+        return proc.returncode == 0
+    # After a good fetch, a commit this repo does not even have is not on origin/main.
+    known = subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=str(repo),
+                           capture_output=True, timeout=60)
+    return False if known.returncode != 0 else None
 
 
 def _push(repo: Path, refspec: str, sha: str) -> None:
-    """Push without force. A failed push that still landed (a lost reply) counts as done."""
+    """Push without force. A failed push that still landed (a lost reply) counts as
+    done; one whose outcome cannot be read raises PushUnknown."""
     try:
         _git(repo, "push", "-q", "origin", refspec)
     except subprocess.CalledProcessError:
-        if not _on_origin(repo, sha):
+        landed = _origin_has(repo, sha)
+        if landed is None:
+            raise PushUnknown(f"the push of {sha[:10]} failed and origin cannot be read") from None
+        if not landed:
             raise
 
 
@@ -113,7 +129,7 @@ def reconcile_all(cfg: Config, now: float) -> None:
         for a in acts:
             if a.get("repo") != name or a.get("id") in settled:
                 continue
-            if a.get("kind") in ("merge_intent", "revert_intent") and not _on_origin(repo, a["to_sha"]):
+            if a.get("kind") in ("merge_intent", "revert_intent") and _origin_has(repo, a["to_sha"]) is False:
                 kind = "merge_abandoned" if a["kind"] == "merge_intent" else "revert_abandoned"
                 ledger.append_action(cfg.state_dir, {"kind": kind, "intent": a["id"], "at": now,
                                                      "why": "never reached origin"})
@@ -190,7 +206,7 @@ def do_revert(cfg: Config, name: str, sha: str, now: float) -> dict:
     candidates = [m for m in ledger.merged(cfg.state_dir) if m.get("repo") == name
                   and str(m.get("to_sha", "")).startswith(sha)]
     # An intent with no outcome (a crash after its push) counts only if origin has it.
-    candidates = [m for m in candidates if m["kind"] == "merge" or _on_origin(repo, m["to_sha"])]
+    candidates = [m for m in candidates if m["kind"] == "merge" or _origin_has(repo, m["to_sha"]) is True]
     if len(candidates) != 1:
         raise Refused(f"{sha} is not one alert-watch merge in {name}")
     target = candidates[0]
@@ -256,6 +272,9 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
             return 2
         except PushedNotLocal as e:
             print(f"pushed, needs Rex: {e}", file=sys.stderr)
+            return 1
+        except PushUnknown as e:
+            print(f"unknown, needs Rex: {e}; the intent stays open and counts", file=sys.stderr)
             return 1
         except subprocess.CalledProcessError as e:
             print(f"git failed: {' '.join(e.cmd)}: {(e.stderr or '').strip()[:500]}", file=sys.stderr)

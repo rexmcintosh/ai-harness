@@ -51,7 +51,9 @@ and how it checked the result.
 
 ## Goals
 
-- Every `tg-send` message is captured, even when Telegram itself is down.
+- Capture is attempted for every `tg-send` message before the send, so a report is kept
+  even when Telegram itself is down. It is best effort: a capture error prints one line
+  and the send goes on; it is not retried.
 - A real failure report starts a fix without Rex.
 - Live steps and merges happen inside the approved list, with a note for each.
 - Rex can open any run later and see everything it did.

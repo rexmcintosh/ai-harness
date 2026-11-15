@@ -95,3 +95,17 @@ def test_a_failed_job_keeps_its_reservation(tmp_path):
     cfg = cfg_with(tmp_path, "exit 3")
     assert rerun.main(["demo"], cfg=cfg) == 3
     assert rerun.main(["demo"], cfg=cfg) == 2
+
+
+def test_a_job_that_exits_75_is_not_mistaken_for_a_busy_lock(tmp_path):
+    cfg = cfg_with(tmp_path, "exit 75", lock=str(tmp_path / "job.lock"))
+    assert rerun.main(["demo"], cfg=cfg) == 75
+    assert rerun.main(["demo"], cfg=cfg) == 2  # it ran, so the window holds
+
+
+def test_the_lock_is_held_while_the_job_runs(tmp_path):
+    lock = tmp_path / "job.lock"
+    probe = tmp_path / "probe.txt"
+    cmd = f"/usr/bin/flock -n {lock} true; echo $? > {probe}"
+    assert rerun.main(["demo"], cfg=cfg_with(tmp_path, cmd, lock=str(lock))) == 0
+    assert probe.read_text().strip() == "1"  # a cron copy started meanwhile would find it busy

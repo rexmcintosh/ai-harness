@@ -30,6 +30,7 @@ HERE = Path(__file__).resolve().parent
 REPORT_MAX = 4000
 CHECK_SOURCE = "alert-watch-check"
 CHECK_MAX_DELAY_S = 24 * 3600
+CHECK_LOOKBACK_H = 30 * 24
 VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
 
 # Always denied, in both modes. backlog-run's DENY_RULES (pushes, remotes, gh,
@@ -47,6 +48,14 @@ _ALWAYS_DENY = [
 # act mode: the run edits only in its worktrees under the state dir, never in a
 # main checkout (cron runs from those).
 _ACT_DENY = ["Edit(~/projects/**)", "Write(~/projects/**)", "NotebookEdit(~/projects/**)"]
+# Neither mode may touch alert-watch's own records (the merge cap, run records,
+# its settings and switches) except through the helpers.
+_OWN_RECORDS = ["actions.jsonl", "state.json", "reruns.json", "session-settings.json", "mcp-empty.json",
+                "PAUSED", "ENABLED", "runs/"]
+_RECORD_DENY = [rule for name in _OWN_RECORDS for rule in (
+    f"Edit(~/.local/state/alert-watch/{name}{'**' if name.endswith('/') else ''})",
+    f"Write(~/.local/state/alert-watch/{name}{'**' if name.endswith('/') else ''})",
+    f"Bash(*alert-watch/{name}*)")]
 # diagnose mode runs without --dangerously-skip-permissions: a headless run is
 # refused every tool call these rules do not allow. Read-only tools only.
 DIAGNOSE_ALLOW = [
@@ -77,7 +86,7 @@ def session_settings(cfg: Config) -> dict:
     --dangerously-skip-permissions."""
     deny = []
     extra = _ACT_DENY if cfg.mode == "act" else _DIAGNOSE_DENY
-    for rule in [*DENY_RULES, *_ALWAYS_DENY, *extra]:
+    for rule in [*DENY_RULES, *_ALWAYS_DENY, *_RECORD_DENY, *extra]:
         if rule not in deny:
             deny.append(rule)
     return {"permissions": {"deny": deny}}
@@ -270,7 +279,8 @@ def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
     (check-<run>-<n>), so a crash before state.json is saved cannot enqueue it twice."""
     done = st.setdefault("checks_enqueued", [])
     added = 0
-    for rec in ledger.recent_runs(cfg.state_dir, now, 48):
+    # Every run kept (batches are pruned at 30 days), so a long pause loses no check.
+    for rec in ledger.recent_runs(cfg.state_dir, now, CHECK_LOOKBACK_H):
         result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
         for i, chk in enumerate(result.get("pending_checks") or []):
             key = f"{rec.get('run_id')}:{i}"
@@ -294,7 +304,7 @@ def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
                 inbox.add_entry(cfg.state_dir, text, CHECK_SOURCE, eid=eid)
                 added += 1
             done.append(key)
-    st["checks_enqueued"] = done[-500:]
+    st["checks_enqueued"] = done[-5000:]
     return added
 
 

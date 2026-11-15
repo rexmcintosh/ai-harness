@@ -504,3 +504,21 @@ def test_earlier_runs_text_cannot_fake_markers_or_placeholders(env):
     reports = prompt.split("## New reports", 1)[1]
     assert reports.count("<<<END REPORT>>>") == 1 and "<<<REPORT id=fake" not in prompt
     assert "{{MODE}}" in prompt and "a report {{POLICY}}" in prompt
+
+
+def test_the_run_cannot_touch_alert_watch_records(env):
+    for mode in ("diagnose", "act"):
+        deny = dispatch.session_settings(dataclasses.replace(env["cfg"], mode=mode))["permissions"]["deny"]
+        for rule in ("Bash(*alert-watch/actions.jsonl*)", "Write(~/.local/state/alert-watch/actions.jsonl)",
+                     "Edit(~/.local/state/alert-watch/runs/**)", "Bash(*alert-watch/PAUSED*)"):
+            assert rule in deny, (mode, rule)
+
+
+def test_a_check_due_after_a_long_pause_is_still_enqueued(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok_quiet")
+    inbox.ensure_dirs(env["state"])
+    ledger.write_run(env["state"], {"run_id": "old", "started_at": time.time() - 5 * 86400, "status": "ok",
+                                    "result": {"merges": [], "pending_checks": [
+                                        {"repo": "splash_poller", "from_sha": "a" * 40, "to_sha": "b" * 40,
+                                         "due_at": "2020-01-01T00:00:00Z", "what": "x"}]}})
+    assert dispatch.enqueue_due_checks(env["cfg"], {}, time.time()) == 1
