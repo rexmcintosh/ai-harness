@@ -2,6 +2,9 @@
 # Design: docs/superpowers/specs/2026-11-15-alert-watch-design.md
 
 chat_id = "7735693897"
+# Only reports tg-send sent to these chats reach a run (all current senders use
+# Rex's chat). A message to any other chat is never put in a prompt or a note.
+watch_chats = ["7735693897"]
 # "diagnose": the run reads and explains only. "act": allowed live steps and merges.
 # Switching to "act" needs Rex's go and the dated section in ~/.claude/CLAUDE.md.
 mode = "diagnose"

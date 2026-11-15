@@ -953,3 +953,27 @@ def test_a_crash_before_the_pause_note_is_sent_still_delivers_it(env, monkeypatc
     go(env)
     assert not (env["state"] / "PAUSED").exists()  # the reset point was saved first
     assert pause_notes(env) == 1
+
+def test_a_pause_is_finished_before_its_note_goes_out(env, monkeypatch):
+    _three_failures_then_crash_in_pause(env, monkeypatch, "before_paused")
+    seen = []
+    real = dispatch.notes.send
+
+    def send(cfg, text):
+        seen.append((text, (env["state"] / "PAUSED").exists()))
+        return real(cfg, text)
+    monkeypatch.setattr(dispatch.notes, "send", send)
+    go(env)
+    assert [paused for text, paused in seen if text.startswith("alert-watch paused itself")] == [True]
+
+
+def test_a_report_to_another_chat_never_reaches_a_run(env):
+    inbox.ensure_dirs(env["state"])
+    eid = inbox.add_entry(env["state"], "[CRIT] something private", "bash run-expect.sh")
+    path = env["state"] / "inbox" / f"{eid}.json"
+    entry = json.loads(path.read_text())
+    entry["chat_id"] = "999"
+    path.write_text(json.dumps(entry))
+    go(env)
+    assert not env["prompt.txt"].exists()
+    assert runs(env)[0]["entries"][0]["rule"] == "other-chat"

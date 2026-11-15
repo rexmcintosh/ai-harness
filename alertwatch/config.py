@@ -43,6 +43,7 @@ class Config:
     worktrees_dir: Path
     meettrack_run_dir: Path
     restart_max_attempts: int
+    watch_chats: tuple[str, ...]
 
 
 def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) -> Config:
@@ -77,4 +78,5 @@ def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) 
         worktrees_dir=Path(state) / "worktrees",
         meettrack_run_dir=Path(str(raw["meettrack_run_dir"])),
         restart_max_attempts=int(raw["restart_max_attempts"]),
+        watch_chats=tuple(str(c) for c in raw.get("watch_chats") or [raw["chat_id"]]),
     )

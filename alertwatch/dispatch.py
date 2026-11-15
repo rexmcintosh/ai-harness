@@ -585,6 +585,8 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     t = now()
     st = _load_state(state)
     if not dry_run:
+        # First an interrupted pause, so PAUSED exists before its note can reach Rex.
+        _finish_pause(cfg, st, t)
         # Before the PAUSED and usage-limit gates: a dead dispatcher's run is never
         # left running, and Rex still gets every note, while paused.
         for dead in inbox.stale_batches(state):
@@ -598,7 +600,6 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     # Before any new run: a crash between a third failure and its pause must not let
     # the next pass carry on.
     if not dry_run:
-        _finish_pause(cfg, st, t)
         if not (state / "PAUSED").exists() and _streak(cfg, st) >= cfg.fail_streak_pause:
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
     if (state / "PAUSED").exists():
@@ -636,6 +637,9 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     for entry in entries:
         entry["_run_id"] = run_id
         entry["_action"], entry["_rule"] = classify(entry, rules)
+        chat = str(entry.get("chat_id") or "")
+        if entry["_action"] == "look" and chat and chat not in cfg.watch_chats:
+            entry["_action"], entry["_rule"] = "ignore", "other-chat"  # never in a prompt or a note
         (looks if entry["_action"] == "look" else quiet).append(entry)
     record = {"run_id": run_id, "started_at": t, "ended_at": None, "status": "running",
               "reason": "", "mode": cfg.mode, "entries": [_summary(e) for e in entries],
