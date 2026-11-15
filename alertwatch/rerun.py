@@ -81,41 +81,46 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
     argv_job = ["/bin/sh", "-c", job.cmd]
     # Take the job's own cron lock here (the same flock(2) lock `flock -n` uses), so
     # a busy lock is known before the job starts, and the job's exit code is its own.
-    held = None
-    if job.lock:
-        held = open(job.lock, "a")
-        try:
-            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            held.close()
-            give_back()
-            print(f"rerun {args.job}: lock busy (the job is running now); not counted")
-            return 1
-    Path(job.log).parent.mkdir(parents=True, exist_ok=True)
-    with open(job.log, "ab") as logf:
+    # Any failure before the job starts gives the reservation back.
+    held = logf = None
+    try:
+        if job.lock:
+            held = open(job.lock, "a")
+            try:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                held.close()
+                held = None
+                give_back()
+                print(f"rerun {args.job}: lock busy (the job is running now); not counted")
+                return 1
+        Path(job.log).parent.mkdir(parents=True, exist_ok=True)
+        logf = open(job.log, "ab")
         logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
                    .encode())
         logf.flush()
+        proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
+                                stderr=subprocess.STDOUT, start_new_session=True)
+    except OSError as e:
+        for fh in (held, logf):
+            if fh:
+                fh.close()
+        give_back()
+        print(f"rerun {args.job}: could not start ({e.__class__.__name__}); not counted")
+        return 1
+    try:
+        rc = proc.wait(timeout=job.timeout_s)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGTERM)
         try:
-            proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
-                                    stderr=subprocess.STDOUT, start_new_session=True)
-        except OSError as e:
-            if held:
-                held.close()
-            give_back()
-            print(f"rerun {args.job}: could not start ({e.__class__.__name__}); not counted")
-            return 1
-        try:
-            rc = proc.wait(timeout=job.timeout_s)
+            proc.wait(timeout=15)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                proc.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
-                proc.wait()
-            print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
-            return 124
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
+        print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
+        return 124
+    finally:
+        logf.close()
     if held:
         held.close()
     print(f"rerun {args.job}: rc={rc} log={job.log}")

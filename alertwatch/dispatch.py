@@ -47,15 +47,35 @@ _ALWAYS_DENY = [
 ]
 # act mode: the run edits only in its worktrees under the state dir, never in a
 # main checkout (cron runs from those).
-_ACT_DENY = ["Edit(~/projects/**)", "Write(~/projects/**)", "NotebookEdit(~/projects/**)"]
 # Neither mode may touch alert-watch's own records (the merge cap, run records,
 # its settings and switches) except through the helpers.
 _OWN_RECORDS = ["actions.jsonl", "state.json", "reruns.json", "session-settings.json", "mcp-empty.json",
                 "PAUSED", "ENABLED", "runs/"]
-_RECORD_DENY = [rule for name in _OWN_RECORDS for rule in (
-    f"Edit(~/.local/state/alert-watch/{name}{'**' if name.endswith('/') else ''})",
-    f"Write(~/.local/state/alert-watch/{name}{'**' if name.endswith('/') else ''})",
-    f"Bash(*alert-watch/{name}*)")]
+
+
+def _rule_path(path: Path) -> str:
+    """A path in Claude Code permission-rule form: ~/ for home, // for absolute
+    (a bare /path would be read relative to the settings file)."""
+    path = Path(path).expanduser().resolve()
+    try:
+        return "~/" + str(path.relative_to(Path.home().resolve()))
+    except ValueError:
+        return "/" + str(path)
+
+
+def _path_rules(cfg: Config) -> tuple[list[str], list[str]]:
+    """(record rules for both modes, act-mode rules), from the configured folders."""
+    state = _rule_path(cfg.state_dir)
+    records = []
+    for name in _OWN_RECORDS:
+        tail = f"{name}**" if name.endswith("/") else name
+        records += [f"Edit({state}/{tail})", f"Write({state}/{tail})",
+                    f"Bash(*{cfg.state_dir}/{name}*)", f"Bash(*{cfg.state_dir.name}/{name}*)"]
+    projects = _rule_path(cfg.projects_dir)
+    act = [f"Edit({projects}/**)", f"Write({projects}/**)", f"NotebookEdit({projects}/**)"]
+    return records, act
+
+
 # diagnose mode runs without --dangerously-skip-permissions: a headless run is
 # refused every tool call these rules do not allow. Read-only tools only.
 DIAGNOSE_ALLOW = [
@@ -85,8 +105,9 @@ def session_settings(cfg: Config) -> dict:
     and alert-watch on 2026-11-15, that `--settings` deny rules hold under
     --dangerously-skip-permissions."""
     deny = []
-    extra = _ACT_DENY if cfg.mode == "act" else _DIAGNOSE_DENY
-    for rule in [*DENY_RULES, *_ALWAYS_DENY, *_RECORD_DENY, *extra]:
+    records, act = _path_rules(cfg)
+    extra = act if cfg.mode == "act" else _DIAGNOSE_DENY
+    for rule in [*DENY_RULES, *_ALWAYS_DENY, *records, *extra]:
         if rule not in deny:
             deny.append(rule)
     return {"permissions": {"deny": deny}}
@@ -499,7 +520,9 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             reason = f"no readable result (rc={run['rc']})"
         record.update(status="failed", reason=reason,
                       stderr_tail=run["stderr"][-4000:], stdout_tail=run["stdout"][-4000:])
-        if not started(data) and not run["timed_out"]:
+        # Only a run that shows zero turns provably did nothing; no JSON at all may
+        # have acted before it died, so it is never replayed.
+        if data is not None and not started(data) and not run["timed_out"]:
             failed_ids = inbox.release(state, run_id, looks, count_attempt=True)
         else:
             inbox.finish(state, run_id, "failed")

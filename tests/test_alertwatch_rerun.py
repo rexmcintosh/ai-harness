@@ -109,3 +109,16 @@ def test_the_lock_is_held_while_the_job_runs(tmp_path):
     cmd = f"/usr/bin/flock -n {lock} true; echo $? > {probe}"
     assert rerun.main(["demo"], cfg=cfg_with(tmp_path, cmd, lock=str(lock))) == 0
     assert probe.read_text().strip() == "1"  # a cron copy started meanwhile would find it busy
+
+
+def test_every_failure_before_the_start_gives_the_rerun_back(tmp_path):
+    base = cfg_with(tmp_path, "true", lock=str(tmp_path / "job.lock"))
+    job = base.rerun["demo"]
+    blocker = tmp_path / "a-file"
+    blocker.write_text("x")
+    for bad in (dataclasses.replace(job, lock=str(tmp_path / "no-such-dir" / "job.lock")),  # lock open fails
+                dataclasses.replace(job, log=str(blocker / "job.log")),                     # log folder fails
+                dataclasses.replace(job, cwd=str(tmp_path / "missing"))):                   # spawn fails
+        cfg = dataclasses.replace(base, rerun={"demo": bad})
+        assert rerun.main(["demo"], cfg=cfg) == 1, bad
+    assert rerun.main(["demo"], cfg=base) == 0

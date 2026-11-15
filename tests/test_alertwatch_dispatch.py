@@ -35,6 +35,8 @@ if mode == "ok_quiet":
                                             for i in ids]})})
 if mode == "crash_early":
     sys.exit(1)
+if mode == "zero_turns":
+    out({"is_error": True, "num_turns": 0, "session_id": "sess-z", "result": "failed before any turn"}, 1)
 if mode == "crash_late":
     out({"is_error": True, "num_turns": 4, "session_id": "sess-late", "result": "error mid-way"}, 1)
 if mode == "garbage":
@@ -156,8 +158,17 @@ def test_quiet_result_sends_no_note(env, monkeypatch):
     assert sent(env) == []
 
 
-def test_crash_before_start_releases_with_attempt(env, monkeypatch):
+def test_crash_with_no_output_is_never_replayed(env, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "crash_early")
+    report(env)
+    go(env)
+    assert not list((env["state"] / "inbox").glob("*.json"))
+    assert list((env["state"] / "failed").iterdir())
+    assert runs(env)[0]["status"] == "failed"
+
+
+def test_crash_before_start_releases_with_attempt(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "zero_turns")
     report(env)
     go(env)
     (back,) = [json.loads(p.read_text()) for p in (env["state"] / "inbox").glob("*.json")]
@@ -168,7 +179,7 @@ def test_crash_before_start_releases_with_attempt(env, monkeypatch):
 
 
 def test_second_early_crash_moves_entry_to_failed(env, monkeypatch):
-    monkeypatch.setenv("FAKE_CLAUDE_MODE", "crash_early")
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "zero_turns")
     eid = report(env)
     go(env)
     go(env)
@@ -335,9 +346,10 @@ def test_act_mode_only_helpers_push_merge_and_kill(env):
     act = dataclasses.replace(env["cfg"], mode="act")
     deny = dispatch.session_settings(act)["permissions"]["deny"]
     assert "Edit" not in deny and "Write" not in deny
+    projects = dispatch._rule_path(act.projects_dir)
     for rule in ("Bash(git push*)", "Bash(git -C * push*)", "Bash(git merge*)", "Bash(git * revert*)",
                  "Bash(kill*)", "Bash(crontab*)", "Bash(systemctl*)", "Bash(sudo*)", "Read(**/.env)",
-                 "Bash(tg-send*)", "Edit(~/projects/**)", "Write(~/projects/**)"):
+                 "Bash(tg-send*)", f"Edit({projects}/**)", f"Write({projects}/**)"):
         assert rule in deny, rule
     assert not any("alertwatch.merge" in r or "alertwatch.restart" in r for r in deny)
     assert dispatch.permission_argv(act) == ["--dangerously-skip-permissions"]
@@ -507,11 +519,25 @@ def test_earlier_runs_text_cannot_fake_markers_or_placeholders(env):
 
 
 def test_the_run_cannot_touch_alert_watch_records(env):
+    state = env["cfg"].state_dir
+    rule_state = dispatch._rule_path(state)
     for mode in ("diagnose", "act"):
         deny = dispatch.session_settings(dataclasses.replace(env["cfg"], mode=mode))["permissions"]["deny"]
-        for rule in ("Bash(*alert-watch/actions.jsonl*)", "Write(~/.local/state/alert-watch/actions.jsonl)",
-                     "Edit(~/.local/state/alert-watch/runs/**)", "Bash(*alert-watch/PAUSED*)"):
+        for rule in (f"Bash(*{state}/actions.jsonl*)", f"Write({rule_state}/actions.jsonl)",
+                     f"Edit({rule_state}/runs/**)", f"Bash(*{state.name}/PAUSED*)"):
             assert rule in deny, (mode, rule)
+
+
+def test_rules_follow_the_configured_folders():
+    from alertwatch.config import load_config
+    default = load_config(env={})
+    deny = dispatch.session_settings(dataclasses.replace(default, mode="act"))["permissions"]["deny"]
+    assert "Edit(~/projects/**)" in deny and "Write(~/.local/state/alert-watch/actions.jsonl)" in deny
+    moved = dataclasses.replace(default, mode="act", projects_dir=Path("/srv/code"),
+                                state_dir=Path("/var/lib/aw"))
+    deny = dispatch.session_settings(moved)["permissions"]["deny"]
+    assert "Edit(//srv/code/**)" in deny and "Write(//var/lib/aw/actions.jsonl)" in deny
+    assert "Bash(*/var/lib/aw/actions.jsonl*)" in deny
 
 
 def test_a_check_due_after_a_long_pause_is_still_enqueued(env, monkeypatch):
