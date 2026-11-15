@@ -97,3 +97,12 @@ def test_replace_run_repairs_a_broken_record(tmp_path):
     (tmp_path / "runs" / "r1.json").write_text("{broken")
     ledger.replace_run(tmp_path, rec("r1", NOW, status="failed"))
     assert ledger.recent_runs(tmp_path, NOW, 1)[0]["status"] == "failed"
+
+
+def test_fail_streak_counts_only_after_the_reset_point(tmp_path):
+    inbox.ensure_dirs(tmp_path)
+    for i in range(3):
+        ledger.write_run(tmp_path, rec(f"r{i}", NOW - 100 + i, status="failed"))
+    assert ledger.fail_streak(tmp_path) == 3
+    assert ledger.fail_streak(tmp_path, since=NOW - 98.5) == 1
+    assert ledger.fail_streak(tmp_path, since=NOW) == 0

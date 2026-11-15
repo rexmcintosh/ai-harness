@@ -31,11 +31,26 @@ def ensure_dirs(state: Path) -> None:
         _mkdir700(Path(state) / sub)
 
 
+def _fsync_dir(folder: Path) -> None:
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def _write_json(path: Path, obj: dict) -> None:
     tmp = path.with_name(f".tmp-{path.name}")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(obj, fh, ensure_ascii=False)
+        fh.flush()
+        os.fsync(fh.fileno())
     os.replace(tmp, path)
 
 
@@ -144,6 +159,9 @@ def release(state: Path, run_id: str, entries: list[dict], *, count_attempt: boo
             failed_ids.append(out["id"])
         else:
             _write_json(state / "inbox" / name, out)
+    # The returned and failed copies are on disk for good before the batch goes.
+    _fsync_dir(state / "inbox")
+    _fsync_dir(state / "failed" / run_id)
     shutil.rmtree(state / "batch" / run_id, ignore_errors=True)
     return failed_ids
 

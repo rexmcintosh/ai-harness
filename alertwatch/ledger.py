@@ -100,9 +100,13 @@ def counts(state: Path, now: float) -> dict:
     }
 
 
-def fail_streak(state: Path) -> int:
+def fail_streak(state: Path, since: float = 0.0) -> int:
+    """Failed runs in a row, newest first, started after `since` (the last self-pause:
+    resuming means those failures were seen, so they must not pause it again)."""
     streak = 0
     for r in _all_runs(state):
+        if float(r["started_at"]) <= since:
+            break
         status = r.get("status")
         if status == "failed":
             streak += 1

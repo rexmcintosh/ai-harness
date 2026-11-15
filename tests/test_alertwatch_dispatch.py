@@ -873,3 +873,32 @@ def test_records_and_state_are_fsynced_before_their_rename(env, monkeypatch):
     synced.clear()
     dispatch._save_state(env["state"], {"a": 1})
     assert len(synced) >= 2
+
+
+def test_pause_then_resume_then_a_new_run(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "crash_late")
+    for _ in range(3):
+        report(env)
+        go(env)
+    assert (env["state"] / "PAUSED").exists()
+    (env["state"] / "PAUSED").unlink()  # Rex resumes
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok")
+    env["prompt.txt"].unlink()
+    report(env)
+    go(env)
+    assert not (env["state"] / "PAUSED").exists()
+    assert env["prompt.txt"].exists() and runs(env)[0]["status"] == "ok"
+
+
+def test_the_reset_point_survives_a_crash_before_state_is_saved(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "crash_late")
+    for _ in range(3):
+        report(env)
+        go(env)
+    st = json.loads((env["state"] / "state.json").read_text())
+    st.pop("streak_reset_at")  # as if state.json was not saved after PAUSED was written
+    (env["state"] / "state.json").write_text(json.dumps(st))
+    go(env)  # still paused: copies the reset point from PAUSED
+    (env["state"] / "PAUSED").unlink()
+    go(env)
+    assert not (env["state"] / "PAUSED").exists()

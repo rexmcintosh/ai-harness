@@ -511,16 +511,42 @@ def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
         item = _queue_note(cfg, st, run_id, text)
         inbox.finish(state, run_id, "failed")
         _deliver(cfg, st, item, now)
-        if ledger.fail_streak(state) >= cfg.fail_streak_pause and not (state / "PAUSED").exists():
+        if _streak(cfg, st) >= cfg.fail_streak_pause and not (state / "PAUSED").exists():
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", now)
     _log(now, f"batch {run_id} was left by a dispatcher that stopped; finished as {dest or 'failed'}")
     return True
 
 
+def _streak(cfg: Config, st: dict) -> int:
+    return ledger.fail_streak(cfg.state_dir, since=float(st.get("streak_reset_at") or 0))
+
+
 def _pause(cfg: Config, st: dict, reason: str, now: float) -> None:
-    (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\n", encoding="utf-8")
+    """Pause, and set the streak's reset point to now: deleting PAUSED resumes, and the
+    failures that caused this pause never count again. The reset point is also in the
+    PAUSED file, so a crash before state.json is saved still keeps it."""
+    (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\nstreak_reset_at={now}\n", encoding="utf-8")
+    st["streak_reset_at"] = now
+    _save_state(cfg.state_dir, st)
     _send_note(cfg, st, "", notes.pause_note(reason, cfg.state_dir))
     _log(now, f"paused: {reason}")
+
+
+def _sync_pause_marker(cfg: Config, st: dict) -> None:
+    """Copy a self-pause's reset point from the PAUSED file into state.json."""
+    try:
+        text = (cfg.state_dir / "PAUSED").read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        if line.startswith("streak_reset_at="):
+            try:
+                value = float(line.split("=", 1)[1])
+            except ValueError:
+                return
+            if float(st.get("streak_reset_at") or 0) < value:
+                st["streak_reset_at"] = value
+                _save_state(cfg.state_dir, st)
 
 
 def main(argv: list[str] | None = None, *, now: Callable[[], float] = time.time,
@@ -559,8 +585,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             retry_notes(cfg, st, t)
     # Before any new run: a crash between a third failure and its pause must not let
     # the next pass carry on.
-    if not dry_run and not (state / "PAUSED").exists() and ledger.fail_streak(state) >= cfg.fail_streak_pause:
-        _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
+    if not dry_run:
+        _sync_pause_marker(cfg, st)
+        if not (state / "PAUSED").exists() and _streak(cfg, st) >= cfg.fail_streak_pause:
+            _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", t)
     if (state / "PAUSED").exists():
         return 0
     if float(st.get("limit_until") or 0) > t:
@@ -688,7 +716,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
 
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
     _log(ended, f"{run_id}: {record['status']} {record['reason']}".rstrip())
-    if record["status"] == "failed" and ledger.fail_streak(state) >= cfg.fail_streak_pause:
+    if record["status"] == "failed" and _streak(cfg, st) >= cfg.fail_streak_pause:
         _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", ended)
     inbox.prune(state, ended)
     _save_state(state, st)

@@ -52,6 +52,7 @@ the reason when one fails.
 
 Pause: `touch ~/.local/state/alert-watch/PAUSED`. Start again: delete the file.
 The dispatcher pauses itself after 3 failed runs in a row and says so in Telegram.
+Deleting `PAUSED` resumes it: the failures that caused the pause do not count again.
 Capture off for one command: `ALERT_INBOX_DIR=off`.
 
 ## Rollout
