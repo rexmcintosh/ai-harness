@@ -343,7 +343,10 @@ def _parse_due(value) -> float | None:
         return None
     if when.tzinfo is None:
         return None
-    return when.timestamp()
+    try:
+        return when.timestamp()
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
@@ -620,11 +623,11 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             if p.name.startswith("."):
                 continue
             try:
-                entry = json.loads(p.read_text(encoding="utf-8"))
-                chat = str(entry.get("chat_id") or "")
-                if chat and chat not in cfg.watch_chats:
-                    print(p.name, "other-chat (not shown; deleted on the next pass)")
+                kind = inbox._eligibility(p, cfg.watch_chats)  # the same rule as claiming
+                if kind != "watched":
+                    print(p.name, f"{kind} chat (text not shown)")
                     continue
+                entry = json.loads(p.read_text(encoding="utf-8"))
                 print(p.name, *classify(entry, rules), _first_line(entry.get("text", "")))
             except (OSError, ValueError):
                 print(p.name, "unreadable")
@@ -643,10 +646,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         noted = set(st.get("unknown_noted") or [])
         fresh = [p for p in stale if p.name not in noted]
         if fresh:
+            # the noted names and the queued note are saved in the same state write
+            st["unknown_noted"] = sorted(noted | {p.name for p in fresh})[-500:]
             item = _queue_note(cfg, st, "", notes.broken_note(
                 "inbox", [(p.name, "its chat could not be proven for an hour; deleted") for p in fresh], state))
-            st["unknown_noted"] = sorted(noted | {p.name for p in fresh})[-500:]
-            _save_state(state, st)
         for p in stale:
             try:
                 p.unlink()

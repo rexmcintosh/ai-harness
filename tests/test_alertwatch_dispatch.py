@@ -1127,3 +1127,35 @@ def test_retention_runs_on_an_idle_pass(env):
     ledger.write_run(env["state"], {"run_id": "ancient", "started_at": time.time() - 40 * 86400, "status": "ok"})
     go(env)  # nothing in the inbox, no run
     assert not (env["state"] / "runs" / "ancient.json").exists()
+
+
+def test_dry_run_shows_no_text_for_an_unproven_chat(env, capsys):
+    for i, extra in enumerate(({}, {"chat_id": None}, {"chat_id": ""})):
+        _raw_report(env, {"version": 1, "id": f"dry{i}", "text": f"PRIVATE-DRYNOCHAT-{i}", "source": "x", **extra})
+    dispatch.main(["--dry-run"], cfg=env["cfg"])
+    out = capsys.readouterr().out
+    assert "PRIVATE-DRYNOCHAT" not in out and "unknown chat" in out
+
+
+def test_a_stale_unknown_note_is_sent_once_after_a_crash(env, monkeypatch):
+    p = _raw_report(env, {"version": 1, "id": "once-nochat", "text": "x", "source": "y"})
+    old = time.time() - 7200
+    os.utime(p, (old, old))
+    real = dispatch.inbox.Path.unlink
+
+    def crash_on_delete(self, *a, **k):
+        if self.name == "once-nochat.json":
+            raise KeyboardInterrupt
+        return real(self, *a, **k)
+    monkeypatch.setattr(dispatch.inbox.Path, "unlink", crash_on_delete)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    monkeypatch.setattr(dispatch.inbox.Path, "unlink", real)
+    go(env)
+    assert sum("once-nochat" in n["text"] for n in sent(env)) == 1
+
+
+def test_an_out_of_range_due_time_does_not_break_the_scan():
+    for value in ("9999-12-31T23:59:59-14:00", "0001-01-01T00:00:00+14:00"):
+        got = dispatch._parse_due(value)  # never raises
+        assert got is None or isinstance(got, float)
