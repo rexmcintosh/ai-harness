@@ -1177,3 +1177,11 @@ def test_the_noted_list_keeps_only_files_still_in_the_inbox(env):
         os.utime(p, (old, old))
     go(env)
     assert json.loads((env["state"] / "state.json").read_text())["unknown_noted"] == []
+
+
+def test_a_check_from_a_run_older_than_thirty_days_is_still_enqueued(env):
+    inbox.ensure_dirs(env["state"])
+    ledger.write_run(env["state"], {"run_id": "ancient-check", "started_at": time.time() - 45 * 86400,
+                                    "status": "ok", "result": {"pending_checks": [
+                                        {"repo": "splash_poller", "due_at": "2020-01-01T00:00:00Z", "what": "x"}]}})
+    assert dispatch.enqueue_due_checks(env["cfg"], {}, time.time()) == 1

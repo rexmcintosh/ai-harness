@@ -458,7 +458,8 @@ remaining paths, each with a test and, for permissions, a real run:
   records are fsynced.
 - **Merges.** Every pushed commit is checked against the denied paths (merge
   commits against each parent, renames both ways), and branches must be a straight
-  line so a revert always applies. Restarts are journaled before the signal, and
+  line so their commits can be reverted (a revert that conflicts with a later change
+  is refused and goes to Rex). Restarts are journaled before the signal, and
   a rerun's job keeps the cron lock if the helper dies.
 
 Round 24 approved the diagnose-mode rollout. The gates before `mode = "act"` stay:

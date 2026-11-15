@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 REPORT_MAX = 4000
 CHECK_SOURCE = "alert-watch-check"
 CHECK_MAX_DELAY_S = 24 * 3600
-CHECK_LOOKBACK_H = 30 * 24
+CHECK_LOOKBACK_H = 3650 * 24  # every retained run: a run with an unenqueued check is never pruned
 PIPE_DRAIN_S = 10
 BATCH_MAX = 20  # reports per run (each cut to REPORT_MAX); the rest wait for the next pass
 VERDICTS = ("fixed", "live_step", "needs_rex", "not_a_failure", "same_as_run")
@@ -354,7 +354,7 @@ def enqueue_due_checks(cfg: Config, st: dict, now: float) -> int:
     (check-<run>-<n>), so a crash before state.json is saved cannot enqueue it twice."""
     done = st.setdefault("checks_enqueued", [])
     added = 0
-    # Every run kept (batches are pruned at 30 days), so a long pause loses no check.
+    # Every retained run, so a check survives a pause of any length.
     for rec in ledger.recent_runs(cfg.state_dir, now, CHECK_LOOKBACK_H):
         result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
         for i, chk in enumerate(result.get("pending_checks") or []):

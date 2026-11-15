@@ -191,7 +191,7 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
     if bad:
         raise Refused(f"the diff touches denied paths: {', '.join(bad)}")
     if _git(repo, "rev-list", "--merges", f"{base}..{head}"):
-        raise Refused("the branch has merge commits; rebase it to a straight line, so a revert always applies")
+        raise Refused("the branch has merge commits; rebase it to a straight line, so its commits can be reverted")
     made = ledger.merges_in_window(cfg.state_dir, now)
     if made >= cfg.max_merges_day:
         raise Refused(f"{made} merges in the last 24 hours (limit {cfg.max_merges_day})")
