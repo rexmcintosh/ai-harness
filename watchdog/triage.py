@@ -211,6 +211,21 @@ def check_log_coverage(found: list[str], missing: list[str]) -> CheckStatus:
     return CheckStatus("cron-logs:coverage", "ok", f"{len(found)} cron log(s) read{note}")
 
 
+def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_status: str | None,
+                     *, max_age_s: int = 1200) -> CheckStatus:
+    """alert-watch turns captured Telegram reports into fix runs. Warn when its inbox
+    stops moving or its newest run failed. A paused watcher is a choice, not a fault
+    (it sends its own note when it pauses itself). A usage-limit run is not a failure."""
+    if paused:
+        return CheckStatus("alertwatch", "ok", "alert-watch is paused")
+    if newest_run_status == "failed":
+        return CheckStatus("alertwatch", "warn", "alert-watch: the newest run failed; see its runs/ record")
+    if oldest_inbox_age_s is not None and oldest_inbox_age_s > max_age_s:
+        return CheckStatus("alertwatch", "warn",
+                           f"alert-watch: a report has waited {int(oldest_inbox_age_s // 60)} min in the inbox")
+    return CheckStatus("alertwatch", "ok", "alert-watch inbox moving")
+
+
 def _iso_epoch(ts: str | None) -> float | None:
     if not ts:
         return None

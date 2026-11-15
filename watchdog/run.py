@@ -21,6 +21,7 @@ import tomllib
 from .triage import (
     CheckStatus,
     LEVELS,
+    check_alertwatch,
     check_bebop_runs,
     check_cron_log,
     check_disk,
@@ -317,6 +318,23 @@ def collect_metrics(now_epoch: int, prior_metrics: dict) -> tuple[list[CheckStat
     return out, new_metrics
 
 
+def alertwatch_status(now_epoch: float) -> CheckStatus | None:
+    """The alert-watch check, or None when alert-watch is not installed on this host."""
+    state = Path(os.environ.get("ALERT_WATCH_STATE")
+                 or Path.home() / ".local" / "state" / "alert-watch")
+    if not state.is_dir():
+        return None
+    try:
+        from alertwatch import inbox as aw_inbox, ledger as aw_ledger
+        counted = [r for r in aw_ledger.recent_runs(state, now_epoch, 24 * 7)
+                   if r.get("status") != "skipped"]
+        return check_alertwatch(aw_inbox.oldest_age_s(state, now_epoch),
+                                (state / "PAUSED").exists(),
+                                counted[0].get("status") if counted else None)
+    except Exception as e:  # a broken alert-watch must not blind the watchdog
+        return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
+
+
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:
     """Gather every signal into normalized statuses. Returns (statuses, new_metrics).
     Missing optional signals are skipped (not invented as failures)."""
@@ -342,6 +360,10 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
         found.append(label)
         out.append(check_cron_log(label, text))
     out.append(check_log_coverage(found, missing))
+
+    alertwatch = alertwatch_status(now_epoch)
+    if alertwatch is not None:
+        out.append(alertwatch)
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)
