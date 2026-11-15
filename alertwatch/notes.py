@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import subprocess
+from pathlib import Path
 
 QUIET_VERDICTS = ("not_a_failure", "same_as_run")
 
@@ -40,10 +41,15 @@ def failure_note(record: dict, failed_ids: list[str]) -> str:
     return "\n".join(lines)
 
 
-def broken_note(run_id: str, broken: list) -> str:
+def _where(state_dir) -> str:
+    home, s = str(Path.home()), str(state_dir)
+    return "~" + s[len(home):] if s == home or s.startswith(home + "/") else s
+
+
+def broken_note(run_id: str, broken: list, state_dir) -> str:
     names = ", ".join(str(name) for name, _ in broken[:5]) + (" and more" if len(broken) > 5 else "")
     return (f"alert-watch: {len(broken)} captured report(s) could not be read and were not handled "
-            f"(run {run_id}): {names}. They are in ~/.local/state/alert-watch/failed/{run_id}/.")
+            f"(run {run_id}): {names}. They are in {_where(state_dir)}/failed/{run_id}/.")
 
 
 def cap_note(cap: str, value: int, limit: int) -> str:
@@ -63,9 +69,9 @@ def limit_note(until_epoch: float, *, part_way: bool = False) -> str:
             f"Reports wait in the inbox. It starts again after {when}.")
 
 
-def pause_note(reason: str) -> str:
+def pause_note(reason: str, state_dir) -> str:
     return (f"alert-watch paused itself: {reason}. "
-            "Remove ~/.local/state/alert-watch/PAUSED to start it again.")
+            f"Remove {_where(state_dir)}/PAUSED to start it again.")
 
 
 def send(cfg, text: str) -> str:

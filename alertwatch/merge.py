@@ -164,7 +164,8 @@ def do_merge(cfg: Config, name: str, worktree: str, now: float) -> dict:
     files = [f for f in _git(repo, "diff", "--name-only", f"{base}...{head}").splitlines() if f]
     untracked = {line[3:] for line in _git(repo, "status", "--porcelain", "--untracked-files=all").splitlines()
                  if line.startswith("?? ")}
-    blocking = sorted(set(files) & untracked)
+    blocking = sorted({u for u in untracked for f in files
+                       if u == f or f.startswith(u.rstrip("/") + "/") or u.startswith(f + "/")})
     if blocking:  # they would stop the local fast forward after the push
         raise Refused(f"untracked files in {repo} are in the way: {', '.join(blocking)}")
     bad = denied(files, cfg.denied_paths)

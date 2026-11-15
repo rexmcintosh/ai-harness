@@ -97,14 +97,31 @@ def fail_streak(state: Path) -> int:
 # "which writers did alert-watch restart".
 
 
+def fsync_dir(folder: Path) -> None:
+    """Make a new or renamed file's directory entry durable."""
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def append_action(state: Path, action: dict) -> None:
     path = Path(state) / "actions.jsonl"
+    new = not path.exists()
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(fd, "a", encoding="utf-8") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
         fh.write(json.dumps(action, ensure_ascii=False) + "\n")
         fh.flush()
         os.fsync(fh.fileno())
+    if new:
+        fsync_dir(Path(state))
 
 
 def actions(state: Path) -> list[dict]:

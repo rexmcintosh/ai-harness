@@ -103,9 +103,10 @@ any job ──> bin/tg-send ──> Telegram (unchanged)
   file in the same folder and renames it, so the dispatcher never reads half a file.
   The folder and files are mode 700 and 600.
 - Fields: `version` (1), `id`, `captured_at` (UTC), `chat_id`, `text`, `source`,
-  `cwd`. `source` is `$ALERT_SOURCE` when the caller sets it, else the parent
-  process command line (for example `python3 coverage_check.py`). This tells the
-  rules and the run which job spoke.
+  `cwd`. `source` is `$ALERT_SOURCE` when the caller sets it, else the names of up
+  to 4 parent processes and their scripts, never their argument values (they can
+  hold secrets), for example `python3 coverage_check.py < sh coverage_check.py`.
+  This tells the rules and the run which job spoke.
 - Capture is best effort. Any capture error prints one line to stderr and the send
   goes on exactly as before. Exit codes and stdout do not change.
 - `ALERT_INBOX_DIR` overrides the folder. `ALERT_INBOX_DIR=off` turns capture off.
@@ -421,3 +422,17 @@ Still policy, not enforced by code (a gate for Rex before `mode = "act"`): the r
 holds the normal database key behind `MEETTRACK_DB_READ_ONLY`, and in act mode a
 shell command can still change files. A read-only database key for the run, or an
 OS sandbox, would close these.
+
+### Later review rounds (2026-11-15)
+
+Rounds 2 to 7 hardened the same parts. Merges and reverts write an intent to
+`actions.jsonl` before any push, are settled against origin (yes, no or unknown;
+only a definite no abandons one) in every repository before any other check, and a
+revert is built in a temporary worktree so the main checkout moves only after the
+push. Restarts pin the writer with a pidfd and check that its own `--meet-url` or
+`--sr-meet-id` is the requested meet. Failed notes are retried, also while paused;
+uncertain or dropped ones make the watchdog warn. A run is replayed only when its
+JSON shows zero turns. Deny rules are built from the configured folders and also
+protect alert-watch's own records. Capture records process and script names only.
+A real diagnose run on Claude Code 2.1.317 refused `;`, `&&`, `>`, `| tee` and
+`$(...)` forms of allowed commands.

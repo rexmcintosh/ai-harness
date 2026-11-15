@@ -148,3 +148,27 @@ def test_two_messages_get_two_files(tmp_path):
     assert _send(env, text="one").returncode == 0
     assert _send(env, text="two").returncode == 0
     assert sorted(e["text"] for e in _entries(tmp_path / "inbox")) == ["one", "two"]
+
+
+def test_source_keeps_names_but_never_argument_values(tmp_path):
+    job = tmp_path / "fake-job.sh"
+    job.write_text(f"#!/usr/bin/env bash\n'{SCRIPT}' 123 'from the job'\n")
+    job.chmod(0o755)
+    env, _ = _env(tmp_path, ACCEPTED)
+    result = _send(env, argv=["bash", str(job), "--token", "SECRET-abc123", "chat=999"])
+    assert result.returncode == 0
+    source = _entries(tmp_path / "inbox")[0]["source"]
+    assert "fake-job.sh" in source
+    assert "SECRET" not in source and "abc123" not in source and "999" not in source
+
+
+def test_source_from_a_cron_style_sh_c_line(tmp_path):
+    job = tmp_path / "coverage_check.py"
+    job.write_text(f"import subprocess\nsubprocess.run([{str(SCRIPT)!r}, '123', 'gap'])\n")
+    env, _ = _env(tmp_path, ACCEPTED)
+    line = f"cd {tmp_path} && TOKEN=hidden python3 coverage_check.py --key s3cr3t >> log 2>&1"
+    result = _send(env, argv=["/bin/sh", "-c", line])
+    assert result.returncode == 0
+    source = _entries(tmp_path / "inbox")[0]["source"]
+    assert source.startswith("python3 coverage_check.py < sh coverage_check.py")
+    assert "hidden" not in source and "s3cr3t" not in source

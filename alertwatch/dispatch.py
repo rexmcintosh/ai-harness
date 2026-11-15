@@ -283,6 +283,7 @@ def _save_state(state: Path, st: dict) -> None:
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(st, fh, indent=1)
     os.replace(tmp, path)
+    ledger.fsync_dir(state)
 
 
 def _parse_due(value) -> float | None:
@@ -387,7 +388,7 @@ def retry_notes(cfg: Config, st: dict, now: float) -> None:
 
 def _pause(cfg: Config, st: dict, reason: str, now: float) -> None:
     (cfg.state_dir / "PAUSED").write_text(f"{_iso(now)} {reason}\n", encoding="utf-8")
-    _send_note(cfg, st, "", notes.pause_note(reason))
+    _send_note(cfg, st, "", notes.pause_note(reason, cfg.state_dir))
     _log(now, f"paused: {reason}")
 
 
@@ -453,7 +454,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     for name, reason in broken:
         _log(t, f"{run_id}: broken inbox file {name}: {reason}")
     if broken:
-        _send_note(cfg, st, run_id, notes.broken_note(run_id, broken))
+        _send_note(cfg, st, run_id, notes.broken_note(run_id, broken, state))
     if not entries and not broken:
         _save_state(state, st)
         return 0

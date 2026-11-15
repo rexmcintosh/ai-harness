@@ -350,3 +350,17 @@ def test_a_failed_push_with_origin_unreadable_leaves_the_intent_open(world, monk
     assert run(world, "merge", "repo", str(wt)) == 1
     assert "unknown, needs Rex" in capsys.readouterr().err
     assert [a["kind"] for a in ledger.actions(world["state"])] == ["merge_intent"]
+
+
+def test_untracked_parent_or_child_in_the_way_is_refused_before_the_push(world):
+    before = git(world["origin"], "rev-parse", "main")
+    wt = fix_worktree(world, change=("pkg/mod.py", "y = 1\n"))
+    (world["repo"] / "pkg").write_text("an untracked file where the merge needs a folder\n")
+    assert run(world, "merge", "repo", str(wt)) == 2
+    (world["repo"] / "pkg").unlink()
+    wt2 = fix_worktree(world, name="alertwatch/run-test-two", change=("tool", "a file\n"))
+    (world["repo"] / "tool").mkdir()
+    (world["repo"] / "tool" / "note.txt").write_text("untracked, where the merge needs a file\n")
+    assert run(world, "merge", "repo", str(wt2)) == 2
+    assert git(world["origin"], "rev-parse", "main") == before
+    assert ledger.actions(world["state"]) == []

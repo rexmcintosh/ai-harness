@@ -49,7 +49,18 @@ def test_usage_limit_without_epoch():
 
 
 def test_usage_limit_from_stderr_only():
-    assert usage_limit(None, "", "Error: usage limit reached")[0] is True
+    assert usage_limit(None, "", "Error: Claude AI usage limit reached")[0] is True
+
+
+def test_other_limits_are_not_a_claude_usage_limit():
+    for text in ("hit your API limit", "You've hit your API limit", "Telegram rate limit 429",
+                 "limit reached for retries"):
+        assert usage_limit({"is_error": True, "result": text}, "", "") == (False, None), text
+
+
+def test_limit_text_in_a_good_run_or_on_stdout_is_ignored():
+    assert usage_limit({"is_error": False, "result": "Claude AI usage limit reached|1"}, "", "")[0] is False
+    assert usage_limit(None, "the report said: You've hit your limit", "")[0] is False
 
 
 def test_no_usage_limit_on_a_good_run():

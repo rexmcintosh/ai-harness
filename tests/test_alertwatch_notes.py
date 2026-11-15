@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 from alertwatch import notes
 from alertwatch.config import load_config
@@ -41,9 +42,14 @@ def test_failure_note_names_failed_entries_and_run():
 
 
 def test_pause_note_exact_copy():
-    assert notes.pause_note("3 failed runs in a row") == (
+    assert notes.pause_note("3 failed runs in a row", Path.home() / ".local/state/alert-watch") == (
         "alert-watch paused itself: 3 failed runs in a row. "
         "Remove ~/.local/state/alert-watch/PAUSED to start it again.")
+
+
+def test_notes_name_the_configured_state_folder():
+    assert "Remove /srv/aw/PAUSED" in notes.pause_note("x", Path("/srv/aw"))
+    assert "/srv/aw/failed/r1/" in notes.broken_note("r1", [("a.json", "bad")], Path("/srv/aw"))
 
 
 def test_notes_have_no_em_dash():
@@ -52,7 +58,8 @@ def test_notes_have_no_em_dash():
         notes.failure_note({"run_id": "r", "reason": "x", "session_id": ""}, []),
         notes.cap_note("runs_hour", 6, 6),
         notes.limit_note(1794738000.0),
-        notes.pause_note("x"),
+        notes.pause_note("x", Path("/srv/aw")),
+        notes.broken_note("r", [("a.json", "bad")], Path("/srv/aw")),
     ]
     assert all("\u2014" not in t for t in texts)
 

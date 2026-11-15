@@ -15,11 +15,68 @@ if [ $# -gt 0 ] && [ "${1}" != "-" ]; then TEXT="$1"; else TEXT="$(cat)"; fi
 # a failure report is kept even when Telegram or the token is down. Best effort:
 # a capture error prints one line and the send goes on exactly as before.
 # Inbox: ALERT_INBOX_DIR, default ~/.local/state/alert-watch/inbox; "off" disables.
-# Source: ALERT_SOURCE, else up to 4 parent command lines (the job that spoke).
+# Source: ALERT_SOURCE, else the names (never the arguments) of up to 4 parent
+# processes and their scripts, e.g. "python3 coverage_check.py < sh coverage_check.py".
 read -r -d '' CAPTURE_PY <<'PY'
-import datetime as dt, json, os, secrets, sys
-inbox, chat, source, cwd = sys.argv[1:5]
+import datetime as dt, json, os, re, secrets, shlex, sys
+inbox, chat, source, cwd, ppid = sys.argv[1:6]
 text = sys.stdin.buffer.read().decode("utf-8", "replace")
+
+SCRIPT = re.compile(r"[\w.+-]+\.(?:py|sh|ts|js|mjs|cjs|rb|pl)$")
+INTERP = re.compile(r"(?:python[\d.]*|bash|sh|dash|zsh|node|ruby|perl)$")
+NAME = re.compile(r"[\w.+:-]{1,80}")
+
+
+def names(argv):
+    """Executable and script names only, never argument values (they can hold secrets)."""
+    if not argv:
+        return ""
+    first, rest = os.path.basename(argv[0]), argv[1:]
+    out = [first]
+    if INTERP.fullmatch(first):
+        if "-c" in rest:  # sh -c / python -c: the script names inside the command string
+            i = rest.index("-c")
+            body = rest[i + 1] if i + 1 < len(rest) else ""
+            try:
+                tokens = shlex.split(body)
+            except ValueError:
+                tokens = body.split()
+            out += [os.path.basename(t) for t in tokens if SCRIPT.search(os.path.basename(t))]
+        elif "-m" in rest:
+            i = rest.index("-m")
+            if i + 1 < len(rest):
+                out.append(rest[i + 1])
+        else:
+            script = next((a for a in rest if not a.startswith("-")), None)
+            if script:
+                out.append(os.path.basename(script))
+            out += [os.path.basename(a) for a in rest if SCRIPT.search(os.path.basename(a))]
+    kept = []
+    for n in out:
+        if NAME.fullmatch(n) and n not in kept:
+            kept.append(n)
+    return " ".join(kept[:4])
+
+
+def ancestry(pid):
+    parts = []
+    for _ in range(4):
+        if pid <= 1:
+            break
+        try:
+            argv = open(f"/proc/{pid}/cmdline", "rb").read().decode("utf-8", "replace").split("\0")
+            stat = open(f"/proc/{pid}/stat").read()
+        except OSError:
+            break
+        label = names([a for a in argv if a != ""])
+        if label:
+            parts.append(label)
+        pid = int(stat.rsplit(")", 1)[1].split()[1])
+    return " < ".join(parts)
+
+
+if not source:
+    source = ancestry(int(ppid))
 parent = os.path.dirname(os.path.abspath(inbox))
 os.makedirs(os.path.dirname(parent), exist_ok=True)
 for d in (parent, inbox):
@@ -40,19 +97,10 @@ os.replace(tmp, os.path.join(inbox, f"{eid}.json"))
 PY
 
 capture_message() {
-  local inbox="${ALERT_INBOX_DIR:-$HOME/.local/state/alert-watch/inbox}" source="${ALERT_SOURCE:-}"
-  local pid="$PPID" n=0 args err
+  local inbox="${ALERT_INBOX_DIR:-$HOME/.local/state/alert-watch/inbox}" err
   [ "$inbox" = "off" ] && return 0
-  if [ -z "$source" ]; then
-    while [ -n "$pid" ] && [ "$pid" -gt 1 ] 2>/dev/null && [ "$n" -lt 4 ]; do
-      args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
-      args="${args% }"
-      [ -n "$args" ] && source="${source:+$source < }$args"
-      pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
-      n=$((n + 1))
-    done
-  fi
-  if ! err="$(printf '%s' "$TEXT" | timeout 5 python3 -c "$CAPTURE_PY" "$inbox" "$CHAT_ID" "$source" "$PWD" 2>&1)"; then
+  if ! err="$(printf '%s' "$TEXT" | timeout 5 python3 -c "$CAPTURE_PY" "$inbox" "$CHAT_ID" \
+                "${ALERT_SOURCE:-}" "$PWD" "$PPID" 2>&1)"; then
     err="${err##*$'\n'}"
     echo "tg-send: capture failed (${err:-timed out}); sending anyway" >&2
   fi
