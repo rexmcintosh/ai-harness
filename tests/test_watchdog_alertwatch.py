@@ -85,3 +85,14 @@ def test_a_dropped_note_warns_for_a_day(tmp_path, monkeypatch):
 def test_a_lost_pause_note_warns_even_while_paused():
     s = check_alertwatch(None, paused=True, newest_run_status="failed", note_status="failed")
     assert s.level == "warn" and "paused" in s.summary
+
+
+def test_an_unsure_note_on_an_earlier_run_still_warns(tmp_path, monkeypatch):
+    state = tmp_path / "state"
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
+    inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
+    now = time.time()
+    ledger.write_run(state, {"run_id": "a", "started_at": now - 600, "status": "ok", "note_status": "uncertain"})
+    ledger.write_run(state, {"run_id": "b", "started_at": now - 60, "status": "ok", "note_status": "accepted"})
+    assert run.alertwatch_status(now).level == "warn"

@@ -45,6 +45,11 @@ _ALWAYS_DENY = [
     "Bash(git merge*)", "Bash(git * merge*)", "Bash(git revert*)", "Bash(git * revert*)",
     "Bash(git reset --hard*)", "Bash(git * reset --hard*)",
     "Read(**/.env)", "Read(**/.env.*)", "Bash(*/.env*)", "Bash(* .env*)",
+    "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.claude/channels/**)", "Read(~/.claude/.credentials*)",
+    "Read(~/.config/gh/**)", "Read(~/.git-credentials)", "Read(**/*.pem)", "Read(**/*.key)",
+    "Read(**/*credentials*)", "Read(**/*secret*)",
+    "Bash(*.ssh/*)", "Bash(*.gnupg*)", "Bash(*channels/telegram*)", "Bash(*.credentials*)",
+    "Bash(*git-credentials*)", "Bash(*.pem*)", "Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*config/gh*)",
 ]
 # act mode: the run edits only in its worktrees under the state dir, never in a
 # main checkout (cron runs from those).
@@ -406,7 +411,8 @@ def _deliver(cfg: Config, st: dict, item: dict, now: float) -> str:
     else:
         if status == "failed":
             _log(now, f"note for {item.get('run_id')} dropped after {NOTE_TRIES} failed sends")
-            st["note_dropped_at"] = now  # the watchdog check reads this
+        if status != "accepted":
+            st["note_dropped_at"] = now  # dropped or uncertain: the watchdog warns for a day
         st["unsent_notes"] = [n for n in st["unsent_notes"] if n is not item]
     _save_state(cfg.state_dir, st)
     if item.get("run_id"):
@@ -461,6 +467,9 @@ def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
     state = cfg.state_dir
     rec = _read_run(state, run_id) or {}
     dest = rec.get("dest")
+    if dest and rec.get("note_status") == "queued" and rec.get("note_text") and not any(
+            n.get("run_id") == run_id for n in st.get("unsent_notes") or []):
+        _queue_note(cfg, st, run_id, rec["note_text"])  # retry_notes sends it this pass
     if dest in ("done", "failed"):
         inbox.finish(state, run_id, dest)
     elif dest in ("release", "release_count"):
@@ -626,10 +635,13 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             st["limit_noted_until"] = until
     else:
         text = notes.failure_note(record, failed_ids)
+    # One atomic write holds the decision, the result and the note. The outbox entry
+    # comes after it; a crash between them is repaired by _recover_batch, which
+    # re-queues a note the record marks queued but the outbox lacks.
     record["note_text"] = text
-    item = _queue_note(cfg, st, run_id, text) if text else None
     record["note_status"] = "queued" if text else "none"
     ledger.update_run(state, run_id, **{k: v for k, v in record.items() if k != "run_id"})
+    item = _queue_note(cfg, st, run_id, text) if text else None
 
     if record["dest"] in ("done", "failed"):
         inbox.finish(state, run_id, record["dest"])

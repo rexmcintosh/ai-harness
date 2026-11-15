@@ -330,7 +330,9 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
         from alertwatch import inbox as aw_inbox, ledger as aw_ledger
         counted = [r for r in aw_ledger.recent_runs(state, now_epoch, 24 * 7)
                    if r.get("status") != "skipped"]
-        note = counted[0].get("note_status") if counted else None
+        unsure = [r for r in counted if float(r["started_at"]) >= now_epoch - 86400
+                  and r.get("note_status") in ("failed", "uncertain")]
+        note = unsure[0].get("note_status") if unsure else None
         try:
             dropped = float(json.loads((state / "state.json").read_text()).get("note_dropped_at") or 0)
         except (OSError, ValueError):

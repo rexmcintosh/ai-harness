@@ -719,3 +719,37 @@ def test_git_config_overrides_are_denied_in_diagnose(env):
     deny = dispatch.session_settings(env["cfg"])["permissions"]["deny"]
     for rule in ("Bash(git* -c*)", "Bash(git*--config-env*)", "Bash(*GIT_CONFIG*)"):
         assert rule in deny
+
+
+def test_a_crash_between_the_record_and_the_outbox_sends_only_the_real_note(env, monkeypatch):
+    real_queue = dispatch._queue_note
+
+    def crash(*a, **k):
+        raise KeyboardInterrupt  # the record (decision, result, note) is saved; the outbox is not
+    monkeypatch.setattr(dispatch, "_queue_note", crash)
+    report(env)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    monkeypatch.setattr(dispatch, "_queue_note", real_queue)
+    go(env)
+    texts = [n["text"] for n in sent(env)]
+    assert len(texts) == 1 and texts[0].startswith("alert-watch: restarted the writer")
+    rec = runs(env)[0]
+    assert rec["status"] == "ok" and rec["result"]["entries"]
+    assert list((env["state"] / "done").iterdir())
+
+
+def test_an_uncertain_note_is_flagged_on_its_own(env, tmp_path):
+    unsure = tmp_path / "unsure-tg"
+    unsure.write_text("#!/usr/bin/env bash\ncat >/dev/null; exit 3\n")
+    unsure.chmod(0o755)
+    report(env)
+    dispatch.main([], cfg=dataclasses.replace(env["cfg"], tg_send=str(unsure)))
+    assert json.loads((env["state"] / "state.json").read_text())["note_dropped_at"]
+
+
+def test_credential_files_are_never_read(env):
+    for mode in ("diagnose", "act"):
+        deny = dispatch.session_settings(dataclasses.replace(env["cfg"], mode=mode))["permissions"]["deny"]
+        for rule in ("Read(~/.ssh/**)", "Read(~/.claude/channels/**)", "Bash(*.ssh/*)", "Bash(*id_ed25519*)"):
+            assert rule in deny, (mode, rule)
