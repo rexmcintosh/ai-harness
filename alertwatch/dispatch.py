@@ -99,7 +99,9 @@ DIAGNOSE_ALLOW = [
     # No git: log, show and diff print file contents (a credential committed in the
     # past included), which the Read deny rules cannot filter. gitinfo prints commit
     # lines and changed file names only.
-    "Bash(ls*)", "Bash(wc *)", "Bash(stat *)", "Bash(date)", "Bash(date -u*)", "Bash(date +*)",
+    # No wc or date either: wc --files0-from and date -f print a file's lines in their
+    # error messages. The prompt gives the time.
+    "Bash(ls*)", "Bash(stat *)",
     "Bash(python3 -m alertwatch.dbread*)", "Bash(python3 -m alertwatch.restart history*)",
     "Bash(python3 -m alertwatch.gitinfo*)",
 ]
@@ -226,10 +228,18 @@ def _recent_lines(recent: list[dict], acts: list[dict]) -> str:
 
 def build_prompt(cfg: Config, entries: list[dict], recent: list[dict], counts: dict, now: float) -> str:
     template = (HERE / "prompt.md").read_text(encoding="utf-8")
+    def body(e: dict) -> str:
+        text = str(e["text"])
+        if len(text) <= REPORT_MAX:
+            return _safe(text)
+        where = cfg.state_dir / "batch" / str(e.get("_run_id", "")) / str(e.get("_file", ""))
+        return (_safe(text[:REPORT_MAX]) + f"\n[report cut at {REPORT_MAX} of {len(text)} characters; "
+                f"the whole report is the \"text\" field of {where}]")
+
     reports = "\n\n".join(
         f"<<<REPORT id={e['id']} source={_safe(str(e.get('source') or '')[:300])} "
         f"captured_at={e.get('captured_at', '')} attempts={e.get('attempts', 0)}>>>\n"
-        f"{_safe(str(e['text'])[:REPORT_MAX])}\n<<<END REPORT>>>"
+        f"{body(e)}\n<<<END REPORT>>>"
         for e in entries)
     fills = {
         "POLICY": (HERE / "POLICY.md").read_text(encoding="utf-8"),
@@ -488,18 +498,17 @@ def _recover_batch(cfg: Config, st: dict, run_id: str, now: float) -> bool:
     elif dest in ("release", "release_count"):
         inbox.release(state, run_id, inbox.batch_entries(state, run_id), count_attempt=dest == "release_count")
     else:
-        inbox.finish(state, run_id, "failed")
+        # Record the failed decision and its note first (replacing a missing or broken
+        # record), then queue the note, then move the batch: a second crash at any point
+        # is finished by the next pass from what is recorded.
         reason = "the dispatcher stopped during this run"
-        try:
-            if rec:
-                ledger.update_run(state, run_id, status="failed", reason=reason)
-            else:  # it died before the record was written: write one, so the pause counts it
-                ledger.write_run(state, {"run_id": run_id, "started_at": now, "ended_at": now,
-                                         "status": "failed", "reason": reason, "entries": []})
-        except (OSError, ValueError):
-            pass
-        _send_note(cfg, st, "", notes.failure_note(
-            {"run_id": run_id, "reason": "the dispatcher stopped during this run"}, []))
+        text = notes.failure_note({"run_id": run_id, "reason": reason}, [])
+        base = rec if rec.get("run_id") == run_id else {"run_id": run_id, "started_at": now, "entries": []}
+        ledger.replace_run(state, {**base, "status": "failed", "reason": reason, "ended_at": now,
+                                   "dest": "failed", "note_text": text, "note_status": "queued"})
+        item = _queue_note(cfg, st, run_id, text)
+        inbox.finish(state, run_id, "failed")
+        _deliver(cfg, st, item, now)
         if ledger.fail_streak(state) >= cfg.fail_streak_pause and not (state / "PAUSED").exists():
             _pause(cfg, st, f"{cfg.fail_streak_pause} failed runs in a row", now)
     _log(now, f"batch {run_id} was left by a dispatcher that stopped; finished as {dest or 'failed'}")
@@ -579,6 +588,7 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         return 0
     looks, quiet = [], []
     for entry in entries:
+        entry["_run_id"] = run_id
         entry["_action"], entry["_rule"] = classify(entry, rules)
         (looks if entry["_action"] == "look" else quiet).append(entry)
     record = {"run_id": run_id, "started_at": t, "ended_at": None, "status": "running",

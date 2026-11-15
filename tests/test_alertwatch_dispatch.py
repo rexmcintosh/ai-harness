@@ -807,3 +807,44 @@ def test_a_batch_with_no_run_record_counts_toward_the_pause(env):
     go(env)
     assert (env["state"] / "PAUSED").exists()
     assert sum(1 for r in runs(env) if r["status"] == "failed") >= 3
+
+
+def test_diagnose_has_no_wc_or_date(env):
+    for cmd in ("wc", "date"):
+        assert not any(a.startswith(f"Bash({cmd}") for a in dispatch.DIAGNOSE_ALLOW), cmd
+
+
+def test_a_broken_run_record_is_repaired_and_counted(env):
+    for i in range(3):
+        report(env)
+        inbox.claim_all(env["state"], f"torn{i}")
+        (env["state"] / "runs" / f"torn{i}.json").write_text('{"run_id": "torn')  # a write cut short
+    go(env)
+    assert (env["state"] / "PAUSED").exists()
+    assert all(json.loads((env["state"] / "runs" / f"torn{i}.json").read_text())["status"] == "failed"
+               for i in range(3))
+
+
+def test_recovery_records_before_it_moves_the_batch(env, monkeypatch):
+    report(env)
+    inbox.claim_all(env["state"], "dead-run")
+    real = inbox.finish
+
+    def crash(*a, **k):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(inbox, "finish", crash)
+    with pytest.raises(KeyboardInterrupt):
+        go(env)
+    rec = json.loads((env["state"] / "runs" / "dead-run.json").read_text())
+    assert rec["dest"] == "failed" and rec["note_status"] == "queued"
+    monkeypatch.setattr(inbox, "finish", real)
+    go(env)
+    assert (env["state"] / "failed" / "dead-run").exists()
+    assert sum("dead-run" in n["text"] for n in sent(env)) == 1
+
+
+def test_a_cut_report_says_where_the_whole_text_is(env):
+    report(env, "y" * 5000, source="/usr/bin/python3 coverage_check.py")
+    go(env)
+    prompt = env["prompt.txt"].read_text()
+    assert "[report cut at 4000 of 5000 characters" in prompt and "/batch/" in prompt

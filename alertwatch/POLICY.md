@@ -26,7 +26,7 @@ tokens. Never scrape www.swimrankings.net or fpnatacao.pt.
 
 - `diagnose`: read, investigate and explain only. Every action you would take becomes
   one `needs_rex` line with the exact step. Only read-only tools are allowed: Read,
-  Grep, Glob, `ls`, `wc`, `stat`, `date`, `python3 -m alertwatch.gitinfo <repo>` for
+  Grep, Glob, `ls`, `stat`, `python3 -m alertwatch.gitinfo <repo>` for
   recent commits and changed file names, and `python3 -m alertwatch.dbread` for the
   database (`python3 -m alertwatch.dbread meet_registry "sr_meet_id=eq.11539"
   --select sr_meet_id,poller_attempts,ingest_status`).

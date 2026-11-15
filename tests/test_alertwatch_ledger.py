@@ -78,3 +78,22 @@ def test_unreadable_run_file_is_skipped(tmp_path):
     (tmp_path / "runs" / "bad.json").write_text("{")
     ledger.write_run(tmp_path, rec("a", NOW - 60))
     assert [r["run_id"] for r in ledger.recent_runs(tmp_path, NOW, hours=1)] == ["a"]
+
+
+def test_write_run_is_whole_or_absent(tmp_path, monkeypatch):
+    inbox.ensure_dirs(tmp_path)
+
+    def crash(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(ledger.os, "link", crash)
+    with pytest.raises(OSError):
+        ledger.write_run(tmp_path, rec("r1", NOW))
+    assert not (tmp_path / "runs" / "r1.json").exists()
+    assert not list((tmp_path / "runs").glob(".tmp-*"))
+
+
+def test_replace_run_repairs_a_broken_record(tmp_path):
+    inbox.ensure_dirs(tmp_path)
+    (tmp_path / "runs" / "r1.json").write_text("{broken")
+    ledger.replace_run(tmp_path, rec("r1", NOW, status="failed"))
+    assert ledger.recent_runs(tmp_path, NOW, 1)[0]["status"] == "failed"

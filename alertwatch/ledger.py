@@ -24,11 +24,34 @@ def _path(state: Path, run_id: str) -> Path:
     return Path(state) / "runs" / f"{run_id}.json"
 
 
-def write_run(state: Path, record: dict) -> Path:
-    path = _path(state, record["run_id"])
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+def _write_tmp(path: Path, record: dict) -> Path:
+    tmp = path.with_name(f".tmp-{path.name}-{secrets.token_hex(4)}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(record, fh, ensure_ascii=False, indent=1)
+        fh.flush()
+        os.fsync(fh.fileno())
+    return tmp
+
+
+def write_run(state: Path, record: dict) -> Path:
+    """Create a run record, whole or not at all: written to a temp file, then linked
+    to its name (which fails if a record already has that name)."""
+    path = _path(state, record["run_id"])
+    tmp = _write_tmp(path, record)
+    try:
+        os.link(tmp, path)
+    finally:
+        tmp.unlink()
+    fsync_dir(path.parent)
+    return path
+
+
+def replace_run(state: Path, record: dict) -> Path:
+    """Write a run record over whatever is there (used to repair an unreadable one)."""
+    path = _path(state, record["run_id"])
+    os.replace(_write_tmp(path, record), path)
+    fsync_dir(path.parent)
     return path
 
 
