@@ -175,7 +175,7 @@ def test_usage_limit_with_epoch(): ...            # "Claude AI usage limit reach
 def test_usage_limit_without_epoch(): ...         # "You've hit your limit · resets 3pm" -> (True, None)
 def test_no_note_for_nothing_real(): ...
 def test_note_has_needs_you_and_resume_footer(): ...
-def test_notes_have_no_em_dash(): ...             # every note builder's output has no "—"
+def test_notes_have_no_em_dash(): ...             # every note builder's output has no "\u2014"
 def test_send_tags_its_own_source(tmp_path): ...  # fake tg-send records env ALERT_SOURCE == "alert-watch"
 ```
 
@@ -302,7 +302,7 @@ def test_supervisor_never_listed(): ...                             # load_confi
 with the install steps (back up `crontab -l` to a file, edit a copy, `crontab <file>`, compare) and the rollback, and the exact `~/.claude/CLAUDE.md` section from the spec for Rex to approve before `mode = "act"`.
 
 - [ ] **Step 1: Write the three docs.**
-- [ ] **Step 2: Check:** `grep -rn $'—' alertwatch docs/contracts/alert-watch.md` prints nothing.
+- [ ] **Step 2: Check:** `grep -rn $'\u2014' alertwatch docs/contracts/alert-watch.md` prints nothing.
 - [ ] **Step 3: Commit** `git commit -m "alert-watch: README and job contract"`
 
 ### Task 9: `db.py` read-only guard (splash_poller)
