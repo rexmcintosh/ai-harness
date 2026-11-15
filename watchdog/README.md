@@ -32,6 +32,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
 | `meets.liveness` | `meet_registry.coverage_at` (racing hours) | a live PDF writer's last tick ≥10/30 min ago (warn/crit); a tick stamp >5 min in the future, a clock or data fault (warn) |
 | `meets.clock` | `zoneinfo` `Europe/Lisbon` | the zone cannot be resolved, so the meet rules read racing hours and dates as UTC (warn; also a line in `logs/runs.log.err`) |
+| `alertwatch` | `~/.local/state/alert-watch/` (when installed) | the oldest inbox message is over 20 min old, or the newest run failed (warn); a paused watcher is ok |
 
 Error-marker matching ignores `key=value` counters (e.g. `failed=0`), empty JSON counters
 (`"failed": 0`, `"error": null`) and JSON per-item data lists (`"quarantined_items": [...]`,
