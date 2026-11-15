@@ -1,0 +1,180 @@
+"""The alert-watch inbox: one JSON file per captured message.
+
+bin/tg-send writes `inbox/<id>.json` (via a `.tmp-` file and a rename). The
+dispatcher claims every entry by renaming it into `batch/<run_id>/` (an atomic
+rename, as in fixit/queue.py, so two claimers never share an entry), then moves
+the batch to `done/` or `failed/`, or puts entries back in `inbox/`.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import re
+import secrets
+import shutil
+from pathlib import Path
+
+SUBDIRS = ("inbox", "batch", "done", "failed", "runs")
+_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,128}")
+_TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _mkdir700(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    os.chmod(path, 0o700)
+
+
+def ensure_dirs(state: Path) -> None:
+    _mkdir700(Path(state))
+    for sub in SUBDIRS:
+        _mkdir700(Path(state) / sub)
+
+
+def _write_json(path: Path, obj: dict) -> None:
+    tmp = path.with_name(f".tmp-{path.name}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def _problem(entry) -> str | None:
+    if not isinstance(entry, dict):
+        return "not a JSON object"
+    if entry.get("version") != 1:
+        return f"unknown version {entry.get('version')!r}"
+    if not isinstance(entry.get("text"), str):
+        return "no text"
+    eid = entry.get("id")
+    if not isinstance(eid, str) or not _ID_RE.fullmatch(eid) or ".." in eid:
+        return "bad id"
+    return None
+
+
+def _visible_json(folder: Path) -> list[Path]:
+    return sorted(p for p in folder.glob("*.json") if not p.name.startswith("."))
+
+
+def claim_all(state: Path, run_id: str) -> tuple[list[dict], list[tuple[str, str]]]:
+    """Claim every inbox entry into batch/<run_id>/. Returns (valid entries,
+    [(file name, reason)]); broken files go to failed/<run_id>/ with a .reason file."""
+    state = Path(state)
+    batch = state / "batch" / run_id
+    entries: list[dict] = []
+    broken: list[tuple[str, str]] = []
+    for src in _visible_json(state / "inbox"):
+        batch.mkdir(parents=True, exist_ok=True)
+        dst = batch / src.name
+        try:
+            os.rename(src, dst)
+        except OSError:
+            continue  # another claimer took it
+        try:
+            entry = json.loads(dst.read_text(encoding="utf-8"))
+            reason = _problem(entry)
+        except (OSError, ValueError) as e:
+            entry, reason = None, f"unreadable: {e.__class__.__name__}"
+        if reason:
+            failed = state / "failed" / run_id
+            failed.mkdir(parents=True, exist_ok=True)
+            os.rename(dst, failed / src.name)
+            (failed / f"{src.name}.reason").write_text(reason + "\n", encoding="utf-8")
+            broken.append((src.name, reason))
+            continue
+        entry["_file"] = src.name
+        entries.append(entry)
+    if batch.exists() and not any(batch.iterdir()):
+        batch.rmdir()
+    return entries, broken
+
+
+def finish(state: Path, run_id: str, to: str) -> None:
+    if to not in ("done", "failed"):
+        raise ValueError(to)
+    src = Path(state) / "batch" / run_id
+    if not src.exists():
+        return
+    dst = Path(state) / to / run_id
+    if dst.exists():  # broken entries of this run may already be there
+        for p in src.iterdir():
+            os.rename(p, dst / p.name)
+        src.rmdir()
+    else:
+        os.rename(src, dst)
+
+
+def _clean(entry: dict) -> dict:
+    return {k: v for k, v in entry.items() if not k.startswith("_")}
+
+
+def release(state: Path, run_id: str, entries: list[dict], *, count_attempt: bool,
+            max_attempts: int = 2) -> list[str]:
+    """Put a failed run's entries back in the inbox. With count_attempt, each gets
+    attempts + 1, and one that reaches max_attempts goes to failed/<run_id>/ instead.
+    Returns the ids that went to failed/."""
+    state = Path(state)
+    failed_ids = []
+    for entry in entries:
+        out = _clean(entry)
+        if count_attempt:
+            out["attempts"] = int(out.get("attempts") or 0) + 1
+        name = entry.get("_file") or f"{out['id']}.json"
+        if count_attempt and out["attempts"] >= max_attempts:
+            folder = state / "failed" / run_id
+            folder.mkdir(parents=True, exist_ok=True)
+            _write_json(folder / name, out)
+            failed_ids.append(out["id"])
+        else:
+            _write_json(state / "inbox" / name, out)
+    shutil.rmtree(state / "batch" / run_id, ignore_errors=True)
+    return failed_ids
+
+
+def recover_stale(state: Path) -> list[str]:
+    """Batches left by a dispatcher that died mid-run. Its run may have acted, so they
+    are never replayed: they go to failed/. Call only while holding the dispatch lock."""
+    state = Path(state)
+    stale = []
+    for batch in sorted(p for p in (state / "batch").iterdir() if p.is_dir()):
+        finish(state, batch.name, "failed")
+        stale.append(batch.name)
+    return stale
+
+
+def add_entry(state: Path, text: str, source: str) -> str:
+    now = dt.datetime.now(dt.timezone.utc)
+    eid = now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + secrets.token_hex(4)
+    entry = {"version": 1, "id": eid, "captured_at": now.strftime(_TS_FMT), "chat_id": "",
+             "text": text, "source": source, "cwd": "", "attempts": 0}
+    _write_json(Path(state) / "inbox" / f"{eid}.json", entry)
+    return eid
+
+
+def _captured_epoch(path: Path) -> float:
+    try:
+        stamp = json.loads(path.read_text(encoding="utf-8"))["captured_at"]
+        return dt.datetime.strptime(stamp, _TS_FMT).replace(tzinfo=dt.timezone.utc).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        return path.stat().st_mtime
+
+
+def oldest_age_s(state: Path, now: float) -> float | None:
+    files = _visible_json(Path(state) / "inbox")
+    if not files:
+        return None
+    return now - min(_captured_epoch(p) for p in files)
+
+
+def prune(state: Path, now: float, days: int = 30) -> int:
+    cutoff = now - days * 86400
+    removed = 0
+    for sub in ("done", "failed"):
+        folder = Path(state) / sub
+        if not folder.exists():
+            continue
+        for d in folder.iterdir():
+            if d.is_dir() and d.stat().st_mtime < cutoff:
+                shutil.rmtree(d, ignore_errors=True)
+                removed += 1
+    return removed
