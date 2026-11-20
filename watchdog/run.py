@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -46,8 +47,25 @@ CRON_LOGS = [
     ("meettrack-supervise", Path("/home/dev/projects/splash_poller/logs/supervise.cron.log")),
     # the daily meet coverage check: a crash here would blind the gap alerts
     ("meettrack-coverage", Path("/home/dev/projects/splash_poller/logs/coverage_check.cron.log")),
+    # hourly meet discovery: a crash here means new meets are not registered
+    ("meettrack-discover", Path("/home/dev/projects/splash_poller/logs/discover.cron.log")),
 ]
+# Logs whose good runs each end with one known line (label -> regex). Only what
+# follows the last such line is judged, so one failed run stops alerting when the
+# next run finishes. Without this, discovery's 2 lines an hour would keep a crash
+# in the 50-line tail for about a day and repeat the alert every 6 hours.
+# discover_meets.py prints this line at the end of every run that gets through its
+# probe step; a crash before it leaves no such line, and the blind-index ERROR is
+# printed after it. The watchdog depends on that exact text.
+RUN_END = {
+    "meettrack-discover": re.compile(r"^\[[^\]]+\] \[discover\] probed=\d+/\d+ candidates$"),
+}
 SERVICES = ["tailscaled"]
+
+
+def cron_log_status(label: str, text: str) -> CheckStatus:
+    """The cron-log rule for one log: alerts and the Jev shadow both use it."""
+    return check_cron_log(label, text, run_end=RUN_END.get(label))
 
 
 def load_state(path) -> dict:
@@ -371,7 +389,7 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
             missing.append(label)
             continue
         found.append(label)
-        out.append(check_cron_log(label, text))
+        out.append(cron_log_status(label, text))
     out.append(check_log_coverage(found, missing))
 
     alertwatch = alertwatch_status(now_epoch)
@@ -398,7 +416,7 @@ def shadow_logs(monitors: dict) -> list[tuple[str, str, str]]:
         text = _read(path)
         if text is not None:
             labels.add(label)
-            out.append((label, text, check_cron_log(label, text).level))
+            out.append((label, text, cron_log_status(label, text).level))
     return out
 
 

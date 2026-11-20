@@ -1,4 +1,6 @@
 """Tests for the watchdog triage core — pure functions over collected signals."""
+import re
+
 from watchdog.triage import (
     CheckStatus,
     check_bebop_runs,
@@ -115,6 +117,42 @@ def test_cron_log_ignores_metric_counters():
 def test_cron_log_matches_real_failure_word():
     # a genuine failure (word not followed by '=') must still fire
     assert check_cron_log("bebop", "run FAILED rc=1\n").level == "warn"
+
+
+# --- check_cron_log with run_end (a quiet log judged from its last good run) --
+
+_RUN_END = re.compile(r"^run done$")
+
+
+def test_run_end_crash_after_the_last_good_run_is_warn():
+    log = "run done\nTraceback (most recent call last):\nValueError: x\n"
+    st = check_cron_log("q", log, run_end=_RUN_END)
+    assert st.level == "warn"
+    assert "Traceback" in st.evidence
+
+
+def test_run_end_crash_followed_by_a_good_run_is_ok_while_still_in_the_tail():
+    log = "run done\nTraceback (most recent call last):\nValueError: x\nrun done\n"
+    assert check_cron_log("q", log).level == "warn"              # the plain tail still sees it
+    assert check_cron_log("q", log, run_end=_RUN_END).level == "ok"
+
+
+def test_run_end_reads_every_line_after_the_last_good_run_past_the_tail():
+    # a crash block longer than the tail whose last 50 lines hold no error word
+    log = ("run done\nTraceback (most recent call last):\n"
+           + "\n".join(f"<p>page {i}</p>" for i in range(80)) + "\n")
+    assert check_cron_log("q", log).level == "ok"                # plain tail: blind to it
+    assert check_cron_log("q", log, run_end=_RUN_END).level == "warn"
+
+
+def test_run_end_with_no_good_run_in_the_log_falls_back_to_the_tail():
+    assert check_cron_log("q", "Traceback (most recent call last):\n", run_end=_RUN_END).level == "warn"
+    old = "Traceback boom\n" + "\n".join(f"line {i} ok" for i in range(200))
+    assert check_cron_log("q", old, run_end=_RUN_END).level == "ok"
+
+
+def test_run_end_good_run_as_last_line_is_ok():
+    assert check_cron_log("q", "FAILED once\nrun done\n", run_end=_RUN_END).level == "ok"
 
 
 # --- triage (escalation + flap suppression) ---------------------------------

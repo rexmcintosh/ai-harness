@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | MeetTrack logs | error markers in the recent tail (warn) |
+| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, in the lines after its last finished run (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
@@ -38,6 +38,22 @@ Error-marker matching ignores `key=value` counters (e.g. `failed=0`), empty JSON
 (`"failed": 0`, `"error": null`) and JSON per-item data lists (`"quarantined_items": [...]`,
 `"articles": [...]`) so metric lines and standing item notes don't read as failures. A
 missing log is skipped (the job may be paused); the coverage check names what was missing.
+
+The hourly discovery log (`cron:meettrack-discover`) writes only 2 lines a good run, so a
+crash would stay in a 50-line tail for about a day and repeat its alert every 6 hours.
+For that log the watchdog judges only the lines after the last
+`[<time>] [discover] probed=N/M candidates` line, which `discover_meets.py` prints at the
+end of every run that gets through its probe step (`RUN_END` in `run.py`). So:
+
+- One failed run alerts once; the next good run clears it.
+- A failure that lasts alerts again every 6 hours while it lasts.
+- The blind-index `[discover] ERROR` line comes after that line, so it still alerts.
+- A `[probe warn]` line comes before it, inside a run that finished, so it never alerts.
+  Blocked live meets alert from the supervisor's own `[probe ERROR]` line instead.
+- The check depends on that exact line. If splash_poller changes it, update `RUN_END`.
+  With no such line in the log, the plain 50-line tail is read.
+- The Jev shadow still reads the last 50 lines, so after a recovered crash its verdict
+  can differ from the alert's.
 
 ## Jev shadow mode (shadow only)
 

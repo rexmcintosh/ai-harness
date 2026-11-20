@@ -189,10 +189,28 @@ def _outcome_text(line: str) -> str:
     return _JSON_EMPTY_COUNTER.sub("", strip_json_data_lists(line))
 
 
-def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50) -> CheckStatus:
+def _since_last_run_end(lines: list[str], run_end) -> list[str] | None:
+    """The lines after the last one `run_end` matches, or None when none matches."""
+    for i in range(len(lines) - 1, -1, -1):
+        if run_end.search(lines[i]):
+            return lines[i + 1:]
+    return None
+
+
+def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
+                   run_end=None) -> CheckStatus:
     """Scan the tail of a cron log for error markers. Tail-only so an old, since-
-    resolved error doesn't fire forever."""
-    tail = log_text.splitlines()[-tail_lines:]
+    resolved error doesn't fire forever.
+
+    `run_end` (a compiled regex) is for a quiet log whose good runs each end with
+    one known line. Then only the lines after the last such line count, however
+    many there are: a crash stops counting once a later run finishes, even while
+    it is still in the last `tail_lines`. With no such line in the log, the plain
+    tail is read."""
+    lines = log_text.splitlines()
+    tail = _since_last_run_end(lines, run_end) if run_end is not None else None
+    if tail is None:
+        tail = lines[-tail_lines:]
     hits = [ln for ln in tail if _ERROR_MARKERS.search(_outcome_text(ln))]
     if hits:
         return CheckStatus(f"cron:{name}", "warn",

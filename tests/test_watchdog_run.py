@@ -50,6 +50,97 @@ def test_retired_loom_log_is_no_longer_watched():
     assert not any("/loom/" in str(path) for _, path in CRON_LOGS)
 
 
+# --- the meet discovery log (hourly, 2 lines a good run) ---------------------
+# Shapes copied from the real discover.cron.log; URLs and page text shortened.
+
+def _good_run(hour):
+    ts = f"2026-09-22T{hour:02d}:17:06+00:00"
+    return (f"[{ts}] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+            f"[{ts}] [discover] probed=0/0 candidates\n")
+
+
+# 22 Sep 2026 02:17: the database answered 522, so the run crashed before any line.
+_CRASH_522 = (
+    "Traceback (most recent call last):\n"
+    '  File "/home/dev/projects/splash_poller/discover_meets.py", line 650, in <module>\n'
+    "    discover(\n"
+    "    raise requests.HTTPError(\n"
+    "requests.exceptions.HTTPError: 522 Server Error: <none> for url: "
+    "https://example.supabase.co/rest/v1/meet_registry?select=sr_meet_id\n"
+    '<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->\n'
+)
+
+
+def test_discover_log_is_watched():
+    from watchdog.run import CRON_LOGS, RUN_END
+    paths = dict(CRON_LOGS)
+    assert str(paths["meettrack-discover"]) == "/home/dev/projects/splash_poller/logs/discover.cron.log"
+    assert set(RUN_END) <= set(paths)            # every run-end rule names a watched log
+
+
+def test_discover_run_end_matches_the_real_summary_line_only():
+    from watchdog.run import RUN_END
+    rule = RUN_END["meettrack-discover"]
+    assert rule.search("[2026-11-20T16:17:06+00:00] [discover] probed=1/1 candidates")
+    assert rule.search("[2026-09-22T01:17:06+00:00] [discover] probed=0/0 candidates")
+    assert not rule.search("[2026-11-20T16:17:06+00:00] [discover] scraped=44 inserted=0 updated=44")
+    assert not rule.search("  [probe warn] sr-1: [2026-11-20T16:17:06+00:00] [discover] probed=1/1 candidates")
+
+
+def test_discover_one_failed_run_then_a_good_one_is_ok():
+    from watchdog.run import cron_log_status
+    log = _good_run(1) + _CRASH_522 + _good_run(3)
+    assert cron_log_status("meettrack-discover", log).level == "ok"
+
+
+def test_discover_crash_as_the_last_run_is_warn():
+    from watchdog.run import cron_log_status
+    st = cron_log_status("meettrack-discover", _good_run(1) + _CRASH_522)
+    assert st.level == "warn"
+    assert "522 Server Error" in st.evidence
+
+
+def test_discover_blind_index_error_after_the_probe_is_warn():
+    # IndexLayoutError: the probe still runs and prints its line, then the ERROR follows.
+    from watchdog.run import cron_log_status
+    log = (_good_run(1) + _good_run(2)
+           + "[2026-09-22T02:17:09+00:00] [discover] ERROR no meet row could be read from the index\n")
+    assert cron_log_status("meettrack-discover", log).level == "warn"
+
+
+def test_discover_probe_warn_inside_a_finished_run_is_ok():
+    # One meet's probe failing is skipped by discovery itself; the run still finishes.
+    from watchdog.run import cron_log_status
+    ts = "2026-09-22T03:17:06+00:00"
+    log = (f"[{ts}] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+           "  [probe warn] 123: HTTPSConnectionPool(host='x.example', port=443): "
+           "Max retries exceeded (Caused by ConnectTimeoutError)\n"
+           f"[{ts}] [discover] probed=0/1 candidates\n")
+    assert cron_log_status("meettrack-discover", log).level == "ok"
+
+
+def test_other_logs_keep_the_plain_tail_rule():
+    from watchdog.run import cron_log_status
+    from watchdog.triage import check_cron_log
+    log = _good_run(1) + _CRASH_522 + _good_run(3)
+    for label in ("meettrack-ingest", "meettrack-supervise", "meettrack-coverage"):
+        assert cron_log_status(label, log) == check_cron_log(label, log)
+        assert cron_log_status(label, log).level == "warn"
+
+
+def test_collect_and_the_shadow_use_the_same_discover_rule(monkeypatch, tmp_path):
+    import watchdog.run as run
+    log = tmp_path / "discover.cron.log"
+    log.write_text(_good_run(1) + _CRASH_522 + _good_run(3))
+    monkeypatch.setattr(run, "CRON_LOGS", [("meettrack-discover", log)])
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    monkeypatch.setattr(run, "collect_metrics", lambda now, prior: ([], {}))
+    monkeypatch.setattr(run, "alertwatch_status", lambda now: None)
+    statuses, _ = run.collect(1_800_000_000, {})
+    assert [s.level for s in statuses if s.name == "cron:meettrack-discover"] == ["ok"]
+    assert [lvl for label, _, lvl in run.shadow_logs({}) if label == "meettrack-discover"] == ["ok"]
+
+
 def test_collect_reports_log_coverage(monkeypatch, tmp_path):
     import watchdog.run as run
     monkeypatch.setattr(run, "CRON_LOGS", [("gone", tmp_path / "gone.log")])
