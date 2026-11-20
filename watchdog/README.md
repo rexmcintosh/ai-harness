@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, in what follows its last finished run, or no finished run at all (warn) |
+| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, any line after its last finished run (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
@@ -56,11 +56,13 @@ then its `[<time>] [discover] probed=N/M candidates` line. So:
   the supervisor's own `[probe ERROR]` line instead. A run with no `probed=` line yet is
   judged in full, so there a `[probe warn]` with an error word counts. A poll does not see
   a run half-written in practice: stdout reaches the file only when the run ends.
+- A good run prints nothing after `probed=`, so any other line after the last finished run
+  warns, even with no error word in it: a run that did not finish (for example a shell
+  error such as `python3: not found`), or splash_poller changed those lines. Then update
+  `RUN_END`. A log with lines but no finished run at all is judged the same way.
 - A line between the two that is not indented by two spaces (for example a warning
   message that spans lines) makes that run count as unfinished. At worst that is one
   extra alert, cleared by the next good run.
-- A log with lines but no finished run at all warns on its own (`no finished run`): every
-  run failed, or splash_poller changed those lines. Then update `RUN_END`.
 - The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
   Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
   can differ from the rule's. Both are only recorded; nothing reads them back.

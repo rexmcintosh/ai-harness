@@ -203,22 +203,24 @@ def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
     resolved error doesn't fire forever.
 
     `run_end` (a compiled regex, searched in the whole text) is for a quiet log
-    whose good runs each end with a known pattern. Then only the text after its
-    last match counts, however long: a crash stops counting once a later run
-    finishes, even while it is still in the last `tail_lines`. A non-empty log
-    with no match at all warns on its own: every run in it failed, or the
-    pattern no longer fits what the job prints."""
+    whose good runs each end with a known pattern and print nothing after it.
+    Then only the text after its last match (all of it, with no match) counts,
+    however long: a crash stops counting once a later run finishes, even while
+    it is still in the last `tail_lines`. Any other line there also warns: a run
+    that did not finish, or lines that no longer fit the pattern."""
     if run_end is None:
         tail = log_text.splitlines()[-tail_lines:]
     else:
         rest = _after_last_run_end(log_text, run_end)
-        if rest is None and log_text.strip():
-            return CheckStatus(f"cron:{name}", "warn",
-                               f"no finished run in the {name} log: every run failed, "
-                               f"or the line that ends a good run has changed",
-                               evidence="\n".join(log_text.splitlines()[-5:]))
-        tail = (rest or "").splitlines()
+        tail = (log_text if rest is None else rest).splitlines()
     hits = [ln for ln in tail if _ERROR_MARKERS.search(_outcome_text(ln))]
+    unfinished = [ln for ln in tail if ln.strip()] if run_end is not None else []
+    if unfinished and not hits:
+        return CheckStatus(f"cron:{name}", "warn",
+                           f"{len(unfinished)} line(s) in the {name} log after its last "
+                           f"finished run: a run did not finish, or the lines that end "
+                           f"a good run have changed",
+                           evidence="\n".join(unfinished[-5:]))
     if hits:
         return CheckStatus(f"cron:{name}", "warn",
                            f"{len(hits)} error marker(s) in recent {name} log",

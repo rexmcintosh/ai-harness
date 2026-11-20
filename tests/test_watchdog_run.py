@@ -140,13 +140,33 @@ def test_discover_blind_index_then_a_good_run_is_ok():
 
 
 def test_discover_log_with_no_good_run_warns():
-    # a fresh log whose runs all crashed, or a summary line that no longer fits RUN_END
+    # a fresh log whose runs all crashed, or summary lines that no longer fit RUN_END
     from watchdog.run import cron_log_status
     drifted = "[2026-11-20T16:17:06+00:00] [discover] done: 44 meets, 1 probed\n" * 30
     for log in (_CRASH_522, drifted):
-        st = cron_log_status("meettrack-discover", log)
-        assert st.level == "warn"
-        assert "no finished run" in st.summary
+        assert cron_log_status("meettrack-discover", log).level == "warn"
+
+
+def test_discover_summary_lines_renamed_after_months_of_good_runs_warn():
+    # the production shape: many old good runs, then splash_poller changes its lines
+    from watchdog.run import cron_log_status
+    renamed = "[2026-11-21T00:17:06+00:00] [discover] done: 44 meets, 1 probed\n"
+    log = "".join(_good_run(h % 24) for h in range(1400)) + renamed * 3
+    st = cron_log_status("meettrack-discover", log)
+    assert st.level == "warn"
+    assert "3 line(s)" in st.summary and "finished run" in st.summary
+
+
+def test_discover_pair_spanning_a_crash_and_a_blind_run_still_warns():
+    # Run A crashed after scraped= (its traceback first, its buffered scraped= after);
+    # run B is a blind-index run: probed=, then ERROR. A's scraped= and B's probed=
+    # read as one finished run, but B's ERROR still follows it.
+    from watchdog.run import cron_log_status
+    a_scraped = "[2026-09-22T02:17:06+00:00] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+    log = _good_run(1) + _CRASH_522 + a_scraped + _BLIND_PROBED + _BLIND_ERROR
+    st = cron_log_status("meettrack-discover", log)
+    assert st.level == "warn"
+    assert "[discover] ERROR" in st.evidence
 
 
 def test_discover_probe_warn_inside_a_finished_run_is_ok():

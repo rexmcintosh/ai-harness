@@ -146,13 +146,24 @@ def test_run_end_reads_every_line_after_the_last_good_run_past_the_tail():
 
 
 def test_run_end_with_no_good_run_in_the_log_warns_on_its_own():
-    # every run failed (a fresh log, even past the tail), or the end pattern drifted
+    # every run failed (a fresh log, even past the tail): its error words count
     crashes = "Traceback (most recent call last):\n" + "\n".join(f"<p>{i}</p>" for i in range(80))
+    assert check_cron_log("q", crashes, run_end=_RUN_END).level == "warn"
+    # the end pattern drifted from the start: no error word, still a warning
     drifted = "\n".join(f"run finished {i}" for i in range(200)) + "\n"
-    for log in (crashes, drifted):
-        st = check_cron_log("q", log, run_end=_RUN_END)
-        assert st.level == "warn"
-        assert "no finished run" in st.summary
+    st = check_cron_log("q", drifted, run_end=_RUN_END)
+    assert st.level == "warn"
+    assert "after its last finished run" in st.summary
+
+
+def test_run_end_any_line_after_the_last_good_run_warns():
+    # nothing follows a good run, so a line there is a run that did not finish,
+    # or the end pattern drifted after years of matches
+    log = "run done\n" * 1000 + "run finished\n" * 30
+    st = check_cron_log("q", log, run_end=_RUN_END)
+    assert st.level == "warn"
+    assert "30 line(s)" in st.summary
+    assert check_cron_log("q", "run done\n\n  \n", run_end=_RUN_END).level == "ok"   # blank lines
 
 
 def test_run_end_empty_log_is_ok():
