@@ -119,6 +119,16 @@ def test_discover_probe_warn_inside_a_finished_run_is_ok():
     assert cron_log_status("meettrack-discover", log).level == "ok"
 
 
+def test_discover_probe_warn_with_no_end_line_after_it_counts():
+    # A run that never printed probed= (crashed, or not yet flushed) is judged in full.
+    from watchdog.run import cron_log_status
+    ts = "2026-09-22T03:17:06+00:00"
+    log = (_good_run(2)
+           + f"[{ts}] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+           "  [probe warn] 123: 503 Server Error: Service Unavailable for url: https://x.example/\n")
+    assert cron_log_status("meettrack-discover", log).level == "warn"
+
+
 def test_other_logs_keep_the_plain_tail_rule():
     from watchdog.run import cron_log_status
     from watchdog.triage import check_cron_log

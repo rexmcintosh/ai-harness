@@ -53,9 +53,14 @@ end of every run that gets through its probe step (`RUN_END` in `run.py`). So:
 - The check depends on that exact line. If splash_poller changes it, update `RUN_END`.
   With no such line in the log, the plain 50-line tail is read.
 - It also depends on that line coming after any step that can crash. Cron sends stdout
-  (buffered) and stderr (written at once) to one file, so if splash_poller ever adds work
-  after that line, its traceback could land before the line and be hidden. Then print the
-  line with `flush=True` at the very end, or move the work before it.
+  (buffered) and stderr (written at once) to one file, so a crash after that line can put
+  its traceback before the line in the file, and the crash is then hidden. One such step
+  exists today: in the blind-index path, `from coverage_check import _tg_send` runs after
+  the line and before the `ERROR` line. If that import failed, this check would read ok.
+  The fix belongs in splash_poller: print the `probed=` line with `flush=True`.
+- A run that has not yet printed its `probed=` line is judged like a crash: a
+  `[probe warn]` with an error word in it then counts. In practice a poll does not see a
+  run half-written, because stdout reaches the file only when the run ends.
 - The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
   Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
   can differ from the rule's. Both are only recorded; nothing reads them back.
