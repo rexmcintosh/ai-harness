@@ -121,7 +121,7 @@ def test_cron_log_matches_real_failure_word():
 
 # --- check_cron_log with run_end (a quiet log judged from its last good run) --
 
-_RUN_END = re.compile(r"^run done$")
+_RUN_END = re.compile(r"^run done$", re.MULTILINE)
 
 
 def test_run_end_crash_after_the_last_good_run_is_warn():
@@ -145,10 +145,19 @@ def test_run_end_reads_every_line_after_the_last_good_run_past_the_tail():
     assert check_cron_log("q", log, run_end=_RUN_END).level == "warn"
 
 
-def test_run_end_with_no_good_run_in_the_log_falls_back_to_the_tail():
-    assert check_cron_log("q", "Traceback (most recent call last):\n", run_end=_RUN_END).level == "warn"
-    old = "Traceback boom\n" + "\n".join(f"line {i} ok" for i in range(200))
-    assert check_cron_log("q", old, run_end=_RUN_END).level == "ok"
+def test_run_end_with_no_good_run_in_the_log_warns_on_its_own():
+    # every run failed (a fresh log, even past the tail), or the end pattern drifted
+    crashes = "Traceback (most recent call last):\n" + "\n".join(f"<p>{i}</p>" for i in range(80))
+    drifted = "\n".join(f"run finished {i}" for i in range(200)) + "\n"
+    for log in (crashes, drifted):
+        st = check_cron_log("q", log, run_end=_RUN_END)
+        assert st.level == "warn"
+        assert "no finished run" in st.summary
+
+
+def test_run_end_empty_log_is_ok():
+    assert check_cron_log("q", "", run_end=_RUN_END).level == "ok"
+    assert check_cron_log("q", "\n\n", run_end=_RUN_END).level == "ok"
 
 
 def test_run_end_good_run_as_last_line_is_ok():

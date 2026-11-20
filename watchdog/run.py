@@ -50,15 +50,22 @@ CRON_LOGS = [
     # hourly meet discovery: a crash here means new meets are not registered
     ("meettrack-discover", Path("/home/dev/projects/splash_poller/logs/discover.cron.log")),
 ]
-# Logs whose good runs each end with one known line (label -> regex). Only what
-# follows the last such line is judged, so one failed run stops alerting when the
-# next run finishes. Without this, discovery's 2 lines an hour would keep a crash
-# in the 50-line tail for about a day and repeat the alert every 6 hours.
-# discover_meets.py prints this line at the end of every run that gets through its
-# probe step; a crash before it leaves no such line, and the blind-index ERROR is
-# printed after it. The watchdog depends on that exact text.
+# Logs whose good runs each end with a known pattern (label -> regex, searched in the
+# whole text). Only what follows its last match is judged, so one failed run stops
+# alerting when the next run finishes. Without this, discovery's 2 lines an hour
+# would keep a crash in the 50-line tail for about a day and repeat the alert every
+# 6 hours.
+# A good discovery run prints its scraped= line, then only lines indented by two
+# spaces ([twin], [reuse], [annp note], [probe warn]), then its probed= line, and
+# nothing after it. The blind-index path prints probed= WITHOUT scraped= and then
+# its ERROR, so it never ends a good run here, even if the step between those two
+# lines crashes and its traceback (stderr, unbuffered) lands before the buffered
+# probed= line. The watchdog depends on this text; see the README.
 RUN_END = {
-    "meettrack-discover": re.compile(r"^\[[^\]]+\] \[discover\] probed=\d+/\d+ candidates$"),
+    "meettrack-discover": re.compile(
+        r"^\[[^\]\n]+\] \[discover\] scraped=[^\n]*\n"
+        r"(?:  [^\n]*\n)*"
+        r"\[[^\]\n]+\] \[discover\] probed=\d+/\d+[^\n]*$", re.MULTILINE),
 }
 SERVICES = ["tailscaled"]
 

@@ -189,12 +189,12 @@ def _outcome_text(line: str) -> str:
     return _JSON_EMPTY_COUNTER.sub("", strip_json_data_lists(line))
 
 
-def _since_last_run_end(lines: list[str], run_end) -> list[str] | None:
-    """The lines after the last one `run_end` matches, or None when none matches."""
-    for i in range(len(lines) - 1, -1, -1):
-        if run_end.search(lines[i]):
-            return lines[i + 1:]
-    return None
+def _after_last_run_end(log_text: str, run_end) -> str | None:
+    """The text after the last match of `run_end`, or None when it never matches."""
+    last = None
+    for last in run_end.finditer(log_text):
+        pass
+    return None if last is None else log_text[last.end():]
 
 
 def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
@@ -202,15 +202,22 @@ def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
     """Scan the tail of a cron log for error markers. Tail-only so an old, since-
     resolved error doesn't fire forever.
 
-    `run_end` (a compiled regex) is for a quiet log whose good runs each end with
-    one known line. Then only the lines after the last such line count, however
-    many there are: a crash stops counting once a later run finishes, even while
-    it is still in the last `tail_lines`. With no such line in the log, the plain
-    tail is read."""
-    lines = log_text.splitlines()
-    tail = _since_last_run_end(lines, run_end) if run_end is not None else None
-    if tail is None:
-        tail = lines[-tail_lines:]
+    `run_end` (a compiled regex, searched in the whole text) is for a quiet log
+    whose good runs each end with a known pattern. Then only the text after its
+    last match counts, however long: a crash stops counting once a later run
+    finishes, even while it is still in the last `tail_lines`. A non-empty log
+    with no match at all warns on its own: every run in it failed, or the
+    pattern no longer fits what the job prints."""
+    if run_end is None:
+        tail = log_text.splitlines()[-tail_lines:]
+    else:
+        rest = _after_last_run_end(log_text, run_end)
+        if rest is None and log_text.strip():
+            return CheckStatus(f"cron:{name}", "warn",
+                               f"no finished run in the {name} log: every run failed, "
+                               f"or the line that ends a good run has changed",
+                               evidence="\n".join(log_text.splitlines()[-5:]))
+        tail = (rest or "").splitlines()
     hits = [ln for ln in tail if _ERROR_MARKERS.search(_outcome_text(ln))]
     if hits:
         return CheckStatus(f"cron:{name}", "warn",

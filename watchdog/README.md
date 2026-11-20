@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, in the lines after its last finished run (warn) |
+| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, in what follows its last finished run, or no finished run at all (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
@@ -41,26 +41,26 @@ missing log is skipped (the job may be paused); the coverage check names what wa
 
 The hourly discovery log (`cron:meettrack-discover`) writes only 2 lines a good run, so a
 crash would stay in a 50-line tail for about a day and repeat its alert every 6 hours.
-For that log the watchdog judges only the lines after the last
-`[<time>] [discover] probed=N/M candidates` line, which `discover_meets.py` prints at the
-end of every run that gets through its probe step (`RUN_END` in `run.py`). So:
+For that log the watchdog judges only what comes after the last finished run
+(`RUN_END` in `run.py`). A finished run is its `[<time>] [discover] scraped=...` line, then
+only lines indented by two spaces (`[twin]`, `[reuse]`, `[annp note]`, `[probe warn]`),
+then its `[<time>] [discover] probed=N/M candidates` line. So:
 
 - One failed run alerts once; the next good run clears it.
 - A failure that lasts alerts again every 6 hours while it lasts.
-- The blind-index `[discover] ERROR` line comes after that line, so it still alerts.
-- A `[probe warn]` line comes before it, inside a run that finished, so it never alerts.
-  Blocked live meets alert from the supervisor's own `[probe ERROR]` line instead.
-- The check depends on that exact line. If splash_poller changes it, update `RUN_END`.
-  With no such line in the log, the plain 50-line tail is read.
-- It also depends on that line coming after any step that can crash. Cron sends stdout
-  (buffered) and stderr (written at once) to one file, so a crash after that line can put
-  its traceback before the line in the file, and the crash is then hidden. One such step
-  exists today: in the blind-index path, `from coverage_check import _tg_send` runs after
-  the line and before the `ERROR` line. If that import failed, this check would read ok.
-  The fix belongs in splash_poller: print the `probed=` line with `flush=True`.
-- A run that has not yet printed its `probed=` line is judged like a crash: a
-  `[probe warn]` with an error word in it then counts. In practice a poll does not see a
-  run half-written, because stdout reaches the file only when the run ends.
+- The blind-index path prints `probed=` with no `scraped=` line, then its `[discover] ERROR`,
+  so it never counts as finished and still alerts. That holds even if the step between
+  those two lines crashes: cron sends stdout (buffered) and stderr (written at once) to one
+  file, so that traceback lands before the `probed=` line, and it is still judged.
+- A `[probe warn]` line inside a finished run never alerts. Blocked live meets alert from
+  the supervisor's own `[probe ERROR]` line instead. A run with no `probed=` line yet is
+  judged in full, so there a `[probe warn]` with an error word counts. A poll does not see
+  a run half-written in practice: stdout reaches the file only when the run ends.
+- A line between the two that is not indented by two spaces (for example a warning
+  message that spans lines) makes that run count as unfinished. At worst that is one
+  extra alert, cleared by the next good run.
+- A log with lines but no finished run at all warns on its own (`no finished run`): every
+  run failed, or splash_poller changed those lines. Then update `RUN_END`.
 - The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
   Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
   can differ from the rule's. Both are only recorded; nothing reads them back.

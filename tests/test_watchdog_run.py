@@ -78,13 +78,22 @@ def test_discover_log_is_watched():
     assert set(RUN_END) <= set(paths)            # every run-end rule names a watched log
 
 
-def test_discover_run_end_matches_the_real_summary_line_only():
+def test_discover_run_end_matches_a_real_good_run_only():
     from watchdog.run import RUN_END
     rule = RUN_END["meettrack-discover"]
-    assert rule.search("[2026-11-20T16:17:06+00:00] [discover] probed=1/1 candidates")
-    assert rule.search("[2026-09-22T01:17:06+00:00] [discover] probed=0/0 candidates")
-    assert not rule.search("[2026-11-20T16:17:06+00:00] [discover] scraped=44 inserted=0 updated=44")
-    assert not rule.search("  [probe warn] sr-1: [2026-11-20T16:17:06+00:00] [discover] probed=1/1 candidates")
+    ts = "[2026-11-20T16:17:06+00:00] [discover]"
+    assert rule.search(f"{ts} scraped=44 inserted=0 updated=44 annp_twins=0 upcoming(14d)=10\n"
+                       f"{ts} probed=1/1 candidates")
+    assert rule.search(f"{ts} scraped=11 inserted=1 updated=10\n"
+                       "  [twin] sr-1 ('Meet', '2026-11-21', 'Porto'): already registered\n"
+                       "  [probe warn] 123: read timed out\n"
+                       f"{ts} probed=0/1 candidates")
+    # a probed= line alone is the blind-index path, not a good run
+    assert not rule.search(f"{ts} probed=1/1 candidates")
+    # a traceback between them breaks the run
+    assert not rule.search(f"{ts} scraped=10\nTraceback (most recent call last):\n"
+                           "  File \"x.py\", line 1, in <module>\nValueError: x\n"
+                           f"{ts} probed=1/1 candidates")
 
 
 def test_discover_one_failed_run_then_a_good_one_is_ok():
@@ -100,12 +109,44 @@ def test_discover_crash_as_the_last_run_is_warn():
     assert "522 Server Error" in st.evidence
 
 
+# The blind-index path (IndexLayoutError): no scraped= line, the probe still runs and
+# prints probed=, then __main__ imports the Telegram sender and prints the ERROR.
+_BLIND_PROBED = "[2026-09-22T02:17:08+00:00] [discover] probed=1/1 candidates\n"
+_BLIND_ERROR = "[2026-09-22T02:17:09+00:00] [discover] ERROR no meet row could be read from the index\n"
+
+
 def test_discover_blind_index_error_after_the_probe_is_warn():
-    # IndexLayoutError: the probe still runs and prints its line, then the ERROR follows.
     from watchdog.run import cron_log_status
-    log = (_good_run(1) + _good_run(2)
-           + "[2026-09-22T02:17:09+00:00] [discover] ERROR no meet row could be read from the index\n")
-    assert cron_log_status("meettrack-discover", log).level == "warn"
+    assert cron_log_status("meettrack-discover", _good_run(1) + _BLIND_PROBED + _BLIND_ERROR).level == "warn"
+
+
+def test_discover_blind_index_crash_before_its_error_line_is_warn():
+    # The import between probed= and ERROR fails: its traceback (stderr, at once) lands
+    # before the buffered probed= line, and no ERROR line is printed.
+    from watchdog.run import cron_log_status
+    crash = ("Traceback (most recent call last):\n"
+             '  File "/home/dev/projects/splash_poller/discover_meets.py", line 664, in <module>\n'
+             "    from coverage_check import _tg_send\n"
+             "ModuleNotFoundError: No module named 'coverage_check'\n")
+    st = cron_log_status("meettrack-discover", _good_run(1) + crash + _BLIND_PROBED)
+    assert st.level == "warn"
+    assert "Traceback" in st.evidence
+
+
+def test_discover_blind_index_then_a_good_run_is_ok():
+    from watchdog.run import cron_log_status
+    log = _good_run(1) + _BLIND_PROBED + _BLIND_ERROR + _good_run(3)
+    assert cron_log_status("meettrack-discover", log).level == "ok"
+
+
+def test_discover_log_with_no_good_run_warns():
+    # a fresh log whose runs all crashed, or a summary line that no longer fits RUN_END
+    from watchdog.run import cron_log_status
+    drifted = "[2026-11-20T16:17:06+00:00] [discover] done: 44 meets, 1 probed\n" * 30
+    for log in (_CRASH_522, drifted):
+        st = cron_log_status("meettrack-discover", log)
+        assert st.level == "warn"
+        assert "no finished run" in st.summary
 
 
 def test_discover_probe_warn_inside_a_finished_run_is_ok():
