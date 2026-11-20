@@ -52,8 +52,13 @@ end of every run that gets through its probe step (`RUN_END` in `run.py`). So:
   Blocked live meets alert from the supervisor's own `[probe ERROR]` line instead.
 - The check depends on that exact line. If splash_poller changes it, update `RUN_END`.
   With no such line in the log, the plain 50-line tail is read.
-- The Jev shadow still reads the last 50 lines, so after a recovered crash its verdict
-  can differ from the alert's.
+- It also depends on that line coming after any step that can crash. Cron sends stdout
+  (buffered) and stderr (written at once) to one file, so if splash_poller ever adds work
+  after that line, its traceback could land before the line and be hidden. Then print the
+  line with `flush=True` at the very end, or move the work before it.
+- The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
+  Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
+  can differ from the rule's. Both are only recorded; nothing reads them back.
 
 ## Jev shadow mode (shadow only)
 
