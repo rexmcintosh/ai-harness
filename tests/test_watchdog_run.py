@@ -180,6 +180,30 @@ def test_discover_probe_warn_inside_a_finished_run_is_ok():
     assert cron_log_status("meettrack-discover", log).level == "ok"
 
 
+def test_discover_note_whose_error_text_spans_lines_is_still_a_finished_run():
+    # e.g. a [twin warn] carrying an HTTP error with its HTML body: the continuation
+    # lines are not indented, but the run still ends with probed= and is good.
+    from watchdog.run import cron_log_status
+    ts = "2026-11-21T03:17:06+00:00"
+    log = (_good_run(2)
+           + f"[{ts}] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+           "  [twin warn] calendar 2026 not read (HTTPError: 503 Server Error for url: https://x.example/\n"
+           "<html><body>Service Unavailable</body></html>\n"
+           "): twins not checked\n"
+           f"[{ts}] [discover] probed=0/1 candidates\n")
+    assert cron_log_status("meettrack-discover", log).level == "ok"
+
+
+def test_discover_a_traceback_header_between_scraped_and_probed_breaks_the_pair():
+    from watchdog.run import cron_log_status
+    log = (_good_run(1)
+           + "[2026-09-22T02:17:06+00:00] [discover] scraped=10 inserted=0 updated=10 delisted=0\n"
+           + _CRASH_522 + _BLIND_PROBED)
+    st = cron_log_status("meettrack-discover", log)
+    assert st.level == "warn"
+    assert "522 Server Error" in st.evidence
+
+
 def test_discover_probe_warn_with_no_end_line_after_it_counts():
     # A run that never printed probed= (crashed, or not yet flushed) is judged in full.
     from watchdog.run import cron_log_status

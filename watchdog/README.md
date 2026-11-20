@@ -43,8 +43,10 @@ The hourly discovery log (`cron:meettrack-discover`) writes only 2 lines a good 
 crash would stay in a 50-line tail for about a day and repeat its alert every 6 hours.
 For that log the watchdog judges only what comes after the last finished run
 (`RUN_END` in `run.py`). A finished run is its `[<time>] [discover] scraped=...` line, then
-only lines indented by two spaces (`[twin]`, `[reuse]`, `[annp note]`, `[probe warn]`),
-then its `[<time>] [discover] probed=N/M candidates` line. So:
+its notes (`[twin]`, `[reuse]`, `[annp note]`, `[probe warn]`; a note's error text may span
+lines), then its `[<time>] [discover] probed=N/M candidates` line. Between the two, only
+another `[<time>] [discover]` line or a `Traceback (most recent call last):` line breaks
+the run. So:
 
 - One failed run alerts once; the next good run clears it.
 - A failure that lasts alerts again every 6 hours while it lasts.
@@ -60,9 +62,13 @@ then its `[<time>] [discover] probed=N/M candidates` line. So:
   warns, even with no error word in it: a run that did not finish (for example a shell
   error such as `python3: not found`), or splash_poller changed those lines. Then update
   `RUN_END`. A log with lines but no finished run at all is judged the same way.
-- A line between the two that is not indented by two spaces (for example a warning
-  message that spans lines) makes that run count as unfinished. At worst that is one
-  extra alert, cleared by the next good run.
+- A crashed run's buffered `scraped=` line can land after its traceback and pair with the
+  next run's `probed=`. That next run is then a blind-index run (no `scraped=` of its own),
+  which always prints its `ERROR` after `probed=` or, if it crashes first, a traceback
+  before it that breaks the pair. So the false pairing cannot hide a failure today.
+- Limits. A poll that lands while a run is writing to stderr could see a half-written run
+  and alert once (runs start at :17 and take seconds; polls are at :00 and :30). A
+  discovery cron that stops running altogether leaves no line and is not caught here.
 - The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
   Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
   can differ from the rule's. Both are only recorded; nothing reads them back.

@@ -55,17 +55,20 @@ CRON_LOGS = [
 # alerting when the next run finishes. Without this, discovery's 2 lines an hour
 # would keep a crash in the 50-line tail for about a day and repeat the alert every
 # 6 hours.
-# A good discovery run prints its scraped= line, then only lines indented by two
-# spaces ([twin], [reuse], [annp note], [probe warn]), then its probed= line, and
-# nothing after it. The blind-index path prints probed= WITHOUT scraped= and then
-# its ERROR, so it never ends a good run here, even if the step between those two
-# lines crashes and its traceback (stderr, unbuffered) lands before the buffered
-# probed= line. The watchdog depends on this text; see the README.
+# A good discovery run prints its scraped= line, then its notes ([twin], [reuse],
+# [annp note], [probe warn], indented; a note's error text may span lines), then
+# its probed= line, and nothing after it. Between the two, any line counts as a
+# note except another "[<time>] [discover]" line or a traceback header. The
+# blind-index path prints probed= WITHOUT scraped= and then its ERROR, so it never
+# ends a good run here, even if the step between those two lines crashes: its
+# traceback (stderr, unbuffered) lands before the buffered probed= line and breaks
+# the pair. The watchdog depends on this text; see the README.
+_DISCOVER_LINE = r"\[[^\]\n]+\] \[discover\] "
 RUN_END = {
     "meettrack-discover": re.compile(
-        r"^\[[^\]\n]+\] \[discover\] scraped=[^\n]*\n"
-        r"(?:  [^\n]*\n)*"
-        r"\[[^\]\n]+\] \[discover\] probed=\d+/\d+[^\n]*$", re.MULTILINE),
+        rf"^{_DISCOVER_LINE}scraped=[^\n]*\n"
+        rf"(?:(?!{_DISCOVER_LINE}|Traceback \(most recent call last\):)[^\n]*\n)*"
+        rf"{_DISCOVER_LINE}probed=\d+/\d+[^\n]*$", re.MULTILINE),
 }
 SERVICES = ["tailscaled"]
 
