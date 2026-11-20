@@ -242,7 +242,7 @@ def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float,
     or a run that hangs and holds its lock, writes nothing, so no log rule sees it.
 
     The finish time is the `end_ts` group of the last `run_end` match. Too old ->
-    warn under the same check name, so one outage is one alert stream: a run that
+    warn (a crit stays crit) under the same check name, so one outage is one alert stream: a run that
     keeps crashing is already a warn here, and its lines stay as the evidence.
     An unreadable time warns too. A log with no finished run is left to `status`:
     check_cron_log warns on any line in it, and an empty log is not timed."""
@@ -253,14 +253,15 @@ def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float,
     stamp = last.group("end_ts")
     end_line = last.group(0).splitlines()[-1]
     finished = _iso_epoch(stamp)
+    level = "crit" if status.level == "crit" else "warn"      # never lower a crit
     if finished is None:
-        return CheckStatus(status.name, "warn",
+        return CheckStatus(status.name, level,
                            f"cannot read the time of the last finished {label} run",
                            evidence=end_line)
     age_h = (now_epoch - finished) / 3600
     if age_h <= max_age_hours:
         return status
-    return CheckStatus(status.name, "warn",
+    return CheckStatus(status.name, level,
                        f"no {label} run has finished for {age_h:.1f}h (limit "
                        f"{max_age_hours:g}h; last at {stamp}): its cron may have stopped, "
                        f"a run may be stuck, or every run since has failed",

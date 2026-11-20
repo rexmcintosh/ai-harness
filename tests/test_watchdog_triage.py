@@ -224,9 +224,14 @@ def test_run_age_with_no_finished_run_returns_the_log_status():
         assert _aged(log, _T0) == check_cron_log("q", log, run_end=_TIMED_END)
 
 
-def test_run_age_never_turns_a_crit_into_a_warn_when_recent():
-    crit = CheckStatus("cron:q", "crit", "worse")
+def test_run_age_never_turns_a_crit_into_a_warn():
+    crit = CheckStatus("cron:q", "crit", "worse", evidence="the crit's lines")
     assert check_run_age(crit, _done(_T0), _TIMED_END, _T0, max_age_hours=3) is crit
+    stale = check_run_age(crit, _done(_T0), _TIMED_END, _T0 + 4 * HOUR, max_age_hours=3)
+    assert stale.level == "crit" and "has finished for 4.0h" in stale.summary
+    assert stale.evidence == "the crit's lines"
+    unreadable = check_run_age(crit, "[yesterday] run done\n", _TIMED_END, _T0, max_age_hours=3)
+    assert unreadable.level == "crit" and "cannot read the time" in unreadable.summary
 
 
 # --- triage (escalation + flap suppression) ---------------------------------
