@@ -8,6 +8,7 @@ from watchdog.triage import (
     check_log_coverage,
     check_disk,
     check_orphan_processes,
+    check_run_age,
     check_service_active,
     triage,
 )
@@ -173,6 +174,59 @@ def test_run_end_empty_log_is_ok():
 
 def test_run_end_good_run_as_last_line_is_ok():
     assert check_cron_log("q", "FAILED once\nrun done\n", run_end=_RUN_END).level == "ok"
+
+
+# --- check_run_age (the last finished run must be recent) ---------------------
+
+_TIMED_END = re.compile(r"^\[(?P<end_ts>[^\]\n]+)\] run done$", re.MULTILINE)
+_T0 = 1_800_000_000                                    # 2027-01-15T08:00:00+00:00
+
+
+def _done(epoch):
+    from datetime import datetime, timezone
+    return f"[{datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()}] run done\n"
+
+
+def _aged(log, now, max_age_hours=3):
+    status = check_cron_log("q", log, run_end=_TIMED_END)
+    return check_run_age(status, log, _TIMED_END, now, max_age_hours=max_age_hours)
+
+
+def test_run_age_recent_run_keeps_the_log_status():
+    log = _done(_T0 - 2 * HOUR) + _done(_T0 - HOUR)
+    assert _aged(log, _T0) == check_cron_log("q", log, run_end=_TIMED_END)
+
+
+def test_run_age_boundary_is_ok_at_the_limit_and_warns_one_second_past_it():
+    log = _done(_T0)
+    assert _aged(log, _T0 + 3 * HOUR).level == "ok"
+    st = _aged(log, _T0 + 3 * HOUR + 1)
+    assert st.level == "warn" and st.name == "cron:q"
+    assert "no q run has finished for 3.0h (limit 3h; last at 2027-01-15T08:00:00+00:00)" in st.summary
+    assert st.evidence == "[2027-01-15T08:00:00+00:00] run done"
+
+
+def test_run_age_keeps_the_log_evidence_when_runs_after_it_failed():
+    log = _done(_T0) + "Traceback (most recent call last):\nValueError: x\n"
+    st = _aged(log, _T0 + 4 * HOUR)
+    assert st.level == "warn" and "has finished for 4.0h" in st.summary
+    assert "Traceback" in st.evidence
+
+
+def test_run_age_unreadable_time_warns():
+    st = _aged("[yesterday] run done\n", _T0)
+    assert st.level == "warn" and "cannot read the time" in st.summary
+    assert "[yesterday]" in st.evidence
+
+
+def test_run_age_with_no_finished_run_returns_the_log_status():
+    for log in ("", "Traceback (most recent call last):\n"):
+        assert _aged(log, _T0) == check_cron_log("q", log, run_end=_TIMED_END)
+
+
+def test_run_age_never_turns_a_crit_into_a_warn_when_recent():
+    crit = CheckStatus("cron:q", "crit", "worse")
+    assert check_run_age(crit, _done(_T0), _TIMED_END, _T0, max_age_hours=3) is crit
 
 
 # --- triage (escalation + flap suppression) ---------------------------------

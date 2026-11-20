@@ -31,6 +31,7 @@ from .triage import (
     check_meet_freshness,
     check_meet_liveness,
     check_orphan_processes,
+    check_run_age,
     check_service_active,
     triage,
 )
@@ -62,13 +63,37 @@ CRON_LOGS = [
 # blind-index path prints probed= WITHOUT scraped= and then its ERROR, so it never
 # ends a good run here, even if the step between those two lines crashes: its
 # traceback (stderr, unbuffered) lands before the buffered probed= line and breaks
-# the pair. The watchdog depends on this text; see the README.
+# the pair. The probed= line's time (`end_ts`) is when the run finished.
+# The watchdog depends on this text; see the README.
 _DISCOVER_LINE = r"\[[^\]\n]+\] \[discover\] "
+# A coverage run prints one summary line, last, and nothing after it. The lines
+# before it in the same run are its notes ([coverage warn], tg-send's stderr) and
+# its errors: "[coverage] ERROR calendar: ..." still ends with a failed=0 summary,
+# and a refused send ends with failed=1 or more. There is no start line, so a run
+# is the text since the previous summary line (or the start of the log). It is
+# finished when its summary says failed=0 and no "[coverage] ERROR" line is in that
+# text. A crashed run prints no summary, so its traceback joins the next run's text
+# and is allowed there: that next good run clears it.
+_COVERAGE_LINE = r"\[[^\]\n]+\] \[coverage\] "
+_COVERAGE_SUMMARY = (rf"{_COVERAGE_LINE}season=\S+ expected=\d+ tracked=\d+ alerts=\d+ "
+                     r"reminders=\d+ blind=\d+ sent=\d+ failed=")
 RUN_END = {
     "meettrack-discover": re.compile(
         rf"^{_DISCOVER_LINE}scraped=[^\n]*\n"
         rf"(?:(?!{_DISCOVER_LINE}|Traceback \(most recent call last\):)[^\n]*\n)*"
-        rf"{_DISCOVER_LINE}probed=\d+/\d+[^\n]*$", re.MULTILINE),
+        r"^\[(?P<end_ts>[^\]\n]+)\] \[discover\] probed=\d+/\d+[^\n]*$", re.MULTILINE),
+    "meettrack-coverage": re.compile(
+        # Start right after the previous summary line (lookbehinds are fixed width,
+        # hence one per digit count), or at the start of the log.
+        r"(?:\A|(?<=failed=\d\n)|(?<=failed=\d\d\n)|(?<=failed=\d\d\d\n)|(?<= dry_run=1\n))"
+        rf"(?:(?!{_COVERAGE_LINE}season=)(?![^\n]*\[coverage\] ERROR)[^\n]*\n)*"
+        rf"^{_COVERAGE_SUMMARY}0$", re.MULTILINE),
+}
+# Logs whose finished runs must also be recent (label -> hours). A cron that stops
+# running writes nothing, so the error-marker rule alone never sees it. The age is
+# read from the RUN_END match's `end_ts` group.
+RUN_MAX_AGE_H = {
+    "meettrack-discover": 3,     # hourly at :17; two missed runs leave it at most 2h43m old at a poll
 }
 SERVICES = ["tailscaled"]
 
@@ -76,6 +101,16 @@ SERVICES = ["tailscaled"]
 def cron_log_status(label: str, text: str) -> CheckStatus:
     """The cron-log rule for one log: alerts and the Jev shadow both use it."""
     return check_cron_log(label, text, run_end=RUN_END.get(label))
+
+
+def cron_status(label: str, text: str, now_epoch: float) -> CheckStatus:
+    """The alerting status for one cron log: its log rule, then its run age. The
+    age stays out of cron_log_status, so the Jev shadow's verdict is the log's alone."""
+    status = cron_log_status(label, text)
+    if label in RUN_MAX_AGE_H:
+        status = check_run_age(status, text, RUN_END[label], now_epoch,
+                               max_age_hours=RUN_MAX_AGE_H[label])
+    return status
 
 
 def load_state(path) -> dict:
@@ -399,7 +434,7 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
             missing.append(label)
             continue
         found.append(label)
-        out.append(cron_log_status(label, text))
+        out.append(cron_status(label, text, now_epoch))
     out.append(check_log_coverage(found, missing))
 
     alertwatch = alertwatch_status(now_epoch)

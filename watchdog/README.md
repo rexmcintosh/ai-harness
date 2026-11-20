@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover`, any line after its last finished run (warn) |
+| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover` and `coverage_check`, any line after the last finished run instead (warn); for `discover`, also no finished run for over 3h (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
@@ -66,12 +66,47 @@ the run. So:
   next run's `probed=`. That next run is then a blind-index run (no `scraped=` of its own),
   which always prints its `ERROR` after `probed=` or, if it crashes first, a traceback
   before it that breaks the pair. So the false pairing cannot hide a failure today.
-- Limits. A poll that lands while a run is writing to stderr could see a half-written run
-  and alert once (runs start at :17 and take seconds; polls are at :00 and :30). A
-  discovery cron that stops running altogether leaves no line and is not caught here.
-- The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`).
-  Jev itself is still sent the last 50 lines, so after a recovered crash Jev's own answer
-  can differ from the rule's. Both are only recorded; nothing reads them back.
+- Limit. A poll that lands while a run is writing to stderr could see a half-written run
+  and alert once (runs start at :17 and take seconds; polls are at :00 and :30).
+- A discovery cron that stops running, or a run that hangs and holds its `flock`, writes
+  no line. So the same check also warns when the last finished run is more than 3 hours
+  old (`RUN_MAX_AGE_H` in `run.py`). The time is the one on that run's `probed=` line. A
+  good run every hour leaves it at most 43 minutes old at a poll, and two missed runs at
+  most 2h43m, so the third missed run warns. It keeps the name `cron:meettrack-discover`:
+  an outage that keeps crashing is one alert stream, and its error lines stay as the
+  evidence. An unreadable time warns too. An empty log is not timed.
+- A discovery cron paused on purpose now warns every 6 hours. To pause it quietly, also
+  take `meettrack-discover` out of `RUN_MAX_AGE_H`.
+- The regex verdict recorded by the Jev shadow uses this same rule (`cron_log_status`),
+  without the age. Jev itself is still sent the last 50 lines, so after a recovered crash
+  Jev's own answer can differ from the rule's. Both are only recorded; nothing reads them
+  back.
+
+The daily coverage check log (`cron:meettrack-coverage`) writes one line a good run, so a
+crash would stay in a 50-line tail for weeks and repeat its alert every 6 hours. It uses
+`RUN_END` too. A good run prints only its summary,
+`[<time>] [coverage] season=... sent=N failed=0`, last. Errors print before it, in the same
+run, and there is no start line. So a run is the text since the previous summary line (or
+the start of the log), and it is finished when its summary says `failed=0` and no
+`[coverage] ERROR` line is in that text. Exit paths of `coverage_check.py`:
+
+- Good run: the summary line only (all 23 real runs to 20 Nov 2026).
+- Telegram refused a message: `[coverage] ERROR <key>: Telegram refused ...`, then a summary
+  with `failed=1` or more. Not finished, so it warns. The job retries the next day.
+- Calendar unreadable: `[coverage] ERROR calendar: ...`, then a summary with `failed=0`. Not
+  finished, so it warns every 6 hours while the calendar stays broken. (The job itself says
+  so on Telegram only once a season.)
+- A crash (a traceback) or a shell error: no summary, so everything after the last finished
+  run warns.
+- Notes (`[coverage warn] ...`, `tg-send:` lines on stderr) inside a finished run never alert.
+  A crashed run's traceback joins the next run's text and is allowed there, so the next good
+  run clears it.
+
+A failed run warns at the next poll and every 6 hours after, until the next morning's run
+clears it. Limit: a run that printed a `[coverage] ERROR` line but no summary (another
+check held its lock, or it crashed after the ERROR) keeps the warning one run longer, since
+the next run's text still holds that line. The check does not yet notice a coverage cron
+that stops running.
 
 ## Jev shadow mode (shadow only)
 
