@@ -215,12 +215,19 @@ def test_discover_probe_warn_with_no_end_line_after_it_counts():
 
 
 def test_other_logs_keep_the_plain_tail_rule():
-    from watchdog.run import cron_log_status
+    from watchdog.run import RUN_END, RUN_MAX_AGE_H, cron_log_status, cron_status
     from watchdog.triage import check_cron_log
     log = _good_run(1) + _CRASH_522 + _good_run(3)
-    for label in ("meettrack-ingest", "meettrack-supervise", "meettrack-coverage"):
+    for label in ("meettrack-ingest", "meettrack-supervise"):
+        assert label not in RUN_END and label not in RUN_MAX_AGE_H
         assert cron_log_status(label, log) == check_cron_log(label, log)
+        assert cron_status(label, log, _epoch("2030-01-01T00:00:00+00:00")) == check_cron_log(label, log)
         assert cron_log_status(label, log).level == "warn"
+
+
+def _epoch(iso):
+    from datetime import datetime
+    return datetime.fromisoformat(iso).timestamp()
 
 
 def test_collect_and_the_shadow_use_the_same_discover_rule(monkeypatch, tmp_path):
@@ -231,9 +238,212 @@ def test_collect_and_the_shadow_use_the_same_discover_rule(monkeypatch, tmp_path
     monkeypatch.setattr(run, "_cmd", lambda args: "")
     monkeypatch.setattr(run, "collect_metrics", lambda now, prior: ([], {}))
     monkeypatch.setattr(run, "alertwatch_status", lambda now: None)
-    statuses, _ = run.collect(1_800_000_000, {})
+    statuses, _ = run.collect(int(_epoch("2026-09-22T03:30:00+00:00")), {})
     assert [s.level for s in statuses if s.name == "cron:meettrack-discover"] == ["ok"]
     assert [lvl for label, _, lvl in run.shadow_logs({}) if label == "meettrack-discover"] == ["ok"]
+
+
+# --- discovery freshness: a cron that stops running writes nothing ----------
+
+def test_discover_last_finished_run_older_than_three_hours_warns():
+    from watchdog.run import cron_status
+    log = _good_run(1) + _good_run(2)               # last run finished 02:17:06
+    assert cron_status("meettrack-discover", log, _epoch("2026-09-22T05:17:06+00:00")).level == "ok"
+    st = cron_status("meettrack-discover", log, _epoch("2026-09-22T05:17:07+00:00"))
+    assert st.level == "warn" and st.name == "cron:meettrack-discover"
+    assert "no meettrack-discover run has finished for 3.0h" in st.summary
+    assert "2026-09-22T02:17:06+00:00" in st.summary
+    assert "probed=0/0" in st.evidence
+
+
+def test_discover_age_is_read_from_the_probed_line_of_the_last_finished_run():
+    # a later blind-index run (probed= with no scraped=) is not a finished run
+    from watchdog.run import cron_status
+    log = _good_run(1) + _BLIND_PROBED + _BLIND_ERROR        # blind run at 02:17
+    st = cron_status("meettrack-discover", log, _epoch("2026-09-22T04:30:00+00:00"))
+    assert st.level == "warn"
+    assert "for 3.2h" in st.summary and "2026-09-22T01:17:06+00:00" in st.summary
+    assert "[discover] ERROR" in st.evidence                 # the lines that follow stay as evidence
+
+
+def test_discover_stale_and_crashing_is_one_alert_stream():
+    # an outage that keeps crashing warns from the log rule first, then from the age:
+    # same check name and level, so the 6-hour cooldown holds
+    from watchdog.run import cron_status
+    from watchdog.triage import triage
+    log = _good_run(1) + _CRASH_522
+    first = cron_status("meettrack-discover", log, _epoch("2026-09-22T01:30:00+00:00"))
+    assert first.level == "warn" and "error marker" in first.summary
+    out = triage([first], {}, int(_epoch("2026-09-22T01:30:00+00:00")))
+    assert out["escalate"]
+    later = cron_status("meettrack-discover", log, _epoch("2026-09-22T05:00:00+00:00"))
+    assert later.level == "warn" and "has finished for" in later.summary
+    assert "522 Server Error" in later.evidence
+    assert not triage([later], out["state"], int(_epoch("2026-09-22T05:00:00+00:00")))["escalate"]
+
+
+def test_discover_unreadable_end_time_warns():
+    from watchdog.run import cron_status
+    log = ("[sometime] [discover] scraped=10 inserted=0 updated=10\n"
+           "[sometime] [discover] probed=0/0 candidates\n")
+    st = cron_status("meettrack-discover", log, _epoch("2026-09-22T03:30:00+00:00"))
+    assert st.level == "warn" and "cannot read the time" in st.summary
+
+
+def test_discover_log_with_no_finished_run_is_left_to_the_log_rule():
+    from watchdog.run import cron_log_status, cron_status
+    now = _epoch("2030-01-01T00:00:00+00:00")
+    assert cron_status("meettrack-discover", "", now).level == "ok"      # an empty log is not timed
+    assert cron_status("meettrack-discover", _CRASH_522, now) == cron_log_status("meettrack-discover", _CRASH_522)
+
+
+def test_the_shadow_verdict_never_includes_the_age(monkeypatch, tmp_path):
+    import watchdog.run as run
+    log = tmp_path / "discover.cron.log"
+    log.write_text(_good_run(1))
+    monkeypatch.setattr(run, "CRON_LOGS", [("meettrack-discover", log)])
+    monkeypatch.setattr(run, "_cmd", lambda args: "")
+    monkeypatch.setattr(run, "collect_metrics", lambda now, prior: ([], {}))
+    monkeypatch.setattr(run, "alertwatch_status", lambda now: None)
+    statuses, _ = run.collect(int(_epoch("2026-09-23T00:00:00+00:00")), {})
+    assert [s.level for s in statuses if s.name == "cron:meettrack-discover"] == ["warn"]
+    assert [lvl for label, _, lvl in run.shadow_logs({}) if label == "meettrack-discover"] == ["ok"]
+
+
+def test_every_age_limit_reads_a_run_end_time():
+    from watchdog.run import RUN_END, RUN_MAX_AGE_H
+    for label in RUN_MAX_AGE_H:
+        assert "end_ts" in RUN_END[label].groupindex
+
+
+def test_an_age_limit_with_no_run_end_time_warns_instead_of_stopping_the_poll(monkeypatch):
+    import watchdog.run as run
+    monkeypatch.setattr(run, "RUN_MAX_AGE_H", {"meettrack-coverage": 26, "meettrack-ingest": 1})
+    now = _epoch("2026-11-02T08:00:00+00:00")
+    for label in ("meettrack-coverage", "meettrack-ingest"):    # no end_ts group / no RUN_END
+        st = run.cron_status(label, _cov_run(1), now)
+        assert st.level == "warn" and "watchdog config" in st.summary and label in st.summary
+
+
+# --- the daily coverage check log (one line a good run) ----------------------
+# Lines copied from the real coverage_check.cron.log; error lines from the print
+# calls in splash_poller coverage_check.py.
+
+def _cov_run(day, failed=0, alerts=0, sent=0):
+    return (f"[2026-11-{day:02d}T07:00:02+00:00] [coverage] season=2026-2027 expected=4 tracked=1 "
+            f"alerts={alerts} reminders=0 blind=0 sent={sent} failed={failed}\n")
+
+
+_COV_CRASH = ("Traceback (most recent call last):\n"
+              '  File "/home/dev/projects/splash_poller/coverage_check.py", line 390, in _run\n'
+              "requests.exceptions.HTTPError: 522 Server Error: <none> for url: "
+              "https://example.supabase.co/rest/v1/meet_registry\n")
+_COV_LOCK = ("[coverage] ERROR another coverage check holds "
+             "/home/dev/projects/splash_poller/logs/coverage_alerts.json.lock; not run\n")
+_COV_REFUSED = ("tg-send: sendMessage rejected by Telegram (HTTP 400)\n"
+                "  [coverage] ERROR por-2026-2027:anl-5: Telegram refused the message (exit 1); "
+                "retried next run\n")
+_COV_CALENDAR = "[coverage] ERROR calendar: calendar/por-2026-2027.toml: Expected '=' at line 4\n"
+_COV_WARN = ("  [coverage warn] https://x.example/meet/: ReadTimeout: read timed out; "
+             "checked again next run\n")
+_COV_UNCERTAIN = ("tg-send: delivery uncertain (network failure)\n"
+                  "  [coverage warn] por-2026-2027:anl-5: Telegram answer uncertain; not sent again\n")
+
+
+def _cov(log):
+    from watchdog.run import cron_log_status
+    return cron_log_status("meettrack-coverage", log)
+
+
+def test_coverage_run_end_matches_each_real_good_run():
+    from watchdog.run import RUN_END
+    rule = RUN_END["meettrack-coverage"]
+    real = ("[2026-10-29T07:00:02+00:00] [coverage] season=2026-2027 expected=2 tracked=1 alerts=1 "
+            "reminders=0 blind=0 sent=1 failed=0\n"
+            "[2026-11-20T07:00:01+00:00] [coverage] season=2026-2027 expected=6 tracked=3 alerts=0 "
+            "reminders=0 blind=0 sent=0 failed=0\n")
+    assert len(list(rule.finditer(real))) == 2
+    assert _cov(real).level == "ok"
+    assert _cov(_cov_run(1) * 400).level == "ok"            # past the 50-line tail
+
+
+def test_coverage_crash_warns_until_the_next_good_run():
+    st = _cov(_cov_run(1) + _COV_CRASH)
+    assert st.level == "warn" and "522 Server Error" in st.evidence
+    assert _cov(_cov_run(1) + _COV_CRASH + _cov_run(2)).level == "ok"
+    # the plain tail would have kept it for weeks
+    from watchdog.triage import check_cron_log
+    assert check_cron_log("meettrack-coverage", _cov_run(1) + _COV_CRASH + _cov_run(2) * 40).level == "warn"
+
+
+def test_coverage_refused_send_is_not_a_finished_run():
+    log = _cov_run(1) + _COV_REFUSED + _cov_run(2, failed=1, alerts=1)
+    st = _cov(log)
+    assert st.level == "warn" and "Telegram refused" in st.evidence
+    assert _cov(log + _cov_run(3)).level == "ok"            # retried and sent next run
+    for failed in (12, 1000):                                # any count still starts the next run
+        many = _cov_run(1) + _COV_REFUSED + _cov_run(2, failed=failed, alerts=failed)
+        assert _cov(many).level == "warn"
+        assert _cov(many + _cov_run(3)).level == "ok"
+
+
+def test_coverage_calendar_error_warns_while_it_lasts_even_with_failed_0():
+    log = _cov_run(1)
+    for day in (2, 3, 4):
+        log += _COV_CALENDAR + _cov_run(day)
+        st = _cov(log)
+        assert st.level == "warn", day
+        assert "ERROR calendar" in st.evidence
+    assert _cov(log + _cov_run(5)).level == "ok"            # calendar fixed
+
+
+def test_coverage_calendar_error_hidden_behind_a_note_still_warns():
+    # the match must not start on the line after the ERROR: the whole run counts
+    st = _cov(_cov_run(1) + _COV_CALENDAR + _COV_WARN + _COV_UNCERTAIN + _cov_run(2))
+    assert st.level == "warn" and "ERROR calendar" in st.evidence
+
+
+def test_coverage_notes_inside_a_finished_run_are_ok():
+    assert _cov(_cov_run(1) + _COV_UNCERTAIN + _COV_WARN + _cov_run(2, alerts=1, sent=1)).level == "ok"
+
+
+def test_coverage_lock_error_warns_and_clears_on_the_second_good_run():
+    # Known limit: the lock path prints its ERROR and no summary, so the next run's
+    # text still holds that line. It clears one run later.
+    assert _cov(_cov_run(1) + _COV_LOCK).level == "warn"
+    assert _cov(_cov_run(1) + _COV_LOCK + _cov_run(2)).level == "warn"
+    assert _cov(_cov_run(1) + _COV_LOCK + _cov_run(2) + _cov_run(3)).level == "ok"
+
+
+def test_coverage_shell_error_with_no_error_word_warns():
+    st = _cov(_cov_run(1) + "/bin/sh: 1: /usr/bin/python3: not found\n")
+    assert st.level == "warn" and "after its last finished run" in st.summary
+
+
+def test_coverage_summary_line_that_changed_warns_until_run_end_is_updated():
+    def changed(day):
+        return _cov_run(day).replace("failed=0", "failed=0 skipped=0")
+    assert _cov(_cov_run(1) + changed(2)).level == "warn"
+    st = _cov(_cov_run(1) + changed(2) + changed(3) + changed(4))
+    assert st.level == "warn" and "3 line(s)" in st.summary
+    # after a rotation or truncation no known summary is left: still a warning, never ok
+    for log in (changed(2), changed(2) * 60, changed(2) + "\n"):
+        assert _cov(log).level == "warn"
+
+
+def test_coverage_a_dry_run_appended_by_hand_starts_the_next_run():
+    dry = ("[dry-run] would send (alert, x):\nMeetTrack: a meet is not tracked yet.\n\n"
+           + _cov_run(2, alerts=1).replace("failed=0", "failed=0 dry_run=1"))
+    assert _cov(_cov_run(1) + dry).level == "warn"
+    assert _cov(_cov_run(1) + dry + _cov_run(3)).level == "ok"
+
+
+def test_coverage_has_no_age_limit_yet():
+    from watchdog.run import RUN_MAX_AGE_H, cron_log_status, cron_status
+    log = _cov_run(1)
+    assert "meettrack-coverage" not in RUN_MAX_AGE_H
+    assert cron_status("meettrack-coverage", log, _epoch("2030-01-01T00:00:00+00:00")) == \
+        cron_log_status("meettrack-coverage", log)
 
 
 def test_collect_reports_log_coverage(monkeypatch, tmp_path):

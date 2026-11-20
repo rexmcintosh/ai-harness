@@ -189,11 +189,17 @@ def _outcome_text(line: str) -> str:
     return _JSON_EMPTY_COUNTER.sub("", strip_json_data_lists(line))
 
 
-def _after_last_run_end(log_text: str, run_end) -> str | None:
-    """The text after the last match of `run_end`, or None when it never matches."""
+def _last_run_end(log_text: str, run_end):
+    """The last match of `run_end` in the log, or None when it never matches."""
     last = None
     for last in run_end.finditer(log_text):
         pass
+    return last
+
+
+def _after_last_run_end(log_text: str, run_end) -> str | None:
+    """The text after the last match of `run_end`, or None when it never matches."""
+    last = _last_run_end(log_text, run_end)
     return None if last is None else log_text[last.end():]
 
 
@@ -202,7 +208,8 @@ def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
     """Scan the tail of a cron log for error markers. Tail-only so an old, since-
     resolved error doesn't fire forever.
 
-    `run_end` (a compiled regex, searched in the whole text) is for a quiet log
+    `run_end` (a compiled regex searched in the whole text, or any object whose
+    finditer(text) yields regex matches in order) is for a quiet log
     whose good runs each end with a known pattern and print nothing after it.
     Then only the text after its last match (all of it, with no match) counts,
     however long: a crash stops counting once a later run finishes, even while
@@ -226,6 +233,39 @@ def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
                            f"{len(hits)} error marker(s) in recent {name} log",
                            evidence="\n".join(hits[-5:]))
     return CheckStatus(f"cron:{name}", "ok", f"{name} log clean")
+
+
+def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float, *,
+                  max_age_hours: float) -> CheckStatus:
+    """`status` (check_cron_log's verdict on this log, same `run_end`), unless the
+    last finished run is more than `max_age_hours` old. A cron that stops running,
+    or a run that hangs and holds its lock, writes nothing, so no log rule sees it.
+
+    The finish time is the `end_ts` group of the last `run_end` match. Too old ->
+    warn (a crit stays crit) under the same check name, so one outage is one alert stream: a run that
+    keeps crashing is already a warn here, and its lines stay as the evidence.
+    An unreadable time warns too. A log with no finished run is left to `status`:
+    check_cron_log warns on any line in it, and an empty log is not timed."""
+    last = _last_run_end(log_text, run_end)
+    if last is None:
+        return status
+    label = status.name.removeprefix("cron:")
+    stamp = last.group("end_ts")
+    end_line = last.group(0).splitlines()[-1]
+    finished = _iso_epoch(stamp)
+    level = "crit" if status.level == "crit" else "warn"      # never lower a crit
+    if finished is None:
+        return CheckStatus(status.name, level,
+                           f"cannot read the time of the last finished {label} run",
+                           evidence="\n".join(filter(None, (end_line, status.evidence))))
+    age_h = (now_epoch - finished) / 3600
+    if age_h <= max_age_hours:
+        return status
+    return CheckStatus(status.name, level,
+                       f"no {label} run has finished for {age_h:.1f}h (limit "
+                       f"{max_age_hours:g}h; last at {stamp}): its cron may have stopped, "
+                       f"a run may be stuck, or every run since has failed",
+                       evidence=status.evidence or end_line)
 
 
 def check_log_coverage(found: list[str], missing: list[str]) -> CheckStatus:
