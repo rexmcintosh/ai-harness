@@ -208,7 +208,8 @@ def check_cron_log(name: str, log_text: str, *, tail_lines: int = 50,
     """Scan the tail of a cron log for error markers. Tail-only so an old, since-
     resolved error doesn't fire forever.
 
-    `run_end` (a compiled regex, searched in the whole text) is for a quiet log
+    `run_end` (a compiled regex searched in the whole text, or any object whose
+    finditer(text) yields regex matches in order) is for a quiet log
     whose good runs each end with a known pattern and print nothing after it.
     Then only the text after its last match (all of it, with no match) counts,
     however long: a crash stops counting once a later run finishes, even while

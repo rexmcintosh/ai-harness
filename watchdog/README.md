@@ -83,12 +83,13 @@ the run. So:
   back.
 
 The daily coverage check log (`cron:meettrack-coverage`) writes one line a good run, so a
-crash would stay in a 50-line tail for weeks and repeat its alert every 6 hours. It uses
-`RUN_END` too. A good run prints only its summary,
-`[<time>] [coverage] season=... sent=N failed=0`, last. Errors print before it, in the same
-run, and there is no start line. So a run is the text since the previous summary line (or
-the start of the log), and it is finished when its summary says `failed=0` and no
-`[coverage] ERROR` line is in that text. Exit paths of `coverage_check.py`:
+crash would stay in a 50-line tail for weeks and repeat its alert every 6 hours. Its
+`RUN_END` entry is a small line parser (`_CoverageRunEnd` in `run.py`). A good run prints
+only its summary, `[<time>] [coverage] season=... sent=N failed=0`, last. Errors print
+before it, in the same run, and there is no start line. So a run is the text since the
+previous `[<time>] [coverage] season=` line of any shape (or the start of the log), and it
+is finished when its summary has the known shape with `failed=0` and no `[coverage] ERROR`
+line is in that text. Exit paths of `coverage_check.py`:
 
 - Good run: the summary line only (all 23 real runs to 20 Nov 2026).
 - Telegram refused a message: `[coverage] ERROR <key>: Telegram refused ...`, then a summary
@@ -103,10 +104,17 @@ the start of the log), and it is finished when its summary says `failed=0` and n
   run clears it.
 
 A failed run warns at the next poll and every 6 hours after, until the next morning's run
-clears it. Limit: a run that printed a `[coverage] ERROR` line but no summary (another
-check held its lock, or it crashed after the ERROR) keeps the warning one run longer, since
-the next run's text still holds that line. The check does not yet notice a coverage cron
-that stops running.
+clears it. If splash_poller changes the summary line, every run after the change warns
+until `_CoverageRunEnd` is updated, and a log left with no known summary at all (after a
+rotation) warns too. Limits:
+
+- A run that printed a `[coverage] ERROR` line but no summary (another check held its
+  lock, or it crashed after the ERROR) keeps the warning one run longer, since the next
+  run's text still holds that line.
+- The job and the watchdog both start at 07:00. A poll that reads the log while the run is
+  still writing (a `tg-send:` line on stderr comes before the summary) can alert once; the
+  next poll clears it.
+- The check does not yet notice a coverage cron that stops running.
 
 ## Jev shadow mode (shadow only)
 

@@ -316,6 +316,15 @@ def test_every_age_limit_reads_a_run_end_time():
         assert "end_ts" in RUN_END[label].groupindex
 
 
+def test_an_age_limit_with_no_run_end_time_warns_instead_of_stopping_the_poll(monkeypatch):
+    import watchdog.run as run
+    monkeypatch.setattr(run, "RUN_MAX_AGE_H", {"meettrack-coverage": 26, "meettrack-ingest": 1})
+    now = _epoch("2026-11-02T08:00:00+00:00")
+    for label in ("meettrack-coverage", "meettrack-ingest"):    # no end_ts group / no RUN_END
+        st = run.cron_status(label, _cov_run(1), now)
+        assert st.level == "warn" and "watchdog config" in st.summary and label in st.summary
+
+
 # --- the daily coverage check log (one line a good run) ----------------------
 # Lines copied from the real coverage_check.cron.log; error lines from the print
 # calls in splash_poller coverage_check.py.
@@ -372,9 +381,10 @@ def test_coverage_refused_send_is_not_a_finished_run():
     st = _cov(log)
     assert st.level == "warn" and "Telegram refused" in st.evidence
     assert _cov(log + _cov_run(3)).level == "ok"            # retried and sent next run
-    log12 = _cov_run(1) + _COV_REFUSED + _cov_run(2, failed=12, alerts=12)
-    assert _cov(log12).level == "warn"
-    assert _cov(log12 + _cov_run(3)).level == "ok"           # two digits still start the next run
+    for failed in (12, 1000):                                # any count still starts the next run
+        many = _cov_run(1) + _COV_REFUSED + _cov_run(2, failed=failed, alerts=failed)
+        assert _cov(many).level == "warn"
+        assert _cov(many + _cov_run(3)).level == "ok"
 
 
 def test_coverage_calendar_error_warns_while_it_lasts_even_with_failed_0():
@@ -410,9 +420,15 @@ def test_coverage_shell_error_with_no_error_word_warns():
     assert st.level == "warn" and "after its last finished run" in st.summary
 
 
-def test_coverage_summary_line_that_changed_warns():
-    changed = _cov_run(2).replace("failed=0", "failed=0 skipped=0")
-    assert _cov(_cov_run(1) + changed).level == "warn"
+def test_coverage_summary_line_that_changed_warns_until_run_end_is_updated():
+    def changed(day):
+        return _cov_run(day).replace("failed=0", "failed=0 skipped=0")
+    assert _cov(_cov_run(1) + changed(2)).level == "warn"
+    st = _cov(_cov_run(1) + changed(2) + changed(3) + changed(4))
+    assert st.level == "warn" and "3 line(s)" in st.summary
+    # after a rotation or truncation no known summary is left: still a warning, never ok
+    for log in (changed(2), changed(2) * 60, changed(2) + "\n"):
+        assert _cov(log).level == "warn"
 
 
 def test_coverage_a_dry_run_appended_by_hand_starts_the_next_run():
