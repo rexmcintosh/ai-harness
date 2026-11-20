@@ -257,7 +257,7 @@ def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float,
     if finished is None:
         return CheckStatus(status.name, level,
                            f"cannot read the time of the last finished {label} run",
-                           evidence=end_line)
+                           evidence="\n".join(filter(None, (end_line, status.evidence))))
     age_h = (now_epoch - finished) / 3600
     if age_h <= max_age_hours:
         return status

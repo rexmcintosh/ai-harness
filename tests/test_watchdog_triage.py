@@ -232,6 +232,7 @@ def test_run_age_never_turns_a_crit_into_a_warn():
     assert stale.evidence == "the crit's lines"
     unreadable = check_run_age(crit, "[yesterday] run done\n", _TIMED_END, _T0, max_age_hours=3)
     assert unreadable.level == "crit" and "cannot read the time" in unreadable.summary
+    assert unreadable.evidence == "[yesterday] run done\nthe crit's lines"   # its lines are kept
 
 
 # --- triage (escalation + flap suppression) ---------------------------------
