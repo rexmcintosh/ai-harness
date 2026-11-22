@@ -474,6 +474,17 @@ def test_coverage_age_survives_the_autumn_clock_change():
     assert _cov_age(summer, "2026-10-25T08:30:00+00:00").level == "warn"  # that run missed
 
 
+def test_coverage_age_around_the_spring_clock_change():
+    # 07:00 UTC on the last winter day, 06:00 UTC the day after: a 23h gap, then a
+    # missed run warns at 09:30 UTC, three and a half hours after it was due
+    winter = _cov_run(28).replace("2026-11-28T07:00:02", "2027-03-27T07:00:02")
+    summer = _cov_run(28).replace("2026-11-28T07:00:02", "2027-03-28T06:00:02")
+    assert _cov_age(winter, "2027-03-28T06:00:59+00:00").level == "ok"
+    assert _cov_age(winter + summer, "2027-03-28T06:30:00+00:00").level == "ok"
+    assert _cov_age(winter, "2027-03-28T09:00:00+00:00").level == "ok"
+    assert _cov_age(winter, "2027-03-28T09:30:00+00:00").level == "warn"
+
+
 def test_coverage_age_counts_from_the_last_finished_run():
     # a refused send or a calendar ERROR is not a finished run, so the age keeps growing
     for bad in (_COV_REFUSED + _cov_run(2, failed=1, alerts=1), _COV_CALENDAR + _cov_run(2)):

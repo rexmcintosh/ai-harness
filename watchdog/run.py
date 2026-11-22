@@ -111,6 +111,7 @@ RUN_MAX_AGE_H = {
     "meettrack-discover": 3,     # hourly at :17; two missed runs leave it at most 2h43m old at a poll
     # daily at 07:00 Lisbon time (06:00 UTC in summer): the autumn clock change makes
     # one 25h gap; a missed run warns at the first poll past 26h, about 2.5h later
+    # (1.5h on the autumn change day, 3.5h on the spring one)
     "meettrack-coverage": 26,
 }
 SERVICES = ["tailscaled"]

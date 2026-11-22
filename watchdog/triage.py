@@ -244,7 +244,8 @@ def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float,
     The finish time is the `end_ts` group of the last `run_end` match. Too old ->
     warn (a crit stays crit) under the same check name, so one outage is one alert stream: a run that
     keeps crashing is already a warn here, and its lines stay as the evidence.
-    An unreadable time warns too. A log with no finished run is left to `status`:
+    An unreadable time warns too, and so does one with no time zone (it would be read
+    as this host's local time). A log with no finished run is left to `status`:
     check_cron_log warns on any line in it, and an empty log is not timed."""
     last = _last_run_end(log_text, run_end)
     if last is None:
@@ -252,7 +253,7 @@ def check_run_age(status: CheckStatus, log_text: str, run_end, now_epoch: float,
     label = status.name.removeprefix("cron:")
     stamp = last.group("end_ts")
     end_line = last.group(0).splitlines()[-1]
-    finished = _iso_epoch(stamp)
+    finished = _aware_iso_epoch(stamp)
     level = "crit" if status.level == "crit" else "warn"      # never lower a crit
     if finished is None:
         return CheckStatus(status.name, level,
@@ -304,6 +305,15 @@ def _iso_epoch(ts: str | None) -> float | None:
         return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
+
+
+def _aware_iso_epoch(ts: str | None) -> float | None:
+    """Like _iso_epoch, but a time with no zone offset is unreadable (None)."""
+    try:
+        parsed = datetime.fromisoformat(ts.replace("Z", "+00:00")) if ts else None
+    except ValueError:
+        return None
+    return parsed.timestamp() if parsed is not None and parsed.tzinfo is not None else None
 
 
 # One published event without results is the normal in-flight state: a

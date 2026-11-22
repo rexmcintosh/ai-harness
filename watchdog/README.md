@@ -123,10 +123,12 @@ warns when the last finished run is more than 26 hours old (`RUN_MAX_AGE_H` in `
 - The cron runs at 07:00 Lisbon time, which is 06:00 UTC in summer. The autumn clock change
   leaves one 25-hour gap between runs, and 26 hours covers it.
 - A missed run warns at the first poll past 26 hours, about two and a half hours after it
-  was due, then every 6 hours until a run finishes.
+  was due (one and a half on the autumn clock change day, three and a half on the spring
+  one), then every 6 hours until a run finishes.
 - A failed run is not a finished run, so it does not reset the age. The outage stays one
   alert stream under `cron:meettrack-coverage`, with the failed run's lines as evidence.
-- An unreadable time warns too. An empty log is not timed.
+- An unreadable time warns too, and so does a time with no zone offset. An empty log is
+  not timed, so a cron that stops just after its log is emptied (a rotation) is not seen.
 - A coverage cron paused on purpose now warns every 6 hours. To pause it quietly, also take
   `meettrack-coverage` out of `RUN_MAX_AGE_H`.
 
