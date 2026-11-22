@@ -219,6 +219,13 @@ def test_run_age_unreadable_time_warns():
     assert "[yesterday]" in st.evidence
 
 
+def test_run_age_time_with_no_zone_warns():
+    # read as this host's local time it could be an hour off: refuse it
+    st = _aged("[2027-01-15T08:00:00] run done\n", _T0)
+    assert st.level == "warn" and "cannot read the time" in st.summary
+    assert "cannot read" not in _aged("[2027-01-15T08:00:00Z] run done\n", _T0).summary
+
+
 def test_run_age_with_no_finished_run_returns_the_log_status():
     for log in ("", "Traceback (most recent call last):\n"):
         assert _aged(log, _T0) == check_cron_log("q", log, run_end=_TIMED_END)
