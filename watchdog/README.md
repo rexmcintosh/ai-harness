@@ -26,7 +26,7 @@ A pure-Python pre-check (`watchdog/run.py`) collects signals and triages them wi
 | `bebop` | `bebop/logs/runs.log` | last run failed (crit), or no run in >14h (warn) |
 | `disk` | `df -P /` | ≥95% crit, ≥85% warn |
 | `svc:tailscaled` | `systemctl is-active` | not `active` (crit) |
-| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover` and `coverage_check`, any line after the last finished run instead (warn); for `discover`, also no finished run for over 3h (warn) |
+| `cron:*` | MeetTrack logs: `ingest_entries`, `supervise`, `coverage_check` and `discover` cron logs | error markers in the last 50 lines (warn); for `discover` and `coverage_check`, any line after the last finished run instead (warn); also no finished run for too long: over 3h for `discover`, over 26h for `coverage_check` (warn) |
 | `cron-logs:coverage` | which configured cron logs were readable | none of them is readable, so the log check is blind (warn) |
 | `proc:orphans` | `ps -eo pid,ppid,etime,args` | a `codex` process has PPID 1 and ≥6h elapsed (warn) |
 | `meets.freshness` | `meet_registry` (racing hours, Lisbon) | a meet `failed` in 24h (crit); a live writer's `last_ingest_at` ≥30/75 min old while a published event has no results (warn/crit); events missing results or tick errors (warn); a live meet unlaunched ≥30 min (warn) |
@@ -91,7 +91,7 @@ previous `[<time>] [coverage] season=` line of any shape (or the start of the lo
 is finished when its summary has the known shape with `failed=0` and no `[coverage] ERROR`
 line is in that text. Exit paths of `coverage_check.py`:
 
-- Good run: the summary line only (all 23 real runs to 20 Nov 2026).
+- Good run: the summary line only (all 25 real runs to 22 Nov 2026).
 - Telegram refused a message: `[coverage] ERROR <key>: Telegram refused ...`, then a summary
   with `failed=1` or more. Not finished, so it warns. The job retries the next day.
 - Calendar unreadable: `[coverage] ERROR calendar: ...`, then a summary with `failed=0`. Not
@@ -114,7 +114,21 @@ rotation) warns too. Limits:
 - The job and the watchdog both start at 07:00. A poll that reads the log while the run is
   still writing (a `tg-send:` line on stderr comes before the summary) can alert once; the
   next poll clears it.
-- The check does not yet notice a coverage cron that stops running.
+
+A coverage cron that stops running writes nothing. Neither does a run that hangs and holds
+its `flock`, and the next day's run is then skipped without a line. So the same check also
+warns when the last finished run is more than 26 hours old (`RUN_MAX_AGE_H` in `run.py`):
+
+- The time is the one on the summary line, taken seconds before the run ends.
+- The cron runs at 07:00 Lisbon time, which is 06:00 UTC in summer. The autumn clock change
+  leaves one 25-hour gap between runs, and 26 hours covers it.
+- A missed run warns at the first poll past 26 hours, about two and a half hours after it
+  was due, then every 6 hours until a run finishes.
+- A failed run is not a finished run, so it does not reset the age. The outage stays one
+  alert stream under `cron:meettrack-coverage`, with the failed run's lines as evidence.
+- An unreadable time warns too. An empty log is not timed.
+- A coverage cron paused on purpose now warns every 6 hours. To pause it quietly, also take
+  `meettrack-coverage` out of `RUN_MAX_AGE_H`.
 
 ## Jev shadow mode (shadow only)
 

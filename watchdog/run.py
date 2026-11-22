@@ -78,9 +78,12 @@ class _CoverageRunEnd:
     known shape with failed=0 and no "[coverage] ERROR" line is in that text. A
     crashed run prints no summary, so its traceback joins the next run's text and is
     allowed there: that next good run clears it. finditer() yields the finished runs'
-    summary-line matches in order, which is all check_cron_log reads."""
+    summary-line matches in order, which is all check_cron_log reads. The age check
+    reads the summary's time (`end_ts`, taken after the reads and before the sends,
+    seconds before the run ends); `groupindex` tells cron_status the group is there."""
     _LINE = r"\[[^\]\n]+\] \[coverage\] "
-    _SUMMARY = re.compile(rf"^{_LINE}season=[^\n]*$", re.MULTILINE)
+    _SUMMARY = re.compile(r"^\[(?P<end_ts>[^\]\n]+)\] \[coverage\] season=[^\n]*$", re.MULTILINE)
+    groupindex = _SUMMARY.groupindex
     _GOOD = re.compile(rf"{_LINE}season=\S+ expected=\d+ tracked=\d+ alerts=\d+ "
                        r"reminders=\d+ blind=\d+ sent=\d+ failed=0")
     _ERROR = "[coverage] ERROR"
@@ -106,6 +109,9 @@ RUN_END = {
 # read from the RUN_END match's `end_ts` group.
 RUN_MAX_AGE_H = {
     "meettrack-discover": 3,     # hourly at :17; two missed runs leave it at most 2h43m old at a poll
+    # daily at 07:00 Lisbon time (06:00 UTC in summer): the autumn clock change makes
+    # one 25h gap; a missed run warns at the first poll past 26h, about 2.5h later
+    "meettrack-coverage": 26,
 }
 SERVICES = ["tailscaled"]
 

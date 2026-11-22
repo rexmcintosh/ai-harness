@@ -317,7 +317,10 @@ def test_every_age_limit_reads_a_run_end_time():
 
 
 def test_an_age_limit_with_no_run_end_time_warns_instead_of_stopping_the_poll(monkeypatch):
+    import re
     import watchdog.run as run
+    no_time = re.compile(r"^\[[^\]\n]+\] \[coverage\] season=[^\n]*$", re.MULTILINE)
+    monkeypatch.setattr(run, "RUN_END", {**run.RUN_END, "meettrack-coverage": no_time})
     monkeypatch.setattr(run, "RUN_MAX_AGE_H", {"meettrack-coverage": 26, "meettrack-ingest": 1})
     now = _epoch("2026-11-02T08:00:00+00:00")
     for label in ("meettrack-coverage", "meettrack-ingest"):    # no end_ts group / no RUN_END
@@ -438,12 +441,73 @@ def test_coverage_a_dry_run_appended_by_hand_starts_the_next_run():
     assert _cov(_cov_run(1) + dry + _cov_run(3)).level == "ok"
 
 
-def test_coverage_has_no_age_limit_yet():
-    from watchdog.run import RUN_MAX_AGE_H, cron_log_status, cron_status
-    log = _cov_run(1)
-    assert "meettrack-coverage" not in RUN_MAX_AGE_H
-    assert cron_status("meettrack-coverage", log, _epoch("2030-01-01T00:00:00+00:00")) == \
-        cron_log_status("meettrack-coverage", log)
+# --- coverage freshness: a daily cron that stops (or a flock -n skip) writes nothing
+
+def _cov_age(log, now_iso):
+    from watchdog.run import cron_status
+    return cron_status("meettrack-coverage", log, _epoch(now_iso))
+
+
+def test_coverage_last_finished_run_older_than_26_hours_warns():
+    log = _cov_run(1) + _cov_run(2)                       # last run finished 2026-11-02T07:00:02
+    assert _cov_age(log, "2026-11-03T07:00:00+00:00").level == "ok"   # the next run is still writing
+    assert _cov_age(log, "2026-11-03T09:00:02+00:00").level == "ok"
+    st = _cov_age(log, "2026-11-03T09:00:03+00:00")
+    assert st.level == "warn" and st.name == "cron:meettrack-coverage"
+    assert "no meettrack-coverage run has finished for 26.0h" in st.summary
+    assert "2026-11-02T07:00:02+00:00" in st.summary
+    assert st.evidence.startswith("[2026-11-02T07:00:02+00:00] [coverage] season=")
+
+
+def test_coverage_age_survives_the_autumn_clock_change():
+    # the cron runs on Lisbon time: 06:00 UTC on the last summer day, 07:00 UTC the
+    # day after the change, a 25h gap. Every poll in between stays ok, even one that
+    # reads the log a minute late, before the new run's line is in.
+    summer = _cov_run(24).replace("2026-11-24T07:00:02", "2026-10-24T06:00:02")
+    winter = _cov_run(25).replace("2026-11-25T07:00:02", "2026-10-25T07:00:02")
+    start = _epoch("2026-10-24T06:30:59+00:00")
+    from watchdog.run import cron_status
+    for poll in range(50):                                # 06:30 Sat .. 07:00 Sun, every 30 min
+        now = start + poll * 1800
+        assert cron_status("meettrack-coverage", summer, now).level == "ok", poll
+    assert _cov_age(summer + winter, "2026-10-25T07:30:00+00:00").level == "ok"
+    assert _cov_age(summer, "2026-10-25T08:30:00+00:00").level == "warn"  # that run missed
+
+
+def test_coverage_age_counts_from_the_last_finished_run():
+    # a refused send or a calendar ERROR is not a finished run, so the age keeps growing
+    for bad in (_COV_REFUSED + _cov_run(2, failed=1, alerts=1), _COV_CALENDAR + _cov_run(2)):
+        st = _cov_age(_cov_run(1) + bad, "2026-11-02T09:30:00+00:00")
+        assert st.level == "warn" and "has finished for 26.5h" in st.summary
+        assert "2026-11-01T07:00:02+00:00" in st.summary
+        assert "ERROR" in st.evidence                     # the failed run's lines stay as evidence
+
+
+def test_coverage_crash_then_stale_is_one_alert_stream():
+    from watchdog.triage import triage
+    log = _cov_run(1) + _COV_CRASH                        # the 2026-11-02 run crashed
+    first = _cov_age(log, "2026-11-02T07:30:00+00:00")
+    assert first.level == "warn" and "error marker" in first.summary
+    out = triage([first], {}, int(_epoch("2026-11-02T07:30:00+00:00")))
+    assert out["escalate"]
+    later = _cov_age(log, "2026-11-02T09:30:00+00:00")
+    assert later.level == "warn" and "has finished for 26.5h" in later.summary
+    assert "522 Server Error" in later.evidence
+    assert not triage([later], out["state"], int(_epoch("2026-11-02T09:30:00+00:00")))["escalate"]
+
+
+def test_coverage_unreadable_end_time_warns():
+    log = _cov_run(1).replace("2026-11-01T07:00:02+00:00", "sometime")
+    assert _cov(log).level == "ok"                        # the log rule alone is happy
+    st = _cov_age(log, "2026-11-01T08:00:00+00:00")
+    assert st.level == "warn" and "cannot read the time" in st.summary
+
+
+def test_coverage_log_with_no_finished_run_is_left_to_the_log_rule():
+    from watchdog.run import cron_log_status
+    now = "2030-01-01T00:00:00+00:00"
+    assert _cov_age("", now).level == "ok"                 # an empty log is not timed
+    assert _cov_age(_COV_CRASH, now) == cron_log_status("meettrack-coverage", _COV_CRASH)
 
 
 def test_collect_reports_log_coverage(monkeypatch, tmp_path):
