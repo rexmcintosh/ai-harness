@@ -50,6 +50,7 @@ TOOLS_ID = OWN_ID + "tools-"
 CLOSE_GRACE = 5.0
 TERM_GRACE = 3.0
 MAX_PAGES = 100
+LOCK_WAIT = 10.0
 CACHE_MAX_AGE = 30 * 24 * 3600
 # Request families that a server only answers when it advertises the matching
 # capability. Without the capability, the real server would reply "method not
@@ -292,8 +293,12 @@ class Child:
         try:
             # Its own process group, so close() can reach every process the
             # server starts, even one whose parent has already exited.
+            if sys.version_info >= (3, 11):
+                group = {"process_group": 0}
+            else:  # process_group= is new in Python 3.11
+                group = {"preexec_fn": os.setpgrp}
             self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                         process_group=0)
+                                         **group)
         except OSError as error:
             raise StartError(f"cannot run {command[0]}: {error}") from error
         self.lines = queue.Queue()
@@ -374,7 +379,7 @@ class Child:
         running after the grace period get SIGTERM, then SIGKILL.
         """
         proc = self.proc
-        group = proc.pid  # process_group=0 makes the server a group leader
+        group = proc.pid  # the server was started as its own group leader
         # Take the tree first: once the top process exits, its orphans are
         # re-parented and can no longer be found from its pid.
         tree = set(descendants(proc.pid))
@@ -624,12 +629,16 @@ class Proxy:
             # One probe per cache key: sessions that start together wait for
             # the first one's probe and then use its cache.
             # A normal probe takes about a second. If the lock holder is still
-            # busy after probe_timeout, this session probes on its own: waiting
-            # longer would run past the client's own start limit (30 s for
-            # Codex here) and the session would lose the helper altogether.
-            lock = lock_file(self.cache_file + ".lock", self.probe_timeout)
+            # busy after LOCK_WAIT, do not start a second probe: pass this
+            # session straight through. Lock wait plus a real start then stays
+            # well inside the client's own start limit (30 s for Codex here).
+            lock = lock_file(self.cache_file + ".lock", LOCK_WAIT)
             try:
                 cached = load_cache(self.cache_file, self.key)
+                if cached is None and lock is None:
+                    log(f"{label}: no cache and another session is still probing; passing through")
+                    self.fail_open(line)
+                    return
                 if cached is None:
                     log(f"{label}: no cache, asking the real server once")
                     started = time.monotonic()

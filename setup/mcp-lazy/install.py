@@ -38,7 +38,6 @@ NAME = "playwright"
 # 0.0.84 is pinned because its Chromium build (1252) is the one installed in
 # ~/.cache/ms-playwright. 0.0.86 expects build 1255, which is not installed.
 REAL = ["npx", "-y", "@playwright/mcp@0.0.84", "--browser", "chromium"]
-ORIGINAL = ["npx", "-y", "@playwright/mcp@latest", "--browser", "chromium"]
 
 
 BASELINE = STATE / "baseline.json"
@@ -69,13 +68,18 @@ def record_baseline(client, entry):
     private_write(BASELINE, json.dumps(data, indent=2).encode() + b"\n")
 
 
+class NoBaseline(Exception):
+    """--undo has no recorded original entry for this client."""
+
+
 def wanted(client, undo=False):
     """Return the (command, args) the client's entry should hold."""
     if undo:
         saved = read_baseline().get(client)
         if isinstance(saved, dict) and saved.get("command"):
             return saved["command"], list(saved.get("args") or [])
-        return ORIGINAL[0], ORIGINAL[1:]
+        raise NoBaseline(f"no recorded original {client} entry in {BASELINE}; "
+                         f"restore it by hand from {STATE / 'backups'}")
     return str(TARGET), ["--name", NAME, "--key-env", "PLAYWRIGHT_", "--", *REAL]
 
 
@@ -160,6 +164,14 @@ def claude_new_entry(current, undo=False):
     return entry
 
 
+def same_entry(a, b):
+    """True if two Claude entries are equal, treating a missing env as an empty one."""
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    norm = lambda e: {k: v for k, v in e.items() if not (k == "env" and not v)}  # noqa: E731
+    return norm(a) == norm(b)
+
+
 def claude_ok(entry, undo=False):
     command, args = wanted("claude", undo)
     return (isinstance(entry, dict) and entry.get("command") == command
@@ -188,8 +200,7 @@ def set_claude(undo=False):
         # Put the old entry back rather than leave none, and say what happened.
         subprocess.run(add + [json.dumps(current)], stdout=subprocess.DEVNULL)
         restored = claude_entry()
-        if restored is not None and all(restored.get(k) == current.get(k)
-                                        for k in ("command", "args", "env")):
+        if same_entry(restored, current):
             raise SystemExit("`claude mcp add-json` failed; the previous entry was put back")
         raise SystemExit("`claude mcp add-json` failed and the previous entry could NOT be put back; "
                          f"restore it from {STATE / 'backups'}")
@@ -341,8 +352,11 @@ def report(undo=False):
         if label == "codex " and not CODEX_TOML.is_file():
             print(f"info codex: no {CODEX_TOML}; skipped")
             continue
-        good = ok(entry, undo)
         shown = " ".join([entry.get("command", "?"), *entry.get("args", [])]) if isinstance(entry, dict) else "missing"
+        try:
+            good = ok(entry, undo)
+        except NoBaseline as error:
+            good, shown = False, f"{shown} ({error})"
         print(f"{'ok  ' if good else 'FAIL'} {label} playwright: {shown}")
         if not good:
             problems.append(label.strip())
@@ -365,10 +379,12 @@ def main():
     if not args.check:
         if not args.undo and install_file():
             print(f"installed {TARGET}")
-        if set_claude(args.undo):
-            print("changed ~/.claude.json playwright entry")
-        if set_codex(args.undo):
-            print("changed ~/.codex/config.toml playwright entry")
+        for label, setter in (("~/.claude.json", set_claude), ("~/.codex/config.toml", set_codex)):
+            try:
+                if setter(args.undo):
+                    print(f"changed {label} playwright entry")
+            except NoBaseline as error:
+                print(f"skip {label}: {error}")
     problems = report(args.undo)
     sys.exit(1 if problems else 0)
 

@@ -397,6 +397,32 @@ def test_sessions_that_start_together_share_one_probe(tmp):
         assert client.close() == 0
 
 
+def test_busy_probe_lock_means_pass_through_not_a_second_probe(tmp):
+    import fcntl
+    key = mcp_lazy.cache_key([sys.executable, "-I", FAKE], {
+        "protocolVersion": "2025-06-18", "capabilities": {"roots": {}},
+        "clientInfo": {"name": "test-client", "version": "9"}})
+    lock_path = mcp_lazy.cache_path(str(tmp / "cache"), "fake", key) + ".lock"
+    os.makedirs(tmp / "cache", exist_ok=True)
+    with open(lock_path, "a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        client = tmp.client()
+        started = time.monotonic()
+        reply, _ = client.request("initialize", {
+            "protocolVersion": "2025-06-18", "capabilities": {"roots": {}},
+            "clientInfo": {"name": "test-client", "version": "9"}}, timeout=mcp_lazy.LOCK_WAIT + 15)
+        waited = time.monotonic() - started
+        assert reply["result"]["serverInfo"]["name"] == "fake"
+        client.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    assert mcp_lazy.LOCK_WAIT - 1 <= waited <= mcp_lazy.LOCK_WAIT + 8
+    # One real server, and it stays up: the session was passed through.
+    assert len(client.starts()) == 1
+    assert mcp_lazy.alive(client.starts()[0]["pid"])
+    assert call(client, "echo", text="through")[0]["result"]["content"][0]["text"] == "through"
+    assert len(client.starts()) == 1
+    assert client.close() == 0
+
+
 def test_repeated_signals_still_shut_down_cleanly(tmp):
     client, pid = live_client(tmp, FAKE_IGNORE_EOF="1")
     for _ in range(3):

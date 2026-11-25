@@ -31,7 +31,10 @@ dependencies.
   files unused for 30 days are deleted.
 - **Cache miss:** the stand-in starts the real server once, records its
   answers, stops it and stays lazy. This took 0.4 to 0.9 s. A lock file next
-  to the cache makes sessions that start together share one probe.
+  to the cache makes sessions that start together share one probe. A session
+  that waits more than 10 s for that lock does not start a second probe; it
+  passes straight through to a real server instead, so its start stays inside
+  the client's own limit (30 s for Codex here).
 - **Own requests:** the stand-in's own request ids carry a random part, and it
   takes back only the replies to ids it has sent, so a client id can never
   be mistaken for one of its own.
@@ -90,10 +93,11 @@ The resulting command for both tools is:
 ~/.local/bin/mcp-lazy --name playwright --key-env PLAYWRIGHT_ -- npx -y @playwright/mcp@0.0.84 --browser chromium
 ```
 
-`--undo` puts back the recorded command and args in both files. Without a
-record, it uses `npx -y @playwright/mcp@latest --browser chromium`, which was
-the entry on lima-vps before the change. It leaves `~/.local/bin/mcp-lazy` in
-place, unused.
+`--undo` puts back the recorded command and args in both files. If a file has
+no record, `--undo` leaves that file alone and says so; restore it from the
+backups folder instead. On lima-vps the record holds
+`npx -y @playwright/mcp@latest --browser chromium` for both. `--undo` leaves
+`~/.local/bin/mcp-lazy` in place, unused.
 
 Sessions that were already running keep their old helper until they restart.
 
@@ -140,6 +144,7 @@ client builds a fresh cache.
 - a server that stops reading its input, and one that closes its output;
 - a process the server starts during shutdown;
 - a failed Claude entry change, with and without a working rollback;
+- a busy probe lock (pass-through, not a second probe);
 - four sessions that start at once (one probe);
 - repeated SIGTERM;
 - cleanup on end of input, on SIGTERM (with a server that ignores end of input

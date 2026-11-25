@@ -52,6 +52,7 @@ def test_edit_changes_only_command_and_args():
 
 
 def test_edit_is_idempotent_and_undo_restores():
+    install.record_baseline("codex", tomllib.loads(CONFIG)["mcp_servers"]["playwright"])
     command, args = install.wanted("codex")
     once = install.edit_codex(CONFIG, command, args)
     assert install.edit_codex(once, command, args) == once
@@ -69,6 +70,14 @@ def test_args_with_a_trailing_comment_are_accepted():
     text = CONFIG.replace('"chromium"]\n', '"chromium"]  # pinned later\n', 1)
     new = install.edit_codex(text, *install.wanted("codex"))
     assert tomllib.loads(new)["mcp_servers"]["playwright"]["args"] == install.wanted("codex")[1]
+
+
+def test_same_entry_compares_every_field():
+    entry = {"type": "stdio", "command": "npx", "args": ["a"]}
+    assert install.same_entry(entry, dict(entry, env={}))
+    assert not install.same_entry(entry, dict(entry, headers={"A": "b"}))
+    assert not install.same_entry(entry, dict(entry, type="http"))
+    assert not install.same_entry(entry, None)
 
 
 def test_remote_claude_entry_becomes_a_plain_local_one():
@@ -109,8 +118,9 @@ def test_undo_restores_the_recorded_original(state):
     undone = install.claude_new_entry(installed, undo=True)
     assert undone == custom
     assert install.claude_ok(undone, undo=True)
-    # Without a record, undo falls back to the packaged default.
-    assert install.wanted("codex", undo=True) == (install.ORIGINAL[0], install.ORIGINAL[1:])
+    # Without a record, undo refuses rather than guess an entry.
+    with pytest.raises(install.NoBaseline):
+        install.wanted("codex", undo=True)
 
 
 def test_backups_are_private(state):
