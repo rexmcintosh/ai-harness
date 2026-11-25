@@ -114,6 +114,23 @@ The process names were checked on 2026-11-25:
   of the server that hosts them. Claude Code's built-in
   `CLAUDE_CODE_TOOL_MEMORY_LIMIT` cannot help there: the session scope is
   owned by root, so Claude cannot create its tool cgroup.
+- The process stopped at a cap is the one with the highest score in that
+  group, and that is not always the test. If a T3 session runs many mid-size
+  jobs, the Claude session itself can be the largest process. In the shared
+  desktop-app scope, the largest can be a different chat.
+- The caps count file cache as well as program memory. The kernel drops cache
+  before it stops a process. Peaks measured on 2026-11-25, which include
+  cache:
+  - the desktop-app server's session reached 7.1 GB;
+  - the standalone Codex server's session reached 9.7 GB;
+  - one T3 Claude session reached 3.8 GB.
+  A suite that needs more than about 5 GB of program memory in one T3
+  session (4 GB plus 1 GB of swap) is now stopped. So is a suite that needs
+  more than about 4 GB on top of the idle desktop-app chats. To raise a cap,
+  change `AGENT_CAP`, `SESSION_CAP` or the swap caps at the top of the script,
+  then run it.
+- tmux panes run in `tmux-spawn-*.scope` units under `user@1000.service`, and
+  those are not capped. None were running on 2026-11-25.
 - A command stopped at a cap exits with status 137 ("Killed"). An agent can
   still re-run it unchanged.
 - The login-session cap applies to every user's sessions, root included.
