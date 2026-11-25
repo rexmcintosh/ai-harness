@@ -1,5 +1,6 @@
 """Tests for the mcp-lazy installer's config edits."""
 import importlib.util
+import json
 import tomllib
 from pathlib import Path
 
@@ -105,3 +106,41 @@ def test_backups_are_private(state):
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
     assert state.stat().st_mode & 0o777 == 0o700
+
+
+class FakeRun:
+    """Stands in for subprocess.run when the installer calls the claude CLI."""
+
+    def __init__(self, entry, add_fails, restore_works):
+        self.calls = []
+        self.entry = entry
+        self.add_fails = add_fails
+        self.restore_works = restore_works
+
+    def __call__(self, argv, **_kwargs):
+        self.calls.append(argv)
+        code = 0
+        if argv[2] == "add-json":
+            first_add = sum(1 for a in self.calls if a[2] == "add-json") == 1
+            if first_add and self.add_fails:
+                code = 1
+            elif not first_add and self.restore_works:
+                self.entry = json.loads(argv[-1])
+        elif argv[2] == "remove":
+            self.entry = None
+        return type("Result", (), {"returncode": code})()
+
+
+@pytest.mark.parametrize("restore_works", [True, False])
+def test_failed_claude_add_reports_whether_the_old_entry_came_back(monkeypatch, restore_works):
+    current = {"type": "stdio", "command": "npx", "args": ["-y", "x"], "env": {}}
+    fake = FakeRun(current, add_fails=True, restore_works=restore_works)
+    monkeypatch.setattr(install.shutil, "which", lambda _name: "/bin/claude")
+    monkeypatch.setattr(install.subprocess, "run", fake)
+    monkeypatch.setattr(install, "claude_entry", lambda: fake.entry)
+    with pytest.raises(SystemExit) as stop:
+        install.set_claude()
+    if restore_works:
+        assert "was put back" in str(stop.value)
+    else:
+        assert "could NOT be put back" in str(stop.value)

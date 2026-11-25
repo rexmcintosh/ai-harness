@@ -93,6 +93,14 @@ def main():
             elif name == "crash":
                 event(event="exit", reason="crash")
                 os._exit(7)
+            elif name == "close_stdout":
+                # Stop answering but keep running and reading.
+                send({"jsonrpc": "2.0", "id": rid, "result": {"content": []}})
+                sys.stdout.close()
+                os.close(1)
+                event(event="stdout-closed")
+                while True:
+                    time.sleep(1)
             elif name == "close_stdin":
                 # Stop reading input but keep the output open and keep running.
                 send({"jsonrpc": "2.0", "id": rid, "result": {"content": []}})
@@ -104,6 +112,12 @@ def main():
                 send({"jsonrpc": "2.0", "id": rid, "error": {"code": -32602, "message": "unknown tool"}})
         else:
             send({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "Method not found"}})
+    if os.environ.get("FAKE_SPAWN_ON_EOF"):
+        # Start a new child during shutdown, then exit and orphan it.
+        late = subprocess.Popen(["sleep", "300"])
+        event(event="grandchild", child=late.pid)
+        event(event="exit", reason="eof-orphan")
+        os._exit(0)
     if os.environ.get("FAKE_IGNORE_EOF"):
         event(event="eof-ignored")
         while True:

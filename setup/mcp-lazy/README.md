@@ -47,9 +47,13 @@ dependencies.
   (exit 1) instead of leaving requests unanswered.
 - **Stopping:** at the end of input, or on SIGTERM, SIGINT or SIGHUP, the
   stand-in closes the server's input. The Playwright server then closes its
-  browser and exits. Processes still running after 5 s get SIGTERM, then
-  SIGKILL after 3 s more. If the stand-in itself is killed with SIGKILL, the
-  server sees the end of its input and exits.
+  browser and exits. The real server runs in its own process group. Anything
+  still running after 5 s, in that group or below the server, gets SIGTERM,
+  then SIGKILL after 3 s more. That includes a process the server started
+  during shutdown and left behind. If the stand-in itself is killed with
+  SIGKILL, the server sees the end of its input and exits.
+- **A server that stops answering:** if the real server closes its output but
+  keeps running, the stand-in stops it the same way and exits.
 
 ## Install, check, undo
 
@@ -130,7 +134,9 @@ client builds a fresh cache.
 - list changes;
 - start failures and corrupt caches;
 - client ids that look like the stand-in's own;
-- a server that stops reading its input;
+- a server that stops reading its input, and one that closes its output;
+- a process the server starts during shutdown;
+- a failed Claude entry change, with and without a working rollback;
 - four sessions that start at once (one probe);
 - repeated SIGTERM;
 - cleanup on end of input, on SIGTERM (with a server that ignores end of input

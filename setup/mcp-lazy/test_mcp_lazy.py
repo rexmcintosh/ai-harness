@@ -396,6 +396,21 @@ def test_repeated_signals_still_shut_down_cleanly(tmp):
     assert mcp_lazy.wait_gone({pid}, 5)
 
 
+def test_server_that_closes_output_but_keeps_running_ends_the_session(tmp):
+    client, pid = live_client(tmp)
+    assert call(client, "close_stdout")[0]["result"] == {"content": []}
+    # No hang: the stand-in stops the server and exits within the grace periods.
+    assert client.proc.wait(timeout=20) != 0
+    assert mcp_lazy.wait_gone({pid}, 5)
+
+
+def test_child_started_during_shutdown_is_stopped(tmp):
+    client, pid = live_client(tmp, FAKE_SPAWN_ON_EOF="1")
+    assert client.close(timeout=20) == 0
+    late = [e["child"] for e in client.events() if e["event"] == "grandchild"]
+    assert late and mcp_lazy.wait_gone(set(late) | {pid}, 10)
+
+
 def test_usage_errors():
     with pytest.raises(SystemExit):
         mcp_lazy.main(["--name", "x"])

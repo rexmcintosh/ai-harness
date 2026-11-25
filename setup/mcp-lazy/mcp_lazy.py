@@ -202,23 +202,45 @@ def prune_cache(folder, keep):
 # Process tree helpers
 
 
-def descendants(pid):
-    """Return the pids of every process below pid (Linux /proc walk)."""
-    children = {}
+def proc_table():
+    """Return {pid: (ppid, process group, state)} for every process (Linux /proc)."""
+    table = {}
     try:
         entries = os.listdir("/proc")
     except OSError:
-        return []
+        return table
     for entry in entries:
         if not entry.isdigit():
             continue
         try:
             with open(f"/proc/{entry}/stat", "rb") as handle:
                 stat = handle.read().decode(errors="replace")
-            ppid = int(stat[stat.rindex(")") + 2:].split()[1])
+            fields = stat[stat.rindex(")") + 2:].split()
+            table[int(entry)] = (int(fields[1]), int(fields[2]), fields[0])
         except (OSError, ValueError, IndexError):
             continue
-        children.setdefault(ppid, []).append(int(entry))
+    return table
+
+
+def group_members(group, table=None):
+    """Return the live pids in a process group."""
+    table = proc_table() if table is None else table
+    return [pid for pid, (_, pgrp, state) in table.items() if pgrp == group and state != "Z"]
+
+
+def signal_group(group, sig):
+    try:
+        os.killpg(group, sig)
+    except OSError:
+        pass
+
+
+def descendants(pid, table=None):
+    """Return the pids of every process below pid."""
+    table = proc_table() if table is None else table
+    children = {}
+    for child, (ppid, _, _) in table.items():
+        children.setdefault(ppid, []).append(child)
     found, todo = [], [pid]
     while todo:
         for child in children.get(todo.pop(), []):
@@ -262,7 +284,10 @@ class Child:
 
     def __init__(self, command):
         try:
-            self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            # Its own process group, so close() can reach every process the
+            # server starts, even one whose parent has already exited.
+            self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         process_group=0)
         except OSError as error:
             raise StartError(f"cannot run {command[0]}: {error}") from error
         self.lines = queue.Queue()
@@ -343,26 +368,35 @@ class Child:
         running after the grace period get SIGTERM, then SIGKILL.
         """
         proc = self.proc
+        group = proc.pid  # process_group=0 makes the server a group leader
         # Take the tree first: once the top process exits, its orphans are
         # re-parented and can no longer be found from its pid.
         tree = set(descendants(proc.pid))
-        with self.write_lock:
+        # If another thread is stuck writing to a server that stopped reading,
+        # do not wait for it: the signals below end that write.
+        if self.write_lock.acquire(timeout=1.0):
             try:
                 proc.stdin.close()
             except (OSError, ValueError):
                 pass
-        try:
-            proc.wait(timeout=grace)
-        except subprocess.TimeoutExpired:
-            pass
+            finally:
+                self.write_lock.release()
+            try:
+                proc.wait(timeout=grace)
+            except subprocess.TimeoutExpired:
+                pass
+        table = proc_table()
+        tree.update(descendants(proc.pid, table))
+        tree.update(group_members(group, table))
         if proc.poll() is None:
             tree.add(proc.pid)
-            tree.update(descendants(proc.pid))
         tree = [pid for pid in tree if alive(pid)]
         if tree:
             log(f"server did not stop on end of input; sending SIGTERM to {len(tree)} process(es)")
+            signal_group(group, signal.SIGTERM)
             signal_all(tree, signal.SIGTERM)
             if not wait_gone(tree, TERM_GRACE):
+                signal_group(group, signal.SIGKILL)
                 signal_all([pid for pid in tree if alive(pid)], signal.SIGKILL)
                 wait_gone(tree, 1.0)
         try:
@@ -494,6 +528,12 @@ class Proxy:
         child, self.child = self.child, None
         if child is not None:
             child.close()
+        if code is None:  # use the real server's exit code
+            returncode = child.proc.returncode if child is not None else None
+            if returncode is None:
+                code = 1
+            else:
+                code = returncode if returncode >= 0 else 128 - returncode
         try:
             self.stdout.flush()
         except (OSError, ValueError, RuntimeError):
@@ -576,6 +616,10 @@ class Proxy:
         if cached is None:
             # One probe per cache key: sessions that start together wait for
             # the first one's probe and then use its cache.
+            # A normal probe takes about a second. If the lock holder is still
+            # busy after probe_timeout, this session probes on its own: waiting
+            # longer would run past the client's own start limit (30 s for
+            # Codex here) and the session would lose the helper altogether.
             lock = lock_file(self.cache_file + ".lock", self.probe_timeout)
             try:
                 cached = load_cache(self.cache_file, self.key)
@@ -677,9 +721,9 @@ class Proxy:
     def from_child(self, line):
         """Called on the reader thread for every line the real server writes."""
         if line is None:
-            child = self.child
-            code = child.proc.wait() if child is not None else 1
-            self.finish(code if code >= 0 else 128 - code, f"real server exited (code {code})")
+            # The server closed its output: it has exited, or it can no longer
+            # answer. finish() stops whatever is left, within a bounded time.
+            self.finish(None, "real server closed its output")
             return
         if self.pending_tools and OWN_ID_BYTES in line:
             message = parse(line)

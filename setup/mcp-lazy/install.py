@@ -173,9 +173,16 @@ def set_claude(undo=False):
                        stdout=subprocess.DEVNULL)
     result = subprocess.run(add + [json.dumps(new)], stdout=subprocess.DEVNULL)
     if result.returncode != 0:
-        if current is not None:  # put the old entry back rather than leave none
-            subprocess.run(add + [json.dumps(current)], stdout=subprocess.DEVNULL)
-        raise SystemExit("`claude mcp add-json` failed; the previous entry was put back")
+        if current is None:
+            raise SystemExit("`claude mcp add-json` failed; there was no previous entry")
+        # Put the old entry back rather than leave none, and say what happened.
+        subprocess.run(add + [json.dumps(current)], stdout=subprocess.DEVNULL)
+        restored = claude_entry()
+        if restored is not None and all(restored.get(k) == current.get(k)
+                                        for k in ("command", "args", "env")):
+            raise SystemExit("`claude mcp add-json` failed; the previous entry was put back")
+        raise SystemExit("`claude mcp add-json` failed and the previous entry could NOT be put back; "
+                         f"restore it from {STATE / 'backups'}")
     if not claude_ok(claude_entry(), undo):
         raise SystemExit("~/.claude.json does not show the new entry after `claude mcp add-json`")
     return True
