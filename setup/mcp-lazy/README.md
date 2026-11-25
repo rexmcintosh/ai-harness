@@ -1,0 +1,136 @@
+# mcp-lazy: start the browser helper only when a session uses it
+
+Claude Code and Codex start every configured stdio MCP server when a session
+starts, and keep it running until the session ends. On lima-vps each session
+started its own Playwright MCP server (`npx -y @playwright/mcp@latest`), about
+120 MB each. On 2026-11-25, 15 copies were running and none had a browser open:
+about 1.8 GB of memory for nothing. Claude Code has no setting that starts a
+local MCP server on first use. The docs describe deferred start only for HTTP
+servers.
+
+`mcp_lazy.py` stands in for the real server. It is plain Python 3 with no
+dependencies.
+
+## How it works
+
+- **Session start:** the stand-in answers `initialize` and `tools/list` from a
+  cache. The session sees all 25 browser tools as usual. No real server runs.
+- **First browser call:** the stand-in starts the real server, replays the
+  client's own `initialize` parameters, and sends `notifications/initialized`
+  itself. From then on it passes every message through unchanged, in both
+  directions. Server-to-client requests such as `roots/list` pass through too.
+- **Cache:** `~/.cache/mcp-lazy/playwright-<hash>.json`. The key is the full
+  real command line, the client's protocol version and the client name. Claude
+  Code (`claude-code`, protocol `2025-11-25`) and Codex (`codex-mcp-client`,
+  protocol `2025-06-18`) each get their own entry. Their tool lists are the same.
+- **Cache miss:** the stand-in starts the real server once, records its
+  answers, stops it and stays lazy. This took 0.4 to 0.9 s.
+- **Refresh:** after every real start, the stand-in asks for the tools again.
+  If the list changed, it updates the cache and sends
+  `notifications/tools/list_changed`.
+- **Requests it cannot answer:** a request outside the cached capabilities
+  (for example `resources/list`, when the server offers only tools) gets
+  "method not found", which the real server would also send. Any other request
+  starts the real server.
+- **Failures:** if the cache cannot be built, the stand-in passes the session
+  straight through to the real server. If the real server will not start for a
+  call, that call gets an error and the stand-in stays up, so a later call can
+  try again. If the real server exits, the stand-in exits with its code.
+- **Stopping:** at the end of input, or on SIGTERM, SIGINT or SIGHUP, the
+  stand-in closes the server's input. The Playwright server then closes its
+  browser and exits. Processes still running after 5 s get SIGTERM, then
+  SIGKILL after 3 s more. If the stand-in itself is killed with SIGKILL, the
+  server sees the end of its input and exits.
+
+## Install, check, undo
+
+```sh
+setup/mcp-lazy/install.py            # install or repair, then check
+setup/mcp-lazy/install.py --check    # check only; exit 1 if anything differs
+setup/mcp-lazy/install.py --undo     # put the original entries back
+```
+
+The installer:
+
+- copies `mcp_lazy.py` to `~/.local/bin/mcp-lazy`;
+- sets the user-scope `playwright` entry in `~/.claude.json` with
+  `claude mcp remove` and `claude mcp add-json`, because live sessions rewrite
+  that file;
+- changes only the `command` and `args` lines of `[mcp_servers.playwright]` in
+  `~/.codex/config.toml`. `startup_timeout_sec` and every other line stay the
+  same. It refuses the edit if anything else would change.
+
+Before it replaces anything, the installer saves the old copy in
+`~/.local/state/mcp-lazy/backups/`.
+
+The resulting command for both tools is:
+
+```
+~/.local/bin/mcp-lazy --name playwright -- npx -y @playwright/mcp@0.0.84 --browser chromium
+```
+
+`--undo` restores `npx -y @playwright/mcp@latest --browser chromium` in both
+files. It leaves `~/.local/bin/mcp-lazy` in place, unused.
+
+Sessions that were already running keep their old helper until they restart.
+
+### The Codex entry and the Claude mirror
+
+The Codex `playwright` entry sits inside the `# BEGIN managed Claude mirror`
+block that `setup/claude-codex-mirror/settings.py` writes. That tool copies
+the entry from `~/.claude.json`. On 2026-11-25 it already refused to refresh,
+because Codex had added other lines to the block. A later refresh would copy
+the new `~/.claude.json` entry, which is the same stand-in, so the two stay in
+agreement.
+
+## The pinned version
+
+The helper is pinned to `@playwright/mcp@0.0.84`. Before this change,
+`@latest` resolved to 0.0.86. That version expects Chromium build 1255, which
+is not installed, so every browser call failed with "Browser
+chrome-for-testing is not installed". Version 0.0.84 uses build 1252, which is
+installed in `~/.cache/ms-playwright`.
+
+To move to a newer version:
+
+1. Install its browser, for example
+   `npx -y @playwright/mcp@<version> install-browser chrome-for-testing`.
+2. Change `REAL` in `install.py`.
+3. Run `install.py`.
+
+The new command line gives a new cache key, so the first session of each
+client builds a fresh cache.
+
+## Tests
+
+`test_mcp_lazy.py` drives the stand-in over real pipes against
+`fake_mcp_server.py`. It covers:
+
+- the cache miss, the cache hit and pass-through;
+- the replayed handshake;
+- a server-to-client round trip;
+- a 3 MB message;
+- tool lists split over several pages;
+- list changes;
+- start failures and corrupt caches;
+- cleanup on end of input, on SIGTERM (with a server that ignores end of input
+  and has a child process), on SIGKILL of the stand-in, and on a server crash.
+
+`test_mcp_lazy_install.py` covers the Codex config edit and the Claude entry
+check.
+
+```sh
+.venv/bin/python -m pytest setup/mcp-lazy -q
+```
+
+These checks with the real helper passed on lima-vps on 2026-11-25:
+
+- **Direct:** with the stand-in at the start of a session, no helper process
+  ran and the stand-in used 16 to 17 MB. The first `browser_navigate` started
+  the helper in 0.3 to 0.5 s and opened the page. With the browser open, all
+  three ways of stopping the session (end of input, SIGTERM, SIGKILL) left no
+  `npm exec`, `node` or Chrome process behind.
+- **Claude Code 2.1.331:** two `claude -p` sessions opened a page through the
+  stand-in. A third session that did not use the browser never started the
+  helper.
+- **Codex 0.172.0:** `codex exec` opened a page through the stand-in.
