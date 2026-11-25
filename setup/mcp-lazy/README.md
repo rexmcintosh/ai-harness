@@ -24,7 +24,11 @@ dependencies.
   Code (`claude-code`, protocol `2025-11-25`) and Codex (`codex-mcp-client`,
   protocol `2025-06-18`) each get their own entry. Their tool lists are the same.
 - **Cache miss:** the stand-in starts the real server once, records its
-  answers, stops it and stays lazy. This took 0.4 to 0.9 s.
+  answers, stops it and stays lazy. This took 0.4 to 0.9 s. A lock file next
+  to the cache makes sessions that start together share one probe.
+- **Own requests:** the stand-in's own request ids carry a random part, and it
+  takes back only the replies to ids it has sent, so a client id can never
+  be mistaken for one of its own.
 - **Refresh:** after every real start, the stand-in asks for the tools again.
   If the list changed, it updates the cache and sends
   `notifications/tools/list_changed`.
@@ -35,7 +39,9 @@ dependencies.
 - **Failures:** if the cache cannot be built, the stand-in passes the session
   straight through to the real server. If the real server will not start for a
   call, that call gets an error and the stand-in stays up, so a later call can
-  try again. If the real server exits, the stand-in exits with its code.
+  try again. If the real server exits, the stand-in exits with its code. If
+  the real server stops reading its input, the stand-in ends the session
+  (exit 1) instead of leaving requests unanswered.
 - **Stopping:** at the end of input, or on SIGTERM, SIGINT or SIGHUP, the
   stand-in closes the server's input. The Playwright server then closes its
   browser and exits. Processes still running after 5 s get SIGTERM, then
@@ -113,6 +119,10 @@ client builds a fresh cache.
 - tool lists split over several pages;
 - list changes;
 - start failures and corrupt caches;
+- client ids that look like the stand-in's own;
+- a server that stops reading its input;
+- four sessions that start at once (one probe);
+- repeated SIGTERM;
 - cleanup on end of input, on SIGTERM (with a server that ignores end of input
   and has a child process), on SIGKILL of the stand-in, and on a server crash.
 

@@ -26,10 +26,12 @@ If the cache cannot be built, mcp-lazy falls back to plain pass-through, which
 is what the client would have got without it.
 """
 import argparse
+import fcntl
 import hashlib
 import json
 import os
 import queue
+import secrets
 import signal
 import subprocess
 import sys
@@ -38,10 +40,15 @@ import threading
 import time
 
 CACHE_VERSION = 1
-INIT_ID = "mcp-lazy-init"
-TOOLS_ID = "mcp-lazy-tools-"
+# Request ids that mcp-lazy sends to the real server itself. The random part
+# keeps them apart from any id a client could choose.
+OWN_ID = f"mcp-lazy-{secrets.token_hex(8)}-"
+OWN_ID_BYTES = OWN_ID.encode()
+INIT_ID = OWN_ID + "init"
+TOOLS_ID = OWN_ID + "tools-"
 CLOSE_GRACE = 5.0
 TERM_GRACE = 3.0
+MAX_PAGES = 100
 # Request families that a server only answers when it advertises the matching
 # capability. Without the capability, the real server would reply "method not
 # found" too, so mcp-lazy replies that itself instead of starting the server.
@@ -59,7 +66,7 @@ def log(message):
     try:
         sys.stderr.write(f"mcp-lazy[{NAME}]: {message}\n")
         sys.stderr.flush()
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         pass
     if LOG_FILE:
         stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -77,6 +84,36 @@ def debug(message):
 
 class StartError(Exception):
     """The real server did not start or did not finish its handshake."""
+
+
+class Stop(BaseException):
+    """Raised by the signal handler so the main loop shuts down normally.
+
+    A BaseException, so the fail-open `except Exception` in the main loop does
+    not catch it, and `with` blocks release their locks on the way out.
+    """
+
+
+def lock_file(path, timeout):
+    """Take an exclusive lock on path, waiting up to timeout. Return the handle or None."""
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        handle = open(path, "a")
+    except OSError:
+        return None
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return handle
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                handle.close()
+                return None
+            time.sleep(0.05)
+        except OSError:
+            handle.close()
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -322,14 +359,16 @@ def probe(command, init_params, timeout):
     """Start the server, record its initialize result and tools, stop it."""
     child = Child(command)
     try:
-        deadline = time.monotonic() + timeout
         init_result, held = handshake(child, init_params, timeout)
         tools, cursor, page = [], None, 0
         while True:
             page += 1
+            if page > MAX_PAGES:
+                raise StartError(f"tools/list still paging after {MAX_PAGES} pages")
             request = {"jsonrpc": "2.0", "id": f"{TOOLS_ID}{page}", "method": "tools/list"}
             if cursor:
                 request["params"] = {"cursor": cursor}
+            deadline = time.monotonic() + timeout  # each page gets the full timeout
             child.send(request)
             while True:
                 _, message = child.recv(deadline, held)
@@ -383,6 +422,7 @@ class Proxy:
         self.served_tools = None
         self.swallow_initialized = True
         self.refresh_tools = []
+        self.pending_tools = set()   # ids of our own tools/list requests in flight
         self.live_init = None
         self.finish_lock = threading.Lock()
         self.finisher = None
@@ -412,12 +452,10 @@ class Proxy:
     def finish(self, code, reason):
         """Stop the real server and leave the process."""
         with self.finish_lock:
-            finisher = self.finisher
-            if finisher is None:
+            if self.finisher is None:
                 self.finisher = threading.get_ident()
-        if finisher is not None:
-            if finisher == threading.get_ident():
-                return  # a signal arrived while this thread was already finishing
+            mine = self.finisher == threading.get_ident()
+        if not mine:
             while True:  # another thread is finishing and will end the process
                 time.sleep(1)
         log(f"exiting: {reason}")
@@ -426,20 +464,25 @@ class Proxy:
             child.close()
         try:
             self.stdout.flush()
-        except (OSError, ValueError):
+        except (OSError, ValueError, RuntimeError):
             pass
         os._exit(code)
 
     def run(self):
-        while True:
-            line = self.stdin.readline()
-            if not line:
-                self.finish(0, "client closed input")
-            try:
-                self.handle(line)
-            except Exception as error:  # fail open rather than lose the client
-                log(f"internal error: {error!r}; switching to pass-through")
-                self.fail_open(line)
+        try:
+            while True:
+                line = self.stdin.readline()
+                if not line:
+                    self.finish(0, "client closed input")
+                try:
+                    self.handle(line)
+                except Exception as error:  # fail open rather than lose the client
+                    log(f"internal error: {error!r}; switching to pass-through")
+                    self.fail_open(line)
+        except Stop as stop:
+            # The signal handler only raises; the shutdown runs here, outside
+            # the handler, after every `with` block has released its lock.
+            self.finish(0, f"signal {stop}")
 
     def handle(self, line):
         if self.state == "live":
@@ -499,17 +542,28 @@ class Proxy:
         cached = load_cache(self.cache_file, self.key)
         label = f"client {client.get('name')} {client.get('version')} protocol {params.get('protocolVersion')}"
         if cached is None:
-            log(f"{label}: no cache, asking the real server once")
-            started = time.monotonic()
+            # One probe per cache key: sessions that start together wait for
+            # the first one's probe and then use its cache.
+            lock = lock_file(self.cache_file + ".lock", self.probe_timeout)
             try:
-                init_result, tools = probe(self.command, params, self.probe_timeout)
-            except StartError as error:
-                log(f"probe failed ({error}); switching to pass-through")
-                self.fail_open(line)
-                return
-            save_cache(self.cache_file, self.key, init_result, tools)
-            log(f"probe took {time.monotonic() - started:.1f}s; {len(tools)} tools cached; staying lazy")
-            cached = {"initialize": init_result, "tools": tools}
+                cached = load_cache(self.cache_file, self.key)
+                if cached is None:
+                    log(f"{label}: no cache, asking the real server once")
+                    started = time.monotonic()
+                    try:
+                        init_result, tools = probe(self.command, params, self.probe_timeout)
+                    except StartError as error:
+                        log(f"probe failed ({error}); switching to pass-through")
+                        self.fail_open(line)
+                        return
+                    save_cache(self.cache_file, self.key, init_result, tools)
+                    log(f"probe took {time.monotonic() - started:.1f}s; {len(tools)} tools cached; staying lazy")
+                    cached = {"initialize": init_result, "tools": tools}
+                else:
+                    log(f"{label}: cache made by another session, {len(cached['tools'])} tools; staying lazy")
+            finally:
+                if lock is not None:
+                    lock.close()
         else:
             log(f"{label}: cache hit, {len(cached['tools'])} tools; staying lazy")
         self.init_result = cached["initialize"]
@@ -566,18 +620,27 @@ class Proxy:
         try:
             self.child.send(line)
         except StartError as error:
-            log(f"cannot write to the real server: {error}")
+            # The real server no longer reads its input, so no request can be
+            # answered. End the session now rather than leave the client waiting.
+            self.finish(1, f"cannot write to the real server: {error}")
 
     def request_tools(self, page, cursor):
+        if page > MAX_PAGES:
+            log(f"tools refresh still paging after {MAX_PAGES} pages; keeping the cache")
+            return
         request = {"jsonrpc": "2.0", "id": f"{TOOLS_ID}{page}", "method": "tools/list"}
         if cursor:
             request["params"] = {"cursor": cursor}
         if page == 1:
             self.refresh_tools = []
+        self.pending_tools.add(request["id"])
+        child = self.child
+        if child is None:
+            return
         try:
-            self.child.send(request)
-        except (StartError, AttributeError):
-            pass
+            child.send(request)
+        except StartError:
+            self.pending_tools.discard(request["id"])
 
     def from_child(self, line):
         """Called on the reader thread for every line the real server writes."""
@@ -586,10 +649,11 @@ class Proxy:
             code = child.proc.wait() if child is not None else 1
             self.finish(code if code >= 0 else 128 - code, f"real server exited (code {code})")
             return
-        if b'"' + TOOLS_ID.encode() in line:
+        if self.pending_tools and OWN_ID_BYTES in line:
             message = parse(line)
             if (isinstance(message, dict) and "method" not in message
-                    and isinstance(message.get("id"), str) and message["id"].startswith(TOOLS_ID)):
+                    and message.get("id") in self.pending_tools):
+                self.pending_tools.discard(message["id"])
                 self.tools_page(message)
                 return
         self.write(line)
@@ -649,7 +713,10 @@ def main(argv=None):
                   sys.stdin.buffer, sys.stdout.buffer)
 
     def stop(signum, _frame):
-        proxy.finish(0, f"signal {signal.Signals(signum).name}")
+        # Only raise here; Proxy.run() does the shutdown. Once a shutdown has
+        # started, later signals are ignored.
+        if proxy.finisher is None:
+            raise Stop(signal.Signals(signum).name)
 
     for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
         signal.signal(sig, stop)

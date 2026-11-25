@@ -213,6 +213,9 @@ def codex_ok(entry, undo=False):
 
 
 def set_codex(undo=False):
+    if not CODEX_TOML.is_file():
+        print(f"info no {CODEX_TOML}; Codex skipped")
+        return False
     if codex_ok(codex_entry(), undo):
         return False
     original = CODEX_TOML.read_bytes()
@@ -251,6 +254,9 @@ def report(undo=False):
             print(f"FAIL {TARGET} is not executable")
             problems.append("mode")
     for label, entry, ok in (("claude", claude_entry(), claude_ok), ("codex ", codex_entry(), codex_ok)):
+        if label == "codex " and not CODEX_TOML.is_file():
+            print(f"info codex: no {CODEX_TOML}; skipped")
+            continue
         good = ok(entry, undo)
         shown = " ".join([entry.get("command", "?"), *entry.get("args", [])]) if isinstance(entry, dict) else "missing"
         print(f"{'ok  ' if good else 'FAIL'} {label} playwright: {shown}")

@@ -93,6 +93,13 @@ def main():
             elif name == "crash":
                 event(event="exit", reason="crash")
                 os._exit(7)
+            elif name == "close_stdin":
+                # Stop reading input but keep the output open and keep running.
+                send({"jsonrpc": "2.0", "id": rid, "result": {"content": []}})
+                os.close(0)
+                event(event="stdin-closed")
+                while True:
+                    time.sleep(1)
             else:
                 send({"jsonrpc": "2.0", "id": rid, "error": {"code": -32602, "message": "unknown tool"}})
         else:

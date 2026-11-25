@@ -342,6 +342,58 @@ def test_server_crash_ends_the_stand_in(tmp):
     assert mcp_lazy.wait_gone({pid}, 5)
 
 
+def test_client_ids_that_look_internal_are_passed_through(tmp):
+    prime(tmp)
+    client = tmp.client()
+    client.initialize()
+    call(client, "echo", text="start")
+    for rid in ("mcp-lazy-tools-1", "mcp-lazy-init", mcp_lazy.TOOLS_ID + "1"):
+        client.send({"jsonrpc": "2.0", "id": rid, "method": "tools/list"})
+        while True:
+            message = client.recv()
+            if message.get("id") == rid:
+                break
+        assert len(message["result"]["tools"]) == 4
+    assert client.close() == 0
+
+
+def test_server_that_stops_reading_ends_the_session(tmp):
+    client, pid = live_client(tmp)
+    call(client, "close_stdin")
+    deadline = time.monotonic() + 5
+    while not any(e["event"] == "stdin-closed" for e in client.events()):
+        assert time.monotonic() < deadline
+        time.sleep(0.05)
+    client.next_id += 1
+    client.send({"jsonrpc": "2.0", "id": client.next_id, "method": "tools/call",
+                 "params": {"name": "echo", "arguments": {"text": "x"}}})
+    # The stand-in cannot deliver the request, so it ends instead of hanging.
+    assert client.proc.wait(timeout=20) == 1
+    assert mcp_lazy.wait_gone({pid}, 5)
+
+
+def test_sessions_that_start_together_share_one_probe(tmp):
+    clients = [tmp.client() for _ in range(4)]
+    for client in clients:
+        client.send({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                     "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                                "clientInfo": {"name": "test-client", "version": "9"}}})
+    for client in clients:
+        assert client.recv()["result"]["serverInfo"]["name"] == "fake"
+    assert len(clients[0].starts()) == 1
+    for client in clients:
+        assert client.close() == 0
+
+
+def test_repeated_signals_still_shut_down_cleanly(tmp):
+    client, pid = live_client(tmp, FAKE_IGNORE_EOF="1")
+    for _ in range(3):
+        client.proc.send_signal(signal.SIGTERM)
+        time.sleep(0.05)
+    assert client.proc.wait(timeout=15) == 0
+    assert mcp_lazy.wait_gone({pid}, 5)
+
+
 def test_usage_errors():
     with pytest.raises(SystemExit):
         mcp_lazy.main(["--name", "x"])
