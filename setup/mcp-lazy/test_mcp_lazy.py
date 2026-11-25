@@ -303,6 +303,16 @@ def test_cache_key_depends_on_command_and_all_initialize_params():
     assert key != mcp_lazy.cache_key(["npx", "a@1"], dict(base, clientInfo={"name": "codex", "version": "1"}))
 
 
+def test_cache_key_includes_chosen_environment_variables():
+    params = {"protocolVersion": "2025-06-18"}
+    one = mcp_lazy.cache_key(["x"], params, ("PLAYWRIGHT_",), {"PLAYWRIGHT_MCP_CAPS": "a", "HOME": "/h"})
+    two = mcp_lazy.cache_key(["x"], params, ("PLAYWRIGHT_",), {"PLAYWRIGHT_MCP_CAPS": "b", "HOME": "/h"})
+    other_home = mcp_lazy.cache_key(["x"], params, ("PLAYWRIGHT_",), {"PLAYWRIGHT_MCP_CAPS": "a", "HOME": "/x"})
+    assert one != two
+    assert one == other_home
+    assert one["env"] == {"PLAYWRIGHT_MCP_CAPS": "a"}
+
+
 def live_client(tmp, **env):
     prime(tmp, **{k: v for k, v in env.items() if k == "FAKE_TOOLS"})
     client = tmp.client(**env)

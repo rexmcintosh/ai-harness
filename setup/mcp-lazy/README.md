@@ -21,7 +21,10 @@ dependencies.
   directions. Server-to-client requests such as `roots/list` pass through too.
 - **Cache:** `~/.cache/mcp-lazy/playwright-<hash>.json`. The key is the full
   real command line plus the client's whole `initialize` parameters: protocol
-  version, client name and version, and client capabilities. Claude Code
+  version, client name and version, and client capabilities. With
+  `--key-env PLAYWRIGHT_`, any environment variable whose name starts with
+  `PLAYWRIGHT_` is part of the key too, because Playwright MCP reads settings
+  from such variables. Claude Code
   (`claude-code`, protocol `2025-11-25`) and Codex (`codex-mcp-client`,
   protocol `2025-06-18`) each get their own entry; their tool lists are the
   same. A client update gives a new key, so it costs one short probe. Cache
@@ -84,7 +87,7 @@ installer records that entry's command and args in
 The resulting command for both tools is:
 
 ```
-~/.local/bin/mcp-lazy --name playwright -- npx -y @playwright/mcp@0.0.84 --browser chromium
+~/.local/bin/mcp-lazy --name playwright --key-env PLAYWRIGHT_ -- npx -y @playwright/mcp@0.0.84 --browser chromium
 ```
 
 `--undo` puts back the recorded command and args in both files. Without a

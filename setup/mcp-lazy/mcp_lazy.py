@@ -2,7 +2,8 @@
 """mcp-lazy: start a stdio MCP server only when a client first needs it.
 
 Usage:
-    mcp-lazy --name NAME [--cache-dir DIR] [--probe-timeout SECONDS] -- COMMAND [ARG ...]
+    mcp-lazy --name NAME [--cache-dir DIR] [--key-env PREFIX] [--probe-timeout SECONDS]
+             [--log-file PATH] -- COMMAND [ARG ...]
 
 Claude Code and Codex start every configured stdio MCP server when a session
 starts, and keep it running for the whole session. For a server that most
@@ -121,15 +122,20 @@ def lock_file(path, timeout):
 # Cache
 
 
-def cache_key(command, init_params):
+def cache_key(command, init_params, env_prefixes=(), environ=None):
     """The cache key: the real command line plus the client's whole initialize params.
 
     A server may answer differently for another protocol version, client,
     client version or set of client capabilities, so all of them are part of
-    the key. A client update therefore costs one short probe.
+    the key. A client update therefore costs one short probe. Environment
+    variables that start with one of env_prefixes are part of the key too,
+    for servers that read settings from the environment.
     """
     params = init_params if isinstance(init_params, dict) else {}
-    return {"v": CACHE_VERSION, "command": list(command), "params": params}
+    environ = os.environ if environ is None else environ
+    env = {k: v for k, v in environ.items() if any(k.startswith(p) for p in env_prefixes)}
+    return {"v": CACHE_VERSION, "command": list(command), "params": params,
+            "env": dict(sorted(env.items()))}
 
 
 def cache_path(cache_dir, name, key):
@@ -471,11 +477,12 @@ def probe_answer(request):
 
 
 class Proxy:
-    def __init__(self, name, command, cache_dir, probe_timeout, stdin, stdout):
+    def __init__(self, name, command, cache_dir, probe_timeout, stdin, stdout, key_env=()):
         self.name = name
         self.command = command
         self.cache_dir = cache_dir
         self.probe_timeout = probe_timeout
+        self.key_env = tuple(key_env)
         self.stdin = stdin
         self.stdout = stdout
         self.out_lock = threading.Lock()
@@ -609,7 +616,7 @@ class Proxy:
         params = message.get("params") if isinstance(message.get("params"), dict) else {}
         client = params.get("clientInfo") if isinstance(params.get("clientInfo"), dict) else {}
         self.init_params = params
-        self.key = cache_key(self.command, params)
+        self.key = cache_key(self.command, params, self.key_env)
         self.cache_file = cache_path(self.cache_dir, self.name, self.key)
         cached = load_cache(self.cache_file, self.key)
         label = f"client {client.get('name')} {client.get('version')} protocol {params.get('protocolVersion')}"
@@ -774,6 +781,9 @@ def main(argv=None):
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument("--log-file", default=None,
                         help="also append log lines, with a time stamp, to this file")
+    parser.add_argument("--key-env", action="append", default=[], metavar="PREFIX",
+                        help="make environment variables starting with PREFIX part of the cache key "
+                             "(repeatable); use it for servers that read settings from the environment")
     parser.add_argument("--probe-timeout", type=float, default=20.0,
                         help="seconds to wait for the real server to start (default 20)")
     parser.add_argument("command", nargs=argparse.REMAINDER)
@@ -786,7 +796,7 @@ def main(argv=None):
     NAME = args.name
     LOG_FILE = args.log_file
     proxy = Proxy(args.name, command, args.cache_dir or default_cache_dir(), args.probe_timeout,
-                  sys.stdin.buffer, sys.stdout.buffer)
+                  sys.stdin.buffer, sys.stdout.buffer, args.key_env)
 
     def stop(signum, _frame):
         # Only raise here; Proxy.run() does the shutdown. Once a shutdown has

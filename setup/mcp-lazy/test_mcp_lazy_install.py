@@ -65,6 +65,19 @@ def test_missing_table_is_added():
     assert new.startswith(text)
 
 
+def test_args_with_a_trailing_comment_are_accepted():
+    text = CONFIG.replace('"chromium"]\n', '"chromium"]  # pinned later\n', 1)
+    new = install.edit_codex(text, *install.wanted("codex"))
+    assert tomllib.loads(new)["mcp_servers"]["playwright"]["args"] == install.wanted("codex")[1]
+
+
+def test_remote_claude_entry_becomes_a_plain_local_one():
+    current = {"type": "http", "url": "https://example/mcp", "headers": {"A": "b"}}
+    new = install.claude_new_entry(current)
+    assert new == {"type": "stdio", "command": str(install.TARGET), "args": install.wanted("claude")[1]}
+    assert install.claude_ok(new)
+
+
 def test_multiline_args_are_refused():
     text = CONFIG.replace('args = ["-y", "@playwright/mcp@latest", "--browser", "chromium"]',
                           'args = [\n  "-y",\n  "x",\n]')

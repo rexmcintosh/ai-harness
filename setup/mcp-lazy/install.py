@@ -76,7 +76,7 @@ def wanted(client, undo=False):
         if isinstance(saved, dict) and saved.get("command"):
             return saved["command"], list(saved.get("args") or [])
         return ORIGINAL[0], ORIGINAL[1:]
-    return str(TARGET), ["--name", NAME, "--", *REAL]
+    return str(TARGET), ["--name", NAME, "--key-env", "PLAYWRIGHT_", "--", *REAL]
 
 
 def stamp():
@@ -111,6 +111,11 @@ def atomic_write(path, data, mode):
             os.fsync(handle.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
+        folder = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(folder)  # make the rename itself durable
+        finally:
+            os.close(folder)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -144,9 +149,14 @@ def claude_new_entry(current, undo=False):
 
     Every other field (env, type, anything newer) is kept as it is.
     """
-    entry = dict(current) if isinstance(current, dict) else {"type": "stdio"}
+    if isinstance(current, dict) and current.get("type", "stdio") == "stdio":
+        entry = dict(current)
+    else:
+        # A missing entry, or a remote (http/sse) one: its url and headers
+        # mean nothing for a local command, so start from a plain entry.
+        entry = {}
+    entry["type"] = "stdio"
     entry["command"], entry["args"] = wanted("claude", undo)
-    entry.setdefault("type", "stdio")
     return entry
 
 
@@ -198,6 +208,15 @@ def toml_string(value):
     return json.dumps(value)  # a JSON string is a valid TOML basic string
 
 
+def single_line_value(line):
+    """True if this one line is a complete TOML key = value (a comment may follow)."""
+    try:
+        tomllib.loads(line)
+        return True
+    except tomllib.TOMLDecodeError:
+        return False
+
+
 def edit_codex(text, command, args):
     """Return text with [mcp_servers.playwright] command and args replaced.
 
@@ -223,7 +242,7 @@ def edit_codex(text, command, args):
                 lines[i] = command_line
                 seen.add(key)
             elif key == "args":
-                if not line.rstrip().endswith("]"):
+                if not single_line_value(line):
                     raise ValueError("args in [mcp_servers.playwright] spans several lines; edit it by hand")
                 lines[i] = args_line
                 seen.add(key)
