@@ -29,8 +29,16 @@ enabled = false
 """
 
 
+@pytest.fixture(autouse=True)
+def state(tmp_path, monkeypatch):
+    """Keep every test away from the real ~/.local/state/mcp-lazy."""
+    monkeypatch.setattr(install, "STATE", tmp_path / "state")
+    monkeypatch.setattr(install, "BASELINE", tmp_path / "state" / "baseline.json")
+    return tmp_path / "state"
+
+
 def test_edit_changes_only_command_and_args():
-    command, args = install.wanted()
+    command, args = install.wanted("codex")
     new = install.edit_codex(CONFIG, command, args)
     parsed = tomllib.loads(new)
     assert parsed["mcp_servers"]["playwright"] == {
@@ -43,15 +51,15 @@ def test_edit_changes_only_command_and_args():
 
 
 def test_edit_is_idempotent_and_undo_restores():
-    command, args = install.wanted()
+    command, args = install.wanted("codex")
     once = install.edit_codex(CONFIG, command, args)
     assert install.edit_codex(once, command, args) == once
-    assert install.edit_codex(once, *install.wanted(undo=True)) == CONFIG
+    assert install.edit_codex(once, *install.wanted("codex", undo=True)) == CONFIG
 
 
 def test_missing_table_is_added():
     text = 'model = "gpt"\n'
-    new = install.edit_codex(text, *install.wanted())
+    new = install.edit_codex(text, *install.wanted("codex"))
     assert tomllib.loads(new)["mcp_servers"]["playwright"]["startup_timeout_sec"] == 30
     assert new.startswith(text)
 
@@ -60,7 +68,7 @@ def test_multiline_args_are_refused():
     text = CONFIG.replace('args = ["-y", "@playwright/mcp@latest", "--browser", "chromium"]',
                           'args = [\n  "-y",\n  "x",\n]')
     with pytest.raises(ValueError):
-        install.edit_codex(text, *install.wanted())
+        install.edit_codex(text, *install.wanted("codex"))
 
 
 def test_other_change_is_refused():
@@ -69,10 +77,31 @@ def test_other_change_is_refused():
                                  "npx", ["-y", "@playwright/mcp@latest", "--browser", "chromium"])
 
 
-def test_claude_entry_check():
-    want = install.claude_wanted()
-    assert install.claude_ok(dict(want))
-    assert not install.claude_ok(dict(want, args=want["args"][:-1]))
-    assert not install.claude_ok(dict(want, env={"A": "1"}))
+def test_claude_entry_keeps_every_other_field(state):
+    current = {"type": "stdio", "command": "npx", "args": ["old"], "env": {"A": "1"}, "extra": 5}
+    new = install.claude_new_entry(current)
+    assert new == dict(current, command=str(install.TARGET), args=install.wanted("claude")[1])
+    assert install.claude_ok(new)
+    assert not install.claude_ok(dict(new, args=new["args"][:-1]))
     assert not install.claude_ok(None)
-    assert install.claude_ok({"type": "stdio", "command": "npx", "args": install.ORIGINAL[1:]}, undo=True)
+
+
+def test_undo_restores_the_recorded_original(state):
+    custom = {"type": "stdio", "command": "/opt/pw", "args": ["--x"], "env": {"A": "1"}}
+    install.record_baseline("claude", custom)
+    installed = install.claude_new_entry(custom)
+    # Recording the stand-in itself must not replace the real original.
+    install.record_baseline("claude", installed)
+    undone = install.claude_new_entry(installed, undo=True)
+    assert undone == custom
+    assert install.claude_ok(undone, undo=True)
+    # Without a record, undo falls back to the packaged default.
+    assert install.wanted("codex", undo=True) == (install.ORIGINAL[0], install.ORIGINAL[1:])
+
+
+def test_backups_are_private(state):
+    path = install.backup("x.json", b"secret")
+    assert path.read_bytes() == b"secret"
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert path.parent.stat().st_mode & 0o777 == 0o700
+    assert state.stat().st_mode & 0o777 == 0o700

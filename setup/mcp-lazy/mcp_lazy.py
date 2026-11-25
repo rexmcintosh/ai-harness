@@ -49,6 +49,7 @@ TOOLS_ID = OWN_ID + "tools-"
 CLOSE_GRACE = 5.0
 TERM_GRACE = 3.0
 MAX_PAGES = 100
+CACHE_MAX_AGE = 30 * 24 * 3600
 # Request families that a server only answers when it advertises the matching
 # capability. Without the capability, the real server would reply "method not
 # found" too, so mcp-lazy replies that itself instead of starting the server.
@@ -121,14 +122,14 @@ def lock_file(path, timeout):
 
 
 def cache_key(command, init_params):
+    """The cache key: the real command line plus the client's whole initialize params.
+
+    A server may answer differently for another protocol version, client,
+    client version or set of client capabilities, so all of them are part of
+    the key. A client update therefore costs one short probe.
+    """
     params = init_params if isinstance(init_params, dict) else {}
-    client = params.get("clientInfo") if isinstance(params.get("clientInfo"), dict) else {}
-    return {
-        "v": CACHE_VERSION,
-        "command": list(command),
-        "protocolVersion": params.get("protocolVersion"),
-        "client": client.get("name"),
-    }
+    return {"v": CACHE_VERSION, "command": list(command), "params": params}
 
 
 def cache_path(cache_dir, name, key):
@@ -156,14 +157,45 @@ def load_cache(path, key):
 def save_cache(path, key, init_result, tools):
     data = {"key": key, "initialize": init_result, "tools": tools,
             "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    folder = os.path.dirname(path)
+    tmp = None
     try:
-        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=folder, prefix=".tmp-")
         with os.fdopen(fd, "wb") as handle:
             handle.write(json.dumps(data).encode())
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(tmp, path)
+        tmp = None
     except OSError as error:
         log(f"could not save cache {path}: {error}")
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    prune_cache(folder, os.path.basename(path))
+
+
+def prune_cache(folder, keep):
+    """Delete cache files and locks of this name unused for CACHE_MAX_AGE."""
+    prefix = keep.rsplit("-", 1)[0] + "-"
+    cutoff = time.time() - CACHE_MAX_AGE
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if name == keep or not name.startswith(prefix):
+            continue
+        path = os.path.join(folder, name)
+        try:
+            if os.stat(path).st_atime < cutoff and os.stat(path).st_mtime < cutoff:
+                os.unlink(path)
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------

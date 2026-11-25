@@ -3,7 +3,7 @@
 
     install.py            install or repair, then check
     install.py --check    check only; exit 1 if anything differs
-    install.py --undo     put the original helper entries back, then show them
+    install.py --undo     put the recorded original helper entries back, then show them
 
 What it changes:
   * ~/.local/bin/mcp-lazy            a copy of mcp_lazy.py
@@ -41,21 +41,64 @@ REAL = ["npx", "-y", "@playwright/mcp@0.0.84", "--browser", "chromium"]
 ORIGINAL = ["npx", "-y", "@playwright/mcp@latest", "--browser", "chromium"]
 
 
-def wanted(undo=False):
+BASELINE = STATE / "baseline.json"
+
+
+def is_standin(command):
+    return command == str(TARGET)
+
+
+def read_baseline():
+    try:
+        data = json.loads(BASELINE.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_baseline(client, entry):
+    """Remember the entry that was there before the stand-in, for --undo.
+
+    Only an entry that is not the stand-in is recorded, so running the
+    installer again never overwrites the real original.
+    """
+    if not isinstance(entry, dict) or is_standin(entry.get("command")):
+        return
+    data = read_baseline()
+    data[client] = {"command": entry.get("command"), "args": list(entry.get("args") or [])}
+    private_write(BASELINE, json.dumps(data, indent=2).encode() + b"\n")
+
+
+def wanted(client, undo=False):
+    """Return the (command, args) the client's entry should hold."""
     if undo:
+        saved = read_baseline().get(client)
+        if isinstance(saved, dict) and saved.get("command"):
+            return saved["command"], list(saved.get("args") or [])
         return ORIGINAL[0], ORIGINAL[1:]
     return str(TARGET), ["--name", NAME, "--", *REAL]
 
 
 def stamp():
-    return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    return time.strftime("%Y%m%dT%H%M%S", time.gmtime()) + f"{time.time_ns() % 10**9:09d}Z"
+
+
+def private_write(path, data):
+    """Write a file only the owner can read; its folder is owner-only too."""
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    os.chmod(path, 0o600)
 
 
 def backup(name, data):
-    folder = STATE / "backups"
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f"{name}.{stamp()}"
-    path.write_bytes(data)
+    """Save a copy before a change. Copies may hold env values, so keep them private."""
+    STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(STATE, 0o700)
+    path = STATE / "backups" / f"{name}.{stamp()}"
+    private_write(path, data)
     return path
 
 
@@ -96,16 +139,21 @@ def claude_entry():
         return None
 
 
-def claude_wanted(undo=False):
-    command, args = wanted(undo)
-    return {"type": "stdio", "command": command, "args": args, "env": {}}
+def claude_new_entry(current, undo=False):
+    """The current entry with only command and args changed.
+
+    Every other field (env, type, anything newer) is kept as it is.
+    """
+    entry = dict(current) if isinstance(current, dict) else {"type": "stdio"}
+    entry["command"], entry["args"] = wanted("claude", undo)
+    entry.setdefault("type", "stdio")
+    return entry
 
 
 def claude_ok(entry, undo=False):
-    want = claude_wanted(undo)
-    return (isinstance(entry, dict) and entry.get("command") == want["command"]
-            and entry.get("args") == want["args"] and not entry.get("env")
-            and entry.get("type", "stdio") == "stdio")
+    command, args = wanted("claude", undo)
+    return (isinstance(entry, dict) and entry.get("command") == command
+            and entry.get("args") == args and entry.get("type", "stdio") == "stdio")
 
 
 def set_claude(undo=False):
@@ -115,12 +163,19 @@ def set_claude(undo=False):
     claude = shutil.which("claude")
     if not claude:
         raise SystemExit("claude CLI not found on PATH")
+    new = claude_new_entry(current, undo)
+    add = [claude, "mcp", "add-json", "-s", "user", NAME]
     if current is not None:
+        if not undo:
+            record_baseline("claude", current)
         print(f"backup: {backup('claude-playwright.json', json.dumps(current, indent=2).encode())}")
         subprocess.run([claude, "mcp", "remove", "-s", "user", NAME], check=True,
                        stdout=subprocess.DEVNULL)
-    subprocess.run([claude, "mcp", "add-json", "-s", "user", NAME, json.dumps(claude_wanted(undo))],
-                   check=True, stdout=subprocess.DEVNULL)
+    result = subprocess.run(add + [json.dumps(new)], stdout=subprocess.DEVNULL)
+    if result.returncode != 0:
+        if current is not None:  # put the old entry back rather than leave none
+            subprocess.run(add + [json.dumps(current)], stdout=subprocess.DEVNULL)
+        raise SystemExit("`claude mcp add-json` failed; the previous entry was put back")
     if not claude_ok(claude_entry(), undo):
         raise SystemExit("~/.claude.json does not show the new entry after `claude mcp add-json`")
     return True
@@ -208,7 +263,7 @@ def codex_entry():
 
 
 def codex_ok(entry, undo=False):
-    command, args = wanted(undo)
+    command, args = wanted("codex", undo)
     return isinstance(entry, dict) and entry.get("command") == command and entry.get("args") == args
 
 
@@ -216,10 +271,13 @@ def set_codex(undo=False):
     if not CODEX_TOML.is_file():
         print(f"info no {CODEX_TOML}; Codex skipped")
         return False
-    if codex_ok(codex_entry(), undo):
+    current = codex_entry()
+    if codex_ok(current, undo):
         return False
+    if not undo:
+        record_baseline("codex", current)
     original = CODEX_TOML.read_bytes()
-    new = edit_codex(original.decode(), *wanted(undo)).encode()
+    new = edit_codex(original.decode(), *wanted("codex", undo)).encode()
     print(f"backup: {backup('codex-config.toml', original)}")
     if CODEX_TOML.read_bytes() != original:
         raise SystemExit("~/.codex/config.toml changed while editing; run again")

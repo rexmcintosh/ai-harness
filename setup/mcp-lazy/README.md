@@ -20,9 +20,12 @@ dependencies.
   itself. From then on it passes every message through unchanged, in both
   directions. Server-to-client requests such as `roots/list` pass through too.
 - **Cache:** `~/.cache/mcp-lazy/playwright-<hash>.json`. The key is the full
-  real command line, the client's protocol version and the client name. Claude
-  Code (`claude-code`, protocol `2025-11-25`) and Codex (`codex-mcp-client`,
-  protocol `2025-06-18`) each get their own entry. Their tool lists are the same.
+  real command line plus the client's whole `initialize` parameters: protocol
+  version, client name and version, and client capabilities. Claude Code
+  (`claude-code`, protocol `2025-11-25`) and Codex (`codex-mcp-client`,
+  protocol `2025-06-18`) each get their own entry; their tool lists are the
+  same. A client update gives a new key, so it costs one short probe. Cache
+  files unused for 30 days are deleted.
 - **Cache miss:** the stand-in starts the real server once, records its
   answers, stops it and stays lazy. This took 0.4 to 0.9 s. A lock file next
   to the cache makes sessions that start together share one probe.
@@ -67,7 +70,12 @@ The installer:
   same. It refuses the edit if anything else would change.
 
 Before it replaces anything, the installer saves the old copy in
-`~/.local/state/mcp-lazy/backups/`.
+`~/.local/state/mcp-lazy/backups/`. The folder is owner-only and each copy is
+mode 600, because an entry's `env` can hold secrets. The Claude entry keeps
+every field except `command` and `args`, so an `env` or any other field stays.
+The first time it replaces a helper entry that is not the stand-in, the
+installer records that entry's command and args in
+`~/.local/state/mcp-lazy/baseline.json`, for `--undo`.
 
 The resulting command for both tools is:
 
@@ -75,8 +83,10 @@ The resulting command for both tools is:
 ~/.local/bin/mcp-lazy --name playwright -- npx -y @playwright/mcp@0.0.84 --browser chromium
 ```
 
-`--undo` restores `npx -y @playwright/mcp@latest --browser chromium` in both
-files. It leaves `~/.local/bin/mcp-lazy` in place, unused.
+`--undo` puts back the recorded command and args in both files. Without a
+record, it uses `npx -y @playwright/mcp@latest --browser chromium`, which was
+the entry on lima-vps before the change. It leaves `~/.local/bin/mcp-lazy` in
+place, unused.
 
 Sessions that were already running keep their old helper until they restart.
 

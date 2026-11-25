@@ -292,10 +292,12 @@ def test_corrupt_cache_is_treated_as_a_miss(tmp):
     assert client.close() == 0
 
 
-def test_cache_key_depends_on_command_protocol_and_client():
+def test_cache_key_depends_on_command_and_all_initialize_params():
     base = {"protocolVersion": "2025-06-18", "clientInfo": {"name": "claude-code", "version": "1"}}
     key = mcp_lazy.cache_key(["npx", "a@1"], base)
-    assert key == mcp_lazy.cache_key(["npx", "a@1"], dict(base, clientInfo={"name": "claude-code", "version": "2"}))
+    assert key == mcp_lazy.cache_key(["npx", "a@1"], dict(base))
+    assert key != mcp_lazy.cache_key(["npx", "a@1"], dict(base, clientInfo={"name": "claude-code", "version": "2"}))
+    assert key != mcp_lazy.cache_key(["npx", "a@1"], dict(base, capabilities={"roots": {}}))
     assert key != mcp_lazy.cache_key(["npx", "a@2"], base)
     assert key != mcp_lazy.cache_key(["npx", "a@1"], dict(base, protocolVersion="2025-11-25"))
     assert key != mcp_lazy.cache_key(["npx", "a@1"], dict(base, clientInfo={"name": "codex", "version": "1"}))
