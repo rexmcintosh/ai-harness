@@ -13,3 +13,7 @@ necessary preference is unclear, ask the owner while continuing independent work
 
 Historical architecture and assessment documents are context, not proof of the
 current deployment. Verify the actual entrypoint before changing a running job.
+
+For how Rex's machines and tools fit together now (Mac mini VM, MacBook, T3,
+Claude and Codex apps, services, memory, backups), read `docs/SETUP.md` first.
+Update it in the same change whenever the setup changes.

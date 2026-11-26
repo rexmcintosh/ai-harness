@@ -1,5 +1,7 @@
 # Mac mini runtime and Hetzner retirement
 
+> **Current setup:** see [SETUP.md](SETUP.md), the living reference. This record is from 2026-10-02.
+
 Verified 2026-10-02. Rex deleted the Hetzner VPS and removed its Tailscale node.
 Rex chose not to retain a Hetzner snapshot. The 7-day fallback period is over;
 there is no rollback to the old server.
