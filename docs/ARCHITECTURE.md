@@ -1,5 +1,7 @@
 # Architecture — Personal Compute Mesh
 
+> **Current setup:** see [SETUP.md](SETUP.md), the living reference. This file is history.
+
 > **Historical deployment:** The Hetzner VPS was deleted on 2026-10-02 without a retained snapshot.
 > Work now runs on `bebop-vm`, inside the Mac mini. Use the
 > [current runtime record](vps-decommission-2026-10-02.md) for addresses, recovery and backup limits.
