@@ -25,12 +25,14 @@ from pathlib import Path
 
 HOME = Path.home()
 CCD_DIR = HOME / ".claude" / "remote" / "ccd-cli"
+SERVER_DIR = HOME / ".claude" / "remote" / "srv"
 PROJECTS = HOME / ".claude" / "projects"
 STATE = HOME / ".local" / "state" / "idle-chats"
 CHAT_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ID_FLAGS = ("--resume", "--session-id")
 TERM_WAIT = 20.0
 CHILD_WAIT = 5.0
+POLL = 0.2
 
 
 def boot_time():
@@ -42,7 +44,7 @@ def boot_time():
 
 
 def read_stat(pid):
-    """Return (ppid, start time in epoch seconds) for a pid, or None if it is gone.
+    """Return (ppid, pgrp, start ticks) for a pid, or None if it is gone.
 
     A zombie (exited, not yet reaped by its parent) counts as gone."""
     try:
@@ -50,13 +52,19 @@ def read_stat(pid):
             text = handle.read()
     except OSError:
         return None
-    # The command name is in brackets and may hold spaces; the fields after it are fixed.
-    fields = text[text.rindex(")") + 2:].split()
-    if fields[0] == "Z":
+    # The command name is in brackets and may hold any byte; the fields after
+    # the last ")" are fixed: state, ppid, pgrp, session, ... starttime (index 19).
+    try:
+        fields = text[text.rindex(")") + 2:].split()
+        if fields[0] == "Z":
+            return None
+        return int(fields[1]), int(fields[2]), int(fields[19])
+    except (ValueError, IndexError):
         return None
-    ppid = int(fields[1])
-    start = BOOT + int(fields[19]) / TICKS
-    return ppid, start
+
+
+def epoch(ticks):
+    return BOOT + ticks / TICKS
 
 
 def read_argv(pid):
@@ -95,7 +103,7 @@ def last_activity(cid, projects):
             pass
         folder = record.with_suffix("")
         if folder.is_dir():
-            for path in folder.rglob("*"):
+            for path in [folder, *folder.rglob("*")]:
                 try:
                     newest = max(newest, path.stat().st_mtime)
                 except OSError:
@@ -125,26 +133,30 @@ def descendants(pid, table):
     found, todo = set(), [pid]
     while todo:
         parent = todo.pop()
-        for child, (ppid, _start) in table.items():
-            if ppid == parent and child not in found:
+        for child, stat in table.items():
+            if stat[0] == parent and child not in found:
                 found.add(child)
                 todo.append(child)
     return found
 
 
-def find_chats(ccd_dir, projects, table):
-    prefix = str(ccd_dir).rstrip("/") + "/"
+def under(argv, folder):
+    return bool(argv) and argv[0].startswith(str(folder).rstrip("/") + "/")
+
+
+def find_chats(ccd_dir, server_dir, projects, table):
     chats = []
-    for pid, (_ppid, start) in sorted(table.items()):
+    for pid, (ppid, pgrp, ticks) in sorted(table.items()):
         argv = read_argv(pid)
-        if not argv or not argv[0].startswith(prefix):
+        if not under(argv, ccd_dir):
             continue
         cid = chat_id(argv)
         try:
             cwd = os.readlink(f"/proc/{pid}/cwd")
         except OSError:
             cwd = None
-        chats.append({"pid": pid, "start": start, "chat": cid, "cwd": cwd,
+        chats.append({"pid": pid, "ticks": ticks, "start": epoch(ticks), "chat": cid, "cwd": cwd,
+                      "desktop": under(read_argv(ppid), server_dir), "leader": pgrp == pid,
                       "activity": last_activity(cid, projects) if cid else None})
     return chats
 
@@ -153,6 +165,8 @@ def decide(chat, now, hours, protected=()):
     """Return (stop?, reason, idle hours or None)."""
     if chat["pid"] in protected:
         return False, "runs this job", None
+    if not chat["desktop"]:
+        return False, "not started by the desktop app", None
     if chat["chat"] is None:
         return False, "no chat id", None
     if chat["activity"] is None:
@@ -163,50 +177,78 @@ def decide(chat, now, hours, protected=()):
     return False, "active", idle
 
 
-def same_process(pid, start):
+def same_process(pid, ticks):
     stat = read_stat(pid)
-    return stat is not None and abs(stat[1] - start) < 1
+    return stat is not None and stat[2] == ticks
 
 
-def wait_gone(pids_starts, seconds):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        if not any(same_process(pid, start) for pid, start in pids_starts):
-            return True
-        time.sleep(0.2)
-    return not any(same_process(pid, start) for pid, start in pids_starts)
-
-
-def signal_each(pids_starts, sig):
-    for pid, start in pids_starts:
-        if same_process(pid, start):
+def signal_each(tracked, sig):
+    for pid, ticks in list(tracked.items()):
+        if same_process(pid, ticks):
             try:
                 os.kill(pid, sig)
             except OSError:
                 pass
 
 
-def stop(chat, table):
-    """Stop a chat program and anything it left behind. Return a short result word."""
-    pid, start = chat["pid"], chat["start"]
-    if not same_process(pid, start):
+def track(pid, group, tracked):
+    """Add every live descendant of pid, and every member of the process group, to tracked."""
+    table = proc_table()
+    found = descendants(pid, table) if pid in table else set()
+    if group is not None:
+        found |= {other for other, stat in table.items() if stat[1] == group}
+    for other in found:
+        tracked.setdefault(other, table[other][2])
+
+
+def wait_gone(tracked, seconds, rescan=None):
+    deadline = time.monotonic() + seconds
+    while True:
+        if rescan is not None:
+            rescan()
+        if not any(same_process(pid, ticks) for pid, ticks in tracked.items()):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(POLL)
+
+
+def stop(chat):
+    """Stop a chat program and every helper it started. Return a short result word.
+
+    Helpers are found again and again while the program shuts down, so ones it
+    starts late are caught too. Its process group catches helpers that were
+    orphaned before they could be seen."""
+    pid, ticks = chat["pid"], chat["ticks"]
+    if not same_process(pid, ticks):
         return "already gone"
-    kids = [(kid, table[kid][1]) for kid in descendants(pid, table) if kid in table]
-    signal_each([(pid, start)], signal.SIGTERM)
+    group = pid if chat["leader"] else None
+    main = {pid: ticks}
+    helpers = {}
+    track(pid, group, helpers)
+    signal_each(main, signal.SIGTERM)
     result = "stopped"
-    if not wait_gone([(pid, start)], TERM_WAIT):
-        signal_each([(pid, start)], signal.SIGKILL)
+    rescan = lambda: track(pid, group, helpers)  # noqa: E731
+    if not wait_gone(main, TERM_WAIT, rescan):
+        signal_each(main, signal.SIGKILL)
         result = "killed"
-        if not wait_gone([(pid, start)], CHILD_WAIT):
+        if not wait_gone(main, CHILD_WAIT, rescan):
             return "would not stop"
-    left = [(kid, kstart) for kid, kstart in kids if same_process(kid, kstart)]
-    if left:
-        signal_each(left, signal.SIGTERM)
-        if not wait_gone(left, CHILD_WAIT):
-            signal_each(left, signal.SIGKILL)
-            if not wait_gone(left, CHILD_WAIT):
+    rescan()
+    helpers.pop(pid, None)
+    if not wait_gone(helpers, 0):
+        signal_each(helpers, signal.SIGTERM)
+        if not wait_gone(helpers, CHILD_WAIT, rescan):
+            signal_each(helpers, signal.SIGKILL)
+            if not wait_gone(helpers, CHILD_WAIT):
                 return result + ", helpers left"
     return result
+
+
+def write_log(path, entry):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a") as handle:
+        handle.write(json.dumps(entry) + "\n")
 
 
 def main(argv=None):
@@ -215,39 +257,47 @@ def main(argv=None):
     parser.add_argument("--hours", type=float, default=24.0, help="idle time before a stop (default 24)")
     parser.add_argument("--log", type=Path, default=STATE / "runs.jsonl", help="JSON line log of each run")
     parser.add_argument("--ccd-dir", type=Path, default=CCD_DIR, help=argparse.SUPPRESS)
+    parser.add_argument("--server-dir", type=Path, default=SERVER_DIR, help=argparse.SUPPRESS)
     parser.add_argument("--projects", type=Path, default=PROJECTS, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if not args.hours > 0:
         parser.error("--hours must be more than 0")
 
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    lock = open(args.log.with_name(args.log.name + ".lock"), "w")
+    lock_fd = os.open(args.log.with_name(args.log.name + ".lock"), os.O_WRONLY | os.O_CREAT, 0o600)
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
+        os.close(lock_fd)
         print("idle-chats: another run is in progress", file=sys.stderr)
         return 2
+    try:
+        return run(args)
+    finally:
+        os.close(lock_fd)  # also released by the kernel if the run crashes
 
+
+def run(args):
     now = time.time()
     table = proc_table()
     protected = ancestors(os.getpid(), table)
-    chats = find_chats(args.ccd_dir, args.projects, table)
+    chats = find_chats(args.ccd_dir, args.server_dir, args.projects, table)
     stamp = time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime(now))
     mode = "apply" if args.apply else "report only"
     print(f"{stamp} idle-chats ({mode}, idle {args.hours:g} h): {len(chats)} chat programs")
     entries, failed = [], 0
     for chat in chats:
         should_stop, reason, idle = decide(chat, now, args.hours, protected)
-        result = "kept"
         if should_stop:
             # Look again just before stopping, in case the chat woke up.
             fresh = last_activity(chat["chat"], args.projects)
             if fresh is not None and fresh > chat["activity"]:
                 chat["activity"] = fresh
-                should_stop, reason, idle = decide(chat, time.time(), args.hours, protected)
+            should_stop, reason, idle = decide(chat, time.time(), args.hours, protected)
+        result = "kept"
         if should_stop:
-            result = stop(chat, table) if args.apply else "would stop"
-            if result in ("would not stop",) or result.endswith("helpers left"):
+            result = stop(chat) if args.apply else "would stop"
+            if result == "would not stop" or result.endswith("helpers left"):
                 failed += 1
         idle_text = "?" if idle is None else f"{idle:.1f} h"
         print(f"  pid {chat['pid']:>8}  chat {chat['chat'] or '-'}  idle {idle_text:>8}  "
@@ -255,11 +305,10 @@ def main(argv=None):
         entries.append({"pid": chat["pid"], "chat": chat["chat"], "cwd": chat["cwd"],
                         "idle_hours": None if idle is None else round(idle, 2),
                         "reason": reason, "result": result})
-    stopped = sum(1 for e in entries if e["result"] in ("stopped", "killed"))
+    stopped = sum(1 for e in entries if e["result"].startswith(("stopped", "killed")))
     print(f"  done: {stopped} stopped, {len(entries) - stopped} left running")
-    with open(args.log, "a") as handle:
-        handle.write(json.dumps({"time": round(now), "apply": args.apply, "hours": args.hours,
-                                 "chats": entries}) + "\n")
+    write_log(args.log, {"time": round(now), "apply": args.apply, "hours": args.hours,
+                         "chats": entries})
     return 1 if failed else 0
 
 

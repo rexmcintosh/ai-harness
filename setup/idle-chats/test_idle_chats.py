@@ -33,8 +33,9 @@ def test_chat_id(argv, expected):
     assert idle.chat_id(argv) == expected
 
 
-def chat(activity, start, cid=CID, pid=100):
-    return {"pid": pid, "start": start, "chat": cid, "cwd": "/x", "activity": activity}
+def chat(activity, start, cid=CID, pid=100, desktop=True):
+    return {"pid": pid, "start": start, "chat": cid, "cwd": "/x", "activity": activity,
+            "desktop": desktop, "leader": True, "ticks": 1}
 
 
 def test_idle_rule():
@@ -47,6 +48,8 @@ def test_idle_rule():
     # Unknown chats are never stopped.
     assert idle.decide(chat(None, now - 40 * HOUR), now, 24)[:2] == (False, "no chat record")
     assert idle.decide(chat(now - 30 * HOUR, now - 40 * HOUR, cid=None), now, 24)[:2] == (False, "no chat id")
+    assert idle.decide(chat(now - 30 * HOUR, now - 40 * HOUR, desktop=False), now, 24)[:2] == (
+        False, "not started by the desktop app")
     # Nor is the program that runs this job.
     assert idle.decide(chat(now - 30 * HOUR, now - 40 * HOUR), now, 24, {100})[:2] == (False, "runs this job")
 
@@ -76,15 +79,35 @@ class Fakes:
         self.projects = root / "projects"
         (self.projects / "-home-dev").mkdir(parents=True)
         self.procs = []
+        # The fake chats are children of this test process, so it plays the desktop server.
+        with open("/proc/self/cmdline", "rb") as handle:
+            self.server_dir = os.path.dirname(handle.read().split(b"\0")[0].decode())
 
-    def start(self, cid, record_age, ignore_term=False):
-        code = ("import signal, subprocess, time, sys\n"
+    def group_members(self, group):
+        found = []
+        for entry in os.listdir("/proc"):
+            stat = idle.read_stat(int(entry)) if entry.isdigit() else None
+            if stat is not None and stat[1] == group:
+                found.append(int(entry))
+        return found
+
+    def start(self, cid, record_age, ignore_term=False, own_session=False, late_child=False):
+        """Start a fake chat program in its own process group, like the real ones.
+
+        Its helper is a `sleep` in the same group, or in a new session (own_session).
+        late_child: on SIGTERM it starts one more `sleep` and exits at once, orphaning it."""
+        code = ("import os, signal, subprocess, time, sys\n"
                 + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_term else "")
-                + "kid = subprocess.Popen(['sleep', '300'], start_new_session=True)\n"
+                + ("def late(*_):\n"
+                   "    subprocess.Popen(['sleep', '301'])\n"
+                   "    os._exit(0)\n"
+                   "signal.signal(signal.SIGTERM, late)\n" if late_child else "")
+                + f"kid = subprocess.Popen(['sleep', '300'], start_new_session={own_session})\n"
                 "print(kid.pid, flush=True)\n"
                 "time.sleep(300)\n")
         proc = subprocess.Popen([str(self.ccd / "9.9.9"), "-c", code, "--resume=" + cid],
-                                executable=str(self.ccd / "9.9.9"), stdout=subprocess.PIPE, text=True)
+                                executable=str(self.ccd / "9.9.9"), stdout=subprocess.PIPE,
+                                text=True, process_group=0)
         kid = int(proc.stdout.readline())
         record = self.projects / "-home-dev" / f"{cid}.jsonl"
         record.write_text("{}\n")
@@ -96,7 +119,7 @@ class Fakes:
     def run(self, *extra):
         log = self.root / "runs.jsonl"
         code = idle.main(["--ccd-dir", str(self.ccd), "--projects", str(self.projects),
-                          "--log", str(log), *extra])
+                          "--server-dir", self.server_dir, "--log", str(log), *extra])
         return code, [json.loads(line) for line in log.read_text().splitlines()]
 
     def cleanup(self):
@@ -106,6 +129,10 @@ class Fakes:
                     os.kill(pid, 9)
                 except OSError:
                     pass
+            try:
+                os.killpg(proc.pid, 9)
+            except OSError:
+                pass
             proc.wait()
 
 
@@ -177,10 +204,45 @@ def test_second_run_waits_for_the_first(fakes, tmp_path):
     import fcntl
     fcntl.flock(lock, fcntl.LOCK_EX)
     code = idle.main(["--ccd-dir", str(fakes.ccd), "--projects", str(fakes.projects),
-                      "--log", str(tmp_path / "runs.jsonl")])
+                      "--server-dir", fakes.server_dir, "--log", str(tmp_path / "runs.jsonl")])
     assert code == 2
 
 
 def test_bad_hours_are_refused():
     with pytest.raises(SystemExit):
         idle.main(["--hours", "0"])
+
+
+def test_helper_in_another_session_is_still_stopped(fakes):
+    old, old_kid = fakes.start(CID, record_age=10 * HOUR, own_session=True)
+    time.sleep(1.5)
+    code, runs = fakes.run("--apply", "--hours", str(1 / HOUR))
+    assert code == 0
+    assert gone(old, old_kid)
+    assert runs[-1]["chats"][0]["result"] == "stopped"
+
+
+def test_helper_started_during_shutdown_is_stopped(fakes):
+    old, old_kid = fakes.start(CID, record_age=10 * HOUR, late_child=True)
+    time.sleep(1.5)
+    code, runs = fakes.run("--apply", "--hours", str(1 / HOUR))
+    assert code == 0
+    assert gone(old, old_kid)
+    time.sleep(0.3)
+    assert fakes.group_members(old.pid) == []
+    assert runs[-1]["chats"][0]["result"] == "stopped"
+
+
+def test_chat_not_started_by_the_desktop_app_is_kept(fakes, tmp_path):
+    old, _ = fakes.start(CID, record_age=10 * HOUR)
+    time.sleep(1.5)
+    fakes.server_dir = str(tmp_path / "elsewhere")
+    code, runs = fakes.run("--apply", "--hours", str(1 / HOUR))
+    assert code == 0
+    assert old.poll() is None
+    assert runs[-1]["chats"][0]["reason"] == "not started by the desktop app"
+
+
+def test_log_is_private(fakes):
+    fakes.run()
+    assert (fakes.root / "runs.jsonl").stat().st_mode & 0o777 == 0o600

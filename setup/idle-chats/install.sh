@@ -38,5 +38,8 @@ rm -f "$new"
 
 crontab -l | grep -qxF "$line" || { echo "idle-chats: cron line not found after install" >&2; exit 1; }
 cmp -s "$here/idle_chats.py" "$target" || { echo "idle-chats: copy differs" >&2; exit 1; }
-echo "idle-chats installed: $target, nightly at 04:00 (server time, Europe/Lisbon)"
+# Debian cron ignores CRON_TZ, so 04:00 is in the server's own time zone.
+zone=$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo unknown)
+echo "idle-chats installed: $target, nightly at 04:00 server time ($zone)"
+[ "$zone" = "Europe/Lisbon" ] || echo "idle-chats: note: the server time zone is $zone, not Europe/Lisbon" >&2
 echo "old crontab saved in $old"

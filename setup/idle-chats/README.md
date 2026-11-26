@@ -21,14 +21,17 @@ A chat program is stopped when both of these are more than 24 hours ago:
   file or folder in the `<chat id>/` folder next to it (subagents, tool output);
 - the time the program started (so a chat you just reopened is left alone).
 
+Only desktop chat programs are touched: the program must live in
+`~/.claude/remote/ccd-cli/`, and its parent must be the desktop app's server in
+`~/.claude/remote/srv/`. Terminal, tmux, T3 Code and Codex sessions do not match.
 It is never stopped when it has no chat id (`--resume` / `--session-id`) or no chat
 record, or when it is the program running the job.
 
 Just before a stop, the record is checked again. The program gets SIGTERM, then
-SIGKILL after 20 seconds. Helpers it leaves behind get the same treatment.
-
-Only desktop chat programs are touched. Terminal, tmux, T3 Code and Codex sessions
-are not.
+SIGKILL after 20 seconds. While it shuts down, its helpers are found again and
+again (its child processes, and its own process group), so helpers started late are
+caught too. Helpers still running after it exits get SIGTERM, then SIGKILL.
+Processes are matched by pid and exact start time, so a reused pid is never hit.
 
 ## Use
 
@@ -49,8 +52,10 @@ setup/idle-chats/install.sh          # copy to ~/.local/bin/idle-chats, add the 
 setup/idle-chats/install.sh --undo   # remove both
 ```
 
-The cron line runs at 04:00 server time (Europe/Lisbon). The installer saves the
-old crontab in `~/.local/state/idle-chats/` before every change.
+The cron line runs at 04:00 server time. Debian cron ignores `CRON_TZ`, so this is
+the server's own time zone (Europe/Lisbon); the installer prints it and warns if it
+differs. The installer saves the old crontab in `~/.local/state/idle-chats/` before
+every change.
 
 ## Limits
 
@@ -62,4 +67,6 @@ old crontab in `~/.local/state/idle-chats/` before every change.
 
 `python -m pytest setup/idle-chats` covers the chat id parsing, the idle rule, the
 record folder, and real stops of fake chat programs: idle stopped with its helper,
-active kept, report-only, a program that ignores SIGTERM, a recent start, and a busy lock.
+active kept, report-only, a program that ignores SIGTERM, a helper in another
+session, a helper started during shutdown, a program not started by the desktop
+app, a recent start, a busy lock, and a private log.
