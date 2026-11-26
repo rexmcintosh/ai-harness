@@ -244,5 +244,18 @@ def test_chat_not_started_by_the_desktop_app_is_kept(fakes, tmp_path):
 
 
 def test_log_is_private(fakes):
+    (fakes.root / "runs.jsonl").write_text("")
+    os.chmod(fakes.root / "runs.jsonl", 0o644)
     fakes.run()
     assert (fakes.root / "runs.jsonl").stat().st_mode & 0o777 == 0o600
+
+
+def test_track_ignores_a_reused_pid(fakes):
+    """If the chat pid now belongs to another process, its children are not tracked."""
+    other, other_kid = fakes.start(CID, record_age=0)
+    helpers = {}
+    real_ticks = idle.read_stat(other.pid)[2]
+    idle.track(other.pid, real_ticks - 1, other.pid, helpers)
+    assert helpers == {}
+    idle.track(other.pid, real_ticks, other.pid, helpers)
+    assert other_kid in helpers

@@ -31,7 +31,10 @@ Just before a stop, the record is checked again. The program gets SIGTERM, then
 SIGKILL after 20 seconds. While it shuts down, its helpers are found again and
 again (its child processes, and its own process group), so helpers started late are
 caught too. Helpers still running after it exits get SIGTERM, then SIGKILL.
-Processes are matched by pid and exact start time, so a reused pid is never hit.
+Processes are matched by pid and exact start time, and a helper only counts when
+it hangs off a process whose identity was checked, so a reused pid is not hit.
+A helper that leaves the process group and is orphaned between two scans (they
+run five times a second) can escape. The MCP helpers here do not do that.
 
 ## Use
 

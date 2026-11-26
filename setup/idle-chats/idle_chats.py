@@ -148,8 +148,8 @@ def find_chats(ccd_dir, server_dir, projects, table):
     chats = []
     for pid, (ppid, pgrp, ticks) in sorted(table.items()):
         argv = read_argv(pid)
-        if not under(argv, ccd_dir):
-            continue
+        if not under(argv, ccd_dir) or not same_process(pid, ticks):
+            continue  # not a chat program, or the pid changed hands while we looked
         cid = chat_id(argv)
         try:
             cwd = os.readlink(f"/proc/{pid}/cwd")
@@ -191,13 +191,24 @@ def signal_each(tracked, sig):
                 pass
 
 
-def track(pid, group, tracked):
-    """Add every live descendant of pid, and every member of the process group, to tracked."""
+def track(pid, ticks, group, tracked):
+    """Add live helpers of the chat program to tracked (pid -> start ticks).
+
+    Every process found must hang off a process whose identity is checked first:
+    the program itself (same pid and start ticks), or a helper already tracked.
+    Group members count only while such a process still holds the group, so a
+    reused pid or group id never pulls in a stranger."""
     table = proc_table()
-    found = descendants(pid, table) if pid in table else set()
-    if group is not None:
+    roots = set()
+    if table.get(pid, (None, None, None))[2] == ticks:
+        roots.add(pid)
+    roots |= {other for other, start in tracked.items() if table.get(other, (0, 0, None))[2] == start}
+    found = set()
+    for root in roots:
+        found |= descendants(root, table)
+    if group is not None and any(table[root][1] == group for root in roots):
         found |= {other for other, stat in table.items() if stat[1] == group}
-    for other in found:
+    for other in found - {pid}:
         tracked.setdefault(other, table[other][2])
 
 
@@ -218,24 +229,24 @@ def stop(chat):
 
     Helpers are found again and again while the program shuts down, so ones it
     starts late are caught too. Its process group catches helpers that were
-    orphaned before they could be seen."""
+    orphaned before they could be seen. A helper that leaves the group and is
+    orphaned between two scans can still escape; the report cannot see it."""
     pid, ticks = chat["pid"], chat["ticks"]
     if not same_process(pid, ticks):
         return "already gone"
     group = pid if chat["leader"] else None
     main = {pid: ticks}
     helpers = {}
-    track(pid, group, helpers)
+    track(pid, ticks, group, helpers)
     signal_each(main, signal.SIGTERM)
     result = "stopped"
-    rescan = lambda: track(pid, group, helpers)  # noqa: E731
+    rescan = lambda: track(pid, ticks, group, helpers)  # noqa: E731
     if not wait_gone(main, TERM_WAIT, rescan):
         signal_each(main, signal.SIGKILL)
         result = "killed"
         if not wait_gone(main, CHILD_WAIT, rescan):
             return "would not stop"
     rescan()
-    helpers.pop(pid, None)
     if not wait_gone(helpers, 0):
         signal_each(helpers, signal.SIGTERM)
         if not wait_gone(helpers, CHILD_WAIT, rescan):
@@ -247,6 +258,7 @@ def stop(chat):
 
 def write_log(path, entry):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    os.fchmod(fd, 0o600)
     with os.fdopen(fd, "a") as handle:
         handle.write(json.dumps(entry) + "\n")
 
