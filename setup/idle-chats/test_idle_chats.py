@@ -91,7 +91,8 @@ class Fakes:
                 found.append(int(entry))
         return found
 
-    def start(self, cid, record_age, ignore_term=False, own_session=False, late_child=False):
+    def start(self, cid, record_age, ignore_term=False, own_session=False, late_child=False,
+              no_kid=False):
         """Start a fake chat program in its own process group, like the real ones.
 
         Its helper is a `sleep` in the same group, or in a new session (own_session).
@@ -102,9 +103,10 @@ class Fakes:
                    "    subprocess.Popen(['sleep', '301'])\n"
                    "    os._exit(0)\n"
                    "signal.signal(signal.SIGTERM, late)\n" if late_child else "")
-                + f"kid = subprocess.Popen(['sleep', '300'], start_new_session={own_session})\n"
-                "print(kid.pid, flush=True)\n"
-                "time.sleep(300)\n")
+                + ("print(0, flush=True)\n" if no_kid else
+                   f"kid = subprocess.Popen(['sleep', '300'], start_new_session={own_session})\n"
+                   "print(kid.pid, flush=True)\n")
+                + "time.sleep(300)\n")
         proc = subprocess.Popen([str(self.ccd / "9.9.9"), "-c", code, "--resume=" + cid],
                                 executable=str(self.ccd / "9.9.9"), stdout=subprocess.PIPE,
                                 text=True, process_group=0)
@@ -119,12 +121,15 @@ class Fakes:
     def run(self, *extra):
         log = self.root / "runs.jsonl"
         code = idle.main(["--ccd-dir", str(self.ccd), "--projects", str(self.projects),
-                          "--server-dir", self.server_dir, "--log", str(log), *extra])
+                          "--server-dir", self.server_dir, "--log", str(log),
+                          "--lock", str(self.root / "run.lock"), *extra])
         return code, [json.loads(line) for line in log.read_text().splitlines()]
 
     def cleanup(self):
         for proc, kid in self.procs:
             for pid in (proc.pid, kid):
+                if pid <= 0:  # no helper; kill(0) would hit this test run
+                    continue
                 try:
                     os.kill(pid, 9)
                 except OSError:
@@ -200,11 +205,12 @@ def test_recent_start_is_kept_by_default(fakes):
 
 
 def test_second_run_waits_for_the_first(fakes, tmp_path):
-    lock = open(tmp_path / "runs.jsonl.lock", "w")
+    lock = open(tmp_path / "run.lock", "w")
     import fcntl
     fcntl.flock(lock, fcntl.LOCK_EX)
     code = idle.main(["--ccd-dir", str(fakes.ccd), "--projects", str(fakes.projects),
-                      "--server-dir", fakes.server_dir, "--log", str(tmp_path / "runs.jsonl")])
+                      "--server-dir", fakes.server_dir, "--log", str(tmp_path / "other.jsonl"),
+                      "--lock", str(tmp_path / "run.lock")])
     assert code == 2
 
 
@@ -255,7 +261,34 @@ def test_track_ignores_a_reused_pid(fakes):
     other, other_kid = fakes.start(CID, record_age=0)
     helpers = {}
     real_ticks = idle.read_stat(other.pid)[2]
-    idle.track(other.pid, real_ticks - 1, other.pid, helpers)
+    idle.track(other.pid, real_ticks - 1, other.pid, helpers, {})
     assert helpers == {}
-    idle.track(other.pid, real_ticks, other.pid, helpers)
+    idle.track(other.pid, real_ticks, other.pid, helpers, {})
     assert other_kid in helpers
+
+
+def test_helper_started_by_a_program_that_had_none_is_stopped(fakes):
+    old, _ = fakes.start(CID, record_age=10 * HOUR, late_child=True, no_kid=True)
+    time.sleep(1.5)
+    code, runs = fakes.run("--apply", "--hours", str(1 / HOUR))
+    assert code == 0
+    old.wait(timeout=10)
+    time.sleep(0.3)
+    assert fakes.group_members(old.pid) == []
+    assert runs[-1]["chats"][0]["result"] == "stopped"
+
+
+def test_record_gone_before_the_stop_keeps_the_chat(fakes, monkeypatch):
+    old, _ = fakes.start(CID, record_age=10 * HOUR)
+    time.sleep(1.5)
+    real = idle.last_activity
+    calls = []
+
+    def vanishing(cid, projects):
+        calls.append(cid)
+        return real(cid, projects) if len(calls) == 1 else None
+    monkeypatch.setattr(idle, "last_activity", vanishing)
+    code, runs = fakes.run("--apply", "--hours", str(1 / HOUR))
+    assert code == 0
+    assert old.poll() is None
+    assert runs[-1]["chats"][0]["reason"] == "no chat record"

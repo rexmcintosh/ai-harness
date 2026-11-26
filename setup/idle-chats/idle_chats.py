@@ -33,6 +33,10 @@ ID_FLAGS = ("--resume", "--session-id")
 TERM_WAIT = 20.0
 CHILD_WAIT = 5.0
 POLL = 0.2
+# After the program was last seen alive, its process group is still searched for
+# this long. A pid (and so a group id) cannot be reused that fast: the kernel
+# hands out every other free pid up to pid_max first.
+GROUP_GRACE = 5.0
 
 
 def boot_time():
@@ -191,22 +195,25 @@ def signal_each(tracked, sig):
                 pass
 
 
-def track(pid, ticks, group, tracked):
+def track(pid, ticks, group, tracked, seen):
     """Add live helpers of the chat program to tracked (pid -> start ticks).
 
     Every process found must hang off a process whose identity is checked first:
     the program itself (same pid and start ticks), or a helper already tracked.
-    Group members count only while such a process still holds the group, so a
-    reused pid or group id never pulls in a stranger."""
+    Group members count while such a process still holds the group, or for
+    GROUP_GRACE seconds after the program was last seen alive (seen["main"]),
+    so a reused pid or group id never pulls in a stranger."""
     table = proc_table()
     roots = set()
     if table.get(pid, (None, None, None))[2] == ticks:
         roots.add(pid)
+        seen["main"] = time.monotonic()
     roots |= {other for other, start in tracked.items() if table.get(other, (0, 0, None))[2] == start}
     found = set()
     for root in roots:
         found |= descendants(root, table)
-    if group is not None and any(table[root][1] == group for root in roots):
+    group_held = any(table[root][1] == group for root in roots)
+    if group is not None and (group_held or time.monotonic() - seen.get("main", -1e9) <= GROUP_GRACE):
         found |= {other for other, stat in table.items() if stat[1] == group}
     for other in found - {pid}:
         tracked.setdefault(other, table[other][2])
@@ -236,11 +243,11 @@ def stop(chat):
         return "already gone"
     group = pid if chat["leader"] else None
     main = {pid: ticks}
-    helpers = {}
-    track(pid, ticks, group, helpers)
+    helpers, seen = {}, {}
+    track(pid, ticks, group, helpers, seen)
     signal_each(main, signal.SIGTERM)
     result = "stopped"
-    rescan = lambda: track(pid, ticks, group, helpers)  # noqa: E731
+    rescan = lambda: track(pid, ticks, group, helpers, seen)  # noqa: E731
     if not wait_gone(main, TERM_WAIT, rescan):
         signal_each(main, signal.SIGKILL)
         result = "killed"
@@ -271,12 +278,15 @@ def main(argv=None):
     parser.add_argument("--ccd-dir", type=Path, default=CCD_DIR, help=argparse.SUPPRESS)
     parser.add_argument("--server-dir", type=Path, default=SERVER_DIR, help=argparse.SUPPRESS)
     parser.add_argument("--projects", type=Path, default=PROJECTS, help=argparse.SUPPRESS)
+    parser.add_argument("--lock", type=Path, default=STATE / "run.lock", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if not args.hours > 0:
         parser.error("--hours must be more than 0")
 
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    lock_fd = os.open(args.log.with_name(args.log.name + ".lock"), os.O_WRONLY | os.O_CREAT, 0o600)
+    # One fixed lock for every run, whatever --log says.
+    args.lock.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock_fd = os.open(args.lock, os.O_WRONLY | os.O_CREAT, 0o600)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
@@ -302,9 +312,8 @@ def run(args):
         should_stop, reason, idle = decide(chat, now, args.hours, protected)
         if should_stop:
             # Look again just before stopping, in case the chat woke up.
-            fresh = last_activity(chat["chat"], args.projects)
-            if fresh is not None and fresh > chat["activity"]:
-                chat["activity"] = fresh
+            # A record that has gone missing since the first look means "keep".
+            chat["activity"] = last_activity(chat["chat"], args.projects)
             should_stop, reason, idle = decide(chat, time.time(), args.hours, protected)
         result = "kept"
         if should_stop:
