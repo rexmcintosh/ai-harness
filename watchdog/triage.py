@@ -109,6 +109,24 @@ def check_backup(last_success_text: str | None, now_epoch: float, *,
     return CheckStatus("backup", "ok", f"off-site backup verified {age_h:.0f} h ago")
 
 
+def check_mini_guard(heartbeat_text: str | None, now_epoch: float, *, stale_after_s: int = 600) -> CheckStatus:
+    """The Mac mini guard watches this VM from outside; this check watches the guard.
+    heartbeat_text is its last-tick.json read over SSH, or None when the mini did not
+    answer. The two cases get different messages: an unreachable mini is not the same
+    as a guard that stopped ticking."""
+    if heartbeat_text is None:
+        return CheckStatus("mini-guard", "warn", "cannot reach the Mac mini to read its guard's heartbeat")
+    try:
+        last = float(json.loads(heartbeat_text).get("time"))
+    except (ValueError, TypeError, AttributeError):
+        return CheckStatus("mini-guard", "warn", "the Mac mini guard's heartbeat is unreadable",
+                           evidence=(heartbeat_text or "")[:200])
+    age = now_epoch - last
+    if age > stale_after_s:
+        return CheckStatus("mini-guard", "crit", f"the Mac mini guard has not run for {int(age // 60)} min")
+    return CheckStatus("mini-guard", "ok", f"Mac mini guard ran {int(age)} s ago")
+
+
 def check_service_active(name: str, systemctl_output: str) -> CheckStatus:
     """`systemctl is-active <unit>` — 'active' is ok, anything else is crit."""
     state = systemctl_output.strip()
