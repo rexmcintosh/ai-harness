@@ -31,6 +31,7 @@ def world(tmp_path, monkeypatch):
     rows = []
     monkeypatch.setattr(run, "_cmd", lambda args: "    PID    PPID     ELAPSED COMMAND\n"
                         + "".join(f"{pid} 1 {etime} {cmd}\n" for pid, etime, cmd in rows))
+    monkeypatch.setattr(fix_orphans, "service_main_pid", lambda pid: False)
     real_identity = fix_orphans.identity
     # The decoy's parent is the test; report it as reparented to init, nothing else changed.
     monkeypatch.setattr(fix_orphans, "identity",
@@ -49,11 +50,12 @@ def alive(p):
 
 def test_a_leftover_codex_is_stopped_once_and_reported(world):
     p = world.start()
-    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    # ps shows the arguments; a prompt or token in them never reaches the note.
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} exec --prompt s3cret-token"))
     assert fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"]) == 0
     p.wait(timeout=5)
-    assert len(world.sent) == 1 and world.sent[0].startswith("STOPPED: 1 leftover Codex")
-    assert f"pid {p.pid}, 5h: codex 300" in world.sent[0]
+    assert len(world.sent) == 1 and world.sent[0].startswith("STOPPED: a leftover Codex")
+    assert f"pid {p.pid}, 5h, codex exec)" in world.sent[0] and "s3cret" not in world.sent[0]
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     assert len(world.sent) == 1
 
@@ -209,7 +211,7 @@ def test_a_real_orphan_adopted_by_the_user_manager_is_found_live(tmp_path, monke
         sent = []
         monkeypatch.setattr(fixkit, "tg_send", lambda text: sent.append(text) or True)
         fix_orphans.main(["--only-pid", str(pid), "--min-hours", "0"])
-        assert sent and sent[0].startswith("STOPPED: 1 leftover Codex")
+        assert sent and sent[0].startswith("STOPPED: a leftover Codex")
         assert fix_orphans.identity(pid) is None or fix_orphans.identity(pid)["start"] != ident["start"]
     finally:
         try:
@@ -225,3 +227,95 @@ def test_ps_lines_are_never_cut(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "_cmd", lambda args: seen.append(args) or "")
     fix_orphans.main(["--dry-run"])
     assert seen and "-ww" in seen[0]
+
+
+def _cgroup(tmp_path, pid, path):
+    d = tmp_path / "proc" / str(pid)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "cgroup").write_text(f"0::{path}\n")
+    return tmp_path / "proc"
+
+
+def test_the_main_process_of_a_service_is_never_stopped(tmp_path):
+    from types import SimpleNamespace
+    user = "/user.slice/user-1000.slice/user@1000.service/app.slice"
+    asked = []
+
+    def answer(main_pid, rc=0):
+        def runner(cmd, **kw):
+            asked.append(cmd)
+            return SimpleNamespace(returncode=rc, stdout=f"{main_pid}\n")
+        return runner
+    proc = _cgroup(tmp_path, 50, f"{user}/codex-worker.service")
+    assert fix_orphans.service_main_pid(50, proc, answer(50))           # supervised
+    assert asked[-1] == ["systemctl", "--user", "show", "-p", "MainPID", "--value",
+                         "codex-worker.service"]
+    assert not fix_orphans.service_main_pid(50, proc, answer(1147))     # left in t3code.service
+    assert fix_orphans.service_main_pid(50, proc, answer(50, rc=1))     # cannot tell: keep
+    assert fix_orphans.service_main_pid(50, proc, answer(""))
+    proc = _cgroup(tmp_path, 51, f"{user}/t3code-codex-9.scope")
+    assert not fix_orphans.service_main_pid(51, proc, answer(51))       # a scope is not supervision
+    proc = _cgroup(tmp_path, 52, "/system.slice/codex.service")
+    fix_orphans.service_main_pid(52, proc, answer(52))
+    assert "--user" not in asked[-1]
+    assert fix_orphans.service_main_pid(4242, proc, answer(0))         # unreadable cgroup: keep
+
+
+def test_a_supervised_codex_is_left_alone(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    monkeypatch.setattr(fix_orphans, "service_main_pid", lambda pid: True)
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    assert alive(p) and world.sent == []
+
+
+def test_a_stop_cut_off_after_the_kill_is_still_reported(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    real_stop = fix_orphans.stop
+
+    def kills_then_dies(fd, *a, **k):
+        real_stop(fd, *a, **k)
+        raise KeyboardInterrupt                 # the fixer dies before it writes the outcome
+    monkeypatch.setattr(fix_orphans, "stop", kills_then_dies)
+    with pytest.raises(KeyboardInterrupt):
+        fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    p.wait(timeout=5)
+    assert world.sent == []
+    world.rows.clear()
+    fix_orphans.main([])
+    assert len(world.sent) == 1 and world.sent[0].startswith("STOPPED: a leftover Codex")
+    assert "cut off" in world.sent[0] and fixkit.load_state("orphans")["pending"] == {}
+
+
+def test_records_from_another_boot_or_a_gone_process_are_dropped(world):
+    p = world.start()
+    start = fix_orphans.identity(p.pid)["start"]
+    boot = fix_orphans.boot_id()
+    live = f"{boot}:{p.pid}:{start}"
+    old_boot, gone = f"zzzz:{p.pid}:{start}", f"{boot}:{p.pid}:{start + 1}"
+    state = fix_orphans._prune({"tried": {live: 1, old_boot: 1, gone: 1}}, boot)
+    assert list(state["tried"]) == [live]
+
+
+def test_a_pidfd_failure_is_one_problem_a_day(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+
+    def refused(pid):
+        raise PermissionError(1, "Operation not permitted")
+    monkeypatch.setattr(fix_orphans.os, "pidfd_open", refused)
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    assert alive(p) and len(world.sent) == 1
+    assert "pidfd_open: Operation not permitted" in world.sent[0]
+
+
+def test_a_process_that_changed_program_before_the_signal_is_left_alone(world):
+    p = world.start()
+    fd = os.pidfd_open(p.pid)
+    try:
+        assert not fix_orphans.stop(fd, same=lambda: False)
+    finally:
+        os.close(fd)
+    assert alive(p)
