@@ -39,3 +39,10 @@ def test_collect_reads_the_heartbeat_over_ssh(tmp_path, monkeypatch):
         statuses, _ = run.collect(int(NOW))
         guard = [s for s in statuses if s.name == "mini-guard"]
         assert len(guard) == 1 and guard[0].level == level and word in guard[0].summary
+
+
+def test_ssh_exit_codes_are_told_apart(monkeypatch, tmp_path):
+    import subprocess
+    for rc, out, expect in [(255, "", None), (1, "", ""), (0, '{"time": 1}', '{"time": 1}')]:
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, rc, out, ""))
+        assert run.read_guard_heartbeat(tmp_path / "k") == expect

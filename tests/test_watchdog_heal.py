@@ -52,3 +52,13 @@ def test_pause_file_expires(tmp_path, monkeypatch):
     assert heal.paused(os.path.getmtime(tmp_path / "pause") + 60)
     assert not heal.paused(os.path.getmtime(tmp_path / "pause") + 3 * 3600)
     assert not (tmp_path / "pause").exists()
+
+
+def test_failed_sends_wait_in_the_outbox(tmp_path, monkeypatch):
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+    heal.send_all(["one"], sender=lambda text: False)
+    sent = []
+    heal.send_all(["two"], sender=lambda text: sent.append(text) or True)
+    assert sent == ["one", "two"]
+    import json
+    assert json.loads((tmp_path / "outbox.json").read_text()) == []

@@ -435,8 +435,15 @@ def cmd_tick() -> int:
         if maint:
             maint.close()
         tick_handle.close()
-    deliver(messages, cfg)
-    heartbeat(cfg)
+    try:
+        deliver(messages, cfg)
+        heartbeat(cfg)
+    except Exception as e:       # disk full, permissions: log it; the VM sees a stale heartbeat
+        try:
+            log(f"delivery failed: {e!r}")
+        except Exception:
+            pass
+        return 1
     return 0
 
 

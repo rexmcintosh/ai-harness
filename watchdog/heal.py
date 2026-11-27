@@ -19,6 +19,7 @@ Rules:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
@@ -101,6 +102,12 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     now_epoch = time.time()
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock = open(STATE / "lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("heal: another run is still going")
+        return 0
     if paused(now_epoch):
         print("heal: paused for planned work")
         return 0
@@ -129,9 +136,29 @@ def main(argv=None) -> int:
     tmp = STATE / "state.json.tmp"
     tmp.write_text(json.dumps(new, indent=1))
     os.replace(tmp, STATE / "state.json")
-    for text in messages:
-        subprocess.run([TG_SEND, CHAT_ID, text], timeout=60)
+    send_all(messages)
     return 0
+
+
+def send_all(messages: list, sender=None) -> None:
+    """Send new messages and any left from earlier runs; keep failures for next time (at most 20)."""
+    sender = sender or _tg_send
+    outbox = STATE / "outbox.json"
+    try:
+        waiting = json.loads(outbox.read_text())
+    except (OSError, ValueError):
+        waiting = []
+    left = [text for text in waiting + messages if not sender(text)]
+    tmp = STATE / "outbox.json.tmp"
+    tmp.write_text(json.dumps(left[-20:]))
+    os.replace(tmp, outbox)
+
+
+def _tg_send(text: str) -> bool:
+    try:
+        return subprocess.run([TG_SEND, CHAT_ID, text], timeout=60).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 if __name__ == "__main__":

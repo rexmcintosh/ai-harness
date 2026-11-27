@@ -454,7 +454,9 @@ def read_guard_heartbeat(key: Path) -> str | None:
                               capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
-    return proc.stdout if proc.returncode == 0 else None
+    if proc.returncode == 255:      # ssh itself failed: the mini did not answer
+        return None
+    return proc.stdout if proc.returncode == 0 else ""   # reachable, but no heartbeat
 
 
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:

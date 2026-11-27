@@ -12,7 +12,11 @@ ssh_mini() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$MINI" "$@"; }
 if [ "${1:-}" = "--undo" ]; then
   ssh_mini 'launchctl bootout gui/$(id -u)/io.bebop.mini-guard 2>/dev/null || true
             rm -f ~/Library/LaunchAgents/io.bebop.mini-guard.plist ~/.local/bin/mini-guard
-            [ -f ~/.ssh/authorized_keys ] && grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.new && mv ~/.ssh/authorized_keys.new ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys || true
+            if [ -f ~/.ssh/authorized_keys ]; then
+              tmp=$(mktemp ~/.ssh/authorized_keys.XXXXXX)
+              grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys > "$tmp" || true
+              chmod 600 "$tmp" && mv "$tmp" ~/.ssh/authorized_keys
+            fi
             echo "mini-guard removed (config and state kept in ~/.config/mini-guard and ~/.local/state/mini-guard)"'
   exit 0
 fi
@@ -43,6 +47,8 @@ pub=$(cat "$key.pub")   # ends with the comment "mini-guard-heartbeat"
 line="command=\"cat /Users/bebop_admin/.local/state/mini-guard/last-tick.json\",no-port-forwarding,no-pty,no-agent-forwarding,no-X11-forwarding $pub"
 # Replace exactly the managed line (matched by its comment at the end), keep every other key.
 printf '%s\n' "$line" | ssh_mini 'set -e; umask 077; touch ~/.ssh/authorized_keys
-  { grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys || true; cat; } > ~/.ssh/authorized_keys.new
-  mv ~/.ssh/authorized_keys.new ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys'
+  tmp=$(mktemp ~/.ssh/authorized_keys.XXXXXX)
+  { grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys || true; cat; } > "$tmp"
+  grep -q " mini-guard-heartbeat\$" "$tmp"
+  chmod 600 "$tmp"; mv "$tmp" ~/.ssh/authorized_keys'
 echo "mini-guard installed. Heartbeat: $(ssh -o BatchMode=yes -o IdentitiesOnly=yes -i "$key" "$MINI" 2>/dev/null | head -c 200)"
