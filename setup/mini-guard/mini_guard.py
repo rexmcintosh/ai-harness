@@ -428,8 +428,12 @@ def cmd_tick() -> int:
     try:
         messages = tick(Runner(), cfg, now(), lock_held=maint is None)
     except Exception as e:       # a broken tick must still be visible
-        log(f"tick crashed: {e!r}")
-        deliver([f"PROBLEM: the Mac mini guard crashed ({e.__class__.__name__}). It will try again in 2 minutes."], cfg)
+        try:
+            log(f"tick crashed: {e!r}")
+            deliver([f"PROBLEM: the Mac mini guard crashed ({e.__class__.__name__}). "
+                     "It will try again in 2 minutes."], cfg)
+        except Exception:
+            pass                 # the stale heartbeat still tells the VM and the outside check
         return 1
     finally:
         if maint:

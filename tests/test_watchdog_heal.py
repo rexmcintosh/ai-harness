@@ -62,3 +62,33 @@ def test_failed_sends_wait_in_the_outbox(tmp_path, monkeypatch):
     assert sent == ["one", "two"]
     import json
     assert json.loads((tmp_path / "outbox.json").read_text()) == []
+
+
+def test_fixed_is_said_after_a_restart_works():
+    s, _, _ = step({}, down=["finance"])
+    s, r, _ = step(s, down=["finance"], t=NOW + 300)
+    assert r == ["finance"]
+    s, r, m = step(s, t=NOW + 600)
+    assert m == ["FIXED: the finance tracker answers again."]
+
+
+def test_rules_ignore_recovery_but_look_at_problems():
+    import tomllib
+    from pathlib import Path
+    import re
+    rules = tomllib.loads((Path(heal.__file__).resolve().parents[1] / "alertwatch" / "rules.toml").read_text())["rule"]
+
+    def action(source, text):
+        for rule in rules:
+            if "source" in rule and not re.search(rule["source"], source):
+                continue
+            if "text" in rule and not re.search(rule["text"], text, re.I):
+                continue
+            return rule["action"]
+        return "look"
+    src = "python3 watchdog.heal < CRON"
+    assert action(src, "FIXED: the finance tracker answers again.") == "ignore"
+    assert action(src, "RESTARTED: the finance tracker was running but not answering") == "ignore"
+    assert action(src, "PROBLEM: the finance tracker was not answering, and restarting it failed") == "look"
+    assert action("python3 watchdog.weekly < CRON", "Weekly check, Mon 30 Nov: all well.") == "ignore"
+    assert action("python3 watchdog.weekly < CRON", "Traceback (most recent call last)") == "look"

@@ -66,11 +66,11 @@ def decide(state: dict, alive: dict, now_epoch: float) -> tuple[dict, list, list
     """Pure decision. Returns (new state, restarts to run, messages)."""
     restarts, messages = [], []
     new = {"fails": dict(state.get("fails", {})), "restarted": dict(state.get("restarted", {})),
-           "reported": dict(state.get("reported", {}))}
+           "reported": dict(state.get("reported", {})), "verify": dict(state.get("verify", {}))}
     for key, ok in alive.items():
         name, _port, cmd = SERVICES[key]
         if ok:
-            if new["fails"].get(key, 0) >= 2 and new["reported"].get(key):
+            if (new["fails"].get(key, 0) >= 2 and new["reported"].get(key)) or new["verify"].pop(key, None):
                 messages.append(f"FIXED: {name} answers again.")
             new["fails"][key] = 0
             new["reported"].pop(key, None)
@@ -92,6 +92,7 @@ def decide(state: dict, alive: dict, now_epoch: float) -> tuple[dict, list, list
         else:
             restarts.append(key)
             new["restarted"][key] = now_epoch
+            new["verify"][key] = now_epoch    # say FIXED once a later probe answers
             new["fails"][key] = 0
     return new, restarts, messages
 
@@ -126,9 +127,14 @@ def main(argv=None) -> int:
             rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120).returncode
         except (OSError, subprocess.SubprocessError):
             rc = None
-        messages.append(f"FIXED?: {name} was running but not answering, so I restarted it "
-                        f"({'done' if rc == 0 else 'the restart command failed'}). "
-                        "I will say again if it still does not answer.")
+        if rc == 0:
+            messages.append(f"RESTARTED: {name} was running but not answering, so I restarted it. "
+                            "I will say FIXED when it answers, or PROBLEM if it does not.")
+        else:
+            new["verify"].pop(key, None)
+            new["reported"][key] = now_epoch
+            messages.append(f"PROBLEM: {name} was not answering, and restarting it failed "
+                            f"(exit {rc}). It needs a look.")
     if args.dry_run:
         print(json.dumps({"alive": alive, "restarts": restarts}, indent=1))
         print("\n".join(messages) or "nothing to do")
