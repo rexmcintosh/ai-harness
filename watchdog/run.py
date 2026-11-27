@@ -23,14 +23,17 @@ from .triage import (
     CheckStatus,
     LEVELS,
     check_alertwatch,
+    check_backup,
     check_bebop_runs,
     check_cron_log,
     check_disk,
     check_log_coverage,
+    check_mini_guard,
     check_meet_clock,
     check_meet_freshness,
     check_meet_liveness,
     check_orphan_processes,
+    check_outside_alarm,
     check_run_age,
     check_service_active,
     triage,
@@ -430,10 +433,64 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
         newest = counted[0].get("status") if counted else None
         if newest == "running" and now_epoch - float(counted[0]["started_at"]) > 3600 + 900:
             newest = "failed"  # past the run's time limit plus a margin: it is stuck
+        pause = state / "PAUSED"
+        try:
+            paused_age = now_epoch - pause.stat().st_mtime
+        except OSError:
+            paused_age = None
         return check_alertwatch(aw_inbox.oldest_age_s(state, now_epoch),
-                                (state / "PAUSED").exists(), newest, note_status=note)
+                                paused_age is not None, newest, note_status=note,
+                                paused_age_s=paused_age)
     except Exception as e:  # a broken alert-watch must not blind the watchdog
         return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
+
+
+def read_guard_heartbeat(key: Path) -> str | None:
+    """The mini guard's last-tick.json over SSH with its read-only key, or None when
+    SSH itself failed (mini unreachable). Bad output with a good exit is returned as
+    is, so the check can tell "unreadable" from "unreachable"."""
+    try:
+        proc = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
+                               "-o", "ConnectTimeout=10", "-i", str(key), "bebop_admin@mini"],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode == 255:      # ssh itself failed: the mini did not answer
+        return None
+    return proc.stdout if proc.returncode == 0 else ""   # reachable, but no heartbeat
+
+
+OUTSIDE_ALARM_SECRET = Path(os.environ.get("OUTSIDE_ALARM_SECRET")
+                            or Path.home() / ".config" / "bebop-uptime" / "secret")
+OUTSIDE_ALARM_URL = "https://bebop-uptime.rex-651.workers.dev/status"
+SECRET_OK = re.compile(r"[0-9a-f]{64}")   # the one format (openssl rand -hex 32); safe in a curl config line
+
+
+def read_outside_alarm(secret_path: Path) -> tuple[str | None, str]:
+    """(status JSON, "") or (None, why not). The secret goes to curl on stdin as a
+    header, never on the command line or in the URL."""
+    try:
+        secret = secret_path.read_text().strip()
+    except OSError:
+        return None, "the server cannot read ~/.config/bebop-uptime/secret"
+    if not SECRET_OK.fullmatch(secret):
+        return None, "~/.config/bebop-uptime/secret is not 64 lowercase hex characters"
+    try:
+        proc = subprocess.run(["curl", "-sS", "-m", "15", "--retry", "2", "--retry-delay", "5",
+                               "-w", "\n%{http_code}", "-K", "-", OUTSIDE_ALARM_URL],
+                              capture_output=True, text=True, timeout=75,
+                              input=f'header = "Authorization: Bearer {secret}"\n')
+    except (OSError, subprocess.SubprocessError):
+        return None, "could not be reached from the server (curl did not run)"
+    body, _, code = proc.stdout.rpartition("\n")
+    if proc.returncode == 0 and code == "200":
+        return body, ""
+    if code == "404":
+        return None, ("refused the server's secret (404): the Worker's PING_SECRET and "
+                      "~/.config/bebop-uptime/secret differ, or the Worker was replaced")
+    if code.isdigit() and code != "000":
+        return None, f"answered HTTP {code} (a Cloudflare or Worker fault)"
+    return None, "could not be reached from the server (network, DNS or Cloudflare)"
 
 
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:
@@ -446,6 +503,11 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
         out.append(check_bebop_runs(bebop_log, now_epoch))
 
     out.append(check_disk(_cmd(["df", "-P", "/"])))
+
+    backup_state = Path(os.environ.get("RESTIC_OFFSITE_STATE")
+                        or Path.home() / ".local" / "state" / "restic-offsite")
+    if backup_state.is_dir():  # only where the off-site backup is installed
+        out.append(check_backup(_read(backup_state / "last-success.json"), now_epoch))
 
     for unit in SERVICES:
         out.append(check_service_active(unit, _cmd(["systemctl", "is-active", unit])))
@@ -462,9 +524,20 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
         out.append(cron_status(label, text, now_epoch))
     out.append(check_log_coverage(found, missing))
 
+    guard_key = Path(os.environ.get("MINI_GUARD_KEY") or Path.home() / ".ssh" / "mini_guard_read")
+    if guard_key.exists():  # only once mini-guard is installed (its installer makes the key)
+        out.append(check_mini_guard(read_guard_heartbeat(guard_key), now_epoch))
+
     alertwatch = alertwatch_status(now_epoch)
     if alertwatch is not None:
         out.append(alertwatch)
+
+    try:
+        configured = OUTSIDE_ALARM_SECRET.stat().st_size > 0
+    except OSError:
+        configured = False
+    text, why = read_outside_alarm(OUTSIDE_ALARM_SECRET) if configured else (None, "")
+    out.append(check_outside_alarm(text, now_epoch, configured=configured, problem=why))
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)

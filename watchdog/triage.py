@@ -8,11 +8,14 @@ data and free of the environment.
 """
 from __future__ import annotations
 
+import json
+import math
 import re
 import sys
 
 from jev.redact import strip_json_data_lists
 from dataclasses import dataclass, field
+import json
 from datetime import datetime, timezone
 
 # Ordered so we can compare severities numerically (worsening detection).
@@ -80,6 +83,50 @@ def check_disk(df_output: str, *, threshold: int = 85) -> CheckStatus:
     if pct >= threshold:
         return CheckStatus("disk", "warn", f"root filesystem {pct}% full")
     return CheckStatus("disk", "ok", f"root filesystem {pct}% full")
+
+
+def check_backup(last_success_text: str | None, now_epoch: float, *,
+                 warn_after_h: float = 30, crit_after_h: float = 54) -> CheckStatus:
+    """The off-site backup's last verified run, from restic-offsite's last-success.json.
+    The backup runs daily and checks itself with a test restore, but it has no alert of
+    its own: on 2026-11-27 a restart killed the catch-up run and nothing said so.
+    Older than warn_after_h warns (one missed day plus the 2-hour run), older than
+    crit_after_h is crit."""
+    if last_success_text is None:
+        return CheckStatus("backup", "warn", "no verified off-site backup on record")
+    try:
+        data = json.loads(last_success_text)
+        when = data.get("verified_at") or ""
+        epoch = datetime.fromisoformat(when.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError, AttributeError):
+        return CheckStatus("backup", "warn", "off-site backup record unreadable",
+                           evidence=(last_success_text or "")[:200])
+    if data.get("verified") is not True:
+        return CheckStatus("backup", "warn", "the last off-site backup was not verified")
+    age_h = (now_epoch - epoch) / 3600
+    if age_h >= crit_after_h:
+        return CheckStatus("backup", "crit", f"no verified off-site backup for {age_h:.0f} h")
+    if age_h >= warn_after_h:
+        return CheckStatus("backup", "warn", f"no verified off-site backup for {age_h:.0f} h")
+    return CheckStatus("backup", "ok", f"off-site backup verified {age_h:.0f} h ago")
+
+
+def check_mini_guard(heartbeat_text: str | None, now_epoch: float, *, stale_after_s: int = 600) -> CheckStatus:
+    """The Mac mini guard watches this VM from outside; this check watches the guard.
+    heartbeat_text is its last-tick.json read over SSH, or None when the mini did not
+    answer. The two cases get different messages: an unreachable mini is not the same
+    as a guard that stopped ticking."""
+    if heartbeat_text is None:
+        return CheckStatus("mini-guard", "warn", "cannot reach the Mac mini to read its guard's heartbeat")
+    try:
+        last = float(json.loads(heartbeat_text).get("time"))
+    except (ValueError, TypeError, AttributeError):
+        return CheckStatus("mini-guard", "warn", "the Mac mini guard's heartbeat is unreadable",
+                           evidence=(heartbeat_text or "")[:200])
+    age = now_epoch - last
+    if age > stale_after_s:
+        return CheckStatus("mini-guard", "crit", f"the Mac mini guard has not run for {int(age // 60)} min")
+    return CheckStatus("mini-guard", "ok", f"Mac mini guard ran {int(age)} s ago")
 
 
 def check_service_active(name: str, systemctl_output: str) -> CheckStatus:
@@ -280,15 +327,22 @@ def check_log_coverage(found: list[str], missing: list[str]) -> CheckStatus:
 
 
 def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_status: str | None,
-                     *, max_age_s: int = 1200, note_status: str | None = None) -> CheckStatus:
+                     *, max_age_s: int = 1200, note_status: str | None = None,
+                     paused_age_s: float | None = None, max_pause_s: int = 6 * 3600) -> CheckStatus:
     """alert-watch turns captured Telegram reports into fix runs. Warn when its inbox
-    stops moving or its newest run failed. A paused watcher is a choice, not a fault
-    (it sends its own note when it pauses itself). A usage-limit run is not a failure."""
+    stops moving or its newest run failed. A short pause is a choice, not a fault (it
+    sends its own note when it pauses itself), but a pause that outlasts max_pause_s
+    warns: on 2026-11-21 it paused itself and stayed off for 6 days unnoticed.
+    A usage-limit run is not a failure."""
     if note_status in ("failed", "uncertain"):  # first: the pause note itself may be the one lost
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a note to Rex {note_status}; see its runs/ record and state.json"
                            + (" (alert-watch is paused)" if paused else ""))
     if paused:
+        if paused_age_s is not None and paused_age_s > max_pause_s:
+            return CheckStatus("alertwatch", "warn",
+                               f"alert-watch has been paused for {int(paused_age_s // 3600)} h; "
+                               "delete ~/.local/state/alert-watch/PAUSED to resume")
         return CheckStatus("alertwatch", "ok", "alert-watch is paused")
     if newest_run_status == "failed":
         return CheckStatus("alertwatch", "warn", "alert-watch: the newest run failed; see its runs/ record")
@@ -296,6 +350,51 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a report has waited {int(oldest_inbox_age_s // 60)} min in the inbox")
     return CheckStatus("alertwatch", "ok", "alert-watch inbox moving")
+
+
+def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured: bool = True,
+                        stale_after_s: int = 20 * 60,
+                        expected: tuple = ("bebop-vm", "mini-guard"), problem: str = "") -> CheckStatus:
+    """The bebop-uptime Worker on Cloudflare is the alarm for "the whole house is down".
+    Nothing tells Rex if it stops or cannot send, so the VM reads its status: no recent
+    cron pass is crit; missing setup, unreachable, unreadable, no Telegram token, a failed
+    send, or a check it reports as down is warn."""
+    name = "outside-alarm"
+    if not configured:
+        return CheckStatus(name, "warn", "outside alarm: the server has no ~/.config/bebop-uptime/secret, "
+                           "so it cannot check the alarm (see setup/uptime-worker)")
+    if status_text is None:
+        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) "
+                           + (problem or "could not be reached from the server"))
+    try:
+        d = json.loads(status_text)
+        if not isinstance(d, dict):
+            raise TypeError
+        checks = d.get("checks") or {}
+        if not isinstance(checks, dict):
+            raise TypeError
+        last_cron = float(d.get("lastCron") or 0)
+        if not math.isfinite(last_cron):
+            raise ValueError
+    except (ValueError, TypeError):
+        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) gave an unreadable status")
+    age = max(0.0, now_epoch - last_cron)   # a clock ahead of ours is not "stale"
+    if not last_cron or age > stale_after_s:
+        when = "never" if not last_cron else f"{int(age // 60)} min ago"
+        return CheckStatus(name, "crit", f"outside alarm (Cloudflare bebop-uptime) last ran {when}; "
+                           "a house power or internet outage would go unreported")
+    if not d.get("alerts"):
+        return CheckStatus(name, "warn", "outside alarm has no Telegram token, so it cannot message Rex "
+                           "(see setup/uptime-worker/README.md)")
+    if d.get("lastSendError"):
+        return CheckStatus(name, "warn", "outside alarm could not deliver a Telegram message; it retries every 5 min")
+    missing = [n for n in expected if not isinstance(checks.get(n), dict)]
+    if missing:   # the Worker ignores a check until its first ping, so say it here
+        return CheckStatus(name, "warn", "outside alarm has never heard from: " + ", ".join(missing))
+    down = sorted(n for n, c in checks.items() if isinstance(c, dict) and c.get("announced") == "down")
+    if down:
+        return CheckStatus(name, "warn", "outside alarm reports no check-in from: " + ", ".join(down))
+    return CheckStatus(name, "ok", f"outside alarm ran {int(age // 60)} min ago")
 
 
 def _iso_epoch(ts: str | None) -> float | None:

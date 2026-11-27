@@ -1,0 +1,12 @@
+{
+  "name": "bebop-uptime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "deploy": "node --test test/*.test.js && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.143.0"
+  }
+}

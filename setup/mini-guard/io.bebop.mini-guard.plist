@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.bebop.mini-guard</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/python3</string>
+		<string>/Users/bebop_admin/.local/bin/mini-guard</string>
+		<string>tick</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>120</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/bebop_admin</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/bebop_admin/.local/state/mini-guard/launchd.out</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/bebop_admin/.local/state/mini-guard/launchd.err</string>
+	<key>ProcessType</key>
+	<string>Background</string>
+</dict>
+</plist>
