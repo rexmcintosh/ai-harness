@@ -160,3 +160,10 @@ def test_a_timed_out_start_counts_as_started(tmp_path, monkeypatch):
     monkeypatch.setattr(fix_backup.subprocess, "run", slow)
     fix_backup.main([])
     assert sent[-1].startswith("STARTED") and fixkit.load_state("backup").get("started_at") == NOW
+
+
+def test_dry_run_never_sends_queued_notes(tmp_path, monkeypatch):
+    calls, sent = _setup(tmp_path, monkeypatch, verified_hours_ago=31)
+    fixkit.queue(["PROBLEM: earlier"], "backup-outbox")
+    fix_backup.main(["--dry-run"])
+    assert sent == []

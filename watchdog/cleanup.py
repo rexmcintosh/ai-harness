@@ -279,6 +279,22 @@ def _reserve(state: dict) -> None:
         print("cleanup: could not save state (disk full?); cleaning anyway")
 
 
+def _queue(messages: list) -> list:
+    """Queue notes; on a full disk, hand them back so they are sent directly instead."""
+    try:
+        fixkit.queue(messages, "cleanup-outbox")
+        return []
+    except OSError:
+        return list(messages)
+
+
+def _flush() -> None:
+    try:
+        fixkit.flush("cleanup-outbox")
+    except OSError:
+        print("cleanup: could not update the outbox (disk full?)")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Free disk space before the disk alerts fire.")
     parser.add_argument("--dry-run", action="store_true")
@@ -289,6 +305,8 @@ def main(argv=None) -> int:
     if lock is None:
         print("cleanup: another run is still going")
         return 0
+    if not args.dry_run:
+        _flush()                         # a pause stops actions, not earlier reports
     if fixkit.paused(now_epoch) and not args.force:
         print("cleanup: paused for planned work")
         return 0
@@ -319,8 +337,7 @@ def main(argv=None) -> int:
                             "The big items left need your call: "
                             + "; ".join(left_for_rex(in_use, now_epoch)) + ".")
     if not args.dry_run:
-        fixkit.queue(messages, "cleanup-outbox")    # before any later state save
-        messages = []
+        messages = _queue(messages)                 # before any later state save
     free = mac_free_gb()
     mac_cooled = now_epoch - float(state.get("mac_last_run", 0)) >= COOLDOWN_S
     if free is not None and (args.dry_run or (free < MAC_TRIGGER_GB and mac_cooled)):
@@ -338,9 +355,13 @@ def main(argv=None) -> int:
                                 "updater leftovers over ssh failed. It needs a look.")
     if args.dry_run:
         return 0
-    fixkit.queue(messages, "cleanup-outbox")   # queue, save, flush: a note is never lost
-    fixkit.save_state(NAME, state)
-    fixkit.flush("cleanup-outbox")
+    messages = _queue(messages)                # queue, save, flush
+    _reserve(state)
+    if messages:
+        # The outbox could not be written (full disk): send these directly, once.
+        for text in messages:
+            fixkit.tg_send(text)
+    _flush()
     return 0
 
 

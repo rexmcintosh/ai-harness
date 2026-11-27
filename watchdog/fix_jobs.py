@@ -69,6 +69,8 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
     if lock is None:
         print("fix_jobs: another run is still going")
         return 0
+    if not args.dry_run:
+        fixkit.flush("jobs-outbox")      # a pause stops actions, not earlier reports
     if fixkit.paused(now_epoch):
         print("fix_jobs: paused for planned work")
         return 0
@@ -84,8 +86,9 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
         # A rerun this fixer started, whose outcome it never recorded (it was stopped).
         for job, info in pending.items():
             at = time.strftime("%H:%M", time.localtime(float(info.get("at", 0))))
-            messages.append(f"PROBLEM: I started a rerun of {job} at {at}, but I was stopped "
-                            f"before it finished. Check its log: {info.get('log')}")
+            messages.append(f"PROBLEM: I began a rerun of {job} at {at}, but I was stopped "
+                            f"before I saw its outcome (it may not have started). Check its log: "
+                            f"{info.get('log')}")
         fixkit.queue(messages, "jobs-outbox")
         messages = []
         pending = {}

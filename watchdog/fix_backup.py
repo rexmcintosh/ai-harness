@@ -94,7 +94,8 @@ def main(argv=None) -> int:
     if lock is None:
         print("fix_backup: another run is still going")
         return 0
-    fixkit.flush("backup-outbox")        # earlier notes go out even if this pass stops early
+    if not args.dry_run:
+        fixkit.flush("backup-outbox")    # earlier notes go out even if this pass stops early
     if fixkit.paused(now_epoch):
         print("fix_backup: paused for planned work")
         return 0

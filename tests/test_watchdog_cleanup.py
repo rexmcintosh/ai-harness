@@ -215,3 +215,15 @@ def test_full_disk_state_save_does_not_stop_the_cleanup(tmp_path, monkeypatch):
     monkeypatch.setattr(fixkit, "save_state", full)
     cleanup.main([])
     assert w.step1_calls == [False] and w.sent[0].startswith("CLEANED")
+
+
+def test_a_disk_that_stays_full_still_gets_its_notes_out(tmp_path, monkeypatch):
+    w = World(tmp_path, monkeypatch, [96, 95])
+
+    def full(*a, **k):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(fixkit, "save_state", full)
+    monkeypatch.setattr(fixkit, "queue", full)
+    monkeypatch.setattr(fixkit, "flush", full)
+    cleanup.main([])
+    assert w.sent[0].startswith("CLEANED") and w.sent[1].startswith("PROBLEM")

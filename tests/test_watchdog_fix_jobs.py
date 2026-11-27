@@ -145,7 +145,7 @@ def test_a_rerun_cut_off_by_a_crash_is_reported_next_pass(world):
         fix_jobs.main([], rerun=dies, cfg=world.cfg)
     assert world.sent == []
     go(world)
-    assert world.sent and world.sent[0].startswith("PROBLEM: I started a rerun of coverage_check")
+    assert world.sent and world.sent[0].startswith("PROBLEM: I began a rerun of coverage_check")
     assert fixkit.load_state("jobs").get("pending") == {}
 
 
@@ -155,3 +155,11 @@ def test_a_rerun_that_writes_another_log_is_skipped(world):
     world.cfg = dataclasses.replace(world.cfg, rerun={"coverage_check": other})
     go(world)
     assert world.sent == [] and "fix-jobs-rerun" not in world.log.read_text()
+
+
+def test_a_pause_stops_reruns_but_not_earlier_reports(world):
+    world.log.write_text(line(time.time() - 39 * 3600))
+    fixkit.queue(["PROBLEM: earlier"], "jobs-outbox")
+    (fixkit.STATE / "pause").write_text("")
+    go(world)
+    assert world.sent == ["PROBLEM: earlier"] and "fix-jobs-rerun" not in world.log.read_text()
