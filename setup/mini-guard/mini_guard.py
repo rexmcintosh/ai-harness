@@ -407,7 +407,15 @@ def heartbeat(cfg: dict, opener=urllib.request.urlopen) -> None:
     if not url:
         return
     # Cloudflare refuses Python's default client name (error 1010), so send our own.
-    req = urllib.request.Request(url, headers={"User-Agent": "mini-guard/1"})
+    # With healthcheck_token (the bebop-uptime Worker) the ping is a POST that carries
+    # the secret in a header, so it never appears in a URL or a log.
+    headers = {"User-Agent": "mini-guard/1"}
+    token = cfg.get("healthcheck_token")
+    data = None
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        data = b""
+    req = urllib.request.Request(url, data=data, headers=headers)
     try:
         with opener(req, timeout=10):
             pass

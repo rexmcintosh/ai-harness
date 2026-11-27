@@ -321,8 +321,12 @@ def test_heartbeat_sends_own_client_name(tmp_path, monkeypatch):
         def __exit__(self, *a): return False
 
     def opener(req, timeout):
-        seen["ua"], seen["url"] = req.get_header("User-agent"), req.full_url
+        seen.update(ua=req.get_header("User-agent"), url=req.full_url,
+                    auth=req.get_header("Authorization"), method=req.get_method())
         return Reply()
     g.heartbeat({"healthcheck_url": "https://example.test/ping/x"}, opener=opener)
-    assert seen == {"ua": "mini-guard/1", "url": "https://example.test/ping/x"}
+    assert (seen["ua"], seen["url"], seen["auth"]) == ("mini-guard/1", "https://example.test/ping/x", None)
+    assert seen["method"] == "GET"
+    g.heartbeat({"healthcheck_url": "https://example.test/ping/x", "healthcheck_token": "t0k"}, opener=opener)
+    assert seen["auth"] == "Bearer t0k" and seen["method"] == "POST" and seen["url"].endswith("/ping/x")
     g.heartbeat({}, opener=lambda *a, **k: 1 / 0)      # no URL: nothing sent

@@ -34,7 +34,7 @@ also hold `~/.local/state/mini-guard/lock` while they work. See the
 | --- | --- |
 | `~/.local/bin/mini-guard` | the script (this folder's `mini_guard.py`) |
 | `~/Library/LaunchAgents/io.bebop.mini-guard.plist` | the launchd job (every 120 s) |
-| `~/.config/mini-guard/config.json` | `mode` (`observe` or `start`), `chat_id`, `telegram_token_file`, optional `healthcheck_url` (mode 600) |
+| `~/.config/mini-guard/config.json` | `mode` (`observe` or `start`), `chat_id`, `telegram_token_file`, optional `healthcheck_url` and `healthcheck_token` (the outside alarm; set by `setup/uptime-worker/install.sh`) (mode 600) |
 | `~/.config/mini-guard/telegram-token` | the guard's own alert-only bot token (mode 600) |
 | `~/.local/state/mini-guard/` | `state.json`, `last-tick.json` (heartbeat), `pause.json`, `outbox.json` (messages waiting for Telegram), `guard.log` |
 
