@@ -220,6 +220,22 @@ def snapshot_databases(home, stage, timeout=600, discovered=None, run_deadline=N
     return manifest
 
 
+def clear_stale_locks(config):
+    """Remove repository locks left by a killed run, before this run needs the repository.
+
+    A run stopped mid-way (a restart, the memory guard) leaves its restic lock behind, and
+    every later run then fails on it: on 2026-11-27 one stale lock failed the next backup.
+    Plain `restic unlock` (never --remove-all) removes only stale locks: one from a process
+    on this host that no longer exists, or one not refreshed for 30 minutes. A live lock is
+    never touched. Best effort: a failure here is printed and the backup goes on, so a lock
+    that is really in use is still reported by the backup command itself."""
+    try:
+        restic(dict(config, restic_timeout=300), ['unlock'])
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+        print(f'Could not check for stale repository locks ({type(error).__name__}); continuing.',
+              file=sys.stderr)
+
+
 def run_backup(config):
     # One budget for the whole run, below the service's TimeoutStartSec of 12 hours.
     config = dict(config, _deadline=time.monotonic() + config.get('run_timeout', 11 * 60 * 60))
@@ -242,6 +258,7 @@ def run_backup(config):
             status['previous_run_interrupted'] = {k: previous.get(k) for k in ('started_at', 'stage')}
         atomic_json(state / 'status.json', status)
         try:
+            clear_stale_locks(config)
             # Only this runner owns this exact staging directory and its verify caches.
             if stage.exists():
                 shutil.rmtree(stage)

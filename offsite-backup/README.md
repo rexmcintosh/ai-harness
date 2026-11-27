@@ -126,6 +126,11 @@ journalctl --user -u restic-offsite.service -n 60 --no-pager
 ~/.local/bin/restic-offsite restic snapshots --tag bebop-offsite
 ```
 
+Each backup run first clears stale repository locks with plain `restic unlock` (never
+`--remove-all`): a run killed by a restart leaves its lock, and the next run would fail
+on it. Only locks from a dead process on this host, or not refreshed for 30 minutes,
+are removed. A failed unlock is printed and the backup goes on (2026-11-27).
+
 A status of `failed`, a failed unit, or no new successful snapshot for 36 hours
 means protection needs attention. `last-error.json` preserves historical stderr from captured commands with nonzero exits,
 with configured credentials removed and without recording restored file contents.

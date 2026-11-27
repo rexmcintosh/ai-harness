@@ -155,6 +155,48 @@ class BackupTests(unittest.TestCase):
         self.assertTrue(json.loads((self.state / 'status.json').read_text())['verified'])
 
     # Exit 3 is a partial backup; it must never trigger retention or record success.
+    def leave_stale_lock(self):
+        """Kill a restic command while it holds an exclusive lock, as a restart does."""
+        env = dict(os.environ, RESTIC_REPOSITORY=self.config['repository'],
+                   RESTIC_PASSWORD=self.config['password'])
+        locks = Path(self.config['repository']) / 'locks'
+        for _ in range(5):
+            proc = subprocess.Popen(['/usr/bin/restic', '--no-cache', 'repair', 'index', '--read-all-packs'],
+                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            deadline = time.monotonic() + 20
+            while proc.poll() is None and not any(locks.iterdir()) and time.monotonic() < deadline:
+                time.sleep(0.005)
+            proc.kill()
+            proc.wait()
+            if any(locks.iterdir()):
+                return
+        self.fail('could not leave a stale lock')
+
+    def test_stale_lock_from_killed_run_is_cleared_before_backup(self):
+        backup.restic(self.config, ['init'])
+        self.leave_stale_lock()
+        # Without the cleanup the repository refuses the backup.
+        with self.assertRaises(subprocess.CalledProcessError):
+            backup.restic(self.config, ['backup', str(self.home), '--host', 'x'], capture=True)
+        (self.state / 'last-error.json').unlink()
+        backup.run_backup(self.config)
+        self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'ok')
+        self.assertFalse(any((Path(self.config['repository']) / 'locks').iterdir()))
+
+    def test_failed_lock_cleanup_does_not_stop_the_backup(self):
+        backup.restic(self.config, ['init'])
+        calls = self.base / 'calls'
+        executable = self.base / 'no-unlock-restic'
+        executable.write_text(f'#!/bin/sh\necho "$*" >> {calls}\n'
+                              'case "$*" in *unlock*) exit 1;; *) exec /usr/bin/restic "$@";; esac\n')
+        executable.chmod(0o700)
+        self.config['restic'] = str(executable)
+        backup.run_backup(self.config)
+        self.assertEqual(json.loads((self.state / 'status.json').read_text())['status'], 'ok')
+        self.assertFalse((self.state / 'last-error.json').exists())
+        # Plain unlock only: never --remove-all, which would also drop a live lock.
+        self.assertEqual(calls.read_text().splitlines()[0], '--no-cache unlock')
+
     def test_partial_backup_fails_without_retention_or_success(self):
         backup.restic(self.config, ['init'])
         backup.run_backup(self.config)
