@@ -354,7 +354,7 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
 
 def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured: bool = True,
                         stale_after_s: int = 20 * 60,
-                        expected: tuple = ("bebop-vm", "mini-guard")) -> CheckStatus:
+                        expected: tuple = ("bebop-vm", "mini-guard"), problem: str = "") -> CheckStatus:
     """The bebop-uptime Worker on Cloudflare is the alarm for "the whole house is down".
     Nothing tells Rex if it stops or cannot send, so the VM reads its status: no recent
     cron pass is crit; missing setup, unreachable, unreadable, no Telegram token, a failed
@@ -364,7 +364,8 @@ def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured
         return CheckStatus(name, "warn", "outside alarm: the server has no ~/.config/bebop-uptime/secret, "
                            "so it cannot check the alarm (see setup/uptime-worker)")
     if status_text is None:
-        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) could not be reached from the server")
+        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) "
+                           + (problem or "could not be reached from the server"))
     try:
         d = json.loads(status_text)
         if not isinstance(d, dict):

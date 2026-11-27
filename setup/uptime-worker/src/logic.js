@@ -107,10 +107,12 @@ export async function runTick({ load, save, send, alertsOn, nowS }) {
 // Returns { kind: "ping", check } | { kind: "status" } | null (answer 404).
 // The secret travels only in "Authorization: Bearer ...", never in the URL, so
 // request logs never hold it. Pings must be POST: a GET never changes state.
+const SECRET_FORMAT = /^[0-9a-f]{64}$/;   // the one format: openssl rand -hex 32
+
 export function route(method, pathname, authorization, secret) {
   const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
     ? authorization.slice(7) : "";
-  if (!sameSecret(token, secret)) return null;
+  if (!SECRET_FORMAT.test(secret || "") || !sameSecret(token, secret)) return null;
   const parts = pathname.split("/").filter(Boolean);
   if (method === "POST" && parts.length === 2 && parts[0] === "ping" && Object.hasOwn(CHECKS, parts[1])) {
     return { kind: "ping", check: parts[1] };

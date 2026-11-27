@@ -89,20 +89,22 @@ test("the two checks match the senders", () => {
 });
 
 test("routes: secret only in the Authorization header, pings POST only", () => {
-  const ok = "Bearer k3y";
-  assert.deepEqual(route("POST", "/ping/mini-guard", ok, "k3y"), { kind: "ping", check: "mini-guard" });
-  assert.deepEqual(route("POST", "/ping/bebop-vm/", ok, "k3y"), { kind: "ping", check: "bebop-vm" });
-  assert.deepEqual(route("GET", "/status", ok, "k3y"), { kind: "status" });
-  assert.equal(route("GET", "/ping/mini-guard", ok, "k3y"), null);      // GET never changes state
-  assert.equal(route("HEAD", "/ping/mini-guard", ok, "k3y"), null);
-  assert.equal(route("POST", "/status", ok, "k3y"), null);
-  assert.equal(route("POST", "/ping/other", ok, "k3y"), null);          // unknown check
-  assert.equal(route("POST", "/ping/__proto__", ok, "k3y"), null);
-  assert.equal(route("POST", "/ping/mini-guard/k3y", null, "k3y"), null); // secret in the path: refused
-  assert.equal(route("POST", "/ping/mini-guard", "Bearer nope", "k3y"), null);
-  assert.equal(route("POST", "/ping/mini-guard", "k3y", "k3y"), null);  // no "Bearer "
+  const K = "a1".repeat(32);
+  const ok = `Bearer ${K}`;
+  assert.deepEqual(route("POST", "/ping/mini-guard", ok, K), { kind: "ping", check: "mini-guard" });
+  assert.deepEqual(route("POST", "/ping/bebop-vm/", ok, K), { kind: "ping", check: "bebop-vm" });
+  assert.deepEqual(route("GET", "/status", ok, K), { kind: "status" });
+  assert.equal(route("GET", "/ping/mini-guard", ok, K), null);      // GET never changes state
+  assert.equal(route("HEAD", "/ping/mini-guard", ok, K), null);
+  assert.equal(route("POST", "/status", ok, K), null);
+  assert.equal(route("POST", "/ping/other", ok, K), null);          // unknown check
+  assert.equal(route("POST", "/ping/__proto__", ok, K), null);
+  assert.equal(route("POST", `/ping/mini-guard/${K}`, null, K), null); // secret in the path: refused
+  assert.equal(route("POST", "/ping/mini-guard", "Bearer nope", K), null);
+  assert.equal(route("POST", "/ping/mini-guard", K, K), null);  // no "Bearer "
   assert.equal(route("GET", "/status", "Bearer ", ""), null);          // unset secret never matches
   assert.equal(route("GET", "/status", ok, undefined), null);
+  assert.equal(route("GET", "/status", "Bearer short", "short"), null); // only the 64-hex format works
 });
 
 function store(initial) {

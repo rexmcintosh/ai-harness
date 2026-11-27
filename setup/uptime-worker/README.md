@@ -30,15 +30,16 @@ Design context: [docs/uptime-design-2026-11-27.md](../../docs/uptime-design-2026
 
 The VM watchdog (`check_outside_alarm`, every 30 minutes) reads `/status`:
 no cron pass for 20 minutes is crit; a missing secret file, unreachable or unreadable
-status, no Telegram token, a failed send, a check the Worker has never heard from, or a
+status (the message says which: refused secret, HTTP error, or no network), no Telegram token, a failed send, a check the Worker has never heard from, or a
 check it reports as down is warn. The status read retries twice before it counts as
 unreachable.
 
 ## Paths
 
 `https://bebop-uptime.rex-651.workers.dev`. Every request needs
-`Authorization: Bearer <PING_SECRET>`; the secret is never in a URL, so Cloudflare's
-request logs never hold it.
+`Authorization: Bearer <PING_SECRET>`. The secret is kept out of URLs, which request
+logs record. It has one format everywhere: 64 lowercase hex characters
+(`openssl rand -hex 32`); every part refuses anything else.
 
 - `POST /ping/<check>` records a check-in (a `GET` never changes anything).
 - `GET /status` returns JSON: `lastCron`, `alerts`, `lastSendError`, `checks`, recent `log`.
@@ -51,8 +52,12 @@ One secret serves both senders and `/status`. Both hosts are Rex's own machines 
 the same tailnet; if either is taken over, a faked ping is the least of the problems,
 so separate secrets per sender are not worth the extra setup.
 
-To change the secret: write a new `~/.config/bebop-uptime/secret`, run the
-`wrangler secret put PING_SECRET` line below, then `install.sh` (it updates the mini).
+To change the secret (pings fail for the minute this takes, which is harmless):
+
+    umask 077; openssl rand -hex 32 > ~/.config/bebop-uptime/secret.new
+    mv ~/.config/bebop-uptime/secret.new ~/.config/bebop-uptime/secret
+    tr -d '\n' < ~/.config/bebop-uptime/secret | npx wrangler secret put PING_SECRET
+    setup/uptime-worker/install.sh     # updates the mini and proves both pings arrive
 
 ## Files
 

@@ -40,6 +40,8 @@ if [ "${1:-}" = "--undo" ]; then
 fi
 
 [ -s "$secret_file" ] || { echo "no $secret_file; deploy the Worker first (README.md)" >&2; exit 1; }
+tr -d '\n' < "$secret_file" | grep -Eqx '[0-9a-f]{64}' \
+  || { echo "$secret_file must be 64 lowercase hex characters (openssl rand -hex 32)" >&2; exit 1; }
 mkdir -p "$HOME/.local/bin" "$HOME/.local/state"
 install -m 755 "$here/vm-ping.sh" "$bin"
 { crontab -l 2>/dev/null | grep -vF "$bin" || true; echo "$cron_line"; } | crontab -

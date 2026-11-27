@@ -463,23 +463,34 @@ def read_guard_heartbeat(key: Path) -> str | None:
 OUTSIDE_ALARM_SECRET = Path(os.environ.get("OUTSIDE_ALARM_SECRET")
                             or Path.home() / ".config" / "bebop-uptime" / "secret")
 OUTSIDE_ALARM_URL = "https://bebop-uptime.rex-651.workers.dev/status"
-SECRET_OK = re.compile(r"[0-9a-f]{32,128}")   # what install makes; safe inside a curl config line
+SECRET_OK = re.compile(r"[0-9a-f]{64}")   # the one format (openssl rand -hex 32); safe in a curl config line
 
 
-def read_outside_alarm(secret_path: Path) -> str | None:
-    """The Worker's status JSON, or None when it cannot be reached. The secret goes to
-    curl on stdin as a header, never on the command line or in the URL."""
+def read_outside_alarm(secret_path: Path) -> tuple[str | None, str]:
+    """(status JSON, "") or (None, why not). The secret goes to curl on stdin as a
+    header, never on the command line or in the URL."""
     try:
         secret = secret_path.read_text().strip()
-        if not SECRET_OK.fullmatch(secret):
-            return None
-        proc = subprocess.run(["curl", "-fsS", "-m", "15", "--retry", "2", "--retry-delay", "5",
-                               "-K", "-", OUTSIDE_ALARM_URL],
+    except OSError:
+        return None, "the server cannot read ~/.config/bebop-uptime/secret"
+    if not SECRET_OK.fullmatch(secret):
+        return None, "~/.config/bebop-uptime/secret is not 64 lowercase hex characters"
+    try:
+        proc = subprocess.run(["curl", "-sS", "-m", "15", "--retry", "2", "--retry-delay", "5",
+                               "-w", "\n%{http_code}", "-K", "-", OUTSIDE_ALARM_URL],
                               capture_output=True, text=True, timeout=75,
                               input=f'header = "Authorization: Bearer {secret}"\n')
     except (OSError, subprocess.SubprocessError):
-        return None
-    return proc.stdout if proc.returncode == 0 else None
+        return None, "could not be reached from the server (curl did not run)"
+    body, _, code = proc.stdout.rpartition("\n")
+    if proc.returncode == 0 and code == "200":
+        return body, ""
+    if code == "404":
+        return None, ("refused the server's secret (404): the Worker's PING_SECRET and "
+                      "~/.config/bebop-uptime/secret differ, or the Worker was replaced")
+    if code.isdigit() and code != "000":
+        return None, f"answered HTTP {code} (a Cloudflare or Worker fault)"
+    return None, "could not be reached from the server (network, DNS or Cloudflare)"
 
 
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:
@@ -525,8 +536,8 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
         configured = OUTSIDE_ALARM_SECRET.stat().st_size > 0
     except OSError:
         configured = False
-    out.append(check_outside_alarm(read_outside_alarm(OUTSIDE_ALARM_SECRET) if configured else None,
-                                   now_epoch, configured=configured))
+    text, why = read_outside_alarm(OUTSIDE_ALARM_SECRET) if configured else (None, "")
+    out.append(check_outside_alarm(text, now_epoch, configured=configured, problem=why))
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)

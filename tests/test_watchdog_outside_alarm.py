@@ -64,36 +64,50 @@ def test_reported_down_warns():
     assert s.level == "warn" and s.summary.endswith("mini-guard")
 
 
+GOOD = "5e" * 32
+
+
+def fake_curl(monkeypatch, stdout, rc=0, seen=None):
+    def fake_run(args, **kw):
+        if seen is not None:
+            seen["args"], seen["input"] = args, kw.get("input")
+        return subprocess.CompletedProcess(args, rc, stdout=stdout, stderr="")
+    monkeypatch.setattr(run.subprocess, "run", fake_run)
+
+
 def test_reader_keeps_secret_off_command_line(tmp_path, monkeypatch):
     secret = tmp_path / "secret"
-    secret.write_text("5ec2e7" * 8 + "\n")
+    secret.write_text(GOOD + "\n")
     seen = {}
-
-    def fake_run(args, **kw):
-        seen["args"], seen["input"] = args, kw.get("input")
-        return subprocess.CompletedProcess(args, 0, stdout="{}", stderr="")
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
-    assert run.read_outside_alarm(secret) == "{}"
-    assert "5ec2e7" not in " ".join(seen["args"])
+    fake_curl(monkeypatch, '{"a": 1}\n200', seen=seen)
+    assert run.read_outside_alarm(secret) == ('{"a": 1}', "")
+    assert GOOD not in " ".join(seen["args"])
     assert seen["args"][-1] == "https://bebop-uptime.rex-651.workers.dev/status"
-    assert seen["input"] == f'header = "Authorization: Bearer {"5ec2e7" * 8}"\n'
+    assert seen["input"] == f'header = "Authorization: Bearer {GOOD}"\n'
 
 
-def test_reader_failure_is_none(tmp_path, monkeypatch):
+def test_reader_names_the_failure(tmp_path, monkeypatch):
     secret = tmp_path / "secret"
-    secret.write_text("ab" * 20)
-    monkeypatch.setattr(run.subprocess, "run",
-                        lambda args, **kw: subprocess.CompletedProcess(args, 22, stdout="", stderr=""))
-    assert run.read_outside_alarm(secret) is None
-    assert run.read_outside_alarm(tmp_path / "missing") is None
+    secret.write_text(GOOD)
+    fake_curl(monkeypatch, "not found\n404")
+    text, why = run.read_outside_alarm(secret)
+    assert text is None and "refused" in why
+    fake_curl(monkeypatch, "oops\n503")
+    assert "HTTP 503" in run.read_outside_alarm(secret)[1]
+    fake_curl(monkeypatch, "\n000", rc=6)
+    assert "could not be reached" in run.read_outside_alarm(secret)[1]
+    assert "cannot read" in run.read_outside_alarm(tmp_path / "missing")[1]
+    s = check_outside_alarm(None, NOW, problem="answered HTTP 503 (a Cloudflare or Worker fault)")
+    assert s.level == "warn" and s.summary.endswith("HTTP 503 (a Cloudflare or Worker fault)")
 
 
 def test_reader_refuses_odd_secret(tmp_path, monkeypatch):
     monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no curl")))
-    for bad in ("", "short", 'ab"cd' * 10, "ab\ncd" * 10):
+    for bad in ("", "short", "ab" * 20, GOOD.upper(), 'ab"cd' * 13, GOOD[:-1] + "\n" + "a"):
         p = tmp_path / "s"
         p.write_text(bad)
-        assert run.read_outside_alarm(p) is None
+        text, why = run.read_outside_alarm(p)
+        assert text is None and "64 lowercase hex" in why
 
 
 def test_non_finite_and_future_cron():
