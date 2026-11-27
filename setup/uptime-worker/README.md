@@ -77,7 +77,7 @@ To change the secret (pings fail for the minute this takes, which is harmless):
     set -a; . ~/.env; set +a          # CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID
     npm run deploy                    # tests, then wrangler deploy
     tr -d '\n' < ~/.config/bebop-uptime/secret | npx wrangler secret put PING_SECRET
-    npx wrangler secret put TELEGRAM_TOKEN     # the alert-only bot, once it exists
+    npx wrangler secret put TELEGRAM_TOKEN     # @Alertbebopbot (alert-only), shared with mini-guard
     setup/uptime-worker/install.sh
 
 `CLOUDFLARE_API_TOKEN` can deploy Workers but cannot create D1 databases, which is why

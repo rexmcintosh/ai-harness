@@ -60,6 +60,7 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 | Key | Where | Use |
 | --- | --- | --- |
 | Cloudflare (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, user token, verified 2026-11-27) | `~/.env` | `wrangler deploy` of Workers (e.g. `bebop-uptime`). It cannot create D1 databases or read billing. Site deploys do not use it (Workers Builds). |
+| Alarm bot `@Alertbebopbot` token (alert-only, made 2026-11-27; separate from the Bebop bot so a leak can only spam) | Mac mini `~/.config/mini-guard/telegram-token` (600); Cloudflare Worker secret `TELEGRAM_TOKEN` on `bebop-uptime` | outside alarm and Mac mini guard messages to Rex (chat 7735693897) |
 | bebop-uptime ping secret | `~/.config/bebop-uptime/secret` (600); same value as the Worker secret `PING_SECRET` and in the mini's `~/.config/mini-guard/config.json` | VM and mini pings, watchdog reads `/status` |
 | App Store Connect API (team key `M59TFWW762`, App Manager, added 2026-11-27) | `~/.appstoreconnect/private_keys/AuthKey_M59TFWW762.p8` (600); key and issuer ids in `~/.appstoreconnect/config.env` | MeetTrack store page: text, screenshots, build choice, review notes. Helpers in `~/.appstoreconnect/tools/` (`asc.py` signs each call; `fill_text.py` reads `splash_poller/ios/APP_STORE.md`; `upload_shots.py`). Submitting for review stays Rex's step. |
 
