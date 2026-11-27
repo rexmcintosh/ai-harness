@@ -172,3 +172,18 @@ def test_the_lock_outlives_the_helper(tmp_path):
         except BlockingIOError:
             got = False
     assert got is False
+
+
+def test_precheck_error_gives_the_reservation_and_lock_back(tmp_path):
+    import fcntl
+    import pytest
+    lock = tmp_path / "job.lock"
+    cfg = cfg_with(tmp_path, "true", lock=str(lock))
+
+    def boom():
+        raise ValueError("bad log")
+    with pytest.raises(ValueError):
+        rerun.rerun(cfg, "demo", precheck=boom)
+    with open(lock, "a") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)        # free again
+    assert rerun.main(["demo"], cfg=cfg) == 0                  # the window was not used up

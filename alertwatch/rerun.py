@@ -47,9 +47,23 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
     if cfg.mode != "act":
         print(f"rerun: mode is {cfg.mode}; reruns need mode = act", file=sys.stderr)
         return 2
-    job = cfg.rerun.get(args.job)
+    return rerun(cfg, args.job, now=now)
+
+
+def rerun(cfg: Config, name: str, *, now: Callable[[], float] = time.time,
+          source: str = "alert-watch-rerun", started: list | None = None,
+          precheck: Callable[[], bool] | None = None) -> int:
+    """Rerun one listed job, at most once per rerun_window_s across every caller (the
+    alert-watch run through main(), and watchdog.fix_jobs, which calls this directly
+    with no AI involved). Returns the job's exit code; 1 or 2 when it did not run.
+    `started`, when given, gets True appended once the job has really started, so a
+    caller can tell a refusal from the job's own exit code. `precheck`, when given, is
+    asked again once the job's lock is held, just before the start: False means the job
+    no longer needs a rerun (a scheduled run finished meanwhile), so nothing runs and the
+    reservation is given back."""
+    job = cfg.rerun.get(name)
     if job is None:
-        print(f"rerun: {args.job!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
+        print(f"rerun: {name!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
               file=sys.stderr)
         return 2
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
@@ -60,27 +74,27 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         fcntl.flock(lock, fcntl.LOCK_EX)
         marks = _load(marks_path)
         t = now()
-        last = float(marks.get(args.job) or 0)
+        last = float(marks.get(name) or 0)
         if t - last < cfg.rerun_window_s:
-            print(f"rerun: {args.job} was already rerun {int((t - last) / 60)} min ago; "
+            print(f"rerun: {name} was already rerun {int((t - last) / 60)} min ago; "
                   f"one rerun per {cfg.rerun_window_s // 3600} h", file=sys.stderr)
             return 2
-        marks[args.job] = t
+        marks[name] = t
         _save(marks_path, marks)
 
     def give_back() -> None:
         with open(cfg.state_dir / "reruns.lock", "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             current = _load(marks_path)
-            if current.get(args.job) == t:
+            if current.get(name) == t:
                 if last:
-                    current[args.job] = last
+                    current[name] = last
                 else:
-                    current.pop(args.job, None)
+                    current.pop(name, None)
                 _save(marks_path, current)
 
     env = {k: v for k, v in os.environ.items() if k != "MEETTRACK_DB_READ_ONLY"}
-    env["ALERT_SOURCE"] = f"alert-watch-rerun:{args.job}"
+    env["ALERT_SOURCE"] = f"{source}:{name}"
     argv_job = ["/bin/sh", "-c", job.cmd]
     # Take the job's own cron lock here (the same flock(2) lock `flock -n` uses), so
     # a busy lock is known before the job starts, and the job's exit code is its own.
@@ -95,11 +109,25 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
                 held.close()
                 held = None
                 give_back()
-                print(f"rerun {args.job}: lock busy (the job is running now); not counted")
+                print(f"rerun {name}: lock busy (the job is running now); not counted")
                 return 1
+        try:
+            needed = precheck is None or precheck()
+        except BaseException:
+            if held:
+                held.close()
+            give_back()
+            raise
+        if not needed:
+            if held:
+                held.close()
+                held = None
+            give_back()
+            print(f"rerun {name}: no longer needed; not counted")
+            return 1
         Path(job.log).parent.mkdir(parents=True, exist_ok=True)
         logf = open(job.log, "ab")
-        logf.write(f"--- alert-watch rerun {args.job} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
+        logf.write(f"--- {source} {name} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"
                    .encode())
         logf.flush()
         # The job inherits the locked file, so the lock stays held for the job's whole
@@ -107,12 +135,14 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         proc = subprocess.Popen(argv_job, cwd=job.cwd, env=env, stdout=logf,
                                 stderr=subprocess.STDOUT, start_new_session=True,
                                 pass_fds=(held.fileno(),) if held else ())
+        if started is not None:
+            started.append(True)
     except OSError as e:
         for fh in (held, logf):
             if fh:
                 fh.close()
         give_back()
-        print(f"rerun {args.job}: could not start ({e.__class__.__name__}); not counted")
+        print(f"rerun {name}: could not start ({e.__class__.__name__}); not counted")
         return 1
     try:
         rc = proc.wait(timeout=job.timeout_s)
@@ -123,13 +153,13 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
         except subprocess.TimeoutExpired:
             os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
-        print(f"rerun {args.job}: timed out after {job.timeout_s} s log={job.log}")
+        print(f"rerun {name}: timed out after {job.timeout_s} s log={job.log}")
         return 124
     finally:
         logf.close()
     if held:
         held.close()
-    print(f"rerun {args.job}: rc={rc} log={job.log}")
+    print(f"rerun {name}: rc={rc} log={job.log}")
     return rc
 
 

@@ -53,7 +53,7 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 | earlyoom | system service; settings managed by the memory guard | |
 | Backups | `restic-offsite.timer`, daily 03:30 | |
 | Outside alarm | Cloudflare Worker `bebop-uptime` ([setup/uptime-worker](../setup/uptime-worker/README.md)), cron every 5 min; the VM (cron `bebop-uptime-ping`) and the Mac mini guard ping it; it messages Rex when a ping is late (house power or internet down). Watched by the VM watchdog. Added 2026-11-27. | `https://bebop-uptime.rex-651.workers.dev` (secret in an `Authorization` header; Cloudflare logs show it as REDACTED) |
-| Watchdog extras | cron: `python3 -m watchdog.heal` every 5 min (restarts a service that runs but does not answer; at most once per 6 h; never T3; pause file `~/.local/state/heal/pause`) and `python3 -m watchdog.weekly` Mondays 09:00 (one Telegram line: all well, or what needs a look). Logs in `watchdog/logs/`. Added 2026-11-27. | |
+| Watchdog extras | cron: `python3 -m watchdog.heal` every 5 min (restarts a service that runs but does not answer; at most once per 6 h; never T3; pause file `~/.local/state/heal/pause`) and `python3 -m watchdog.weekly` Mondays 09:00 (one Telegram line: all well, or what needs a look). Logs in `watchdog/logs/`. Also the other no-AI fixers: `watchdog.fix_backup` and `watchdog.fix_jobs` every 15 min, `watchdog.cleanup` hourly (see [watchdog/README.md](../watchdog/README.md), "Automatic fixers"). Added 2026-11-27. | |
 | Cron jobs | `crontab -l` (about 25 lines). Debian cron ignores `CRON_TZ`; all times are server time, Europe/Lisbon. | |
 
 ## Service keys on the VM
