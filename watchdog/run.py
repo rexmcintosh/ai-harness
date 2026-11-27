@@ -23,6 +23,7 @@ from .triage import (
     CheckStatus,
     LEVELS,
     check_alertwatch,
+    check_backup,
     check_bebop_runs,
     check_cron_log,
     check_disk,
@@ -452,6 +453,11 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
         out.append(check_bebop_runs(bebop_log, now_epoch))
 
     out.append(check_disk(_cmd(["df", "-P", "/"])))
+
+    backup_state = Path(os.environ.get("RESTIC_OFFSITE_STATE")
+                        or Path.home() / ".local" / "state" / "restic-offsite")
+    if backup_state.is_dir():  # only where the off-site backup is installed
+        out.append(check_backup(_read(backup_state / "last-success.json"), now_epoch))
 
     for unit in SERVICES:
         out.append(check_service_active(unit, _cmd(["systemctl", "is-active", unit])))

@@ -13,6 +13,7 @@ import sys
 
 from jev.redact import strip_json_data_lists
 from dataclasses import dataclass, field
+import json
 from datetime import datetime, timezone
 
 # Ordered so we can compare severities numerically (worsening detection).
@@ -80,6 +81,32 @@ def check_disk(df_output: str, *, threshold: int = 85) -> CheckStatus:
     if pct >= threshold:
         return CheckStatus("disk", "warn", f"root filesystem {pct}% full")
     return CheckStatus("disk", "ok", f"root filesystem {pct}% full")
+
+
+def check_backup(last_success_text: str | None, now_epoch: float, *,
+                 warn_after_h: float = 30, crit_after_h: float = 54) -> CheckStatus:
+    """The off-site backup's last verified run, from restic-offsite's last-success.json.
+    The backup runs daily and checks itself with a test restore, but it has no alert of
+    its own: on 2026-11-27 a restart killed the catch-up run and nothing said so.
+    Older than warn_after_h warns (one missed day plus the 2-hour run), older than
+    crit_after_h is crit."""
+    if last_success_text is None:
+        return CheckStatus("backup", "warn", "no verified off-site backup on record")
+    try:
+        data = json.loads(last_success_text)
+        when = data.get("verified_at") or ""
+        epoch = datetime.fromisoformat(when.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError, AttributeError):
+        return CheckStatus("backup", "warn", "off-site backup record unreadable",
+                           evidence=(last_success_text or "")[:200])
+    if data.get("verified") is not True:
+        return CheckStatus("backup", "warn", "the last off-site backup was not verified")
+    age_h = (now_epoch - epoch) / 3600
+    if age_h >= crit_after_h:
+        return CheckStatus("backup", "crit", f"no verified off-site backup for {age_h:.0f} h")
+    if age_h >= warn_after_h:
+        return CheckStatus("backup", "warn", f"no verified off-site backup for {age_h:.0f} h")
+    return CheckStatus("backup", "ok", f"off-site backup verified {age_h:.0f} h ago")
 
 
 def check_service_active(name: str, systemctl_output: str) -> CheckStatus:
