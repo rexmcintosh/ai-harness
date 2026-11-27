@@ -2,10 +2,11 @@
 // 5 minutes Cloudflare runs the check and sends Rex a Telegram message when a ping
 // is late (DOWN) or comes back (UP). State lives in one Durable Object.
 //
-//   GET|POST /ping/<check>/<PING_SECRET>   record a check-in (mini-guard, bebop-vm)
-//   GET      /status/<PING_SECRET>         JSON: last cron run, checks, recent events
+//   POST /ping/<check>   record a check-in (mini-guard, bebop-vm)
+//   GET  /status         JSON: last cron run, checks, recent events
+// Both need "Authorization: Bearer <PING_SECRET>"; anything else is 404.
 import { DurableObject } from "cloudflare:workers";
-import { CHECKS, recordPing, evaluate, applyChanges, sameSecret } from "./logic.js";
+import { recordPing, evaluate, applyChanges, route } from "./logic.js";
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj, null, 1), { status, headers: { "content-type": "application/json" } });
@@ -31,7 +32,8 @@ export class Beacon extends DurableObject {
   }
 
   // One cron pass. A change is stored as announced only after Telegram took the
-  // message, so a failed send is retried on the next pass and never repeated after.
+  // message, so a failed send is retried on the next pass. Delivery is at least
+  // once: a send that worked but whose save then failed can repeat one message.
   async tick() {
     const t = nowS();
     let state = { ...(await this.load()), lastCron: t };
@@ -68,16 +70,14 @@ const beacon = (env) => env.BEACON.get(env.BEACON.idFromName("main"));
 
 export default {
   async fetch(request, env) {
-    if (!["GET", "POST", "HEAD"].includes(request.method)) return notFound();
-    const parts = new URL(request.url).pathname.split("/").filter(Boolean);
-    if (parts[0] === "ping" && parts.length === 3 && CHECKS[parts[1]] && sameSecret(parts[2], env.PING_SECRET)) {
-      await beacon(env).ping(parts[1]);
+    const r = route(request.method, new URL(request.url).pathname,
+      request.headers.get("authorization"), env.PING_SECRET);
+    if (!r) return notFound();
+    if (r.kind === "ping") {
+      await beacon(env).ping(r.check);
       return new Response("ok\n");
     }
-    if (parts[0] === "status" && parts.length === 2 && sameSecret(parts[1], env.PING_SECRET)) {
-      return json(await beacon(env).status());
-    }
-    return notFound();
+    return json(await beacon(env).status());
   },
 
   async scheduled(_event, env, ctx) {

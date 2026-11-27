@@ -78,7 +78,23 @@ export function applyChanges(state, changes, nowS, note = "sent") {
   return { ...state, checks, log: log.slice(-LOG_KEEP) };
 }
 
-// Constant-time string compare (for the URL secret).
+// Which request is this? Pure, so it is tested without the Workers runtime.
+// Returns { kind: "ping", check } | { kind: "status" } | null (answer 404).
+// The secret travels only in "Authorization: Bearer ...", never in the URL, so
+// request logs never hold it. Pings must be POST: a GET never changes state.
+export function route(method, pathname, authorization, secret) {
+  const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
+    ? authorization.slice(7) : "";
+  if (!sameSecret(token, secret)) return null;
+  const parts = pathname.split("/").filter(Boolean);
+  if (method === "POST" && parts.length === 2 && parts[0] === "ping" && Object.hasOwn(CHECKS, parts[1])) {
+    return { kind: "ping", check: parts[1] };
+  }
+  if (method === "GET" && parts.length === 1 && parts[0] === "status") return { kind: "status" };
+  return null;
+}
+
+// Constant-time string compare (for the secret).
 export function sameSecret(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || !b) return false;
   const enc = new TextEncoder();

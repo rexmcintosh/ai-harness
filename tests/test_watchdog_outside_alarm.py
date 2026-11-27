@@ -20,9 +20,20 @@ def test_healthy():
     assert (s.level, s.summary) == ("ok", "outside alarm ran 2 min ago")
 
 
-def test_alerts_off_is_noted_but_ok():
+def test_alerts_off_warns():
     s = check_outside_alarm(status(alerts=False), NOW)
-    assert s.level == "ok" and "Telegram not set up" in s.summary
+    assert s.level == "warn" and "no Telegram token" in s.summary
+
+
+def test_failed_send_warns():
+    s = check_outside_alarm(status(lastSendError=NOW - 300), NOW)
+    assert s.level == "warn" and "could not deliver" in s.summary
+    assert check_outside_alarm(status(lastSendError=None), NOW).level == "ok"
+
+
+def test_not_configured_warns():
+    s = check_outside_alarm(None, NOW, configured=False)
+    assert s.level == "warn" and "bebop-uptime/secret" in s.summary
 
 
 def test_unreachable_warns():
@@ -32,6 +43,8 @@ def test_unreachable_warns():
 def test_unreadable_warns():
     assert check_outside_alarm("<html>", NOW).level == "warn"
     assert check_outside_alarm("[1]", NOW).level == "warn"
+    assert check_outside_alarm('{"checks": [1], "lastCron": 1}', NOW).level == "warn"
+    assert check_outside_alarm('{"lastCron": "soon"}', NOW).level == "warn"
 
 
 def test_stale_cron_is_crit():
@@ -61,7 +74,8 @@ def test_reader_keeps_secret_off_command_line(tmp_path, monkeypatch):
     monkeypatch.setattr(run.subprocess, "run", fake_run)
     assert run.read_outside_alarm(secret) == "{}"
     assert "s3cret" not in " ".join(seen["args"])
-    assert seen["input"] == 'url = "https://bebop-uptime.rex-651.workers.dev/status/s3cret"\n'
+    assert seen["args"][-1] == "https://bebop-uptime.rex-651.workers.dev/status"
+    assert seen["input"] == 'header = "Authorization: Bearer s3cret"\n'
 
 
 def test_reader_failure_is_none(tmp_path, monkeypatch):

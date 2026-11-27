@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHECKS, recordPing, evaluate, applyChanges, sameSecret } from "../src/logic.js";
+import { CHECKS, recordPing, evaluate, applyChanges, sameSecret, route } from "../src/logic.js";
 
 const T0 = 1_800_000_000;
 const MIN = 60;
@@ -86,4 +86,21 @@ test("secret compare", () => {
 
 test("the two checks match the senders", () => {
   assert.deepEqual(Object.keys(CHECKS).sort(), ["bebop-vm", "mini-guard"]);
+});
+
+test("routes: secret only in the Authorization header, pings POST only", () => {
+  const ok = "Bearer k3y";
+  assert.deepEqual(route("POST", "/ping/mini-guard", ok, "k3y"), { kind: "ping", check: "mini-guard" });
+  assert.deepEqual(route("POST", "/ping/bebop-vm/", ok, "k3y"), { kind: "ping", check: "bebop-vm" });
+  assert.deepEqual(route("GET", "/status", ok, "k3y"), { kind: "status" });
+  assert.equal(route("GET", "/ping/mini-guard", ok, "k3y"), null);      // GET never changes state
+  assert.equal(route("HEAD", "/ping/mini-guard", ok, "k3y"), null);
+  assert.equal(route("POST", "/status", ok, "k3y"), null);
+  assert.equal(route("POST", "/ping/other", ok, "k3y"), null);          // unknown check
+  assert.equal(route("POST", "/ping/__proto__", ok, "k3y"), null);
+  assert.equal(route("POST", "/ping/mini-guard/k3y", null, "k3y"), null); // secret in the path: refused
+  assert.equal(route("POST", "/ping/mini-guard", "Bearer nope", "k3y"), null);
+  assert.equal(route("POST", "/ping/mini-guard", "k3y", "k3y"), null);  // no "Bearer "
+  assert.equal(route("GET", "/status", "Bearer ", ""), null);          // unset secret never matches
+  assert.equal(route("GET", "/status", ok, undefined), null);
 });
