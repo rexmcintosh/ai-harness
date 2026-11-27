@@ -109,7 +109,9 @@ def env(tmp_path, monkeypatch):
     state = tmp_path / "state"
     cfg = load_config(env={"ALERT_WATCH_STATE": str(state), "ALERT_WATCH_TG_SEND": str(tg),
                            "ALERT_WATCH_CLAUDE": str(claude)})
-    cfg = dataclasses.replace(cfg, projects_dir=tmp_path)
+    # The tests pick their mode: diagnose here, act where a test says so (the
+    # committed config is "act" since 2026-11-27).
+    cfg = dataclasses.replace(cfg, projects_dir=tmp_path, mode="diagnose")
     return {"cfg": cfg, "state": state, **files}
 
 

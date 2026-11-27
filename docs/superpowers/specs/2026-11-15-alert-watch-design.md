@@ -465,3 +465,5 @@ remaining paths, each with a test and, for permissions, a real run:
 Round 24 approved the diagnose-mode rollout. The gates before `mode = "act"` stay:
 a read-only database key for the run and an OS sandbox, or Rex's explicit
 acceptance of their absence.
+
+On 2026-11-27 Rex accepted the absence of both gates and switched to `mode = "act"`.

@@ -6,8 +6,9 @@ chat_id = "7735693897"
 # Rex's chat). A message to any other chat is never put in a prompt or a note.
 watch_chats = ["7735693897"]
 # "diagnose": the run reads and explains only. "act": allowed live steps and merges.
-# Switching to "act" needs Rex's go and the dated section in ~/.claude/CLAUDE.md.
-mode = "diagnose"
+# "act" since 2026-11-27: Rex's go, the dated section in ~/.claude/CLAUDE.md, and his
+# acceptance of both open gates (no read-only database key, no OS sandbox).
+mode = "act"
 model = "opus"
 projects_dir = "/home/dev/projects"
 tg_send = "/home/dev/projects/ai-harness/bin/tg-send"

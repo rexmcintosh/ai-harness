@@ -67,6 +67,9 @@ Capture off for one command: `ALERT_INBOX_DIR=off`.
    `--dangerously-skip-permissions`); every action is a "Needs you" line.
 3. **Act.** After Rex approves, add the section below to `~/.claude/CLAUDE.md`,
    set `mode = "act"` in `config.toml`, and merge that change.
+   **Done 2026-11-27.** Rex chose to switch without the two gates (a read-only
+   database key and an OS sandbox) and accepted both gaps. Back to diagnose: set
+   `mode = "diagnose"` and merge, or `touch ~/.local/state/alert-watch/PAUSED`.
 
 ### Cron line (stage 2)
 
@@ -91,7 +94,7 @@ Rollback: `crontab ~/.local/state/alert-watch/crontab.before`, then
 ### `~/.claude/CLAUDE.md` section (stage 3, needs Rex's approval of the words)
 
 ```
-### alert-watch runs (2026-11-15)
+### alert-watch runs (2026-11-27)
 Rex approved that alert-watch runs (started by `alertwatch/dispatch.py`, with
 `ALERT_WATCH_RUN=1` set) may take the live steps and merges listed in
 `~/projects/ai-harness/alertwatch/POLICY.md` without asking. That policy is Rex's

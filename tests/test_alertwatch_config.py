@@ -7,7 +7,7 @@ from alertwatch.config import RerunJob, load_config
 
 def test_load_config_defaults_from_repo_file():
     cfg = load_config(env={})
-    assert cfg.mode == "diagnose"
+    assert cfg.mode == "act"  # switched 2026-11-27 on Rex's go
     assert cfg.chat_id == "7735693897"
     assert cfg.max_runs_day == 30 and cfg.max_runs_hour == 6 and cfg.max_merges_day == 3
     assert cfg.run_timeout_s == 3600 and cfg.kill_after_s == 30
@@ -33,7 +33,7 @@ def test_tool_paths_env_override(tmp_path):
 
 def test_bad_mode_is_rejected(tmp_path):
     p = tmp_path / "c.toml"
-    p.write_text(Path("alertwatch/config.toml").read_text().replace('mode = "diagnose"', 'mode = "yolo"'))
+    p.write_text(Path("alertwatch/config.toml").read_text().replace('mode = "act"', 'mode = "yolo"'))
     with pytest.raises(ValueError):
         load_config(p, env={})
 
