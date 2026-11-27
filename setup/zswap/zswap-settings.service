@@ -1,0 +1,11 @@
+[Unit]
+Description=Turn on zswap (compressed swap cache)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/zswap-settings
+
+[Install]
+WantedBy=multi-user.target

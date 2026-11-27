@@ -1,6 +1,6 @@
 # Current setup (living reference)
 
-Last verified: 2026-11-26. This is the one place that says how Rex's machines and
+Last verified: 2026-11-27. This is the one place that says how Rex's machines and
 tools fit together **now**. Update it in the same change whenever the setup
 changes (a new app, a new link between machines, a new always-on job, a resize).
 Older documents ([ARCHITECTURE.md](ARCHITECTURE.md), the
@@ -10,7 +10,7 @@ Older documents ([ARCHITECTURE.md](ARCHITECTURE.md), the
 
 | Machine | What it is | Role |
 | --- | --- | --- |
-| **bebop-vm** | Ubuntu 24.04 arm64 VM (Lima, `vz`) inside the Mac mini. Linux hostname `lima-vps`, Lima instance `vps`, user `dev` (passwordless sudo). Tailnet `100.99.202.95`, `bebop-vm.taila64e8f.ts.net`. 8 CPUs, 12 GiB RAM (14 GiB planned), 4 GiB swapfile, 100 GiB disk. | Where all work runs: projects, T3 server, Claude and Codex sessions, cron, services. |
+| **bebop-vm** | Ubuntu 24.04 arm64 VM (kernel 6.8.0-151) (Lima, `vz`) inside the Mac mini. Linux hostname `lima-vps`, Lima instance `vps`, user `dev` (passwordless sudo). Tailnet `100.99.202.95`, `bebop-vm.taila64e8f.ts.net`. 8 CPUs, 12 GiB RAM (14 GiB planned), 4 GiB swapfile, 100 GiB disk. | Where all work runs: projects, T3 server, Claude and Codex sessions, cron, services. |
 | **mini** | Mac mini M4, 16 GB, macOS Tahoe. Login `bebop_admin` (`ssh bebop_admin@mini`, `100.65.130.64`). Auto-login on, FileVault off, sleep off (Amphetamine), restarts after power loss. LaunchAgent `io.lima-vm.autostart.vps` starts the VM at login. | Host for the VM only. Rex uses it for nothing else, so the VM gets priority for memory. Not used for on-screen jobs. |
 | **rexmb** | MacBook, M1, 16 GB. Claude, ChatGPT and T3 Code apps, Tailscale. | Rex's daily window into the VM. If on-screen (computer-use) jobs are set up, they run here, only while it is open. |
 | iPhone, iPad | Tailscale clients. | Thin clients. |
@@ -62,8 +62,9 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 - **Browser helper stand-in** `mcp-lazy` ([setup/mcp-lazy](../setup/mcp-lazy/README.md)):
   the Playwright MCP starts only when a session uses it (Claude and Codex).
 - **idle-chats** nightly at 04:00 (see above).
-- Planned at the next restart: VM RAM 12 to 14 GiB, and zswap (compressed swap
-  cache, zstd, 20% pool) via a boot-time oneshot unit. Plan checked by Astra 6.2.
+- **zswap** on since 2026-11-27 (compressed swap cache, zstd, zsmalloc, 20% pool):
+  `zswap-settings.service`, files in [setup/zswap](../setup/zswap/README.md).
+- Planned: VM RAM 12 to 14 GiB (needs a VM stop on the mini).
 
 ## Backups
 
@@ -80,7 +81,11 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
   apt broken for 12 days (`~/.config/zsh/apt-tmux-guard.zsh`).
 - Kernel meta package is `linux-virtual`, so `linux-modules-extra` (zram) is not
   installed. zswap is built in.
-- Mac mini: Homebrew (Lima, tools). Automatic macOS installs are off; install
+- Mac mini: Homebrew (Lima, tools). To stop the VM from a script, check
+  `limactl list --format '{{.Status}}' vps` instead of the exit code of `limactl stop`:
+  on 2026-11-26 it exited with an error after the VM had stopped, the script quit,
+  and the VM stayed off for about 12 hours. The fixed script is
+  `~/restart-2026-11-26.sh` on the mini (it always starts the VM again). Automatic macOS installs are off; install
   minor macOS updates on purpose. A Mac restart restarts the VM (auto-login, then
   the LaunchAgent starts it).
 - Claude Code, Codex and T3 do not update themselves; T3 shows update checks.
