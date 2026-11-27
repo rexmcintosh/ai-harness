@@ -81,6 +81,8 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 
 ## Updates
 
+- **Before any VM stop or restart, follow [vm-restart-runbook.md](vm-restart-runbook.md).**
+
 - VM: Ubuntu packages through apt. **Run mutating apt commands inside tmux** (or
   detached): a network-daemon restart once killed an apt run over SSH and left
   apt broken for 12 days (`~/.config/zsh/apt-tmux-guard.zsh`).
@@ -90,7 +92,8 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
   `limactl list --format '{{.Status}}' vps` instead of the exit code of `limactl stop`:
   on 2026-11-26 it exited with an error after the VM had stopped, the script quit,
   and the VM stayed off for about 12 hours. The fixed script is
-  `~/restart-2026-11-26.sh` on the mini (it always starts the VM again).
+  `~/restart-2026-11-26.sh` on the mini. Its exit trap starts the VM again after an
+  error, but not if the script is killed or the Mac crashes.
   `limactl stop` still gives up after about 3 minutes, because the guest shutdown
   stalls (the journal stops mid-shutdown). The script runs `sync` in the guest first,
   so nothing is lost; the cause of the stall is not known yet.
