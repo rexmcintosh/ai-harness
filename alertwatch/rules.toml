@@ -40,6 +40,14 @@ action = "ignore"
 source = "watchdog\\.heal|heal\\.py"
 text = "^(FIXED|RESTARTED): "
 
+# The other no-AI fixers (watchdog/fix_backup.py, fix_jobs.py, cleanup.py): their
+# success notes report what they already did. Their PROBLEM lines are looked at.
+[[rule]]
+name = "fixers-done"
+action = "ignore"
+source = "watchdog\\.(fix_backup|fix_jobs|cleanup)|(fix_backup|fix_jobs|cleanup)\\.py"
+text = "^(FIXED|STARTED|RERAN|CLEANED): "
+
 # The Monday all-well line (watchdog/weekly.py). Its problems are already raised by
 # the watchdog's own checks, so the summary itself is never a report.
 [[rule]]
