@@ -94,6 +94,7 @@ def main(argv=None) -> int:
     if lock is None:
         print("fix_backup: another run is still going")
         return 0
+    fixkit.flush("backup-outbox")        # earlier notes go out even if this pass stops early
     if fixkit.paused(now_epoch):
         print("fix_backup: paused for planned work")
         return 0
@@ -124,6 +125,8 @@ def main(argv=None) -> int:
                 ok = subprocess.run(["systemctl", "--user", "start", "--no-block", UNIT],
                                     capture_output=True, timeout=60,
                                     env=fixkit.child_env()).returncode == 0
+            except subprocess.TimeoutExpired:
+                ok = True                  # systemd may have taken it; the outcome check decides
             except (OSError, subprocess.SubprocessError):
                 ok = False
             messages.append(record_start(new, check, now_epoch, ok))

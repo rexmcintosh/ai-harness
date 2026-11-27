@@ -139,3 +139,24 @@ def test_an_unknown_service_state_starts_nothing():
         assert not start and msgs == []
     _, start, _ = fix_backup.decide(OLD, "failed", {}, {}, NOW)
     assert start
+
+
+def test_queued_notes_go_out_even_when_the_bus_is_down(tmp_path, monkeypatch):
+    calls, sent = _setup(tmp_path, monkeypatch, verified_hours_ago=31, unit="")
+    fixkit.queue(["PROBLEM: earlier"], "backup-outbox")
+    fix_backup.main([])
+    assert sent == ["PROBLEM: earlier"]
+
+
+def test_a_timed_out_start_counts_as_started(tmp_path, monkeypatch):
+    import subprocess
+    calls, sent = _setup(tmp_path, monkeypatch, verified_hours_ago=31)
+    real = fix_backup.subprocess.run
+
+    def slow(cmd, **kw):
+        if "start" in cmd:
+            raise subprocess.TimeoutExpired(cmd, 60)
+        return real(cmd, **kw)
+    monkeypatch.setattr(fix_backup.subprocess, "run", slow)
+    fix_backup.main([])
+    assert sent[-1].startswith("STARTED") and fixkit.load_state("backup").get("started_at") == NOW

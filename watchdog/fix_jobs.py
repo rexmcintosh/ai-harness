@@ -94,6 +94,8 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
         if job not in cfg.rerun:
             continue
         path = _log_path(label)
+        if path is None or cfg.rerun[job].log != str(path):
+            continue                  # the rerun would write a log the check does not read
         status = missed(label, _read(path), now_epoch)
         if status is None:
             continue

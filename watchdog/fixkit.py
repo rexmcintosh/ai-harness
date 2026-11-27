@@ -93,8 +93,9 @@ def _write_outbox(outbox_name: str, items: list) -> None:
 
 def queue(messages: list, outbox_name: str) -> None:
     """Write new notes to the fixer's outbox before anything is sent. A fixer queues its
-    notes, then saves its state, then flushes: a crash anywhere repeats a note at worst,
-    and never loses one."""
+    notes, then saves its state, then flushes: a crash repeats a note at worst. The one
+    loss left is a long Telegram outage with more than OUTBOX_KEEP notes waiting: the
+    oldest go first, PROBLEM lines last."""
     if messages:
         _write_outbox(outbox_name, _read_outbox(outbox_name) + list(messages))
 

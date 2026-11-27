@@ -183,3 +183,35 @@ def test_partial_removal_reports_only_what_went(tmp_path, monkeypatch):
     freed = cleanup._remove(d, False)
     assert 0 < freed < cleanup.size_bytes(d) + freed and (d / "b").exists()
     monkeypatch.setattr(cleanup.shutil, "rmtree", real)
+
+
+def test_failed_mac_cleanup_is_a_problem(tmp_path, monkeypatch):
+    w = World(tmp_path, monkeypatch, [70], mac=8.0)
+    monkeypatch.setattr(cleanup, "mac_clean", lambda dry: False)
+    cleanup.main([])
+    assert w.sent and w.sent[-1].startswith("PROBLEM: the Mac mini has only 8 GB free")
+
+
+def test_unreadable_projects_still_sends_the_problem(tmp_path, monkeypatch):
+    w = World(tmp_path, monkeypatch, [90, 88])
+
+    def broken(in_use, now):
+        raise PermissionError("projects")
+    monkeypatch.setattr(cleanup, "idle_node_modules", broken)
+    cleanup.main([])
+    assert any(t.startswith("PROBLEM: the server disk is still 88% full") for t in w.sent)
+
+
+def test_full_disk_state_save_does_not_stop_the_cleanup(tmp_path, monkeypatch):
+    w = World(tmp_path, monkeypatch, [96, 90])
+    real = fixkit.save_state
+    calls = []
+
+    def full(name, data):
+        calls.append(name)
+        if len(calls) == 1:
+            raise OSError(28, "No space left on device")
+        real(name, data)
+    monkeypatch.setattr(fixkit, "save_state", full)
+    cleanup.main([])
+    assert w.step1_calls == [False] and w.sent[0].startswith("CLEANED")

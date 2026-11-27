@@ -138,7 +138,8 @@ def main(argv=None) -> int:
             continue
         # Reserve first: a crash after the restart then counts it, so no second one
         # comes inside the 6 hours.
-        reserved = {**new, "restarted": {**new["restarted"], key: now_epoch}}
+        reserved = {**new, "restarted": {**new["restarted"], key: now_epoch},
+                    "verify": {**new["verify"], key: now_epoch}}
         _save_state(reserved)
         try:
             rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120,

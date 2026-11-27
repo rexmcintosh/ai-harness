@@ -182,3 +182,23 @@ def test_a_note_is_queued_before_it_is_sent(tmp_path, monkeypatch):
     except KeyboardInterrupt:
         pass
     assert json.loads((tmp_path / "outbox.json").read_text()) == ["PROBLEM: x"]
+
+
+def test_a_good_restart_cut_off_by_a_crash_is_still_reported(tmp_path, monkeypatch):
+    up = {"now": False}
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+    monkeypatch.setattr(heal, "probe", lambda port: port != 3000 or up["now"])
+    sent = []
+    monkeypatch.setattr(heal, "_tg_send", lambda text: sent.append(text) or True)
+
+    def restart_then_crash(cmd, **kw):
+        up["now"] = True                 # the restart works...
+        raise KeyboardInterrupt          # ...and heal dies before it records the outcome
+    monkeypatch.setattr(heal.subprocess, "run", restart_then_crash)
+    heal.main([])
+    try:
+        heal.main([])
+    except KeyboardInterrupt:
+        pass
+    heal.main([])
+    assert sent == ["FIXED: the finance tracker answers again."]

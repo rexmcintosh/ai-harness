@@ -242,7 +242,10 @@ def idle_node_modules(in_use: list[str], now_epoch: float) -> str | None:
 
 
 def left_for_rex(in_use: list[str], now_epoch: float) -> list[str]:
-    note = idle_node_modules(in_use, now_epoch)
+    try:
+        note = idle_node_modules(in_use, now_epoch)
+    except OSError:
+        note = None
     return [*LEFT_FOR_REX, *([note] if note else [])]
 
 
@@ -264,6 +267,16 @@ def mac_clean(dry: bool) -> bool:
                                f"rm -rf {paths}"], capture_output=True, timeout=120).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def _reserve(state: dict) -> None:
+    """Save the cooldown before acting. On a full disk the save itself can fail: removing
+    caches is still safe, and freeing space is the point, so the cleanup goes on (the
+    cooldown is then kept only in memory for this pass)."""
+    try:
+        fixkit.save_state(NAME, state)
+    except OSError:
+        print("cleanup: could not save state (disk full?); cleaning anyway")
 
 
 def main(argv=None) -> int:
@@ -288,7 +301,7 @@ def main(argv=None) -> int:
     if before is not None and (args.force or args.dry_run or (before >= TRIGGER_PCT and cooled)):
         if not args.dry_run:
             state["last_run"] = now_epoch           # reserve before acting
-            fixkit.save_state(NAME, state)
+            _reserve(state)
         in_use = in_use_paths()
         done = step1(args.dry_run, in_use)
         after = df_pct() or before
@@ -315,11 +328,14 @@ def main(argv=None) -> int:
             print(f"Mac free {free:.0f} GB; would remove ~/Library/Caches: {', '.join(MAC_CACHES)}")
         else:
             state["mac_last_run"] = now_epoch       # reserve before acting
-            fixkit.save_state(NAME, state)
-        if not args.dry_run and mac_clean(False):
-            later = mac_free_gb()
-            messages.append(f"CLEANED: the Mac mini had {free:.0f} GB free. I removed app updater "
-                            f"leftovers. It now has {later or free:.0f} GB free.")
+            _reserve(state)
+            if mac_clean(False):
+                later = mac_free_gb()
+                messages.append(f"CLEANED: the Mac mini had {free:.0f} GB free. I removed app updater "
+                                f"leftovers. It now has {later or free:.0f} GB free.")
+            else:
+                messages.append(f"PROBLEM: the Mac mini has only {free:.0f} GB free, and removing app "
+                                "updater leftovers over ssh failed. It needs a look.")
     if args.dry_run:
         return 0
     fixkit.queue(messages, "cleanup-outbox")   # queue, save, flush: a note is never lost

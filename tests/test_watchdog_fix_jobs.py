@@ -147,3 +147,11 @@ def test_a_rerun_cut_off_by_a_crash_is_reported_next_pass(world):
     go(world)
     assert world.sent and world.sent[0].startswith("PROBLEM: I started a rerun of coverage_check")
     assert fixkit.load_state("jobs").get("pending") == {}
+
+
+def test_a_rerun_that_writes_another_log_is_skipped(world):
+    world.log.write_text(line(time.time() - 39 * 3600))
+    other = dataclasses.replace(world.job, log=str(world.log) + ".other")
+    world.cfg = dataclasses.replace(world.cfg, rerun={"coverage_check": other})
+    go(world)
+    assert world.sent == [] and "fix-jobs-rerun" not in world.log.read_text()
