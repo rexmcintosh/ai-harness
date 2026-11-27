@@ -353,7 +353,8 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
 
 
 def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured: bool = True,
-                        stale_after_s: int = 20 * 60) -> CheckStatus:
+                        stale_after_s: int = 20 * 60,
+                        expected: tuple = ("bebop-vm", "mini-guard")) -> CheckStatus:
     """The bebop-uptime Worker on Cloudflare is the alarm for "the whole house is down".
     Nothing tells Rex if it stops or cannot send, so the VM reads its status: no recent
     cron pass is crit; missing setup, unreachable, unreadable, no Telegram token, a failed
@@ -386,6 +387,9 @@ def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured
                            "(see setup/uptime-worker/README.md)")
     if d.get("lastSendError"):
         return CheckStatus(name, "warn", "outside alarm could not deliver a Telegram message; it retries every 5 min")
+    missing = [n for n in expected if not isinstance(checks.get(n), dict)]
+    if missing:   # the Worker ignores a check until its first ping, so say it here
+        return CheckStatus(name, "warn", "outside alarm has never heard from: " + ", ".join(missing))
     down = sorted(n for n, c in checks.items() if isinstance(c, dict) and c.get("announced") == "down")
     if down:
         return CheckStatus(name, "warn", "outside alarm reports no check-in from: " + ", ".join(down))

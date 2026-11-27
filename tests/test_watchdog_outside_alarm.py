@@ -58,7 +58,8 @@ def test_never_ran_is_crit():
 
 
 def test_reported_down_warns():
-    checks = {"mini-guard": {"lastSeen": NOW - 3600, "announced": "down"}}
+    checks = {"mini-guard": {"lastSeen": NOW - 3600, "announced": "down"},
+              "bebop-vm": {"lastSeen": NOW - 60, "announced": "up"}}
     s = check_outside_alarm(status(checks=checks), NOW)
     assert s.level == "warn" and s.summary.endswith("mini-guard")
 
@@ -100,3 +101,9 @@ def test_non_finite_and_future_cron():
     assert check_outside_alarm('{"lastCron": Infinity}', NOW).level == "warn"
     s = check_outside_alarm(status(lastCron=NOW + 600), NOW)
     assert (s.level, s.summary) == ("ok", "outside alarm ran 0 min ago")
+
+
+def test_check_never_heard_from_warns():
+    checks = {"bebop-vm": {"lastSeen": NOW - 60, "announced": "up"}}
+    s = check_outside_alarm(status(checks=checks), NOW)
+    assert s.level == "warn" and s.summary.endswith("mini-guard")

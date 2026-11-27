@@ -30,7 +30,9 @@ Design context: [docs/uptime-design-2026-11-27.md](../../docs/uptime-design-2026
 
 The VM watchdog (`check_outside_alarm`, every 30 minutes) reads `/status`:
 no cron pass for 20 minutes is crit; a missing secret file, unreachable or unreadable
-status, no Telegram token, a failed send, or a check the Worker reports as down is warn.
+status, no Telegram token, a failed send, a check the Worker has never heard from, or a
+check it reports as down is warn. The status read retries twice before it counts as
+unreachable.
 
 ## Paths
 
@@ -44,6 +46,10 @@ request logs never hold it.
 
 Cloudflare refuses Python's default `User-Agent` (error 1010); mini-guard sends
 `mini-guard/1`.
+
+One secret serves both senders and `/status`. Both hosts are Rex's own machines on
+the same tailnet; if either is taken over, a faked ping is the least of the problems,
+so separate secrets per sender are not worth the extra setup.
 
 To change the secret: write a new `~/.config/bebop-uptime/secret`, run the
 `wrangler secret put PING_SECRET` line below, then `install.sh` (it updates the mini).

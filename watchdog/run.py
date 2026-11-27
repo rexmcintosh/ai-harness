@@ -473,8 +473,9 @@ def read_outside_alarm(secret_path: Path) -> str | None:
         secret = secret_path.read_text().strip()
         if not SECRET_OK.fullmatch(secret):
             return None
-        proc = subprocess.run(["curl", "-fsS", "-m", "15", "-K", "-", OUTSIDE_ALARM_URL],
-                              capture_output=True, text=True, timeout=30,
+        proc = subprocess.run(["curl", "-fsS", "-m", "15", "--retry", "2", "--retry-delay", "5",
+                               "-K", "-", OUTSIDE_ALARM_URL],
+                              capture_output=True, text=True, timeout=75,
                               input=f'header = "Authorization: Bearer {secret}"\n')
     except (OSError, subprocess.SubprocessError):
         return None
