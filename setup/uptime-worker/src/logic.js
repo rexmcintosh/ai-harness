@@ -78,6 +78,31 @@ export function applyChanges(state, changes, nowS, note = "sent") {
   return { ...state, checks, log: log.slice(-LOG_KEEP) };
 }
 
+// One cron pass, with storage and Telegram passed in so it is testable.
+// Telegram is slow, and a ping can land while the send is in flight, so the state is
+// read again before saving: only lastCron, the delivered changes and the send result
+// are written over it. A change counts as announced only once Telegram took it.
+export async function runTick({ load, save, send, alertsOn, nowS }) {
+  const snapshot = await load();
+  const { changes, text } = evaluate(snapshot, nowS);
+  let outcome = "nothing";
+  if (text) {
+    if (!alertsOn) outcome = "alerts off";
+    else outcome = (await send(text)) ? "sent" : "failed";
+  }
+  let state = { ...(await load()), lastCron: nowS };
+  if (outcome === "sent" || outcome === "alerts off") {
+    state = applyChanges(state, changes, nowS, outcome);
+    state.lastSendError = null;
+  } else if (outcome === "failed") {
+    state.lastSendError = nowS;
+  } else {
+    state.lastSendError = null;           // nothing pending: an old failure no longer matters
+  }
+  await save(state);
+  return outcome;
+}
+
 // Which request is this? Pure, so it is tested without the Workers runtime.
 // Returns { kind: "ping", check } | { kind: "status" } | null (answer 404).
 // The secret travels only in "Authorization: Bearer ...", never in the URL, so

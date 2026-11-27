@@ -9,6 +9,7 @@ data and free of the environment.
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 
@@ -371,9 +372,11 @@ def check_outside_alarm(status_text: str | None, now_epoch: float, *, configured
         if not isinstance(checks, dict):
             raise TypeError
         last_cron = float(d.get("lastCron") or 0)
+        if not math.isfinite(last_cron):
+            raise ValueError
     except (ValueError, TypeError):
         return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) gave an unreadable status")
-    age = now_epoch - last_cron
+    age = max(0.0, now_epoch - last_cron)   # a clock ahead of ours is not "stale"
     if not last_cron or age > stale_after_s:
         when = "never" if not last_cron else f"{int(age // 60)} min ago"
         return CheckStatus(name, "crit", f"outside alarm (Cloudflare bebop-uptime) last ran {when}; "

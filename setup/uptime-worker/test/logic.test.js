@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHECKS, recordPing, evaluate, applyChanges, sameSecret, route } from "../src/logic.js";
+import { CHECKS, recordPing, evaluate, applyChanges, sameSecret, route, runTick } from "../src/logic.js";
 
 const T0 = 1_800_000_000;
 const MIN = 60;
@@ -103,4 +103,53 @@ test("routes: secret only in the Authorization header, pings POST only", () => {
   assert.equal(route("POST", "/ping/mini-guard", "k3y", "k3y"), null);  // no "Bearer "
   assert.equal(route("GET", "/status", "Bearer ", ""), null);          // unset secret never matches
   assert.equal(route("GET", "/status", ok, undefined), null);
+});
+
+function store(initial) {
+  let state = structuredClone(initial);
+  return { load: async () => structuredClone(state), save: async (x) => { state = structuredClone(x); }, get: () => state };
+}
+const late = () => recordPing(recordPing({}, "mini-guard", T0), "bebop-vm", T0 + 15 * MIN);
+
+test("tick: failed send is kept, retried, then recorded once", async () => {
+  const db = store(late());
+  const sent = [];
+  let up = false;
+  const send = async (t) => { if (up) sent.push(t); return up; };
+  assert.equal(await runTick({ ...db, send, alertsOn: true, nowS: T0 + 18 * MIN }), "failed");
+  assert.equal(db.get().lastSendError, T0 + 18 * MIN);
+  assert.equal(db.get().checks["mini-guard"].announced, "up");
+  up = true;
+  assert.equal(await runTick({ ...db, send, alertsOn: true, nowS: T0 + 23 * MIN }), "sent");
+  assert.equal(db.get().lastSendError, null);
+  assert.equal(db.get().checks["mini-guard"].announced, "down");
+  assert.equal(await runTick({ ...db, send, alertsOn: true, nowS: T0 + 28 * MIN }), "nothing");
+  assert.equal(sent.length, 1);
+});
+
+test("tick: a failure that clears before the retry leaves no stale error", async () => {
+  const db = store(late());
+  await runTick({ ...db, send: async () => false, alertsOn: true, nowS: T0 + 18 * MIN });
+  await db.save(recordPing(await db.load(), "mini-guard", T0 + 19 * MIN));   // back before the retry
+  assert.equal(await runTick({ ...db, send: async () => true, alertsOn: true, nowS: T0 + 23 * MIN }), "nothing");
+  assert.equal(db.get().lastSendError, null);
+  assert.equal(db.get().lastCron, T0 + 23 * MIN);
+});
+
+test("tick: a ping that lands during the send is kept", async () => {
+  const db = store(late());
+  const send = async () => {
+    await db.save(recordPing(await db.load(), "bebop-vm", T0 + 18 * MIN));   // arrives mid-send
+    return true;
+  };
+  await runTick({ ...db, send, alertsOn: true, nowS: T0 + 18 * MIN });
+  assert.equal(db.get().checks["bebop-vm"].lastSeen, T0 + 18 * MIN);
+  assert.equal(db.get().checks["mini-guard"].announced, "down");
+});
+
+test("tick: alerts off records changes without sending", async () => {
+  const db = store(late());
+  const out = await runTick({ ...db, send: async () => assert.fail("no send"), alertsOn: false, nowS: T0 + 18 * MIN });
+  assert.equal(out, "alerts off");
+  assert.equal(db.get().log.at(-1).note, "alerts off");
 });

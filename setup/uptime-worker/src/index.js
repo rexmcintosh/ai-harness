@@ -6,7 +6,7 @@
 //   GET  /status         JSON: last cron run, checks, recent events
 // Both need "Authorization: Bearer <PING_SECRET>"; anything else is 404.
 import { DurableObject } from "cloudflare:workers";
-import { recordPing, evaluate, applyChanges, route } from "./logic.js";
+import { recordPing, route, runTick } from "./logic.js";
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj, null, 1), { status, headers: { "content-type": "application/json" } });
@@ -31,24 +31,14 @@ export class Beacon extends DurableObject {
     return { now: nowS(), alerts: Boolean(this.env.TELEGRAM_TOKEN), ...state };
   }
 
-  // One cron pass. A change is stored as announced only after Telegram took the
-  // message, so a failed send is retried on the next pass. Delivery is at least
-  // once: a send that worked but whose save then failed can repeat one message.
   async tick() {
-    const t = nowS();
-    let state = { ...(await this.load()), lastCron: t };
-    const { changes, text } = evaluate(state, t);
-    if (text) {
-      if (!this.env.TELEGRAM_TOKEN) {
-        state = applyChanges(state, changes, t, "alerts off");
-      } else if (await this.send(text)) {
-        state = applyChanges(state, changes, t, "sent");
-        state.lastSendError = null;
-      } else {
-        state.lastSendError = t;
-      }
-    }
-    await this.save(state);
+    return runTick({
+      load: () => this.load(),
+      save: (state) => this.save(state),
+      send: (text) => this.send(text),
+      alertsOn: Boolean(this.env.TELEGRAM_TOKEN),
+      nowS: nowS(),
+    });
   }
 
   async send(text) {

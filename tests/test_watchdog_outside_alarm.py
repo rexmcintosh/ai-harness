@@ -65,7 +65,7 @@ def test_reported_down_warns():
 
 def test_reader_keeps_secret_off_command_line(tmp_path, monkeypatch):
     secret = tmp_path / "secret"
-    secret.write_text("s3cret\n")
+    secret.write_text("5ec2e7" * 8 + "\n")
     seen = {}
 
     def fake_run(args, **kw):
@@ -73,15 +73,30 @@ def test_reader_keeps_secret_off_command_line(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(args, 0, stdout="{}", stderr="")
     monkeypatch.setattr(run.subprocess, "run", fake_run)
     assert run.read_outside_alarm(secret) == "{}"
-    assert "s3cret" not in " ".join(seen["args"])
+    assert "5ec2e7" not in " ".join(seen["args"])
     assert seen["args"][-1] == "https://bebop-uptime.rex-651.workers.dev/status"
-    assert seen["input"] == 'header = "Authorization: Bearer s3cret"\n'
+    assert seen["input"] == f'header = "Authorization: Bearer {"5ec2e7" * 8}"\n'
 
 
 def test_reader_failure_is_none(tmp_path, monkeypatch):
     secret = tmp_path / "secret"
-    secret.write_text("x")
+    secret.write_text("ab" * 20)
     monkeypatch.setattr(run.subprocess, "run",
                         lambda args, **kw: subprocess.CompletedProcess(args, 22, stdout="", stderr=""))
     assert run.read_outside_alarm(secret) is None
     assert run.read_outside_alarm(tmp_path / "missing") is None
+
+
+def test_reader_refuses_odd_secret(tmp_path, monkeypatch):
+    monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no curl")))
+    for bad in ("", "short", 'ab"cd' * 10, "ab\ncd" * 10):
+        p = tmp_path / "s"
+        p.write_text(bad)
+        assert run.read_outside_alarm(p) is None
+
+
+def test_non_finite_and_future_cron():
+    assert check_outside_alarm('{"lastCron": NaN}', NOW).level == "warn"
+    assert check_outside_alarm('{"lastCron": Infinity}', NOW).level == "warn"
+    s = check_outside_alarm(status(lastCron=NOW + 600), NOW)
+    assert (s.level, s.summary) == ("ok", "outside alarm ran 0 min ago")

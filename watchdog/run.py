@@ -463,6 +463,7 @@ def read_guard_heartbeat(key: Path) -> str | None:
 OUTSIDE_ALARM_SECRET = Path(os.environ.get("OUTSIDE_ALARM_SECRET")
                             or Path.home() / ".config" / "bebop-uptime" / "secret")
 OUTSIDE_ALARM_URL = "https://bebop-uptime.rex-651.workers.dev/status"
+SECRET_OK = re.compile(r"[0-9a-f]{32,128}")   # what install makes; safe inside a curl config line
 
 
 def read_outside_alarm(secret_path: Path) -> str | None:
@@ -470,6 +471,8 @@ def read_outside_alarm(secret_path: Path) -> str | None:
     curl on stdin as a header, never on the command line or in the URL."""
     try:
         secret = secret_path.read_text().strip()
+        if not SECRET_OK.fullmatch(secret):
+            return None
         proc = subprocess.run(["curl", "-fsS", "-m", "15", "-K", "-", OUTSIDE_ALARM_URL],
                               capture_output=True, text=True, timeout=30,
                               input=f'header = "Authorization: Bearer {secret}"\n')
@@ -517,7 +520,10 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
     if alertwatch is not None:
         out.append(alertwatch)
 
-    configured = OUTSIDE_ALARM_SECRET.exists()
+    try:
+        configured = OUTSIDE_ALARM_SECRET.stat().st_size > 0
+    except OSError:
+        configured = False
     out.append(check_outside_alarm(read_outside_alarm(OUTSIDE_ALARM_SECRET) if configured else None,
                                    now_epoch, configured=configured))
 
