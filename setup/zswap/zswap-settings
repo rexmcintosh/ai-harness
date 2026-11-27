@@ -1,0 +1,14 @@
+#!/bin/sh
+# Turn on zswap: a compressed cache in front of the swapfile (see README.md).
+# Set the compressor, pool type and size first, then switch it on. Fail loudly.
+set -eu
+P=/sys/module/zswap/parameters
+echo zstd > "$P/compressor"
+echo zsmalloc > "$P/zpool"
+echo 20 > "$P/max_pool_percent"
+echo 1 > "$P/enabled"
+[ "$(cat "$P/enabled")" = Y ]
+[ "$(cat "$P/compressor")" = zstd ]
+[ "$(cat "$P/zpool")" = zsmalloc ]
+[ "$(cat "$P/max_pool_percent")" = 20 ]
+echo "zswap on: zstd, zsmalloc, 20% pool"
