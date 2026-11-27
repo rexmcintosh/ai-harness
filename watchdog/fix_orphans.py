@@ -11,19 +11,23 @@ Rules:
 - The same matcher as the watchdog check (watchdog.triage.orphan_rows): an executable
   named `codex` or `codex-*` whose parent is init or the user manager. Nothing else is
   ever signalled.
+- Positive proof that nobody waits: its output (fd 1) is a pipe that no process holds
+  open for reading. Output to a file, a terminal, /dev/null or a socket may be a
+  deliberately detached run, so it is left alone (the watchdog still reports it).
 - Never the main process of a systemd service: that one is supervised, not left
   behind. When the service answer cannot be read, nothing is signalled.
 - Only after 3 hours, so the fixer acts well before the watchdog warns at 6 hours.
 - Identity is pinned before any signal: a pidfd is opened, then /proc/<pid>/stat is
   read again for an adopting parent (init, or Rex's own user manager), the same start
   time, the same executable name, and Rex's own uid. Every signal goes through that
-  pidfd, so a reused pid is never hit; start time and name are checked again just
-  before each signal.
+  pidfd, so a reused pid is never hit; every rule is checked again just before each
+  signal.
 - TERM, up to 10 seconds, then KILL, up to 5 seconds. Each process is tried once
   (recorded before the signal, with the boot ID, and kept while the process runs). If
   it is still running, one PROBLEM names it. A stop cut off by a crash is reported on
   the next pass.
-- Notes name the pid, age, executable and subcommand only: arguments can hold a prompt.
+- Notes name the pid, age, executable and a known subcommand only: arguments can hold a
+  prompt.
 - Never while the pause file exists (planned work). Child processes that Codex itself
   started are not touched.
 
@@ -35,7 +39,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import select
 import signal
 import subprocess
@@ -155,35 +158,80 @@ def _wait_exit(pidfd: int, seconds: float) -> bool:
     return bool(poller.poll(int(seconds * 1000)))
 
 
-def stop(pidfd: int, term_wait: float = TERM_WAIT_S, kill_wait: float = KILL_WAIT_S,
-         same=lambda: True) -> bool:
-    """TERM, wait, then KILL once, all through the pidfd. `same()` is checked again just
-    before each signal, so a process that started another program in the meantime is
-    left alone. True when the process ended."""
+STOPPED, LEFT, FAILED = "stopped", "left", "failed"
+
+
+def stop(pidfd: int, term_wait: float | None = None, kill_wait: float | None = None,
+         same=lambda: True) -> str:
+    """TERM, wait, then KILL once, all through the pidfd. `same()` (every rule) is checked
+    again just before each signal. STOPPED when the process ended; LEFT when it no longer
+    qualified before the first signal (nothing was sent); FAILED otherwise, including a
+    process that ignored TERM and then stopped qualifying for the KILL."""
+    term_wait = TERM_WAIT_S if term_wait is None else term_wait
+    kill_wait = KILL_WAIT_S if kill_wait is None else kill_wait
     try:
         if not same():
-            return False
+            return LEFT
         signal.pidfd_send_signal(pidfd, signal.SIGTERM)
         if _wait_exit(pidfd, term_wait):
-            return True
+            return STOPPED
         if not same():
-            return False
+            return FAILED
         signal.pidfd_send_signal(pidfd, signal.SIGKILL)
     except ProcessLookupError:
-        return True                              # it ended on its own
+        return STOPPED                           # it ended on its own
+    except OSError:
+        return FAILED
+    return STOPPED if _wait_exit(pidfd, kill_wait) else FAILED
+
+
+def output_abandoned(pid: int, proc: Path | None = None) -> bool:
+    """The positive sign that nobody waits for the answer: the process writes its output
+    (fd 1) into a pipe, and no other process holds that pipe open for reading. A file,
+    a terminal, /dev/null or a socket is not proof (a deliberately detached run may be
+    writing its result there), so those are False and the process is left alone. A
+    reader that cannot be checked also gives False."""
+    proc = proc or PROC
+    try:
+        target = os.readlink(proc / str(pid) / "fd" / "1")
     except OSError:
         return False
-    return _wait_exit(pidfd, kill_wait)
+    if not target.startswith("pipe:["):
+        return False
+    try:
+        entries = [d for d in proc.iterdir() if d.name.isdigit() and d.name != str(pid)]
+    except OSError:
+        return False
+    for entry in entries:
+        try:
+            fds = list((entry / "fd").iterdir())
+        except OSError:
+            continue                             # another user's process, or gone
+        for fd in fds:
+            try:
+                if os.readlink(fd) != target:
+                    continue
+            except OSError:
+                continue                         # closed meanwhile
+            try:
+                info = (entry / "fdinfo" / fd.name).read_text()
+                flags = int(next(ln for ln in info.splitlines() if ln.startswith("flags:")).split()[1], 8)
+            except (OSError, StopIteration, ValueError, IndexError):
+                return False                     # a holder we cannot read: keep it
+            if flags & os.O_ACCMODE in (os.O_RDONLY, os.O_RDWR):
+                return False                     # someone still reads the answer
+    return True
 
 
-_WORD = re.compile(r"[a-z][a-z-]{0,20}")
+# Codex subcommands that may appear in a note. Anything else in the arguments (a prompt,
+# a token) never leaves the machine.
+SUBCOMMANDS = {"exec", "review", "app-server", "mcp", "mcp-server", "proto", "resume", "apply"}
 
 
 def _short(ps_args: str) -> str:
-    """The executable name and its subcommand word only. Arguments can hold a prompt or
-    a token, so they never go into a note."""
+    """The executable name, plus its subcommand when it is a known one."""
     parts = ps_args.split()
-    sub = parts[1] if len(parts) > 1 and _WORD.fullmatch(parts[1]) else ""
+    sub = parts[1] if len(parts) > 1 and parts[1] in SUBCOMMANDS else ""
     return f"{_exe_name(parts[0])} {sub}".strip()
 
 
@@ -211,12 +259,17 @@ def _prune(state: dict, boot: str) -> dict:
     return out
 
 
-def reconcile(state: dict, boot: str, now_epoch: float) -> list:
-    """Stops that were cut off before their outcome was written: report each once."""
+def reconcile(state: dict, boot: str, now_epoch: float, waiting: list) -> list:
+    """Stops that were cut off before their outcome was cleared: report each once. Runs
+    before the outbox is flushed, so a note already queued (`waiting`) is not repeated."""
     notes = []
     for key, info in sorted(state["pending"].items()):
-        what = info.get("what", key) if isinstance(info, dict) else key
-        if _key_alive(key, boot):
+        info = info if isinstance(info, dict) else {}
+        what = info.get("what", key)
+        if "outcome" in info:
+            if info["outcome"] and info["outcome"] not in waiting:
+                notes.append(info["outcome"])        # decided, but cut off before queueing
+        elif _key_alive(key, boot):
             state["tried"][key] = state["tried"].get(key, now_epoch)
             state["reported"][key] = now_epoch
             notes.append(f"PROBLEM: a leftover Codex process is still running after I tried to "
@@ -228,10 +281,22 @@ def reconcile(state: dict, boot: str, now_epoch: float) -> list:
     return notes
 
 
-def _still_same(pid: int, ident: dict):
+def eligible(pid: int, row_exe: str, min_minutes: float) -> dict | None:
+    """Every rule at once: the identity, the parent, the age, not a service's main
+    process, and nobody reading the output. Checked before the reservation and again
+    just before each signal."""
+    ident = identity(pid)
+    if not still_ours(ident, row_exe, min_minutes):
+        return None
+    if service_main_pid(pid) or not output_abandoned(pid):
+        return None
+    return ident
+
+
+def _still_same(pid: int, ident: dict, row_exe: str, min_minutes: float):
     def check() -> bool:
-        now = identity(pid)
-        return bool(now) and now["start"] == ident["start"] and now["exe"] == ident["exe"]
+        now = eligible(pid, row_exe, min_minutes)
+        return bool(now) and now["start"] == ident["start"]
     return check
 
 
@@ -249,16 +314,19 @@ def main(argv=None) -> int:
     if lock is None:
         print("fix_orphans: another run is still going")
         return 0
+    boot = boot_id()
+    state = _prune(fixkit.load_state(NAME), boot)
     if not args.dry_run:
+        if state["pending"]:
+            # Before the flush: a note queued just before a crash is still in the outbox.
+            waiting = fixkit._read_outbox("orphans-outbox")
+            fixkit.queue(reconcile(state, boot, now_epoch, waiting), "orphans-outbox")
+            fixkit.save_state(NAME, state)
         fixkit.flush("orphans-outbox")   # a pause stops actions, not earlier reports
     if fixkit.paused(now_epoch):
         print("fix_orphans: paused for planned work")
         return 0
-    boot = boot_id()
-    state = _prune(fixkit.load_state(NAME), boot)
     messages = []
-    if not args.dry_run and state["pending"]:
-        messages += reconcile(state, boot, now_epoch)
     ps = run._cmd(["ps", "-ww", "-eo", "pid,ppid,etime,args"])  # -ww: never cut the line
     rows = orphan_rows(ps, min_minutes=min_minutes, command=COMMAND) if ps.strip() else []
     if not ps.strip():
@@ -278,11 +346,10 @@ def main(argv=None) -> int:
                                 f"(pidfd_open: {err.strerror}). The watchdog keeps reporting them.")
             continue
         try:
-            ident = identity(pid)
-            if not still_ours(ident, _exe_name(ps_args.split()[0]), min_minutes):
-                continue
-            if service_main_pid(pid):
-                continue                 # supervised by systemd, or we cannot tell
+            row_exe = _exe_name(ps_args.split()[0])
+            ident = eligible(pid, row_exe, min_minutes)
+            if ident is None:
+                continue                 # not ours, supervised, or someone reads its output
             key = f"{boot}:{pid}:{ident['start']}"
             what = f"pid {pid}, {_age(minutes)}, {_short(ps_args)}"
             if key in state["tried"]:
@@ -301,14 +368,23 @@ def main(argv=None) -> int:
             state["tried"][key] = now_epoch
             state["pending"][key] = {"at": now_epoch, "what": what}
             fixkit.save_state(NAME, state)
-            if stop(pidfd, same=_still_same(pid, ident)):
+            result = stop(pidfd, same=_still_same(pid, ident, row_exe, min_minutes))
+            if result == STOPPED:
                 note = (f"STOPPED: a leftover Codex process that nothing was waiting for "
-                        f"(parent gone) ({what}).")
+                        f"(parent gone, nobody reading its output) ({what}).")
+            elif result == LEFT:
+                note = None              # it changed before any signal: left alone, no note
+                del state["tried"][key]  # and it may be judged again later
             else:
                 state["reported"][key] = now_epoch
                 note = (f"PROBLEM: a leftover Codex process did not stop on TERM or KILL "
                         f"({what}). It needs a look.")
-            fixkit.queue([note], "orphans-outbox")     # queue, then clear the reservation
+            # Outcome first, then the note, then clear: a crash at any step is
+            # reconciled once on the next pass, never twice.
+            state["pending"][key]["outcome"] = note
+            fixkit.save_state(NAME, state)
+            if note:
+                fixkit.queue([note], "orphans-outbox")
             del state["pending"][key]
             fixkit.save_state(NAME, state)
         finally:

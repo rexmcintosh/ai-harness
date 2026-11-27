@@ -275,7 +275,7 @@ alert-watch ignores, or PROBLEM, which alert-watch looks at. Each has `--dry-run
 | `watchdog.heal` | every 5 min | a service runs but gives no HTTP answer twice | restarts it once per 6 h (never T3) |
 | `watchdog.fix_backup` | every 15 min | no verified off-site backup for 30 h (`check_backup`) and none running | starts one backup run per 6 h; after a PROBLEM, nothing until a backup passes |
 | `watchdog.fix_jobs` | every 15 min | a job in `fix_jobs.JOBS` has a run too old with a clean log (a missed run) | reruns it once through `alertwatch.rerun.rerun()`, sharing alert-watch's 6-hour mark |
-| `watchdog.fix_orphans` | :10 and :40 | a `codex` process with PPID 1 (nothing waits for it) has run 3 h | stops it (TERM, then KILL) through a pidfd after re-checking it is the same process; once per process; never anything not named `codex`/`codex-*` |
+| `watchdog.fix_orphans` | :10 and :40 | a `codex` process adopted by init or `systemd --user` has run 3 h, writes into a pipe nobody reads, and is not a service's main process | stops it (TERM, then KILL) through a pidfd, re-checking every rule before each signal; once per process; never anything not named `codex`/`codex-*`; output to a file or terminal is left to the watchdog report |
 | `watchdog.cleanup` | hourly | server disk 80% full, Mac under 15 GB free | removes the explicit list in its docstring; still 85% after that: one PROBLEM a day naming what is left (idle `node_modules` too, never removed automatically) |
 
 The restic runner also clears stale repository locks before each backup

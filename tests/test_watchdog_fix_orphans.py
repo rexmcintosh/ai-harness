@@ -32,6 +32,7 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "_cmd", lambda args: "    PID    PPID     ELAPSED COMMAND\n"
                         + "".join(f"{pid} 1 {etime} {cmd}\n" for pid, etime, cmd in rows))
     monkeypatch.setattr(fix_orphans, "service_main_pid", lambda pid: False)
+    monkeypatch.setattr(fix_orphans, "output_abandoned", lambda pid: True)
     real_identity = fix_orphans.identity
     # The decoy's parent is the test; report it as reparented to init, nothing else changed.
     monkeypatch.setattr(fix_orphans, "identity",
@@ -66,7 +67,7 @@ def test_one_that_ignores_term_gets_kill(world, monkeypatch):
     world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
     fd = os.pidfd_open(p.pid)
     try:
-        assert fix_orphans.stop(fd, term_wait=0.3, kill_wait=5)
+        assert fix_orphans.stop(fd, term_wait=0.3, kill_wait=5) == fix_orphans.STOPPED
     finally:
         os.close(fd)
     assert p.wait(timeout=5) == -signal.SIGKILL
@@ -136,7 +137,7 @@ def test_crash_after_the_reservation_never_signals_twice(world, monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     calls = []
-    monkeypatch.setattr(fix_orphans, "stop", lambda fd, *a, **k: calls.append(fd) or True)
+    monkeypatch.setattr(fix_orphans, "stop", lambda fd, *a, **k: calls.append(fd) or fix_orphans.STOPPED)
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     assert calls == [] and alive(p)
@@ -146,7 +147,7 @@ def test_crash_after_the_reservation_never_signals_twice(world, monkeypatch):
 def test_one_that_will_not_die_is_one_problem(world, monkeypatch):
     p = world.start()
     world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
-    monkeypatch.setattr(fix_orphans, "stop", lambda fd, *a, **k: False)
+    monkeypatch.setattr(fix_orphans, "stop", lambda fd, *a, **k: fix_orphans.FAILED)
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     assert len(world.sent) == 1 and world.sent[0].startswith("PROBLEM: a leftover Codex process did not stop")
@@ -189,35 +190,101 @@ def test_is_reaper_needs_our_own_user_manager(tmp_path):
     assert not fix_orphans.is_reaper(1147, proc) and not fix_orphans.is_reaper(4242, proc)
 
 
-def test_a_real_orphan_adopted_by_the_user_manager_is_found_live(tmp_path, monkeypatch):
-    """No faked parent: a double fork, as when a session dies. The decoy is stopped by
-    the fixer through its own pidfd, and nothing else is touched (--only-pid)."""
-    decoy = tmp_path / "codex"
-    shutil.copy("/bin/sleep", decoy)
+def _real_orphan(decoy, stdout):
+    """Double fork, as when a session dies: the middle process exits, so the decoy is
+    adopted, and with stdout=PIPE the only reader of its output is gone with it."""
     r, w = os.pipe()
     if os.fork() == 0:
         os.setsid()
         child = subprocess.Popen([str(decoy), "300"], stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                 stdout=stdout, stderr=subprocess.DEVNULL)
         os.write(w, str(child.pid).encode())
         os._exit(0)
     os.wait()
     pid = int(os.read(r, 32))
+    os.close(r)
+    os.close(w)
+    return pid, fix_orphans.identity(pid)
+
+
+def _kill_if_same(pid, ident):
+    now = fix_orphans.identity(pid)
+    if now and now["start"] == ident["start"]:
+        os.kill(pid, 9)
+
+
+def test_real_orphans_found_live_only_the_abandoned_one_is_stopped(tmp_path, monkeypatch):
+    """No faked parent or reader. Nothing but the two decoys is acted on (--only-pid)."""
+    decoy = tmp_path / "codex"
+    shutil.copy("/bin/sleep", decoy)
+    monkeypatch.setattr(fixkit, "STATE", tmp_path / "heal")
+    sent = []
+    monkeypatch.setattr(fixkit, "tg_send", lambda text: sent.append(text) or True)
+    abandoned, a_ident = _real_orphan(decoy, subprocess.PIPE)
+    to_file, f_ident = _real_orphan(decoy, open(tmp_path / "result.txt", "w"))
     try:
-        ident = fix_orphans.identity(pid)
-        if not fix_orphans.is_reaper(ident["ppid"]):
-            pytest.skip(f"adopted by pid {ident['ppid']}, not init or a user manager")
-        monkeypatch.setattr(fixkit, "STATE", tmp_path / "heal")
-        sent = []
-        monkeypatch.setattr(fixkit, "tg_send", lambda text: sent.append(text) or True)
-        fix_orphans.main(["--only-pid", str(pid), "--min-hours", "0"])
-        assert sent and sent[0].startswith("STOPPED: a leftover Codex")
-        assert fix_orphans.identity(pid) is None or fix_orphans.identity(pid)["start"] != ident["start"]
+        if not fix_orphans.is_reaper(a_ident["ppid"]):
+            pytest.skip(f"adopted by pid {a_ident['ppid']}, not init or a user manager")
+        assert fix_orphans.output_abandoned(abandoned) and not fix_orphans.output_abandoned(to_file)
+        fix_orphans.main(["--only-pid", str(to_file), "--min-hours", "0"])
+        assert sent == [] and fix_orphans.identity(to_file)["start"] == f_ident["start"]
+        fix_orphans.main(["--only-pid", str(abandoned), "--min-hours", "0"])
+        assert len(sent) == 1 and sent[0].startswith("STOPPED: a leftover Codex")
+        now = fix_orphans.identity(abandoned)
+        assert now is None or now["start"] != a_ident["start"]
     finally:
-        try:
-            os.kill(pid, 9)
-        except ProcessLookupError:
-            pass
+        _kill_if_same(abandoned, a_ident)
+        _kill_if_same(to_file, f_ident)
+
+
+def test_a_pipe_someone_still_reads_is_not_abandoned(tmp_path):
+    decoy = tmp_path / "codex"
+    shutil.copy("/bin/sleep", decoy)
+    p = subprocess.Popen([str(decoy), "300"], stdout=subprocess.PIPE)
+    try:
+        assert not fix_orphans.output_abandoned(p.pid)          # the test holds the read end
+        p.stdout.close()
+        assert fix_orphans.output_abandoned(p.pid)
+    finally:
+        p.kill()
+        p.wait()
+
+
+def test_unknown_subcommands_never_reach_a_note():
+    assert fix_orphans._short("/x/codex exec --json") == "codex exec"
+    assert fix_orphans._short("/x/codex s3cret") == "codex"
+    assert fix_orphans._short("/x/codex-code-mode") == "codex-code-mode"
+
+
+def test_a_decided_outcome_is_reported_once_after_a_crash(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    real_queue = fixkit.queue
+
+    def queue_then_die(messages, name):
+        real_queue(messages, name)
+        if any(m.startswith("STOPPED") for m in messages):
+            raise KeyboardInterrupt              # dies between queueing and clearing pending
+    monkeypatch.setattr(fixkit, "queue", queue_then_die)
+    with pytest.raises(KeyboardInterrupt):
+        fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    monkeypatch.setattr(fixkit, "queue", real_queue)
+    world.rows.clear()
+    fix_orphans.main([])
+    fix_orphans.main([])
+    assert len(world.sent) == 1 and world.sent[0].startswith("STOPPED: a leftover Codex")
+
+
+def test_the_kill_is_skipped_when_it_no_longer_qualifies(world, monkeypatch):
+    p = world.start(ignore_term=True)
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    monkeypatch.setattr(fix_orphans, "TERM_WAIT_S", 0.2)
+    checks = []
+    monkeypatch.setattr(fix_orphans, "_still_same",
+                        lambda *a: (lambda: checks.append(1) or len(checks) == 1))
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    assert alive(p) and len(checks) == 2
+    assert len(world.sent) == 1 and world.sent[0].startswith("PROBLEM: a leftover Codex process did not stop")
 
 
 def test_ps_lines_are_never_cut(monkeypatch, tmp_path):
@@ -315,7 +382,7 @@ def test_a_process_that_changed_program_before_the_signal_is_left_alone(world):
     p = world.start()
     fd = os.pidfd_open(p.pid)
     try:
-        assert not fix_orphans.stop(fd, same=lambda: False)
+        assert fix_orphans.stop(fd, same=lambda: False) == fix_orphans.LEFT
     finally:
         os.close(fd)
     assert alive(p)
