@@ -59,6 +59,7 @@ def test_notes_have_no_em_dash():
         notes.cap_note("runs_hour", 6, 6),
         notes.limit_note(1794738000.0),
         notes.pause_note("x", Path("/srv/aw")),
+        notes.login_note(900),
         notes.broken_note("r", [("a.json", "bad")], Path("/srv/aw")),
     ]
     assert all("\u2014" not in t for t in texts)

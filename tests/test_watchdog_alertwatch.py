@@ -131,3 +131,8 @@ def test_a_run_stuck_in_running_warns(tmp_path, monkeypatch):
     assert run.alertwatch_status(now).level == "warn"
     ledger.write_run(state, {"run_id": "b", "started_at": now - 60, "status": "running"})
     assert run.alertwatch_status(now).level == "ok"
+
+
+def test_expired_login_is_named_plainly():
+    s = check_alertwatch(1500.0, paused=False, newest_run_status="login")
+    assert s.level == "warn" and "Claude login" in s.summary and "/login" in s.summary

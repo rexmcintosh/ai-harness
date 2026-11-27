@@ -27,6 +27,9 @@ max_merges_day = 3
 fail_streak_pause = 3
 # Wait this long after a usage limit when its message gives no reset time.
 limit_backoff_s = 3600
+# An expired Claude login: reports stay in the inbox and a run is tried again this
+# often. These runs do not count as failures, so a login problem never pauses the watcher.
+login_retry_s = 900
 # A job is rerun at most once in this window.
 rerun_window_s = 21600
 

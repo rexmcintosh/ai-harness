@@ -60,6 +60,22 @@ if mode == "detached":
     child = subprocess.Popen(["setsid", "sleep", "60"], env=env)
     open(os.environ["FAKE_CHILD_PID"], "w").write(str(child.pid))
     time.sleep(30)
+if mode == "login":  # the real 21 Nov 2026 output: one turn counted, no model call made
+    out({"is_error": True, "num_turns": 1, "duration_api_ms": 0, "total_cost_usd": 0,
+         "usage": {"input_tokens": 0, "output_tokens": 0}, "modelUsage": {},
+         "terminal_reason": "api_error", "session_id": "sess-auth",
+         "result": "Failed to authenticate: OAuth session expired and could not be refreshed"}, 1)
+if mode == "login_late":  # the login ran out after the model had already worked
+    out({"is_error": True, "num_turns": 6, "duration_api_ms": 41000, "total_cost_usd": 0.4,
+         "usage": {"input_tokens": 9000, "output_tokens": 800}, "session_id": "sess-auth2",
+         "result": "Failed to authenticate: OAuth session expired and could not be refreshed"}, 1)
+if mode == "login_zero_turns_but_work":  # contradicting counts prove nothing
+    out({"is_error": True, "num_turns": 0, "duration_api_ms": 9000, "total_cost_usd": 0.1,
+         "usage": {"input_tokens": 900, "output_tokens": 80}, "session_id": "sess-auth3",
+         "result": "Failed to authenticate: OAuth session expired and could not be refreshed"}, 1)
+if mode == "login_no_json":
+    sys.stderr.write("Error: Failed to authenticate: OAuth session expired\\n")
+    sys.exit(1)
 if mode == "limit_no_json":
     sys.stderr.write("Error: Claude AI usage limit reached|" + os.environ["FAKE_LIMIT_EPOCH"] + "\\n")
     sys.exit(1)
@@ -1185,3 +1201,105 @@ def test_a_check_from_a_run_older_than_thirty_days_is_still_enqueued(env):
                                     "status": "ok", "result": {"pending_checks": [
                                         {"repo": "splash_poller", "due_at": "2020-01-01T00:00:00Z", "what": "x"}]}})
     assert dispatch.enqueue_due_checks(env["cfg"], {}, time.time()) == 1
+
+
+def _back_in_inbox(env):
+    return [json.loads(p.read_text()) for p in (env["state"] / "inbox").glob("*.json")]
+
+
+def _state(env):
+    return json.loads((env["state"] / "state.json").read_text())
+
+
+def test_expired_login_keeps_the_reports_and_never_pauses(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login")
+    report(env)
+    go(env)
+    (back,) = _back_in_inbox(env)
+    assert back["attempts"] == 0
+    assert runs(env)[0]["status"] == "login"
+    assert ledger.fail_streak(env["state"]) == 0
+    assert _state(env)["login_until"] > time.time()
+    (note,) = sent(env)
+    assert "Claude login" in note["text"] and "wait in the inbox" in note["text"]
+    # inside the retry wait: no new run
+    env["prompt.txt"].unlink()
+    go(env)
+    assert not env["prompt.txt"].exists()
+    # three more expired-login runs: still one note, never paused, reports kept
+    for _ in range(3):
+        st = _state(env)
+        st["login_until"] = 0
+        (env["state"] / "state.json").write_text(json.dumps(st))
+        go(env)
+    assert len(sent(env)) == 1
+    assert not (env["state"] / "PAUSED").exists()
+    assert len(_back_in_inbox(env)) == 1
+    assert ledger.counts(env["state"], time.time())["runs_day"] == 0
+
+
+def test_login_back_runs_the_held_reports_and_rearms_the_note(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login")
+    report(env)
+    go(env)
+    st = _state(env)
+    st["login_until"] = 0
+    (env["state"] / "state.json").write_text(json.dumps(st))
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok")
+    go(env)
+    assert runs(env)[0]["status"] == "ok"
+    assert _back_in_inbox(env) == []
+    assert "login_noted" not in _state(env)
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login")
+    report(env)
+    go(env)
+    assert sum("Claude login" in n["text"] for n in sent(env)) == 2
+
+
+def test_login_lost_after_model_work_is_an_ordinary_failure(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login_late")
+    report(env)
+    go(env)
+    assert _back_in_inbox(env) == []
+    assert runs(env)[0]["status"] == "failed"
+    assert ledger.fail_streak(env["state"]) == 1
+    (note,) = sent(env)
+    assert "will not be tried again" in note["text"] and "/login" in note["text"]
+    assert "login_until" not in _state(env)
+
+
+def test_login_error_without_json_is_an_ordinary_failure(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login_no_json")
+    report(env)
+    go(env)
+    assert _back_in_inbox(env) == []
+    assert runs(env)[0]["status"] == "failed"
+    assert "/login" in sent(env)[0]["text"]
+
+
+def test_login_error_with_contradicting_counts_is_an_ordinary_failure(env, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "login_zero_turns_but_work")
+    report(env)
+    go(env)
+    assert runs(env)[0]["status"] == "failed"
+    assert "login_until" not in _state(env)
+    assert _back_in_inbox(env) == []  # not replayed: it may have acted
+
+
+def test_login_failures_do_not_hide_the_failure_streak(env, monkeypatch):
+    for mode in ("crash_late", "crash_late", "login", "crash_late"):
+        st = _state(env) if (env["state"] / "state.json").exists() else {}
+        st["login_until"] = 0
+        inbox.ensure_dirs(env["state"])
+        (env["state"] / "state.json").write_text(json.dumps(st))
+        monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
+        report(env)
+        go(env)
+    assert (env["state"] / "PAUSED").exists()
+
+
+def test_login_retry_has_a_floor(tmp_path):
+    cfg_path = tmp_path / "c.toml"
+    from alertwatch.config import DEFAULT_PATH
+    cfg_path.write_text(Path(DEFAULT_PATH).read_text().replace("login_retry_s = 900", "login_retry_s = 0"))
+    assert load_config(cfg_path, env={}).login_retry_s == 60

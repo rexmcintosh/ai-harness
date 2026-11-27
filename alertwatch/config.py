@@ -33,6 +33,7 @@ class Config:
     max_merges_day: int
     fail_streak_pause: int
     limit_backoff_s: int
+    login_retry_s: int
     rerun_window_s: int
     projects_dir: Path
     repos: tuple[str, ...]
@@ -69,6 +70,7 @@ def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) 
         max_merges_day=int(raw["max_merges_day"]),
         fail_streak_pause=int(raw["fail_streak_pause"]),
         limit_backoff_s=int(raw["limit_backoff_s"]),
+        login_retry_s=max(60, int(raw.get("login_retry_s", 900))),  # never a run every pass
         rerun_window_s=int(raw["rerun_window_s"]),
         projects_dir=Path(str(raw["projects_dir"])),
         repos=tuple(str(r) for r in raw["repos"]),

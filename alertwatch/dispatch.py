@@ -22,7 +22,7 @@ from typing import Callable
 
 from alertwatch import inbox, ledger, notes
 from alertwatch.config import Config, load_config
-from alertwatch.result import parse_result, proved_idle, started, usage_limit
+from alertwatch.result import login_failed, no_model_call, parse_result, proved_idle, started, usage_limit
 from alertwatch.rules import classify, load_rules
 from backlogrun.cli import DENY_RULES
 
@@ -621,6 +621,8 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         return 0
     if float(st.get("limit_until") or 0) > t:
         return 0
+    if float(st.get("login_until") or 0) > t:
+        return 0
     rules = load_rules()
     if dry_run:
         for p in sorted((state / "inbox").glob("*.json")):
@@ -714,13 +716,18 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
     if ignored:
         parsed = None  # a result block from a run that failed or timed out is not a success
     hit, until = (False, None) if parsed else usage_limit(data, run["stdout"], run["stderr"])
+    login = not parsed and not hit and login_failed(data, run["stdout"], run["stderr"])
     idle = proved_idle(data) and not run["timed_out"]
+    # Only a login error with proof that no model call answered gets the login path:
+    # nothing can have acted. Any other login error is an ordinary failed run.
+    login_quiet = login and not run["timed_out"] and no_model_call(data)
 
     # 1. decide; 2. persist the decision and result (a crash after this is finished by
     # _recover_batch, and the pending checks are safe); 3. move the batch; 4. the note.
     if parsed:
         parsed["needs_rex"] = [*parsed["needs_rex"], *check_result(parsed, [e["id"] for e in looks])]
         record.update(status="ok", result=parsed, dest="done")
+        st.pop("login_noted", None)  # the login works: the next expiry is told again
     elif hit:
         until = until or ended + cfg.limit_backoff_s
         st["limit_until"] = until
@@ -728,6 +735,12 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
         record.update(status="limit", dest="release" if idle else "failed",
                       reason="Claude usage limit" if idle else
                       "Claude usage limit, part way through the run (or no proof it was idle)")
+    elif login_quiet:
+        # Not a failure: the run never reached the model, so the reports wait for the login.
+        # Saved with the rest of the state below, so a crash first leaves no wait behind.
+        st["login_until"] = ended + cfg.login_retry_s
+        record.update(status="login", dest="release", reason="Claude login expired",
+                      stdout_tail=run["stdout"][-4000:])
     else:
         if run["timed_out"]:
             reason = f"timed out after {cfg.run_timeout_s} s"
@@ -737,7 +750,10 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
             reason = f"no readable result (rc={run['rc']})"
         if ignored:
             reason += "; its result block was ignored because the run did not end cleanly"
-        record.update(status="failed", reason=reason, dest="release_count" if idle else "failed",
+        if login:
+            reason += "; the Claude login expired (on the VM run `claude`, then /login)"
+        # A login error without proof is never replayed, whatever its turn count says.
+        record.update(status="failed", reason=reason, dest="release_count" if idle and not login else "failed",
                       stderr_tail=run["stderr"][-4000:], stdout_tail=run["stdout"][-4000:])
     # The note is decided and queued with the decision, before the batch moves, so a
     # crash at any later point cannot lose it.
@@ -755,6 +771,9 @@ def _dispatch(cfg: Config, dry_run: bool, now: Callable[[], float]) -> int:
                 if part_way or float(st.get("limit_noted_until") or 0) != until else None)
         if text:
             st["limit_noted_until"] = until
+    elif record["status"] == "login":
+        text = None if st.get("login_noted") else notes.login_note(cfg.login_retry_s)
+        st["login_noted"] = True
     else:
         text = notes.failure_note(record, failed_ids)
     # One atomic write holds the decision, the result and the note. The outbox entry

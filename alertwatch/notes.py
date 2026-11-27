@@ -69,6 +69,13 @@ def limit_note(until_epoch: float, *, part_way: bool = False) -> str:
             f"Reports wait in the inbox. It starts again after {when}.")
 
 
+def login_note(retry_s: int) -> str:
+    return ("alert-watch: the Claude login on the VM has expired, so no run can start. "
+            "Reports wait in the inbox and run once the login works. "
+            "Fix: on the VM run `claude`, then /login. "
+            f"It tries again every {max(1, retry_s // 60)} minutes.")
+
+
 def pause_note(reason: str, state_dir) -> str:
     return (f"alert-watch paused itself: {reason}. "
             f"Remove {_where(state_dir)}/PAUSED to start it again.")

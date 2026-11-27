@@ -52,7 +52,7 @@ denied). The helpers check every rule at the moment of the action and refuse wit
 the reason when one fails.
 
 Pause: `touch ~/.local/state/alert-watch/PAUSED`. Start again: delete the file.
-The dispatcher pauses itself after 3 failed runs in a row and says so in Telegram.
+The dispatcher pauses itself after 3 failed runs in a row and says so in Telegram. An expired Claude login, in a run whose JSON proves no model call answered, is not a failed run: one note says to log in again (on the VM run `claude`, then /login), the reports wait in the inbox, and a run is tried again every 15 minutes. A login error without that proof (after model work, on a timeout, or with no JSON) is an ordinary failed run, and its failure note says to log in.
 Deleting `PAUSED` resumes it: the failures that caused the pause do not count again.
 Capture off for one command: `ALERT_INBOX_DIR=off`.
 

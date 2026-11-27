@@ -346,6 +346,10 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
         return CheckStatus("alertwatch", "ok", "alert-watch is paused")
     if newest_run_status == "failed":
         return CheckStatus("alertwatch", "warn", "alert-watch: the newest run failed; see its runs/ record")
+    if newest_run_status == "login":
+        return CheckStatus("alertwatch", "warn",
+                           "alert-watch: the Claude login on the VM has expired; reports wait in "
+                           "the inbox. On the VM run `claude`, then /login")
     if oldest_inbox_age_s is not None and oldest_inbox_age_s > max_age_s:
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a report has waited {int(oldest_inbox_age_s // 60)} min in the inbox")

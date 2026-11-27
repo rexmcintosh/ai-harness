@@ -42,14 +42,53 @@ def parse_result(text: str) -> dict | None:
 def usage_limit(data: dict | None, stdout: str, stderr: str) -> tuple[bool, float | None]:
     """True only for a Claude limit error: in the result of a run that reports
     is_error, or on stderr when there was no JSON at all. Never from stdout text."""
-    if data is not None:
-        blob = str(data.get("result") or "") if data.get("is_error") else ""
-    else:
-        blob = (stderr or "")[-4000:]
+    blob = _error_blob(data, stderr)
     if not _LIMIT_RE.search(blob):
         return False, None
     m = _RESET_RE.search(blob)
     return True, float(m.group(1)) if m else None
+
+
+# Claude's own login errors, and nothing looser (report text can say "authenticate").
+# An invalid API key is left out: /login does not fix it, so it stays an ordinary failure.
+_LOGIN_RE = re.compile(r"Failed to authenticate|OAuth (?:session|token) (?:has )?expired"
+                       r"|Not logged in|Please run /login", re.IGNORECASE)
+
+
+def _error_blob(data: dict | None, stderr: str) -> str:
+    if data is not None:
+        return str(data.get("result") or "") if data.get("is_error") else ""
+    return (stderr or "")[-4000:]
+
+
+def login_failed(data: dict | None, stdout: str, stderr: str) -> bool:
+    """True only for a Claude login error: in the result of a run that reports
+    is_error, or on stderr when there was no JSON at all. Never from stdout text."""
+    blob = _error_blob(data, stderr)
+    return bool(_LOGIN_RE.search(blob)) and not re.search(r"invalid api key", blob, re.IGNORECASE)
+
+
+def no_model_call(data: dict | None) -> bool:
+    """True only when every count in the run's JSON agrees that no model call answered:
+    0 ms of API time, 0 input and output tokens, at most 1 turn (a failed login still counts one),
+    and, when present, 0 cost and no model usage. Then no tool can have run, so its
+    reports are safe to try again. One missing, malformed or contradicting count proves
+    nothing."""
+    if not isinstance(data, dict):
+        return False
+    api_ms, turns = data.get("duration_api_ms"), data.get("num_turns")
+    usage = data.get("usage")
+    out = usage.get("output_tokens") if isinstance(usage, dict) else None
+    if not (type(api_ms) is int and api_ms == 0 and type(out) is int and out == 0):
+        return False
+    if usage.get("input_tokens", 0) != 0 or type(usage.get("input_tokens", 0)) is not int:
+        return False
+    if not (type(turns) is int and 0 <= turns <= 1):
+        return False
+    cost = data.get("total_cost_usd", 0)
+    if type(cost) not in (int, float) or cost != 0:
+        return False
+    return data.get("modelUsage", {}) == {}
 
 
 def started(data: dict | None) -> bool:

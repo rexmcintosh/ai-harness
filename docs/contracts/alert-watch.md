@@ -19,7 +19,7 @@ Success for a message: its run record in `runs/<run-id>.json` has `status: ok` a
 
 ## Failure, escalation, and gaps
 
-A failed run (crash, time limit, unreadable result) sends a failure note from the dispatcher itself. Three failed runs in a row write `PAUSED` and send one note. A usage limit backs off until the reset and does not count as a failure. The watchdog `alertwatch` check (on once `ENABLED` exists) warns when the oldest inbox message is over 20 minutes old or the newest run failed. A run that may have acted is never replayed.
+A failed run (crash, time limit, unreadable result) sends a failure note from the dispatcher itself. Three failed runs in a row write `PAUSED` and send one note. A usage limit backs off until the reset and does not count as a failure. An expired Claude login (added 2026-11-27, after the 21-27 Nov pause) is not a failure either: one note says so, this applies only when the run's JSON proves no model call answered (any other login error is an ordinary failed run), the reports wait in the inbox, a run is tried again every `login_retry_s` (15 minutes), and the watchdog check warns by name until a run works. The watchdog `alertwatch` check (on once `ENABLED` exists) warns when the oldest inbox message is over 20 minutes old, the newest run failed or hit an expired login. A run that may have acted is never replayed.
 
 Gaps: the database rule is enforced by policy plus `MEETTRACK_DB_READ_ONLY` in `db.py`, which a Bash command could unset. Jobs that call the Telegram API directly (`diem/report.py`, Romance Empire `tiktok_replies.py`) are not captured. Rex cannot reply to a note from Telegram; he opens the run with `claude --resume`.
 
