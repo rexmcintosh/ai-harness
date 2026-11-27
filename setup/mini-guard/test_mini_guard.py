@@ -288,3 +288,24 @@ def test_maintenance_lock_makes_the_tick_a_paused_one(monkeypatch):
     g.cmd_tick()
     assert seen["held"] is True
     maint.close()
+
+
+def test_delivery_stops_at_the_first_failure_and_is_bounded():
+    g.save_json(g.STATE_DIR / "outbox.json", [f"old {i}" for i in range(10)])
+    tried = []
+    g.deliver(["new"], {}, sender=lambda text, cfg: tried.append(text) or False)
+    assert tried == ["old 0"]
+    assert len(json.loads((g.STATE_DIR / "outbox.json").read_text())) == 11
+    tried.clear()
+    g.deliver([], {}, sender=lambda text, cfg: tried.append(text) or True)
+    assert len(tried) == g.MAX_SENDS_PER_TICK
+    assert len(json.loads((g.STATE_DIR / "outbox.json").read_text())) == 11 - g.MAX_SENDS_PER_TICK
+
+
+@pytest.mark.parametrize("bad", ['{"until": "soon"}', '{"until": "nan"}', '{"until": "inf"}', '[1, 2]', '"x"'])
+def test_bad_pause_file_is_removed_not_fatal(bad):
+    g.STATE_DIR.mkdir(parents=True, exist_ok=True)
+    (g.STATE_DIR / "pause.json").write_text(bad)
+    paused, note = g.pause_state(clock["t"])
+    assert paused is False
+    assert not (g.STATE_DIR / "pause.json").exists()

@@ -92,3 +92,15 @@ def test_rules_ignore_recovery_but_look_at_problems():
     assert action(src, "PROBLEM: the finance tracker was not answering, and restarting it failed") == "look"
     assert action("python3 watchdog.weekly < CRON", "Weekly check, Mon 30 Nov: all well.") == "ignore"
     assert action("python3 watchdog.weekly < CRON", "Traceback (most recent call last)") == "look"
+
+
+def test_only_one_fixed_after_restart_and_report():
+    s, _, _ = step({}, down=["finance"])
+    s, r, _ = step(s, down=["finance"], t=NOW + 300)          # restart
+    s, _, _ = step(s, down=["finance"], t=NOW + 600)
+    s, _, m = step(s, down=["finance"], t=NOW + 900)          # PROBLEM: again within 6 h
+    assert len(m) == 1
+    s, _, m = step(s, t=NOW + 1200)
+    assert m == ["FIXED: the finance tracker answers again."]
+    s, _, m = step(s, t=NOW + 1500)
+    assert m == [] and "finance" not in s["verify"]

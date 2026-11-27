@@ -37,7 +37,8 @@ ssh_mini 'set -e
   chmod 600 ~/.config/mini-guard/config.json
   launchctl bootout gui/$(id -u)/io.bebop.mini-guard 2>/dev/null || true
   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.bebop.mini-guard.plist
-  launchctl print gui/$(id -u)/io.bebop.mini-guard | grep -E "^\s+state =" | head -1'
+  launchctl print gui/$(id -u)/io.bebop.mini-guard >/dev/null
+  echo "launchd job loaded"'
 
 # Read-only heartbeat key for the VM's watchdog.
 if [ ! -f "$key" ]; then
@@ -46,7 +47,7 @@ fi
 pub=$(cat "$key.pub")   # ends with the comment "mini-guard-heartbeat"
 line="command=\"cat /Users/bebop_admin/.local/state/mini-guard/last-tick.json\",no-port-forwarding,no-pty,no-agent-forwarding,no-X11-forwarding $pub"
 # Replace exactly the managed line (matched by its comment at the end), keep every other key.
-printf '%s\n' "$line" | ssh_mini 'set -e; umask 077; touch ~/.ssh/authorized_keys
+printf '%s\n' "$line" | ssh_mini 'set -e; umask 077; mkdir -p ~/.ssh; chmod 700 ~/.ssh; touch ~/.ssh/authorized_keys
   tmp=$(mktemp ~/.ssh/authorized_keys.XXXXXX)
   { grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys || true; cat; } > "$tmp"
   grep -q " mini-guard-heartbeat\$" "$tmp"

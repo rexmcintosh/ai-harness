@@ -214,20 +214,30 @@ def send(text: str, cfg: dict, opener=urllib.request.urlopen) -> bool:
         return False
     data = urllib.parse.urlencode({"chat_id": chat, "text": text}).encode()
     try:
-        with opener(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=20) as reply:
+        with opener(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=10) as reply:
             return 200 <= reply.status < 300
     except Exception:
         return False
 
 
+MAX_SENDS_PER_TICK = 5
+
+
 def deliver(messages: list, cfg: dict, sender=send) -> None:
-    """Send new messages plus any still waiting from earlier ticks. Keeps at most 20."""
+    """Send new messages plus any still waiting from earlier ticks, oldest first. Stops at
+    the first failure (Telegram or the network is down) and sends at most
+    MAX_SENDS_PER_TICK, so a backlog never holds up the checks. Keeps at most 20."""
     outbox_path = STATE_DIR / "outbox.json"
-    outbox = load_json(outbox_path, []) + messages
-    left = []
-    for text in outbox:
-        if not sender(text, cfg):
-            left.append(text)
+    outbox = load_json(outbox_path, [])
+    if not isinstance(outbox, list):
+        outbox = []
+    outbox += messages
+    left, sent = [], 0
+    for i, text in enumerate(outbox):
+        if sent >= MAX_SENDS_PER_TICK or not sender(text, cfg):
+            left = outbox[i:]
+            break
+        sent += 1
     for text in messages:
         log("message: " + text.replace("\n", " / "))
     save_json(outbox_path, left[-20:])
@@ -241,8 +251,12 @@ def pause_state(t: float):
     data = load_json(path, None)
     if not data:
         return False, None
-    until = float(data.get("until", 0))
-    if until <= t or until - t > MAX_PAUSE_S + 60:
+    try:
+        until = float(data.get("until", 0))
+    except (TypeError, ValueError, AttributeError):
+        until = float("nan")
+    if not (until == until) or until in (float("inf"), float("-inf")) \
+            or until <= t or until - t > MAX_PAUSE_S + 60:
         try:
             path.unlink()
         except OSError:

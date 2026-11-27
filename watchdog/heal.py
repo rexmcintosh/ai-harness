@@ -70,7 +70,9 @@ def decide(state: dict, alive: dict, now_epoch: float) -> tuple[dict, list, list
     for key, ok in alive.items():
         name, _port, cmd = SERVICES[key]
         if ok:
-            if (new["fails"].get(key, 0) >= 2 and new["reported"].get(key)) or new["verify"].pop(key, None):
+            was_reported = new["fails"].get(key, 0) >= 2 and new["reported"].get(key)
+            was_restarted = new["verify"].pop(key, None)     # always cleared on recovery
+            if was_reported or was_restarted:
                 messages.append(f"FIXED: {name} answers again.")
             new["fails"][key] = 0
             new["reported"].pop(key, None)
