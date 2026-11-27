@@ -81,7 +81,9 @@ is off, nothing on it can help.
 2. **Check what was interrupted**, not only what is up:
    - the last backup result (not "timer active"); if a run was cut off, start one with
      `systemctl --user start --no-block restic-offsite.service` and follow it to
-     `verified: true`,
+     `verified: true`. A cut-off run leaves a stale repository lock that makes the next
+     run fail ("repository is already locked"): once `pgrep restic` shows nothing, run
+     `~/.local/bin/restic-offsite restic unlock`, then start the backup (2026-11-27),
    - `systemctl --failed` and `systemctl --user --failed`,
    - `git fsck --full` in repos, and empty files under `.git/objects` and `.git/refs`
      (`find ~/projects -path '*/.git/*' -type f -empty`). Move bad files to a
