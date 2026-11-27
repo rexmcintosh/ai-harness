@@ -265,3 +265,26 @@ def test_cooldown_between_starts():
     assert len(fake.kicks()) == 1
     run(fake, minutes=14)
     assert len(fake.kicks()) == 2
+
+
+def test_overlapping_tick_changes_nothing(monkeypatch):
+    held = g.try_lock("tick.lock")
+    assert held is not None
+    called = []
+    monkeypatch.setattr(g, "tick", lambda *a, **k: called.append(1) or [])
+    monkeypatch.setattr(g, "config", lambda: {"mode": "start"})
+    assert g.cmd_tick() == 0
+    assert called == []
+    held.close()
+
+
+def test_maintenance_lock_makes_the_tick_a_paused_one(monkeypatch):
+    maint = g.try_lock("lock")
+    seen = {}
+    monkeypatch.setattr(g, "tick", lambda runner, cfg, t, lock_held: seen.setdefault("held", lock_held) and [])
+    monkeypatch.setattr(g, "config", lambda: {"mode": "start"})
+    monkeypatch.setattr(g, "deliver", lambda *a, **k: None)
+    monkeypatch.setattr(g, "heartbeat", lambda *a, **k: None)
+    g.cmd_tick()
+    assert seen["held"] is True
+    maint.close()

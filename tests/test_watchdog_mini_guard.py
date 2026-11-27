@@ -32,8 +32,10 @@ def test_collect_reads_the_heartbeat_over_ssh(tmp_path, monkeypatch):
     key = tmp_path / "key"
     key.write_text("x")
     monkeypatch.setenv("MINI_GUARD_KEY", str(key))
-    real = run._cmd
-    monkeypatch.setattr(run, "_cmd", lambda args: json.dumps({"time": NOW - 60}) if args[0] == "ssh" else real(args))
-    statuses, _ = run.collect(int(NOW))
-    guard = [s for s in statuses if s.name == "mini-guard"]
-    assert len(guard) == 1 and guard[0].level == "ok"
+    for answer, level, word in [(json.dumps({"time": NOW - 60}), "ok", "ran"),
+                                (None, "warn", "cannot reach"),
+                                ("Welcome!\n", "warn", "unreadable")]:
+        monkeypatch.setattr(run, "read_guard_heartbeat", lambda k, a=answer: a)
+        statuses, _ = run.collect(int(NOW))
+        guard = [s for s in statuses if s.name == "mini-guard"]
+        assert len(guard) == 1 and guard[0].level == level and word in guard[0].summary

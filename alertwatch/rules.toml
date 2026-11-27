@@ -32,6 +32,21 @@ name = "bebop-briefing"
 action = "ignore"
 source = "run-briefing\\.sh"
 
+# watchdog/heal.py: a "FIXED" line means it already recovered; a "PROBLEM" line is
+# looked at like any other report.
+[[rule]]
+name = "heal-fixed"
+action = "ignore"
+source = "watchdog\\.heal|heal\\.py"
+text = "^FIXED"
+
+# The Monday all-well line (watchdog/weekly.py). Its problems are already raised by
+# the watchdog's own checks, so the summary itself is never a report.
+[[rule]]
+name = "weekly-check"
+action = "ignore"
+source = "watchdog\\.weekly|weekly\\.py"
+
 # Finished backlog work waits for Rex's review; it is not a failure.
 [[rule]]
 name = "backlog-run"

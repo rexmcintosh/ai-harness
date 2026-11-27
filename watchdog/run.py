@@ -444,6 +444,19 @@ def alertwatch_status(now_epoch: float) -> CheckStatus | None:
         return CheckStatus("alertwatch", "warn", f"alert-watch state unreadable: {e.__class__.__name__}")
 
 
+def read_guard_heartbeat(key: Path) -> str | None:
+    """The mini guard's last-tick.json over SSH with its read-only key, or None when
+    SSH itself failed (mini unreachable). Bad output with a good exit is returned as
+    is, so the check can tell "unreadable" from "unreachable"."""
+    try:
+        proc = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
+                               "-o", "ConnectTimeout=10", "-i", str(key), "bebop_admin@mini"],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:
     """Gather every signal into normalized statuses. Returns (statuses, new_metrics).
     Missing optional signals are skipped (not invented as failures)."""
@@ -477,9 +490,7 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
 
     guard_key = Path(os.environ.get("MINI_GUARD_KEY") or Path.home() / ".ssh" / "mini_guard_read")
     if guard_key.exists():  # only once mini-guard is installed (its installer makes the key)
-        beat = _cmd(["ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "ConnectTimeout=10",
-                     "-i", str(guard_key), "bebop_admin@mini"])
-        out.append(check_mini_guard(beat if beat.strip().startswith("{") else None, now_epoch))
+        out.append(check_mini_guard(read_guard_heartbeat(guard_key), now_epoch))
 
     alertwatch = alertwatch_status(now_epoch)
     if alertwatch is not None:

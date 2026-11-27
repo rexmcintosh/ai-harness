@@ -401,11 +401,12 @@ def heartbeat(cfg: dict, opener=urllib.request.urlopen) -> None:
 
 # ---------------------------------------------------------------- commands
 
-def with_lock(blocking: bool):
+def try_lock(name: str):
+    """A held flock on STATE_DIR/name, or None if someone else holds it."""
     STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-    handle = open(STATE_DIR / "lock", "w")
+    handle = open(STATE_DIR / name, "w")
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return handle
     except OSError:
         handle.close()
@@ -413,17 +414,27 @@ def with_lock(blocking: bool):
 
 
 def cmd_tick() -> int:
+    """One tick. Two locks:
+    - tick.lock: only one tick at a time. A second tick changes nothing and exits.
+    - lock: the maintenance lock. Restart scripts hold it while they work; a tick that
+      cannot get it treats the time as planned work (no starts, no outage messages).
+      A tick holds it while it may start the VM, so a restart script waits for it."""
     cfg = config()
-    handle = with_lock(blocking=False)
+    tick_handle = try_lock("tick.lock")
+    if tick_handle is None:
+        log("another tick is still running; skipped")
+        return 0
+    maint = try_lock("lock")
     try:
-        messages = tick(Runner(), cfg, now(), lock_held=handle is None)
+        messages = tick(Runner(), cfg, now(), lock_held=maint is None)
     except Exception as e:       # a broken tick must still be visible
         log(f"tick crashed: {e!r}")
         deliver([f"PROBLEM: the Mac mini guard crashed ({e.__class__.__name__}). It will try again in 2 minutes."], cfg)
         return 1
     finally:
-        if handle:
-            handle.close()
+        if maint:
+            maint.close()
+        tick_handle.close()
     deliver(messages, cfg)
     heartbeat(cfg)
     return 0
