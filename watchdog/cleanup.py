@@ -207,13 +207,16 @@ def _remove(path: Path, dry: bool) -> int:
 
 def step1(dry: bool, in_use: list[str]) -> list[str]:
     done = []
+    # A VS Code session that starts between the in-use check and the removal loses its
+    # server copy; VS Code downloads it again on the next connect. Only old copies go.
     olds = old_vscode_servers(VSCODE_SERVERS, HOME / ".vscode-server", in_use)
-    if olds:
-        freed = sum(_remove(d, dry) for d in olds)
+    freed = sum(_remove(d, dry) for d in olds)
+    if freed > 0:
         done.append(f"{len(olds)} old VS Code server copies ({gb(freed)})")
     cache = HOME / ".npm" / "_cacache"
-    if cache.is_dir():
-        done.append(f"the npm download cache ({gb(_remove(cache, dry))})")
+    freed = _remove(cache, dry) if cache.is_dir() else 0
+    if freed > 0:
+        done.append(f"the npm download cache ({gb(freed)})")
     if shutil.which("pnpm") and (dry or _run(["pnpm", "store", "prune"])):
         done.append("unused pnpm store files")
     if dry or _run(["sudo", "-n", "apt-get", "clean"]):
@@ -280,15 +283,16 @@ def main(argv=None) -> int:
     messages = []
     before = df_pct()
     if before is None:
-        print("cleanup: cannot read disk use; doing nothing")
-        return 0
+        print("cleanup: cannot read the server's disk use; skipping the server")
     cooled = now_epoch - float(state.get("last_run", 0)) >= COOLDOWN_S
-    if args.force or args.dry_run or (before >= TRIGGER_PCT and cooled):
+    if before is not None and (args.force or args.dry_run or (before >= TRIGGER_PCT and cooled)):
+        if not args.dry_run:
+            state["last_run"] = now_epoch           # reserve before acting
+            fixkit.save_state(NAME, state)
         in_use = in_use_paths()
         done = step1(args.dry_run, in_use)
         after = df_pct() or before
         if not args.dry_run:
-            state["last_run"] = now_epoch
             if done:
                 messages.append(f"CLEANED: the server disk was {before}% full. I removed "
                                 + "; ".join(done) + f". It is now {after}% full.")
@@ -306,15 +310,18 @@ def main(argv=None) -> int:
     if free is not None and (args.dry_run or (free < MAC_TRIGGER_GB and mac_cooled)):
         if args.dry_run:
             print(f"Mac free {free:.0f} GB; would remove ~/Library/Caches: {', '.join(MAC_CACHES)}")
-        elif mac_clean(False):
-            state["mac_last_run"] = now_epoch
+        else:
+            state["mac_last_run"] = now_epoch       # reserve before acting
+            fixkit.save_state(NAME, state)
+        if not args.dry_run and mac_clean(False):
             later = mac_free_gb()
             messages.append(f"CLEANED: the Mac mini had {free:.0f} GB free. I removed app updater "
                             f"leftovers. It now has {later or free:.0f} GB free.")
     if args.dry_run:
         return 0
-    fixkit.send_all(messages, "cleanup-outbox")     # first: a crash then repeats, never loses, a note
+    fixkit.queue(messages, "cleanup-outbox")   # queue, save, flush: a note is never lost
     fixkit.save_state(NAME, state)
+    fixkit.flush("cleanup-outbox")
     return 0
 
 

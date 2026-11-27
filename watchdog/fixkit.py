@@ -72,31 +72,54 @@ def save_state(name: str, data: dict) -> None:
     os.replace(tmp, STATE / f"{name}.json")
 
 
-def send_all(messages: list, outbox_name: str, *, sender=None) -> None:
-    """Send waiting messages oldest first, then new ones. Stop at the first failure and
-    after MAX_SENDS_PER_RUN, so a Telegram outage never holds up the fixer. Keep what is
-    left for the next run (at most OUTBOX_KEEP, PROBLEM lines first). Each fixer has its
-    own outbox_name. Call it BEFORE saving the fixer's state: a crash in between then
-    repeats a note instead of losing one. A send that timed out may have been delivered;
-    it is sent again (a duplicate is better than a lost PROBLEM)."""
-    sender = sender or tg_send
-    outbox = STATE / f"{outbox_name}.json"
+def _outbox(outbox_name: str) -> Path:
+    return STATE / f"{outbox_name}.json"
+
+
+def _read_outbox(outbox_name: str) -> list:
     try:
-        waiting = json.loads(outbox.read_text())
+        waiting = json.loads(_outbox(outbox_name).read_text())
     except (OSError, ValueError):
-        waiting = []
-    if not isinstance(waiting, list):
-        waiting = []
-    queue, left, sent = waiting + list(messages), [], 0
-    for i, text in enumerate(queue):
-        if sent >= MAX_SENDS_PER_RUN or not sender(text):
-            left = queue[i:]
-            break
-        sent += 1
+        return []
+    return waiting if isinstance(waiting, list) else []
+
+
+def _write_outbox(outbox_name: str, items: list) -> None:
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = STATE / f"{outbox_name}.json.tmp"
-    tmp.write_text(json.dumps(trim(left)))
-    os.replace(tmp, outbox)
+    tmp.write_text(json.dumps(trim(items)))
+    os.replace(tmp, _outbox(outbox_name))
+
+
+def queue(messages: list, outbox_name: str) -> None:
+    """Write new notes to the fixer's outbox before anything is sent. A fixer queues its
+    notes, then saves its state, then flushes: a crash anywhere repeats a note at worst,
+    and never loses one."""
+    if messages:
+        _write_outbox(outbox_name, _read_outbox(outbox_name) + list(messages))
+
+
+def flush(outbox_name: str, *, sender=None) -> None:
+    """Send queued notes oldest first. Stop at the first failure and after
+    MAX_SENDS_PER_RUN, so a Telegram outage never holds up the fixer; the rest stay
+    (at most OUTBOX_KEEP, PROBLEM lines first). A send that timed out may have been
+    delivered; it is sent again (a duplicate is better than a lost PROBLEM)."""
+    sender = sender or tg_send
+    waiting = _read_outbox(outbox_name)
+    left, sent = [], 0
+    for i, text in enumerate(waiting):
+        if sent >= MAX_SENDS_PER_RUN or not sender(text):
+            left = waiting[i:]
+            break
+        sent += 1
+    if waiting:
+        _write_outbox(outbox_name, left)
+
+
+def send_all(messages: list, outbox_name: str, *, sender=None) -> None:
+    """queue() then flush(), for a fixer with no state to save in between."""
+    queue(messages, outbox_name)
+    flush(outbox_name, sender=sender)
 
 
 def trim(items: list, keep: int = None) -> list:

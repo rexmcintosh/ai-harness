@@ -136,7 +136,7 @@ def test_restart_reaches_the_user_service_manager_from_cron(tmp_path, monkeypatc
     monkeypatch.setattr(heal, "STATE", tmp_path)
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
     monkeypatch.setattr(heal, "probe", lambda port: port != 3000)
-    monkeypatch.setattr(heal, "send_all", lambda messages: None)
+    monkeypatch.setattr(heal, "_tg_send", lambda text: True)
     seen = []
 
     def fake_run(cmd, **kw):
@@ -147,3 +147,38 @@ def test_restart_reaches_the_user_service_manager_from_cron(tmp_path, monkeypatc
     heal.main([])
     heal.main([])
     assert seen and seen[0].startswith("/run/user/")
+
+
+def test_crash_during_a_restart_still_counts_it(tmp_path, monkeypatch):
+    """The restart is recorded before it runs, so a crash cannot allow a second one."""
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+    monkeypatch.setattr(heal, "probe", lambda port: port != 3000)
+    monkeypatch.setattr(heal, "_tg_send", lambda text: True)
+    calls = []
+
+    def crash(cmd, **kw):
+        calls.append(cmd)
+        raise KeyboardInterrupt          # the process dies mid-restart
+    monkeypatch.setattr(heal.subprocess, "run", crash)
+    heal.main([])
+    try:
+        heal.main([])
+    except KeyboardInterrupt:
+        pass
+    assert len(calls) == 1
+    heal.main([])
+    heal.main([])
+    assert len(calls) == 1               # inside the 6 hours: reported, not restarted
+
+
+def test_a_note_is_queued_before_it_is_sent(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+
+    def dies(text):
+        raise KeyboardInterrupt
+    try:
+        heal.send_all(["PROBLEM: x"], sender=dies)
+    except KeyboardInterrupt:
+        pass
+    assert json.loads((tmp_path / "outbox.json").read_text()) == ["PROBLEM: x"]

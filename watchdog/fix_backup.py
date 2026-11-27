@@ -117,6 +117,9 @@ def main(argv=None) -> int:
         if args.dry_run:
             messages.append(f"(dry run) would start {UNIT}: {check.summary}")
         else:
+            # Reserve first: a crash after the start can then never allow a second one.
+            reserved = dict(new, last_start=now_epoch, started_at=now_epoch)
+            fixkit.save_state(NAME, reserved)
             try:
                 ok = subprocess.run(["systemctl", "--user", "start", "--no-block", UNIT],
                                     capture_output=True, timeout=60,
@@ -128,8 +131,9 @@ def main(argv=None) -> int:
         print(f"backup check: {check.level}: {check.summary}; service: {unit_state}")
         print("\n".join(messages) or "nothing to do")
         return 0
-    fixkit.send_all(messages, "backup-outbox")      # first: a crash then repeats, never loses, a note
+    fixkit.queue(messages, "backup-outbox")    # queue, save, flush: a note is never lost
     fixkit.save_state(NAME, new)
+    fixkit.flush("backup-outbox")
     return 0
 
 

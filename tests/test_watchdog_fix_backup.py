@@ -111,3 +111,23 @@ def test_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
     assert all("start" not in c[0] for c in calls) and sent == []
     assert "would start" in capsys.readouterr().out
     assert not (tmp_path / "heal" / "backup.json").exists()
+
+
+def test_crash_during_the_start_still_counts_it(tmp_path, monkeypatch):
+    calls, sent = _setup(tmp_path, monkeypatch, verified_hours_ago=31)
+    real = fix_backup.subprocess.run
+
+    def crash(cmd, **kw):
+        if "start" in cmd:
+            calls.append((cmd, None))
+            raise KeyboardInterrupt
+        return real(cmd, **kw)
+    monkeypatch.setattr(fix_backup.subprocess, "run", crash)
+    try:
+        fix_backup.main([])
+    except KeyboardInterrupt:
+        pass
+    state = fixkit.load_state("backup")
+    assert state.get("last_start") == NOW and state.get("started_at") == NOW
+    _, start, _ = fix_backup.decide(fix_backup.check_backup(None, NOW), "inactive", {}, state, NOW + 60)
+    assert not start

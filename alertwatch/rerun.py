@@ -51,12 +51,16 @@ def main(argv: list[str] | None = None, *, cfg: Config | None = None,
 
 
 def rerun(cfg: Config, name: str, *, now: Callable[[], float] = time.time,
-          source: str = "alert-watch-rerun", started: list | None = None) -> int:
+          source: str = "alert-watch-rerun", started: list | None = None,
+          precheck: Callable[[], bool] | None = None) -> int:
     """Rerun one listed job, at most once per rerun_window_s across every caller (the
     alert-watch run through main(), and watchdog.fix_jobs, which calls this directly
     with no AI involved). Returns the job's exit code; 1 or 2 when it did not run.
     `started`, when given, gets True appended once the job has really started, so a
-    caller can tell a refusal from the job's own exit code."""
+    caller can tell a refusal from the job's own exit code. `precheck`, when given, is
+    asked again once the job's lock is held, just before the start: False means the job
+    no longer needs a rerun (a scheduled run finished meanwhile), so nothing runs and the
+    reservation is given back."""
     job = cfg.rerun.get(name)
     if job is None:
         print(f"rerun: {name!r} is not on the rerun list ({', '.join(sorted(cfg.rerun))})",
@@ -107,6 +111,13 @@ def rerun(cfg: Config, name: str, *, now: Callable[[], float] = time.time,
                 give_back()
                 print(f"rerun {name}: lock busy (the job is running now); not counted")
                 return 1
+        if precheck is not None and not precheck():
+            if held:
+                held.close()
+                held = None
+            give_back()
+            print(f"rerun {name}: no longer needed; not counted")
+            return 1
         Path(job.log).parent.mkdir(parents=True, exist_ok=True)
         logf = open(job.log, "ab")
         logf.write(f"--- {source} {name} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t))}\n"

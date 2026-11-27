@@ -120,3 +120,16 @@ def test_rerun_with_an_error_before_a_fresh_summary_is_a_problem(world):
     world.log.write_text(line(time.time() - 39 * 3600))
     go(world)
     assert len(world.sent) == 1 and world.sent[0].startswith("PROBLEM")
+
+
+def test_a_scheduled_run_that_finishes_before_the_lock_stops_the_rerun(world):
+    world.log.write_text(line(time.time() - 39 * 3600))
+
+    def rerun_after_cron(cfg, job, **kw):
+        with open(world.log, "a") as fh:     # cron's own run lands before the lock is taken
+            fh.write(line(time.time()))
+        return rerun_mod.rerun(cfg, job, **kw)
+    fix_jobs.main([], rerun=rerun_after_cron, cfg=world.cfg)
+    assert world.sent == [] and "fix-jobs-rerun" not in world.log.read_text()
+    marks = world.cfg.state_dir / "reruns.json"
+    assert not marks.exists() or "coverage_check" not in marks.read_text()

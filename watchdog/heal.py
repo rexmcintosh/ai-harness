@@ -136,6 +136,10 @@ def main(argv=None) -> int:
         if args.dry_run:
             messages.append(f"(dry run) would restart {name}: {' '.join(cmd)}")
             continue
+        # Reserve first: a crash after the restart then counts it, so no second one
+        # comes inside the 6 hours.
+        reserved = {**new, "restarted": {**new["restarted"], key: now_epoch}}
+        _save_state(reserved)
         try:
             rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
                                 env=fixkit.child_env()).returncode
@@ -146,37 +150,59 @@ def main(argv=None) -> int:
         print(json.dumps({"alive": alive, "restarts": restarts}, indent=1))
         print("\n".join(messages) or "nothing to do")
         return 0
-    send_all(messages)        # first: a crash then repeats, never loses, a note
-    tmp = STATE / "state.json.tmp"
-    tmp.write_text(json.dumps(new, indent=1))
-    os.replace(tmp, STATE / "state.json")
+    _queue(messages)          # queue, save, flush: a note is never lost
+    _save_state(new)
+    _flush()
     return 0
+
+
+def _save_state(data: dict) -> None:
+    tmp = STATE / "state.json.tmp"
+    tmp.write_text(json.dumps(data, indent=1))
+    os.replace(tmp, STATE / "state.json")
 
 
 MAX_SENDS_PER_RUN = 5
 
 
-def send_all(messages: list, sender=None) -> None:
-    """Send waiting messages oldest first, then new ones. Stop at the first failure and
-    after MAX_SENDS_PER_RUN, so a Telegram outage never holds up the next probes.
-    Keep what is left for the next run (at most fixkit.OUTBOX_KEEP, PROBLEM lines first)."""
-    sender = sender or _tg_send
-    outbox = STATE / "outbox.json"
+def _read_outbox() -> list:
     try:
-        waiting = json.loads(outbox.read_text())
+        waiting = json.loads((STATE / "outbox.json").read_text())
     except (OSError, ValueError):
-        waiting = []
-    if not isinstance(waiting, list):
-        waiting = []
-    queue, left, sent = waiting + messages, [], 0
-    for i, text in enumerate(queue):
+        return []
+    return waiting if isinstance(waiting, list) else []
+
+
+def _write_outbox(items: list) -> None:
+    tmp = STATE / "outbox.json.tmp"
+    tmp.write_text(json.dumps(fixkit.trim(items)))
+    os.replace(tmp, STATE / "outbox.json")
+
+
+def _queue(messages: list) -> None:
+    if messages:
+        _write_outbox(_read_outbox() + list(messages))
+
+
+def _flush(sender=None) -> None:
+    """Send queued messages oldest first. Stop at the first failure and after
+    MAX_SENDS_PER_RUN, so a Telegram outage never holds up the next probes. Keep what is
+    left (at most fixkit.OUTBOX_KEEP, PROBLEM lines first)."""
+    sender = sender or _tg_send
+    waiting = _read_outbox()
+    left, sent = [], 0
+    for i, text in enumerate(waiting):
         if sent >= MAX_SENDS_PER_RUN or not sender(text):
-            left = queue[i:]
+            left = waiting[i:]
             break
         sent += 1
-    tmp = STATE / "outbox.json.tmp"
-    tmp.write_text(json.dumps(fixkit.trim(left)))
-    os.replace(tmp, outbox)
+    if waiting:
+        _write_outbox(left)
+
+
+def send_all(messages: list, sender=None) -> None:
+    _queue(messages)
+    _flush(sender)
 
 
 def _tg_send(text: str) -> bool:

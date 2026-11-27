@@ -89,7 +89,9 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
             messages.append(f"(dry run) would rerun {job}: {_what(status)}")
             continue
         started: list = []
-        rc = rerun(cfg, job, source="fix-jobs-rerun", started=started)
+        # Asked again under the job's lock: a scheduled run may have finished meanwhile.
+        still = lambda: missed(label, _read(path), time.time()) is not None
+        rc = rerun(cfg, job, source="fix-jobs-rerun", started=started, precheck=still)
         if not started:
             continue                  # rerun already used in the last 6 h, or running now
         text = _read(path) or ""
