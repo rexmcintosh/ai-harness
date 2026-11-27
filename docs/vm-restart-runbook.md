@@ -50,6 +50,10 @@ is off, nothing on it can help.
    it carries. Keep the script in the repo, not only on the mini.
 8. **One risky change per stop.** Bundle only steps that cannot leave the VM off.
 9. **Send "starting in 2 minutes, reply stop to cancel", then wait** the 2 minutes.
+10. **Tell Rex to expect outside-alarm messages** if the VM or the mini will be off for
+    more than about 15 minutes: a `DOWN` from the Cloudflare `bebop-uptime` alarm, then
+    `UP` when it is back. Pause the mini guard too: `~/.local/bin/mini-guard pause 30
+    "restart"` on the mini.
 
 ## During
 

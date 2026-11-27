@@ -36,9 +36,13 @@ both reviews were read-only and checked live facts. Background: the
 
 1. **Today.** Rex turns off Tailscale key expiry for the mini and the MacBook. Fix
    alert-watch's failing runs, and alert when it is paused.
-2. **Outside check-in** (healthchecks.io free tier, needs Rex's approval). Two checks:
-   the VM pings after its own checks pass; the mini guard pings after each completed
-   tick. Silence for 15 minutes emails or pushes Rex. This is the only watcher that
+2. **Outside check-in.** Built 2026-11-27 as the Cloudflare Worker `bebop-uptime`
+   (`setup/uptime-worker/`) on Rex's existing Cloudflare account, in place of the
+   healthchecks.io account first planned. Two checks: the VM pings every 5 minutes
+   (a plain "alive" ping, so one failing check never reads as "server down"); the mini
+   guard pings after each completed tick. Silence for 15 minutes past the ping interval
+   sends a Telegram DOWN, and UP when it returns. The VM watchdog checks that the
+   Worker's own 5-minute cron keeps running. This is the only watcher that
    does not share the house's fate, and it also tells which machine went quiet. No
    inbound port opens.
 3. **Stale-backup alert** on the VM: no verified backup in 30 hours sends a message.
