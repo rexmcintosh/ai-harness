@@ -52,7 +52,7 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 | Home Assistant | Docker container `homeassistant`, restart `unless-stopped`, `8123` | `:8443` (also plain `8123` on the tailnet) |
 | earlyoom | system service; settings managed by the memory guard | |
 | Backups | `restic-offsite.timer`, daily 03:30 | |
-| Outside alarm | Cloudflare Worker `bebop-uptime` ([setup/uptime-worker](../setup/uptime-worker/README.md)), cron every 5 min; the VM (cron `bebop-uptime-ping`) and the Mac mini guard ping it; it messages Rex when a ping is late (house power or internet down). Watched by the VM watchdog. Added 2026-11-27. | `https://bebop-uptime.rex-651.workers.dev` (secret paths) |
+| Outside alarm | Cloudflare Worker `bebop-uptime` ([setup/uptime-worker](../setup/uptime-worker/README.md)), cron every 5 min; the VM (cron `bebop-uptime-ping`) and the Mac mini guard ping it; it messages Rex when a ping is late (house power or internet down). Watched by the VM watchdog. Added 2026-11-27. | `https://bebop-uptime.rex-651.workers.dev` (secret in an `Authorization` header; Cloudflare logs show it as REDACTED) |
 | Cron jobs | `crontab -l` (about 25 lines). Debian cron ignores `CRON_TZ`; all times are server time, Europe/Lisbon. | |
 
 ## Service keys on the VM
