@@ -20,6 +20,29 @@ def test_paused_with_stale_inbox_is_ok():
     assert s.level == "ok" and "paused" in s.summary
 
 
+def test_short_pause_is_ok():
+    assert check_alertwatch(None, paused=True, newest_run_status=None, paused_age_s=3600).level == "ok"
+
+
+def test_long_pause_warns():
+    s = check_alertwatch(None, paused=True, newest_run_status="failed", paused_age_s=6 * 86400)
+    assert s.level == "warn" and "144 h" in s.summary and "PAUSED" in s.summary
+
+
+def test_status_warns_on_old_pause_file(tmp_path, monkeypatch):
+    state = tmp_path / "state"
+    monkeypatch.setenv("ALERT_WATCH_STATE", str(state))
+    inbox.ensure_dirs(state)
+    (state / "ENABLED").write_text("")
+    pause = state / "PAUSED"
+    pause.write_text("paused\n")
+    old = time.time() - 7 * 3600
+    import os
+    os.utime(pause, (old, old))
+    s = run.alertwatch_status(time.time())
+    assert s is not None and s.level == "warn" and "7 h" in s.summary
+
+
 def test_failed_newest_run_warns():
     s = check_alertwatch(None, paused=False, newest_run_status="failed")
     assert s.level == "warn" and "failed" in s.summary

@@ -280,15 +280,22 @@ def check_log_coverage(found: list[str], missing: list[str]) -> CheckStatus:
 
 
 def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_status: str | None,
-                     *, max_age_s: int = 1200, note_status: str | None = None) -> CheckStatus:
+                     *, max_age_s: int = 1200, note_status: str | None = None,
+                     paused_age_s: float | None = None, max_pause_s: int = 6 * 3600) -> CheckStatus:
     """alert-watch turns captured Telegram reports into fix runs. Warn when its inbox
-    stops moving or its newest run failed. A paused watcher is a choice, not a fault
-    (it sends its own note when it pauses itself). A usage-limit run is not a failure."""
+    stops moving or its newest run failed. A short pause is a choice, not a fault (it
+    sends its own note when it pauses itself), but a pause that outlasts max_pause_s
+    warns: on 2026-11-21 it paused itself and stayed off for 6 days unnoticed.
+    A usage-limit run is not a failure."""
     if note_status in ("failed", "uncertain"):  # first: the pause note itself may be the one lost
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a note to Rex {note_status}; see its runs/ record and state.json"
                            + (" (alert-watch is paused)" if paused else ""))
     if paused:
+        if paused_age_s is not None and paused_age_s > max_pause_s:
+            return CheckStatus("alertwatch", "warn",
+                               f"alert-watch has been paused for {int(paused_age_s // 3600)} h; "
+                               "delete ~/.local/state/alert-watch/PAUSED to resume")
         return CheckStatus("alertwatch", "ok", "alert-watch is paused")
     if newest_run_status == "failed":
         return CheckStatus("alertwatch", "warn", "alert-watch: the newest run failed; see its runs/ record")
