@@ -92,8 +92,12 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
         rc = rerun(cfg, job, source="fix-jobs-rerun", started=started)
         if not started:
             continue                  # rerun already used in the last 6 h, or running now
-        after = run.cron_status(label, _read(path) or "", time.time())
-        if rc == 0 and after.level == "ok":
+        text = _read(path) or ""
+        clean = run.cron_log_status(label, text)
+        after = run.cron_status(label, text, time.time())
+        if clean.level != "ok":
+            after = clean
+        if rc == 0 and clean.level == "ok" and after.level == "ok":
             messages.append(f"RERAN: {_what(status)}, probably missed while the server was off. "
                             "I ran it once and it finished fine.")
         else:

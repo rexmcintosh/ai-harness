@@ -80,14 +80,14 @@ def test_no_commit_history_is_kept(tmp_path):
 class World:
     def __init__(self, tmp_path, monkeypatch, disk, mac=40.0):
         self.disk = list(disk)            # successive df readings
-        self.sent, self.step1_calls, self.step2_calls, self.mac_cleaned = [], [], [], []
+        self.sent, self.step1_calls, self.mac_cleaned = [], [], []
         monkeypatch.setattr(fixkit, "STATE", tmp_path / "heal")
         monkeypatch.setattr(fixkit, "tg_send", lambda t: self.sent.append(t) or True)
         monkeypatch.setattr(cleanup.time, "time", lambda: NOW)
         monkeypatch.setattr(cleanup, "df_pct", lambda path="/": self.disk.pop(0) if len(self.disk) > 1 else self.disk[0])
         monkeypatch.setattr(cleanup, "in_use_paths", lambda: [])
         monkeypatch.setattr(cleanup, "step1", lambda dry, in_use: self.step1_calls.append(dry) or ["old copies (2.0 GB)"])
-        monkeypatch.setattr(cleanup, "step2", lambda dry, in_use, now: self.step2_calls.append(dry) or ["node_modules (1.0 GB)"])
+        monkeypatch.setattr(cleanup, "idle_node_modules", lambda in_use, now: "node_modules in 1 projects (x; 1.0 GB)")
         monkeypatch.setattr(cleanup, "mac_free_gb", lambda: mac)
         monkeypatch.setattr(cleanup, "mac_clean", lambda dry: self.mac_cleaned.append(dry) or True)
 
@@ -101,7 +101,7 @@ def test_below_trigger_does_nothing(tmp_path, monkeypatch):
 def test_over_trigger_runs_step1_only_and_reports(tmp_path, monkeypatch):
     w = World(tmp_path, monkeypatch, [81, 78, 78])
     cleanup.main([])
-    assert w.step1_calls == [False] and w.step2_calls == []
+    assert w.step1_calls == [False]
     assert w.sent == ["CLEANED: the server disk was 81% full. I removed old copies (2.0 GB). It is now 78% full."]
     # Inside the 6-hour cooldown nothing runs again.
     w.disk = [81]
@@ -109,12 +109,11 @@ def test_over_trigger_runs_step1_only_and_reports(tmp_path, monkeypatch):
     assert w.step1_calls == [False]
 
 
-def test_still_full_runs_step2_then_one_problem_a_day(tmp_path, monkeypatch):
-    w = World(tmp_path, monkeypatch, [90, 88, 87])
+def test_still_full_reports_what_is_left_once_a_day(tmp_path, monkeypatch):
+    w = World(tmp_path, monkeypatch, [90, 87])
     cleanup.main([])
-    assert w.step2_calls == [False]
     assert len(w.sent) == 2 and w.sent[1].startswith("PROBLEM: the server disk is still 87% full")
-    assert "need your call" in w.sent[1]
+    assert "need your call" in w.sent[1] and "node_modules in 1 projects" in w.sent[1]
     monkeypatch.setattr(cleanup.time, "time", lambda: NOW + 7 * 3600)   # cooled, same day
     w.disk = [87]
     cleanup.main([])
@@ -132,7 +131,7 @@ def test_mac_low_is_cleaned_once_per_cooldown(tmp_path, monkeypatch):
 def test_dry_run_changes_and_sends_nothing(tmp_path, monkeypatch, capsys):
     w = World(tmp_path, monkeypatch, [72])
     cleanup.main(["--dry-run"])
-    assert w.step1_calls == [True] and w.step2_calls == [True] and w.sent == []
+    assert w.step1_calls == [True] and w.sent == []
     assert not (tmp_path / "heal" / "cleanup.json").exists()
     assert "would remove" in capsys.readouterr().out
 
@@ -155,3 +154,32 @@ def test_step1_removes_only_the_listed_paths(tmp_path, monkeypatch):
     assert ["sudo", "-n", "apt-get", "clean"] in ran
     assert ["sudo", "-n", "docker", "image", "prune", "-f"] in ran
     assert any("VS Code" in d for d in done)
+
+
+def test_service_inventory_fails_closed(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(cleanup, "HOME", tmp_path)
+    monkeypatch.setattr(cleanup.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1, stdout=""))
+    assert cleanup._service_texts() is None
+    monkeypatch.setattr(cleanup.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="* * * * * x\n"))
+    units = tmp_path / ".config" / "systemd" / "user"
+    units.mkdir(parents=True)
+    (units / "a.service").write_text("ExecStart=/home/dev/projects/a/run")
+    assert cleanup._service_texts() == ["* * * * * x\n", "ExecStart=/home/dev/projects/a/run"]
+    (units / "b.service").mkdir()                  # unreadable as a file
+    assert cleanup._service_texts() is None
+
+
+def test_partial_removal_reports_only_what_went(tmp_path, monkeypatch):
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "a").write_bytes(b"x" * 100_000)
+    (d / "b").write_bytes(b"x" * 100_000)
+    real = cleanup.shutil.rmtree
+
+    def half(path, ignore_errors=False):
+        (Path(path) / "a").unlink()
+    monkeypatch.setattr(cleanup.shutil, "rmtree", half)
+    freed = cleanup._remove(d, False)
+    assert 0 < freed < cleanup.size_bytes(d) + freed and (d / "b").exists()
+    monkeypatch.setattr(cleanup.shutil, "rmtree", real)

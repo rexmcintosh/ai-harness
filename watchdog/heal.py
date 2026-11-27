@@ -146,10 +146,10 @@ def main(argv=None) -> int:
         print(json.dumps({"alive": alive, "restarts": restarts}, indent=1))
         print("\n".join(messages) or "nothing to do")
         return 0
+    send_all(messages)        # first: a crash then repeats, never loses, a note
     tmp = STATE / "state.json.tmp"
     tmp.write_text(json.dumps(new, indent=1))
     os.replace(tmp, STATE / "state.json")
-    send_all(messages)
     return 0
 
 
@@ -159,7 +159,7 @@ MAX_SENDS_PER_RUN = 5
 def send_all(messages: list, sender=None) -> None:
     """Send waiting messages oldest first, then new ones. Stop at the first failure and
     after MAX_SENDS_PER_RUN, so a Telegram outage never holds up the next probes.
-    Keep what is left for the next run (at most 20)."""
+    Keep what is left for the next run (at most fixkit.OUTBOX_KEEP, PROBLEM lines first)."""
     sender = sender or _tg_send
     outbox = STATE / "outbox.json"
     try:
@@ -175,7 +175,7 @@ def send_all(messages: list, sender=None) -> None:
             break
         sent += 1
     tmp = STATE / "outbox.json.tmp"
-    tmp.write_text(json.dumps(left[-20:]))
+    tmp.write_text(json.dumps(fixkit.trim(left)))
     os.replace(tmp, outbox)
 
 

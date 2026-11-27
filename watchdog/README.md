@@ -275,7 +275,7 @@ alert-watch ignores, or PROBLEM, which alert-watch looks at. Each has `--dry-run
 | `watchdog.heal` | every 5 min | a service runs but gives no HTTP answer twice | restarts it once per 6 h (never T3) |
 | `watchdog.fix_backup` | every 15 min | no verified off-site backup for 30 h (`check_backup`) and none running | starts one backup run per 6 h; after a PROBLEM, nothing until a backup passes |
 | `watchdog.fix_jobs` | every 15 min | a job in `fix_jobs.JOBS` has a run too old with a clean log (a missed run) | reruns it once through `alertwatch.rerun.rerun()`, sharing alert-watch's 6-hour mark |
-| `watchdog.cleanup` | hourly | server disk 80% full, Mac under 15 GB free | removes the explicit list in its docstring; step 2 (idle `node_modules`) only at 85% |
+| `watchdog.cleanup` | hourly | server disk 80% full, Mac under 15 GB free | removes the explicit list in its docstring; still 85% after that: one PROBLEM a day naming what is left (idle `node_modules` too, never removed automatically) |
 
 The restic runner also clears stale repository locks before each backup
 (`offsite-backup/backup.py`, `clear_stale_locks`).

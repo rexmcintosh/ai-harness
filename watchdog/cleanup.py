@@ -10,10 +10,11 @@ Step 1, always safe (server):
 - the npm download cache (~/.npm/_cacache; never _npx, which holds the MCP servers),
   unreferenced pnpm store files (`pnpm store prune`), the apt cache (`apt-get clean`)
   and dangling Docker images (`docker image prune`, untagged layers only).
-Step 2, only if the server is still 85% full or more after step 1:
-- `node_modules` (downloaded libraries, rebuilt with `npm ci`/`pnpm install`) in a
-  project under ~/projects with a lock file, no commit and no install for 30 days, not
-  named in the crontab or a user service, and with no process running inside it.
+Report only, when the server is still 85% full or more after that: the big items
+that need Rex's call, and `node_modules` (downloaded libraries, rebuilt with `npm ci`)
+in projects with a lock file, no commit and no install for 30 days, not named in the
+crontab or a user service, and with no process inside. That last list is never removed
+automatically: no snapshot of cron, services and processes proves nothing needs them.
 Mac step (over the VM's existing ssh to the mini): app updater leftovers
   (~/Library/Caches: VS Code and Bitwarden ShipIt, bitwarden-updater).
 
@@ -44,7 +45,7 @@ from . import fixkit
 NAME = "cleanup"
 HOME = Path.home()
 TRIGGER_PCT = 80
-STEP2_PCT = 85
+STILL_FULL_PCT = 85
 MAC_TRIGGER_GB = 15
 COOLDOWN_S = 6 * 3600
 PROBLEM_EVERY_S = 24 * 3600
@@ -170,17 +171,21 @@ def _last_commit(proj: Path) -> float | None:
         return None
 
 
-def _service_texts() -> list[str]:
-    texts = []
+def _service_texts() -> list[str] | None:
+    """The crontab and every user service file, or None when any of them cannot be read
+    (then no project can be called unused)."""
     try:
-        texts.append(subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=20).stdout)
+        cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):
-        return []                     # unknown crontab: treat every project as referenced
+        return None
+    if cron.returncode != 0 or not cron.stdout.strip():
+        return None
+    texts = [cron.stdout]
     for unit in (HOME / ".config" / "systemd" / "user").glob("*.service"):
         try:
             texts.append(unit.read_text())
         except OSError:
-            pass
+            return None
     return texts
 
 
@@ -192,10 +197,12 @@ def _run(cmd: list, timeout: int = 600) -> bool:
 
 
 def _remove(path: Path, dry: bool) -> int:
+    """Bytes freed: measured before and after, so a partial removal is not overstated."""
     n = size_bytes(path)
-    if not dry:
-        shutil.rmtree(path, ignore_errors=True)
-    return n
+    if dry:
+        return n
+    shutil.rmtree(path, ignore_errors=True)
+    return n - (size_bytes(path) if path.exists() else 0)
 
 
 def step1(dry: bool, in_use: list[str]) -> list[str]:
@@ -216,17 +223,24 @@ def step1(dry: bool, in_use: list[str]) -> list[str]:
     return done
 
 
-def step2(dry: bool, in_use: list[str], now_epoch: float) -> list[str]:
+def idle_node_modules(in_use: list[str], now_epoch: float) -> str | None:
+    """A note naming idle projects' node_modules that Rex may remove. Report only: no
+    snapshot of cron, services and processes can prove nothing will need them."""
     texts = _service_texts()
-    if not texts:
-        return []
+    if texts is None:
+        return None
     found = stale_node_modules(PROJECTS, referenced_projects(texts), in_use, now_epoch)
     if not found:
-        return []
-    freed = sum(_remove(nm, dry) for nm in found)
+        return None
+    size = sum(size_bytes(nm) for nm in found)
     names = ", ".join(nm.parent.name for nm in found)
-    return [f"node_modules in {len(found)} projects untouched for 30 days ({names}; {gb(freed)}; "
-            "`npm ci` rebuilds them)"]
+    return (f"node_modules in {len(found)} projects untouched for 30 days ({names}; {gb(size)}; "
+            "`npm ci` rebuilds them)")
+
+
+def left_for_rex(in_use: list[str], now_epoch: float) -> list[str]:
+    note = idle_node_modules(in_use, now_epoch)
+    return [*LEFT_FOR_REX, *([note] if note else [])]
 
 
 def mac_free_gb() -> float | None:
@@ -272,10 +286,7 @@ def main(argv=None) -> int:
     if args.force or args.dry_run or (before >= TRIGGER_PCT and cooled):
         in_use = in_use_paths()
         done = step1(args.dry_run, in_use)
-        mid = df_pct() or before
-        if args.dry_run or mid >= STEP2_PCT:
-            done += step2(args.dry_run, in_use, now_epoch)
-        after = df_pct() or mid
+        after = df_pct() or before
         if not args.dry_run:
             state["last_run"] = now_epoch
             if done:
@@ -283,11 +294,13 @@ def main(argv=None) -> int:
                                 + "; ".join(done) + f". It is now {after}% full.")
         else:
             print(f"server disk {before}% full; would remove:\n- " + "\n- ".join(done or ["nothing"]))
-        if not args.dry_run and after >= STEP2_PCT and \
+            print("left for Rex: " + "; ".join(left_for_rex(in_use, now_epoch)))
+        if not args.dry_run and after >= STILL_FULL_PCT and \
                 now_epoch - float(state.get("problem_at", 0)) >= PROBLEM_EVERY_S:
             state["problem_at"] = now_epoch
             messages.append(f"PROBLEM: the server disk is still {after}% full after cleanup. "
-                            "The big items left need your call: " + "; ".join(LEFT_FOR_REX) + ".")
+                            "The big items left need your call: "
+                            + "; ".join(left_for_rex(in_use, now_epoch)) + ".")
     free = mac_free_gb()
     mac_cooled = now_epoch - float(state.get("mac_last_run", 0)) >= COOLDOWN_S
     if free is not None and (args.dry_run or (free < MAC_TRIGGER_GB and mac_cooled)):
@@ -300,8 +313,8 @@ def main(argv=None) -> int:
                             f"leftovers. It now has {later or free:.0f} GB free.")
     if args.dry_run:
         return 0
+    fixkit.send_all(messages, "cleanup-outbox")     # first: a crash then repeats, never loses, a note
     fixkit.save_state(NAME, state)
-    fixkit.send_all(messages, "cleanup-outbox")
     return 0
 
 

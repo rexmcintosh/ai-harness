@@ -19,6 +19,7 @@ TG_SEND = os.environ.get("WATCHDOG_TG_SEND") or str(run.BASE / "bin" / "tg-send"
 STATE = Path(os.environ.get("HEAL_STATE") or Path.home() / ".local" / "state" / "heal")
 MAX_PAUSE_S = 2 * 3600
 MAX_SENDS_PER_RUN = 5
+OUTBOX_KEEP = 50
 
 
 def child_env() -> dict:
@@ -74,7 +75,10 @@ def save_state(name: str, data: dict) -> None:
 def send_all(messages: list, outbox_name: str, *, sender=None) -> None:
     """Send waiting messages oldest first, then new ones. Stop at the first failure and
     after MAX_SENDS_PER_RUN, so a Telegram outage never holds up the fixer. Keep what is
-    left for the next run (at most 20). Each fixer has its own outbox_name."""
+    left for the next run (at most OUTBOX_KEEP, PROBLEM lines first). Each fixer has its
+    own outbox_name. Call it BEFORE saving the fixer's state: a crash in between then
+    repeats a note instead of losing one. A send that timed out may have been delivered;
+    it is sent again (a duplicate is better than a lost PROBLEM)."""
     sender = sender or tg_send
     outbox = STATE / f"{outbox_name}.json"
     try:
@@ -91,8 +95,23 @@ def send_all(messages: list, outbox_name: str, *, sender=None) -> None:
         sent += 1
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = STATE / f"{outbox_name}.json.tmp"
-    tmp.write_text(json.dumps(left[-20:]))
+    tmp.write_text(json.dumps(trim(left)))
     os.replace(tmp, outbox)
+
+
+def trim(items: list, keep: int = None) -> list:
+    """At most `keep` items in order: every PROBLEM line first (newest if too many), then
+    the newest others."""
+    keep = OUTBOX_KEEP if keep is None else keep
+    if len(items) <= keep:
+        return list(items)
+    problems = [i for i, t in enumerate(items) if str(t).startswith("PROBLEM")]
+    chosen = set(problems[-keep:])
+    for i in range(len(items) - 1, -1, -1):
+        if len(chosen) >= keep:
+            break
+        chosen.add(i)
+    return [items[i] for i in sorted(chosen)]
 
 
 def tg_send(text: str) -> bool:

@@ -108,3 +108,15 @@ def test_every_listed_job_has_an_age_limit_and_a_rerun_entry():
     for label, job in fix_jobs.JOBS.items():
         assert label in run.RUN_MAX_AGE_H and label in dict(run.CRON_LOGS)
         assert job in cfg.rerun and cfg.rerun[job].log == str(dict(run.CRON_LOGS)[label])
+
+
+def test_rerun_with_an_error_before_a_fresh_summary_is_a_problem(world):
+    world.script.write_text(
+        "import datetime\n"
+        "ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')\n"
+        "print(f'[{ts}] [coverage] ERROR calendar: down')\n"
+        "print(f'[{ts}] [coverage] season=2026-2027 expected=6 tracked=5 alerts=0 "
+        "reminders=0 blind=0 sent=0 failed=0')\n")
+    world.log.write_text(line(time.time() - 39 * 3600))
+    go(world)
+    assert len(world.sent) == 1 and world.sent[0].startswith("PROBLEM")

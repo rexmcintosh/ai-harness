@@ -49,3 +49,12 @@ def test_outbox_is_per_fixer_bounded_and_kept_on_failure(tmp_path, monkeypatch):
     fixkit.send_all([f"m{i}" for i in range(8)], "one", sender=lambda t: sent.append(t) or True)
     assert sent == ["a", "b", "m0", "m1", "m2"]
     assert json.loads((tmp_path / "one.json").read_text()) == ["m3", "m4", "m5", "m6", "m7"]
+
+
+def test_trim_keeps_every_problem_first():
+    items = ["PROBLEM: old"] + [f"FIXED: {i}" for i in range(60)] + ["PROBLEM: new"]
+    out = fixkit.trim(items, keep=5)
+    assert out == ["PROBLEM: old", "FIXED: 57", "FIXED: 58", "FIXED: 59", "PROBLEM: new"]
+    assert fixkit.trim(["a", "b"], keep=5) == ["a", "b"]
+    many = [f"PROBLEM: {i}" for i in range(8)]
+    assert fixkit.trim(many, keep=3) == ["PROBLEM: 5", "PROBLEM: 6", "PROBLEM: 7"]

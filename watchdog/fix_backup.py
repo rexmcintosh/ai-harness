@@ -128,8 +128,8 @@ def main(argv=None) -> int:
         print(f"backup check: {check.level}: {check.summary}; service: {unit_state}")
         print("\n".join(messages) or "nothing to do")
         return 0
+    fixkit.send_all(messages, "backup-outbox")      # first: a crash then repeats, never loses, a note
     fixkit.save_state(NAME, new)
-    fixkit.send_all(messages, "backup-outbox")
     return 0
 
 
