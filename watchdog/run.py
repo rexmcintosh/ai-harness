@@ -33,6 +33,7 @@ from .triage import (
     check_meet_freshness,
     check_meet_liveness,
     check_orphan_processes,
+    check_outside_alarm,
     check_run_age,
     check_service_active,
     triage,
@@ -459,6 +460,23 @@ def read_guard_heartbeat(key: Path) -> str | None:
     return proc.stdout if proc.returncode == 0 else ""   # reachable, but no heartbeat
 
 
+OUTSIDE_ALARM_SECRET = Path(os.environ.get("OUTSIDE_ALARM_SECRET")
+                            or Path.home() / ".config" / "bebop-uptime" / "secret")
+OUTSIDE_ALARM_URL = "https://bebop-uptime.rex-651.workers.dev/status/"
+
+
+def read_outside_alarm(secret_path: Path) -> str | None:
+    """The Worker's status JSON, or None when it cannot be reached. The secret goes to
+    curl on stdin, never on the command line."""
+    try:
+        secret = secret_path.read_text().strip()
+        proc = subprocess.run(["curl", "-fsS", "-m", "15", "-K", "-"], capture_output=True, text=True,
+                              timeout=30, input=f'url = "{OUTSIDE_ALARM_URL}{secret}"\n')
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[CheckStatus], dict]:
     """Gather every signal into normalized statuses. Returns (statuses, new_metrics).
     Missing optional signals are skipped (not invented as failures)."""
@@ -497,6 +515,9 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
     alertwatch = alertwatch_status(now_epoch)
     if alertwatch is not None:
         out.append(alertwatch)
+
+    if OUTSIDE_ALARM_SECRET.exists():
+        out.append(check_outside_alarm(read_outside_alarm(OUTSIDE_ALARM_SECRET), now_epoch))
 
     metric_statuses, new_metrics = collect_metrics(now_epoch, prior_metrics or {})
     out.extend(metric_statuses)

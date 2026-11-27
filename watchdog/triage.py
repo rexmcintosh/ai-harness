@@ -8,6 +8,7 @@ data and free of the environment.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 
@@ -348,6 +349,31 @@ def check_alertwatch(oldest_inbox_age_s: float | None, paused: bool, newest_run_
         return CheckStatus("alertwatch", "warn",
                            f"alert-watch: a report has waited {int(oldest_inbox_age_s // 60)} min in the inbox")
     return CheckStatus("alertwatch", "ok", "alert-watch inbox moving")
+
+
+def check_outside_alarm(status_text: str | None, now_epoch: float, *, stale_after_s: int = 20 * 60) -> CheckStatus:
+    """The bebop-uptime Worker on Cloudflare is the alarm for "the whole house is down".
+    Nothing tells Rex if it stops, so the VM reads its status: no recent cron pass is
+    crit; unreachable or unreadable is warn; a check it reports as down is warn."""
+    name = "outside-alarm"
+    if status_text is None:
+        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) could not be reached from the server")
+    try:
+        d = json.loads(status_text)
+        last_cron = float(d.get("lastCron") or 0)
+        checks = d.get("checks") or {}
+    except (ValueError, TypeError, AttributeError):
+        return CheckStatus(name, "warn", "outside alarm (Cloudflare bebop-uptime) gave an unreadable status")
+    age = now_epoch - last_cron
+    if not last_cron or age > stale_after_s:
+        when = "never" if not last_cron else f"{int(age // 60)} min ago"
+        return CheckStatus(name, "crit", f"outside alarm (Cloudflare bebop-uptime) last ran {when}; "
+                           "a house power or internet outage would go unreported")
+    down = sorted(n for n, c in checks.items() if isinstance(c, dict) and c.get("announced") == "down")
+    if down:
+        return CheckStatus(name, "warn", "outside alarm reports no check-in from: " + ", ".join(down))
+    alerts = "" if d.get("alerts") else "; Telegram not set up yet, so it cannot message Rex"
+    return CheckStatus(name, "ok", f"outside alarm ran {int(age // 60)} min ago{alerts}")
 
 
 def _iso_epoch(ts: str | None) -> float | None:

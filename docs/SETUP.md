@@ -52,12 +52,15 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 | Home Assistant | Docker container `homeassistant`, restart `unless-stopped`, `8123` | `:8443` (also plain `8123` on the tailnet) |
 | earlyoom | system service; settings managed by the memory guard | |
 | Backups | `restic-offsite.timer`, daily 03:30 | |
+| Outside alarm | Cloudflare Worker `bebop-uptime` ([setup/uptime-worker](../setup/uptime-worker/README.md)), cron every 5 min; the VM (cron `bebop-uptime-ping`) and the Mac mini guard ping it; it messages Rex when a ping is late (house power or internet down). Watched by the VM watchdog. Added 2026-11-27. | `https://bebop-uptime.rex-651.workers.dev` (secret paths) |
 | Cron jobs | `crontab -l` (about 25 lines). Debian cron ignores `CRON_TZ`; all times are server time, Europe/Lisbon. | |
 
 ## Service keys on the VM
 
 | Key | Where | Use |
 | --- | --- | --- |
+| Cloudflare (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, user token, verified 2026-11-27) | `~/.env` | `wrangler deploy` of Workers (e.g. `bebop-uptime`). It cannot create D1 databases or read billing. Site deploys do not use it (Workers Builds). |
+| bebop-uptime ping secret | `~/.config/bebop-uptime/secret` (600); same value as the Worker secret `PING_SECRET` and in the mini's `~/.config/mini-guard/config.json` | VM and mini pings, watchdog reads `/status` |
 | App Store Connect API (team key `M59TFWW762`, App Manager, added 2026-11-27) | `~/.appstoreconnect/private_keys/AuthKey_M59TFWW762.p8` (600); key and issuer ids in `~/.appstoreconnect/config.env` | MeetTrack store page: text, screenshots, build choice, review notes. Helpers in `~/.appstoreconnect/tools/` (`asc.py` signs each call; `fill_text.py` reads `splash_poller/ios/APP_STORE.md`; `upload_shots.py`). Submitting for review stays Rex's step. |
 
 ## Memory
