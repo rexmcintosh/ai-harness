@@ -16,7 +16,8 @@ Design context: [docs/uptime-design-2026-11-27.md](../../docs/uptime-design-2026
 | `mini-guard` | the Mac mini guard, after every 2-minute tick (`healthcheck_url` in its config) | 17 min | `DOWN: no check-in from the Mac mini guard ...` |
 | `bebop-vm` | VM cron, every 5 minutes (`~/.local/bin/bebop-uptime-ping`) | 20 min | `DOWN: no check-in from the server (bebop-vm) ...` |
 
-- One DOWN when a check goes late, one UP when it checks in again. No repeats.
+- One DOWN when a check goes late, one UP when it checks in again. Delivery is at least
+  once: in a rare failure after Telegram took a message, it can arrive twice.
 - If every check is down, the message adds: likely house power or internet.
 - A check that has never pinged is ignored, so a fresh deploy never alarms.
 - A message counts as sent only when Telegram accepts it; otherwise the next 5-minute
@@ -28,19 +29,24 @@ Design context: [docs/uptime-design-2026-11-27.md](../../docs/uptime-design-2026
 ## Who watches the alarm
 
 The VM watchdog (`check_outside_alarm`, every 30 minutes) reads `/status`:
-no cron pass for 20 minutes is crit, unreachable or unreadable is warn, and a check the
-Worker reports as down is warn.
+no cron pass for 20 minutes is crit; a missing secret file, unreachable or unreadable
+status, no Telegram token, a failed send, or a check the Worker reports as down is warn.
 
 ## Paths
 
-`https://bebop-uptime.rex-651.workers.dev`; every useful path carries `PING_SECRET`.
+`https://bebop-uptime.rex-651.workers.dev`. Every request needs
+`Authorization: Bearer <PING_SECRET>`; the secret is never in a URL, so Cloudflare's
+request logs never hold it.
 
-- `GET|POST /ping/<check>/<secret>` records a check-in.
-- `GET /status/<secret>` returns JSON: `lastCron`, `alerts`, `checks`, recent `log`.
-- Anything else is 404.
+- `POST /ping/<check>` records a check-in (a `GET` never changes anything).
+- `GET /status` returns JSON: `lastCron`, `alerts`, `lastSendError`, `checks`, recent `log`.
+- Anything else, or a wrong secret, is 404.
 
 Cloudflare refuses Python's default `User-Agent` (error 1010); mini-guard sends
 `mini-guard/1`.
+
+To change the secret: write a new `~/.config/bebop-uptime/secret`, run the
+`wrangler secret put PING_SECRET` line below, then `install.sh` (it updates the mini).
 
 ## Files
 
@@ -52,7 +58,7 @@ Cloudflare refuses Python's default `User-Agent` (error 1010); mini-guard sends
 | `vm-ping.sh` | the VM ping, installed as `~/.local/bin/bebop-uptime-ping` |
 | `install.sh` | installs the VM ping cron line and sets the mini's `healthcheck_url`; `--undo` |
 | VM `~/.config/bebop-uptime/secret` | `PING_SECRET` (0600); also the watchdog's key to `/status` |
-| mini `~/.config/mini-guard/config.json` | `healthcheck_url` holds the mini's ping URL (0600) |
+| mini `~/.config/mini-guard/config.json` | `healthcheck_url` (the ping URL) and `healthcheck_token` (the secret) (0600) |
 
 ## Deploy and secrets (from the VM)
 
