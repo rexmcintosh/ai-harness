@@ -348,7 +348,7 @@ def tick(runner: Runner, cfg: dict, t: float, lock_held: bool) -> list:
         elif starts and t - max(starts) < START_COOLDOWN_S:
             action_note = None          # give the last start time to work
         elif len(starts) >= MAX_STARTS:
-            action_note = (f"I have already started it {len(starts)} times in 24 hours, so I stopped trying. "
+            action_note = (f"I have already tried to start it {len(starts)} times in 24 hours, so I stopped trying. "
                            "On the mini, open Terminal and run: limactl start vps")
         else:
             starts.append(t)
@@ -356,7 +356,7 @@ def tick(runner: Runner, cfg: dict, t: float, lock_held: bool) -> list:
             save_json(STATE_DIR / "state.json", state)      # count the attempt before trying
             rc, _ = runner.run(["/bin/launchctl", "kickstart", f"gui/{os.getuid()}/{AUTOSTART_JOB}"], 30)
             if rc == 0:
-                action_note = f"I started it (start {len(starts)} of {MAX_STARTS} allowed in 24 hours)."
+                action_note = f"I started it (start attempt {len(starts)} of {MAX_STARTS} allowed in 24 hours)."
             else:
                 action_note = "I tried to start it, but launchd refused. On the mini, run: limactl start vps"
             log(f"start attempt rc={rc}")
@@ -438,31 +438,33 @@ def cmd_tick() -> int:
     if tick_handle is None:
         log("another tick is still running; skipped")
         return 0
-    maint = try_lock("lock")
     try:
-        messages = tick(Runner(), cfg, now(), lock_held=maint is None)
-    except Exception as e:       # a broken tick must still be visible
+        maint = try_lock("lock")
         try:
-            log(f"tick crashed: {e!r}")
-            deliver([f"PROBLEM: the Mac mini guard crashed ({e.__class__.__name__}). "
-                     "It will try again in 2 minutes."], cfg)
-        except Exception:
-            pass                 # the stale heartbeat still tells the VM and the outside check
-        return 1
+            messages = tick(Runner(), cfg, now(), lock_held=maint is None)
+        except Exception as e:       # a broken tick must still be visible
+            try:
+                log(f"tick crashed: {e!r}")
+                deliver([f"PROBLEM: the Mac mini guard crashed ({e.__class__.__name__}). "
+                         "It will try again in 2 minutes."], cfg)
+            except Exception:
+                pass                 # the stale heartbeat still tells the VM and the outside check
+            return 1
+        finally:
+            if maint:
+                maint.close()
+        try:                          # still under tick.lock: no second tick sends the same message
+            deliver(messages, cfg)
+            heartbeat(cfg)
+        except Exception as e:       # disk full, permissions: log it; the VM sees a stale heartbeat
+            try:
+                log(f"delivery failed: {e!r}")
+            except Exception:
+                pass
+            return 1
+        return 0
     finally:
-        if maint:
-            maint.close()
         tick_handle.close()
-    try:
-        deliver(messages, cfg)
-        heartbeat(cfg)
-    except Exception as e:       # disk full, permissions: log it; the VM sees a stale heartbeat
-        try:
-            log(f"delivery failed: {e!r}")
-        except Exception:
-            pass
-        return 1
-    return 0
 
 
 def cmd_pause(minutes: float, reason: str) -> int:

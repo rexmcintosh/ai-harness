@@ -5,9 +5,13 @@ NOW = 1_800_000_000.0
 ALL_UP = {k: True for k in heal.SERVICES}
 
 
-def step(state, down=(), t=NOW):
+def step(state, down=(), t=NOW, restart_ok=True):
+    """One run, including the restart command's result, like main() does."""
     alive = {k: (k not in down) for k in heal.SERVICES}
-    return heal.decide(state, alive, t)
+    new, restarts, msgs = heal.decide(state, alive, t)
+    for key in restarts:
+        heal.record_restart(new, key, t, restart_ok)
+    return new, restarts, msgs
 
 
 def test_healthy_does_nothing():
@@ -104,3 +108,23 @@ def test_only_one_fixed_after_restart_and_report():
     assert m == ["FIXED: the finance tracker answers again."]
     s, _, m = step(s, t=NOW + 1500)
     assert m == [] and "finance" not in s["verify"]
+
+
+def test_failed_restart_command_is_not_a_restart():
+    s, _, _ = step({}, down=["finance"])
+    s, r, _ = step(s, down=["finance"], t=NOW + 300, restart_ok=False)
+    assert r == ["finance"] and "finance" not in s["restarted"] and "finance" in s["reported"]
+    msg = heal.record_restart({"restarted": {}, "verify": {}, "fails": {}, "reported": {}}, "finance", NOW, False)
+    assert msg.startswith("PROBLEM") and "restarting it failed" in msg
+
+
+def test_outbox_send_is_bounded_and_stops_at_failure(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+    (tmp_path / "outbox.json").write_text(json.dumps([f"m{i}" for i in range(10)]))
+    tried = []
+    heal.send_all([], sender=lambda text: tried.append(text) or False)
+    assert tried == ["m0"]
+    tried.clear()
+    heal.send_all([], sender=lambda text: tried.append(text) or True)
+    assert tried == [f"m{i}" for i in range(heal.MAX_SENDS_PER_RUN)]

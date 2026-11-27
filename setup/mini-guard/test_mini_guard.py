@@ -77,7 +77,7 @@ def test_stopped_vm_is_started_on_the_second_check_then_fixed():
     assert fake.kicks() == []
     second = run(fake, minutes=2)
     assert fake.kicks() and "kickstart" in fake.kicks()[0]
-    assert second == ["UPDATE: I started it (start 1 of 2 allowed in 24 hours)."]
+    assert second == ["UPDATE: I started it (start attempt 1 of 2 allowed in 24 hours)."]
     fake.status = "Running"
     third = run(fake, minutes=4)
     assert len(third) == 1 and third[0].startswith("FIXED")

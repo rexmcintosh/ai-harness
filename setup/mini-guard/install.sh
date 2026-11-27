@@ -52,4 +52,14 @@ printf '%s\n' "$line" | ssh_mini 'set -e; umask 077; mkdir -p ~/.ssh; chmod 700 
   { grep -v " mini-guard-heartbeat\$" ~/.ssh/authorized_keys || true; cat; } > "$tmp"
   grep -q " mini-guard-heartbeat\$" "$tmp"
   chmod 600 "$tmp"; mv "$tmp" ~/.ssh/authorized_keys'
-echo "mini-guard installed. Heartbeat: $(ssh -o BatchMode=yes -o IdentitiesOnly=yes -i "$key" "$MINI" 2>/dev/null | head -c 200)"
+# Prove the VM can read the heartbeat with the read-only key (the first tick may still be running).
+for try in 1 2 3 4 5; do
+  if beat=$(ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 -i "$key" "$MINI" 2>/dev/null) \
+     && printf '%s' "$beat" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "time" in d'; then
+    echo "mini-guard installed; the VM reads its heartbeat."
+    exit 0
+  fi
+  sleep 5
+done
+echo "mini-guard installed, but the VM could NOT read its heartbeat with $key" >&2
+exit 1

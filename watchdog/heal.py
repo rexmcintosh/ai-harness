@@ -92,11 +92,22 @@ def decide(state: dict, alive: dict, now_epoch: float) -> tuple[dict, list, list
                             "I did not restart it again; it needs a look.")
             new["reported"][key] = now_epoch
         else:
-            restarts.append(key)
-            new["restarted"][key] = now_epoch
-            new["verify"][key] = now_epoch    # say FIXED once a later probe answers
-            new["fails"][key] = 0
+            restarts.append(key)          # recorded by record_restart once it has run
     return new, restarts, messages
+
+
+def record_restart(new: dict, key: str, now_epoch: float, ok: bool) -> str:
+    """After a restart command ran: start the 6-hour cooldown and the FIXED check only if
+    it succeeded; a failed command is reported and does not count as a restart."""
+    name = SERVICES[key][0]
+    if ok:
+        new["restarted"][key] = now_epoch
+        new["verify"][key] = now_epoch    # say FIXED once a later probe answers
+        new["fails"][key] = 0
+        return (f"RESTARTED: {name} was running but not answering, so I restarted it. "
+                "I will say FIXED when it answers, or PROBLEM if it does not.")
+    new["reported"][key] = now_epoch
+    return f"PROBLEM: {name} was not answering, and restarting it failed. It needs a look."
 
 
 def main(argv=None) -> int:
@@ -129,14 +140,7 @@ def main(argv=None) -> int:
             rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120).returncode
         except (OSError, subprocess.SubprocessError):
             rc = None
-        if rc == 0:
-            messages.append(f"RESTARTED: {name} was running but not answering, so I restarted it. "
-                            "I will say FIXED when it answers, or PROBLEM if it does not.")
-        else:
-            new["verify"].pop(key, None)
-            new["reported"][key] = now_epoch
-            messages.append(f"PROBLEM: {name} was not answering, and restarting it failed "
-                            f"(exit {rc}). It needs a look.")
+        messages.append(record_restart(new, key, now_epoch, rc == 0))
     if args.dry_run:
         print(json.dumps({"alive": alive, "restarts": restarts}, indent=1))
         print("\n".join(messages) or "nothing to do")
@@ -148,15 +152,27 @@ def main(argv=None) -> int:
     return 0
 
 
+MAX_SENDS_PER_RUN = 5
+
+
 def send_all(messages: list, sender=None) -> None:
-    """Send new messages and any left from earlier runs; keep failures for next time (at most 20)."""
+    """Send waiting messages oldest first, then new ones. Stop at the first failure and
+    after MAX_SENDS_PER_RUN, so a Telegram outage never holds up the next probes.
+    Keep what is left for the next run (at most 20)."""
     sender = sender or _tg_send
     outbox = STATE / "outbox.json"
     try:
         waiting = json.loads(outbox.read_text())
     except (OSError, ValueError):
         waiting = []
-    left = [text for text in waiting + messages if not sender(text)]
+    if not isinstance(waiting, list):
+        waiting = []
+    queue, left, sent = waiting + messages, [], 0
+    for i, text in enumerate(queue):
+        if sent >= MAX_SENDS_PER_RUN or not sender(text):
+            left = queue[i:]
+            break
+        sent += 1
     tmp = STATE / "outbox.json.tmp"
     tmp.write_text(json.dumps(left[-20:]))
     os.replace(tmp, outbox)
@@ -164,7 +180,7 @@ def send_all(messages: list, sender=None) -> None:
 
 def _tg_send(text: str) -> bool:
     try:
-        return subprocess.run([TG_SEND, CHAT_ID, text], timeout=60).returncode == 0
+        return subprocess.run([TG_SEND, CHAT_ID, text], timeout=45).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
 
