@@ -105,6 +105,16 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
   the LaunchAgent starts it).
 - Claude Code, Codex and T3 do not update themselves; T3 shows update checks.
 
+## Decisions
+
+- **Home power and internet are accepted limits** (Rex, 2026-11-27). No second server
+  elsewhere unless income starts to depend on uninterrupted uptime.
+- **Starlink is being installed** as a backup internet line; how it fits in is not
+  decided yet.
+- Watchers must not share the fate of what they watch: the Mac mini guards the VM, the
+  VM watches the mini's guard, the MacBook checks both while open (design agreed
+  2026-11-27, not built yet).
+
 ## Pending decisions (2026-11-26)
 
 - OpenBot: on hold. Rex may skip the always-on bot and use a T3 Chief of Staff
