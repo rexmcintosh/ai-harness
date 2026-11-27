@@ -109,6 +109,9 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 
 - **Home power and internet are accepted limits** (Rex, 2026-11-27). No second server
   elsewhere unless income starts to depend on uninterrupted uptime.
+- **Power:** the house has a whole-house backup battery. The Mac mini is also on an
+  Eaton 5E UPS, connected by USB (`pmset -g batt` shows it; macOS shutdown-on-battery
+  settings are off). The router has no UPS yet; Rex plans one.
 - **Starlink is being installed** as a backup internet line; how it fits in is not
   decided yet.
 - Watchers must not share the fate of what they watch: the Mac mini guards the VM, the
