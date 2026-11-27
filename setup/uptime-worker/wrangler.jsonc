@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bebop-uptime",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  // Reached as https://bebop-uptime.rex-651.workers.dev; every useful path needs PING_SECRET.
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": { "TELEGRAM_CHAT_ID": "7735693897" },
+  // Secrets (wrangler secret put): PING_SECRET, and TELEGRAM_TOKEN once the alert bot exists.
+  "durable_objects": { "bindings": [{ "name": "BEACON", "class_name": "Beacon" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Beacon"] }]
+}
