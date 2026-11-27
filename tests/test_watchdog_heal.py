@@ -128,3 +128,22 @@ def test_outbox_send_is_bounded_and_stops_at_failure(tmp_path, monkeypatch):
     tried.clear()
     heal.send_all([], sender=lambda text: tried.append(text) or True)
     assert tried == [f"m{i}" for i in range(heal.MAX_SENDS_PER_RUN)]
+
+
+def test_restart_reaches_the_user_service_manager_from_cron(tmp_path, monkeypatch):
+    """Cron gives no XDG_RUNTIME_DIR; without it `systemctl --user` fails."""
+    from types import SimpleNamespace
+    monkeypatch.setattr(heal, "STATE", tmp_path)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.setattr(heal, "probe", lambda port: port != 3000)
+    monkeypatch.setattr(heal, "send_all", lambda messages: None)
+    seen = []
+
+    def fake_run(cmd, **kw):
+        assert cmd[:2] == ["systemctl", "--user"]
+        seen.append(kw.get("env", {}).get("XDG_RUNTIME_DIR"))
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(heal.subprocess, "run", fake_run)
+    heal.main([])
+    heal.main([])
+    assert seen and seen[0].startswith("/run/user/")

@@ -27,7 +27,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import run
+from . import fixkit, run
 
 CHAT_ID = "7735693897"
 TG_SEND = os.environ.get("WATCHDOG_TG_SEND") or str(run.BASE / "bin" / "tg-send")
@@ -137,7 +137,8 @@ def main(argv=None) -> int:
             messages.append(f"(dry run) would restart {name}: {' '.join(cmd)}")
             continue
         try:
-            rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120).returncode
+            rc = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                                env=fixkit.child_env()).returncode
         except (OSError, subprocess.SubprocessError):
             rc = None
         messages.append(record_restart(new, key, now_epoch, rc == 0))
