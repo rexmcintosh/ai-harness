@@ -11,7 +11,7 @@ Every `tg-send` message is copied to `~/.local/state/alert-watch/inbox/` before 
 
 Merges, reverts and restarts go only through checked helpers (`alertwatch/merge.py`, `alertwatch/restart.py`), which apply the rules at the moment of the action and append to `~/.local/state/alert-watch/actions.jsonl`; the run's deny rules block doing them directly. In `mode = "diagnose"` (the committed default) the run only reads and explains, with an allowlist of read-only tools. `mode = "act"` needs Rex's go and the dated section in `~/.claude/CLAUDE.md` (`alertwatch/README.md`).
 
-It owns `~/.local/state/alert-watch/`. **Secrets, names only:** none of its own. The run inherits the cron environment; `venice-delegate` and `splash_poller/config.py` load their own keys.
+It owns `~/.local/state/alert-watch/`. **Secrets, names only:** none in its own code; its notes go out through the MeetTrack bot token file `~/.config/meettrack/telegram.env` (config `tg_env`), read by `tg-send`. The run inherits the cron environment; `venice-delegate` and `splash_poller/config.py` load their own keys.
 
 ## Success and evidence
 
