@@ -321,7 +321,7 @@ def test_the_main_process_of_a_service_is_never_stopped(tmp_path):
     assert fix_orphans.service_main_pid(50, proc, answer(50, rc=1))     # cannot tell: keep
     assert fix_orphans.service_main_pid(50, proc, answer(""))
     proc = _cgroup(tmp_path, 51, f"{user}/t3code-codex-9.scope")
-    assert not fix_orphans.service_main_pid(51, proc, answer(51))       # a scope is not supervision
+    assert not fix_orphans.service_main_pid(51, proc, answer(929))      # a scope is not supervision
     proc = _cgroup(tmp_path, 52, "/system.slice/codex.service")
     fix_orphans.service_main_pid(52, proc, answer(52))
     assert "--user" not in asked[-1]
@@ -386,3 +386,93 @@ def test_a_process_that_changed_program_before_the_signal_is_left_alone(world):
     finally:
         os.close(fd)
     assert alive(p)
+
+
+def _fake_proc(tmp_path, procs):
+    """procs: {pid: dict(session=, fds={fd: (target, flags)} or None for unreadable)}"""
+    root = tmp_path / "fakeproc"
+    for pid, info in procs.items():
+        d = root / str(pid)
+        (d / "fdinfo").mkdir(parents=True)
+        fields = ["S", "1", "0", str(info["session"])] + ["0"] * 15 + ["100"] + ["0"] * 10
+        (d / "stat").write_text(f"{pid} (x) " + " ".join(fields) + "\n")
+        (d / "fd").mkdir()
+        for fd, (target, flags) in (info.get("fds") or {}).items():
+            os.symlink(target, d / "fd" / str(fd))
+            (d / "fdinfo" / str(fd)).write_text(f"pos:\t0\nflags:\t{flags}\n")
+        if info.get("fds") is None:
+            (d / "fd").chmod(0)
+    return root
+
+
+def test_another_users_process_in_the_same_session_may_be_the_reader(tmp_path):
+    pipe = "pipe:[777]"
+    target = {"session": 40, "fds": {1: (pipe, "01")}}
+    proc = _fake_proc(tmp_path / "a", {10: target, 20: {"session": 99, "fds": None}})
+    try:
+        assert fix_orphans.output_abandoned(10, proc)        # a service in another session
+        (proc / "20" / "fd").chmod(0o700)
+        proc = _fake_proc(tmp_path / "b", {10: target, 20: {"session": 40, "fds": None}})
+        assert not fix_orphans.output_abandoned(10, proc)    # `codex | sudo tee`: keep
+        proc = _fake_proc(tmp_path / "c", {10: {"session": 40, "fds": {1: (pipe, "01"), 5: (pipe, "0")}}})
+        assert not fix_orphans.output_abandoned(10, proc)    # it reads its own pipe
+        proc = _fake_proc(tmp_path / "d", {10: target, 30: {"session": 7, "fds": {0: (pipe, "02")}}})
+        assert not fix_orphans.output_abandoned(10, proc)    # a reader that reads and writes
+    finally:
+        for d in tmp_path.rglob("fd"):
+            d.chmod(0o700)
+
+
+def test_a_process_that_only_calls_itself_codex_is_left_alone(world):
+    p = subprocess.Popen(["codex", "300"], executable="/bin/sleep")
+    world.procs.append(p)
+    world.rows.append((p.pid, "05:10:00", "codex 300"))
+    assert fix_orphans.identity(p.pid)["binary"] == "sleep"
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    assert alive(p) and world.sent == []
+
+
+def test_the_service_around_a_nested_group_is_found(tmp_path):
+    from types import SimpleNamespace
+    asked = []
+
+    def runner(cmd, **kw):
+        asked.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="60\n")
+    user = "/user.slice/user-1000.slice/user@1000.service/app.slice"
+    proc = _cgroup(tmp_path, 60, f"{user}/codex-worker.service/worker")
+    assert fix_orphans.service_main_pid(60, proc, runner)
+    assert asked[-1][1] == "--user" and asked[-1][-1] == "codex-worker.service"
+    proc = _cgroup(tmp_path, 61, f"{user}/t3code-codex-9.scope")
+    assert not fix_orphans.service_main_pid(61, proc, runner)   # user@1000.service's main is 60
+    assert "--user" not in asked[-1] and asked[-1][-1] == "user@1000.service"
+
+
+def test_an_undecided_stop_cut_off_twice_is_still_one_note(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    real_stop = fix_orphans.stop
+
+    def kills_then_dies(fd, *a, **k):
+        real_stop(fd, *a, **k)
+        raise KeyboardInterrupt
+    monkeypatch.setattr(fix_orphans, "stop", kills_then_dies)
+    with pytest.raises(KeyboardInterrupt):
+        fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    p.wait(timeout=5)
+    world.rows.clear()
+    real_save = fixkit.save_state
+    saves = []
+
+    def save_then_die(name, data):
+        saves.append(1)
+        if len(saves) == 2:                      # after the outcome is queued, before clearing
+            raise KeyboardInterrupt
+        real_save(name, data)
+    monkeypatch.setattr(fixkit, "save_state", save_then_die)
+    with pytest.raises(KeyboardInterrupt):
+        fix_orphans.main([])
+    monkeypatch.setattr(fixkit, "save_state", real_save)
+    fix_orphans.main([])
+    fix_orphans.main([])
+    assert len(world.sent) == 1 and "cut off" in world.sent[0]

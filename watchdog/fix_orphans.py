@@ -72,13 +72,23 @@ def identity(pid: int, proc: Path | None = None) -> dict | None:
         uid = (proc / str(pid)).stat().st_uid
     except OSError:
         return None
+    try:
+        # The program file itself, not the argv[0] a process may set as it likes. An
+        # update of Codex while it runs shows as "... (deleted)".
+        binary = _exe_name(os.readlink(proc / str(pid) / "exe").removesuffix(" (deleted)"))
+    except OSError:
+        binary = None
     # The command name in field 2 may hold spaces and ")"; split after the last one.
     rest = stat[stat.rfind(")") + 2:].split()
     try:
         return {"state": rest[0], "ppid": int(rest[1]), "start": int(rest[19]),
-                "exe": _exe_name(argv0.decode(errors="replace")), "uid": uid}
+                "exe": _exe_name(argv0.decode(errors="replace")), "binary": binary, "uid": uid}
     except (IndexError, ValueError):
         return None
+
+
+def _is_codex_name(name: str | None) -> bool:
+    return bool(name) and (name == COMMAND or name.startswith(f"{COMMAND}-"))
 
 
 def is_reaper(ppid: int, proc: Path | None = None) -> bool:
@@ -109,8 +119,8 @@ def still_ours(ident: dict | None, row_exe: str, min_minutes: float) -> bool:
         return False
     if not is_reaper(ident["ppid"]) or ident["uid"] != os.getuid() or ident["exe"] != row_exe:
         return False
-    if ident["exe"] != COMMAND and not ident["exe"].startswith(f"{COMMAND}-"):
-        return False
+    if not _is_codex_name(ident["exe"]) or not _is_codex_name(ident.get("binary")):
+        return False                     # both the name it shows and its program file
     age = age_seconds(ident["start"])
     return age is not None and age >= min_minutes * 60
 
@@ -137,10 +147,14 @@ def service_main_pid(pid: int, proc: Path | None = None, runner=None) -> bool:
     path = next((ln.split(":", 2)[2] for ln in lines if ln.startswith("0::")), None)
     if path is None:
         return True
-    unit = path.rstrip("/").rsplit("/", 1)[-1]
-    if not unit.endswith(".service"):
+    # The nearest enclosing service, also from a nested group (foo.service/worker).
+    parts = [p for p in path.split("/") if p]
+    at = next((i for i in range(len(parts) - 1, -1, -1) if parts[i].endswith(".service")), None)
+    if at is None:
         return False
-    cmd = ["systemctl"] + (["--user"] if "/user@" in path else []) + [
+    unit = parts[at]
+    user_manager = any(p.startswith("user@") and p.endswith(".service") for p in parts[:at])
+    cmd = ["systemctl"] + (["--user"] if user_manager else []) + [
         "show", "-p", "MainPID", "--value", unit]
     try:
         out = runner(cmd, capture_output=True, text=True, timeout=20, env=fixkit.child_env())
@@ -185,12 +199,30 @@ def stop(pidfd: int, term_wait: float | None = None, kill_wait: float | None = N
     return STOPPED if _wait_exit(pidfd, kill_wait) else FAILED
 
 
+def _session(entry: Path) -> int | None:
+    """Field 6 of /proc/<pid>/stat: the session id, readable for every user's process."""
+    try:
+        stat = (entry / "stat").read_text()
+        return int(stat[stat.rfind(")") + 2:].split()[3])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def output_abandoned(pid: int, proc: Path | None = None) -> bool:
     """The positive sign that nobody waits for the answer: the process writes its output
-    (fd 1) into a pipe, and no other process holds that pipe open for reading. A file,
-    a terminal, /dev/null or a socket is not proof (a deliberately detached run may be
-    writing its result there), so those are False and the process is left alone. A
-    reader that cannot be checked also gives False."""
+    (fd 1) into a pipe, and no process, the target included, holds that pipe open for
+    reading. A file, a terminal, /dev/null or a socket is not proof (a deliberately
+    detached run may be writing its result there), so those are False and the process
+    is left alone.
+
+    Another user's process cannot be looked into. A reader in another user's process
+    comes from the same pipeline (`codex ... | sudo tee`), and a pipeline shares one
+    session; sudo keeps its own process in that session even when it gives the command a
+    new terminal. So a process we cannot read in the target's session, or one whose
+    session we cannot read, means unknown: False. Other users' processes in other
+    sessions (system services, the root cron process that starts this fixer, ssh
+    logins) cannot hold the pipe, except by a deliberate hand-over over a socket, the
+    one case this cannot see."""
     proc = proc or PROC
     try:
         target = os.readlink(proc / str(pid) / "fd" / "1")
@@ -198,16 +230,30 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
         return False
     if not target.startswith("pipe:["):
         return False
+    own_session = _session(proc / str(pid))
+    if own_session is None:
+        return False
     try:
-        entries = [d for d in proc.iterdir() if d.name.isdigit() and d.name != str(pid)]
+        entries = [d for d in proc.iterdir() if d.name.isdigit()]
     except OSError:
         return False
     for entry in entries:
         try:
             fds = list((entry / "fd").iterdir())
+        except FileNotFoundError:
+            continue                             # gone
         except OSError:
-            continue                             # another user's process, or gone
+            session = _session(entry)
+            if session is None:
+                if not entry.exists():
+                    continue                     # gone meanwhile
+                return False                     # unreadable, session unknown: keep
+            if session == own_session:
+                return False                     # unreadable, same pipeline maybe: keep
+            continue
         for fd in fds:
+            if entry.name == str(pid) and fd.name == "1":
+                continue                         # the write end we are asking about
             try:
                 if os.readlink(fd) != target:
                     continue
@@ -259,24 +305,33 @@ def _prune(state: dict, boot: str) -> dict:
     return out
 
 
-def reconcile(state: dict, boot: str, now_epoch: float, waiting: list) -> list:
-    """Stops that were cut off before their outcome was cleared: report each once. Runs
-    before the outbox is flushed, so a note already queued (`waiting`) is not repeated."""
-    notes = []
-    for key, info in sorted(state["pending"].items()):
+def decide_pending(state: dict, boot: str, now_epoch: float) -> bool:
+    """Give each stop that was cut off before its outcome an outcome now. True when
+    anything changed (the caller saves before it queues, so this runs once)."""
+    changed = False
+    for key, info in state["pending"].items():
+        if isinstance(info, dict) and "outcome" in info:
+            continue
         info = info if isinstance(info, dict) else {}
         what = info.get("what", key)
-        if "outcome" in info:
-            if info["outcome"] and info["outcome"] not in waiting:
-                notes.append(info["outcome"])        # decided, but cut off before queueing
-        elif _key_alive(key, boot):
+        if _key_alive(key, boot):
             state["tried"][key] = state["tried"].get(key, now_epoch)
             state["reported"][key] = now_epoch
-            notes.append(f"PROBLEM: a leftover Codex process is still running after I tried to "
-                         f"stop it ({what}). It needs a look.")
+            info["outcome"] = (f"PROBLEM: a leftover Codex process is still running after I "
+                               f"tried to stop it ({what}). It needs a look.")
         else:
-            notes.append(f"STOPPED: a leftover Codex process that nothing was waiting for is gone "
-                         f"({what}). I was cut off before I could confirm it myself.")
+            info["outcome"] = (f"STOPPED: a leftover Codex process that nothing was waiting for "
+                               f"is gone ({what}). I was cut off before I could confirm it myself.")
+        state["pending"][key] = info
+        changed = True
+    return changed
+
+
+def reconcile(state: dict, waiting: list) -> list:
+    """The notes of decided pending stops that are not already in the outbox. Runs before
+    the outbox is flushed, so a note queued just before a crash is never repeated."""
+    notes = [info["outcome"] for _, info in sorted(state["pending"].items())
+             if info.get("outcome") and info["outcome"] not in waiting]
     state["pending"] = {}
     return notes
 
@@ -318,9 +373,12 @@ def main(argv=None) -> int:
     state = _prune(fixkit.load_state(NAME), boot)
     if not args.dry_run:
         if state["pending"]:
-            # Before the flush: a note queued just before a crash is still in the outbox.
-            waiting = fixkit._read_outbox("orphans-outbox")
-            fixkit.queue(reconcile(state, boot, now_epoch, waiting), "orphans-outbox")
+            # Decide and save first, then queue what is not already waiting, then clear.
+            # This runs before the flush, so a note queued before a crash is still in
+            # the outbox and is not queued twice.
+            if decide_pending(state, boot, now_epoch):
+                fixkit.save_state(NAME, state)
+            fixkit.queue(reconcile(state, fixkit._read_outbox("orphans-outbox")), "orphans-outbox")
             fixkit.save_state(NAME, state)
         fixkit.flush("orphans-outbox")   # a pause stops actions, not earlier reports
     if fixkit.paused(now_epoch):
