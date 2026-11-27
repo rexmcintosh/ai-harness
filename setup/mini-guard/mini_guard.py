@@ -413,6 +413,9 @@ def heartbeat(cfg: dict, opener=urllib.request.urlopen) -> None:
     token = cfg.get("healthcheck_token")
     data = None
     if token:
+        if not url.startswith("https://"):
+            log("heartbeat skipped: healthcheck_token needs an https:// healthcheck_url")
+            return
         headers["Authorization"] = f"Bearer {token}"
         data = b""
     req = urllib.request.Request(url, data=data, headers=headers)

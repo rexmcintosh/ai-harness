@@ -330,3 +330,5 @@ def test_heartbeat_sends_own_client_name(tmp_path, monkeypatch):
     g.heartbeat({"healthcheck_url": "https://example.test/ping/x", "healthcheck_token": "t0k"}, opener=opener)
     assert seen["auth"] == "Bearer t0k" and seen["method"] == "POST" and seen["url"].endswith("/ping/x")
     g.heartbeat({}, opener=lambda *a, **k: 1 / 0)      # no URL: nothing sent
+    g.heartbeat({"healthcheck_url": "http://example.test/p", "healthcheck_token": "t"},
+                opener=lambda *a, **k: 1 / 0)          # never send the secret over plain http
