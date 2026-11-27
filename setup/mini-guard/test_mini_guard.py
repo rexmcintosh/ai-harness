@@ -309,3 +309,20 @@ def test_bad_pause_file_is_removed_not_fatal(bad):
     paused, note = g.pause_state(clock["t"])
     assert paused is False
     assert not (g.STATE_DIR / "pause.json").exists()
+
+
+def test_heartbeat_sends_own_client_name(tmp_path, monkeypatch):
+    # Cloudflare answers 403 (error 1010) to Python's default User-Agent.
+    monkeypatch.setattr(g, "STATE_DIR", tmp_path)
+    seen = {}
+
+    class Reply:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def opener(req, timeout):
+        seen["ua"], seen["url"] = req.get_header("User-agent"), req.full_url
+        return Reply()
+    g.heartbeat({"healthcheck_url": "https://example.test/ping/x"}, opener=opener)
+    assert seen == {"ua": "mini-guard/1", "url": "https://example.test/ping/x"}
+    g.heartbeat({}, opener=lambda *a, **k: 1 / 0)      # no URL: nothing sent

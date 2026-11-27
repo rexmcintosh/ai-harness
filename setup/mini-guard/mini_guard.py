@@ -406,11 +406,13 @@ def heartbeat(cfg: dict, opener=urllib.request.urlopen) -> None:
     url = cfg.get("healthcheck_url")
     if not url:
         return
+    # Cloudflare refuses Python's default client name (error 1010), so send our own.
+    req = urllib.request.Request(url, headers={"User-Agent": "mini-guard/1"})
     try:
-        with opener(url, timeout=10):
+        with opener(req, timeout=10):
             pass
     except Exception as e:
-        log(f"heartbeat failed: {e.__class__.__name__}")
+        log(f"heartbeat failed: {e.__class__.__name__} {getattr(e, 'code', '')}".rstrip())
 
 
 # ---------------------------------------------------------------- commands
