@@ -54,6 +54,12 @@ only; see [MESH-ONLY-LOCKDOWN.md](MESH-ONLY-LOCKDOWN.md)).
 | Backups | `restic-offsite.timer`, daily 03:30 | |
 | Cron jobs | `crontab -l` (about 25 lines). Debian cron ignores `CRON_TZ`; all times are server time, Europe/Lisbon. | |
 
+## Service keys on the VM
+
+| Key | Where | Use |
+| --- | --- | --- |
+| App Store Connect API (team key `M59TFWW762`, App Manager, added 2026-11-27) | `~/.appstoreconnect/private_keys/AuthKey_M59TFWW762.p8` (600); key and issuer ids in `~/.appstoreconnect/config.env` | MeetTrack store page: text, screenshots, build choice, review notes. Helpers in `~/.appstoreconnect/tools/` (`asc.py` signs each call; `fill_text.py` reads `splash_poller/ios/APP_STORE.md`; `upload_shots.py`). Submitting for review stays Rex's step. |
+
 ## Memory
 
 - 12 GiB RAM, 4 GiB swapfile. Out-of-memory stops happened often in November.
