@@ -133,3 +133,17 @@ def test_a_scheduled_run_that_finishes_before_the_lock_stops_the_rerun(world):
     assert world.sent == [] and "fix-jobs-rerun" not in world.log.read_text()
     marks = world.cfg.state_dir / "reruns.json"
     assert not marks.exists() or "coverage_check" not in marks.read_text()
+
+
+def test_a_rerun_cut_off_by_a_crash_is_reported_next_pass(world):
+    world.log.write_text(line(time.time() - 39 * 3600))
+
+    def dies(cfg, job, **kw):
+        kw["started"].append(True)
+        raise KeyboardInterrupt                  # the fixer is killed while the job runs
+    with pytest.raises(KeyboardInterrupt):
+        fix_jobs.main([], rerun=dies, cfg=world.cfg)
+    assert world.sent == []
+    go(world)
+    assert world.sent and world.sent[0].startswith("PROBLEM: I started a rerun of coverage_check")
+    assert fixkit.load_state("jobs").get("pending") == {}

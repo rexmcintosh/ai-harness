@@ -78,6 +78,18 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
         rerun = rerun or rerun_mod.rerun
         cfg = cfg or load_config()
     messages = []
+    state = fixkit.load_state(NAME)
+    pending = dict(state.get("pending") or {})
+    if not args.dry_run and pending:
+        # A rerun this fixer started, whose outcome it never recorded (it was stopped).
+        for job, info in pending.items():
+            at = time.strftime("%H:%M", time.localtime(float(info.get("at", 0))))
+            messages.append(f"PROBLEM: I started a rerun of {job} at {at}, but I was stopped "
+                            f"before it finished. Check its log: {info.get('log')}")
+        fixkit.queue(messages, "jobs-outbox")
+        messages = []
+        pending = {}
+        fixkit.save_state(NAME, {**state, "pending": pending})
     for label, job in JOBS.items():
         if job not in cfg.rerun:
             continue
@@ -89,11 +101,15 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
             messages.append(f"(dry run) would rerun {job}: {_what(status)}")
             continue
         started: list = []
+        pending[job] = {"at": time.time(), "log": str(path)}
+        fixkit.save_state(NAME, {**state, "pending": pending})      # before the rerun
         # Asked again under the job's lock: a scheduled run may have finished meanwhile.
         still = lambda: missed(label, _read(path), time.time()) is not None
         rc = rerun(cfg, job, source="fix-jobs-rerun", started=started, precheck=still)
         if not started:
-            continue                  # rerun already used in the last 6 h, or running now
+            pending.pop(job, None)    # rerun already used in the last 6 h, or running now
+            fixkit.save_state(NAME, {**state, "pending": pending})
+            continue
         text = _read(path) or ""
         clean = run.cron_log_status(label, text)
         after = run.cron_status(label, text, time.time())
@@ -105,10 +121,14 @@ def main(argv=None, *, rerun=None, cfg=None) -> int:
         else:
             messages.append(f"PROBLEM: {_what(status)}. I ran it once (exit {rc}), and its check "
                             f"still fails: {after.summary}. Log: {path}")
+        fixkit.queue(messages, "jobs-outbox")       # queue, then clear the pending mark
+        messages = []
+        pending.pop(job, None)
+        fixkit.save_state(NAME, {**state, "pending": pending})
     if args.dry_run:
         print("\n".join(messages) or "nothing to do")
         return 0
-    fixkit.send_all(messages, "jobs-outbox")
+    fixkit.flush("jobs-outbox")
     return 0
 
 

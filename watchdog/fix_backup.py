@@ -32,7 +32,7 @@ NAME = "backup"
 UNIT = "restic-offsite.service"
 COOLDOWN_S = 6 * 3600
 SETTLE_S = 10 * 60        # a start that never shows as running counts as ended after this
-RUNNING = ("active", "activating", "deactivating", "reloading", "refreshing")
+IDLE = ("inactive", "failed")     # any other answer ("unknown", an error) means: do nothing
 STATE_DIR = Path(os.environ.get("RESTIC_OFFSITE_STATE")
                  or Path.home() / ".local" / "state" / "restic-offsite")
 
@@ -49,8 +49,8 @@ def decide(check, unit_state: str, run_status: dict, state: dict, now_epoch: flo
         new.pop("started_at", None)
         new.pop("reported", None)
         return new, False, ["FIXED: the off-site backup passed its check again."] if started else []
-    if unit_state in RUNNING:
-        return new, False, []
+    if unit_state not in IDLE:
+        return new, False, []         # running, or a state we cannot trust
     if started and not new.get("reported") and now_epoch - started >= SETTLE_S:
         stage = run_status.get("failed_stage") or run_status.get("stage") or "unknown"
         new["reported"] = now_epoch

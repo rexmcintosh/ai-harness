@@ -305,6 +305,9 @@ def main(argv=None) -> int:
             messages.append(f"PROBLEM: the server disk is still {after}% full after cleanup. "
                             "The big items left need your call: "
                             + "; ".join(left_for_rex(in_use, now_epoch)) + ".")
+    if not args.dry_run:
+        fixkit.queue(messages, "cleanup-outbox")    # before any later state save
+        messages = []
     free = mac_free_gb()
     mac_cooled = now_epoch - float(state.get("mac_last_run", 0)) >= COOLDOWN_S
     if free is not None and (args.dry_run or (free < MAC_TRIGGER_GB and mac_cooled)):

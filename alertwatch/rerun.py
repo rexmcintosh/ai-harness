@@ -111,7 +111,14 @@ def rerun(cfg: Config, name: str, *, now: Callable[[], float] = time.time,
                 give_back()
                 print(f"rerun {name}: lock busy (the job is running now); not counted")
                 return 1
-        if precheck is not None and not precheck():
+        try:
+            needed = precheck is None or precheck()
+        except BaseException:
+            if held:
+                held.close()
+            give_back()
+            raise
+        if not needed:
             if held:
                 held.close()
                 held = None

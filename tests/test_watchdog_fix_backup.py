@@ -131,3 +131,11 @@ def test_crash_during_the_start_still_counts_it(tmp_path, monkeypatch):
     assert state.get("last_start") == NOW and state.get("started_at") == NOW
     _, start, _ = fix_backup.decide(fix_backup.check_backup(None, NOW), "inactive", {}, state, NOW + 60)
     assert not start
+
+
+def test_an_unknown_service_state_starts_nothing():
+    for state in ("unknown", "Failed to connect to bus", "activating", "active"):
+        _, start, msgs = fix_backup.decide(OLD, state, {}, {}, NOW)
+        assert not start and msgs == []
+    _, start, _ = fix_backup.decide(OLD, "failed", {}, {}, NOW)
+    assert start
