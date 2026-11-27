@@ -99,8 +99,8 @@ def test_bad_action_rejected(tmp_path):
 
 def test_no_ai_fixer_success_notes_are_ignored_and_problems_looked_at():
     for src in ("python3 watchdog.fix_backup < CRON", "python3 watchdog.fix_jobs < sh < CRON",
-                "python3 watchdog.cleanup < CRON"):
-        for word in ("FIXED", "STARTED", "RERAN", "CLEANED"):
+                "python3 watchdog.cleanup < CRON", "python3 watchdog.fix_orphans < CRON"):
+        for word in ("FIXED", "STARTED", "RERAN", "CLEANED", "STOPPED"):
             assert classify(entry(src, f"{word}: done"), RULES)[0] == "ignore", (src, word)
         assert classify(entry(src, "PROBLEM: it needs a look"), RULES)[0] == "look"
     # The rerun job's own messages are not the fixer's notes.

@@ -45,8 +45,8 @@ text = "^(FIXED|RESTARTED): "
 [[rule]]
 name = "fixers-done"
 action = "ignore"
-source = "watchdog\\.(fix_backup|fix_jobs|cleanup)|(fix_backup|fix_jobs|cleanup)\\.py"
-text = "^(FIXED|STARTED|RERAN|CLEANED): "
+source = "watchdog\\.(fix_backup|fix_jobs|fix_orphans|cleanup)|(fix_backup|fix_jobs|fix_orphans|cleanup)\\.py"
+text = "^(FIXED|STARTED|RERAN|CLEANED|STOPPED): "
 
 # The Monday all-well line (watchdog/weekly.py). Its problems are already raised by
 # the watchdog's own checks, so the summary itself is never a report.

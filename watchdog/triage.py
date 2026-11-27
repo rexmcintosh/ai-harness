@@ -168,9 +168,55 @@ def _age(minutes: int) -> str:
     return f"{minutes}m"
 
 
+def is_user_manager(args: str) -> bool:
+    """`systemd --user`: the per-user service manager, a child subreaper."""
+    parts = args.split()
+    return bool(parts) and parts[0].rsplit("/", 1)[-1] == "systemd" and "--user" in parts[1:]
+
+
+def reaper_pids(ps_output: str) -> set[str]:
+    """PIDs that adopt a process whose parent died: init (1), and each `systemd --user`.
+    On this VM, T3 and its sessions run under the user manager, so a Codex run left
+    behind by one of them gets the user manager as its parent, not PID 1."""
+    out = {"1"}
+    for line in ps_output.splitlines():
+        row = _PS_ROW.match(line)
+        if row and is_user_manager(row["args"]):
+            out.add(row["pid"])
+    return out
+
+
+def orphan_rows(ps_output: str, *, min_minutes: int,
+                command: str = "codex") -> list[tuple[int, str, str]]:
+    """`(minutes, pid, args)` for each `command` process (or `command-*` helper) whose
+    parent is a reaper (see ``reaper_pids``) and that has run at least ``min_minutes``.
+    An unreadable ELAPSED field gives minutes -1 and is kept, so the check can report
+    it; the fixer skips it. Shared by check_orphan_processes and watchdog.fix_orphans."""
+    reapers = reaper_pids(ps_output)
+    found: list[tuple[int, str, str]] = []
+    for line in ps_output.splitlines():
+        row = _PS_ROW.match(line)
+        if not row or row["ppid"] not in reapers:
+            continue
+        args = row["args"].strip()
+        executable = args.split()[0].rsplit("/", 1)[-1]
+        # `codex` and its helpers (`codex-code-mode`), but not unrelated
+        # neighbours like `codexctl` or `codexd`.
+        if executable != command and not executable.startswith(f"{command}-"):
+            continue
+        minutes = _etime_minutes(row["etime"])
+        if minutes is not None and minutes < min_minutes:
+            continue
+        # An unreadable ELAPSED field is reported, not dropped: an orphan that
+        # `ps` prints oddly would otherwise stay invisible forever.
+        found.append((minutes if minutes is not None else -1, row["pid"], args))
+    return found
+
+
 def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
                            command: str = "codex") -> CheckStatus:
-    """Leaked `codex` processes: reparented to init (PPID 1) and still running.
+    """Leaked `codex` processes: reparented to init (PPID 1) or to the user's
+    `systemd --user` manager, and still running.
 
     The Codex CLI on PATH is a Node wrapper around a native binary. When the
     calling session dies, or a helper's timeout kills the wrapper, the native
@@ -180,27 +226,11 @@ def check_orphan_processes(ps_output: str, *, min_hours: int = 6,
     warn — one or more orphans at or past ``min_hours``.
     ok   — none, or ``ps`` produced nothing usable (never invent a failure).
 
-    Report only. Killing a process is the operator's call, per the watchdog's
-    no-remediation rule.
+    The check only reports. `watchdog.fix_orphans` stops these sooner (after 3
+    hours), so this warning means the fixer missed one or could not stop it.
     """
     name = f"proc:{command}-orphans" if command != "codex" else "proc:orphans"
-    found: list[tuple[int, str, str]] = []
-    for line in ps_output.splitlines():
-        row = _PS_ROW.match(line)
-        if not row or row["ppid"] != "1":
-            continue
-        args = row["args"].strip()
-        executable = args.split()[0].rsplit("/", 1)[-1]
-        # `codex` and its helpers (`codex-code-mode`), but not unrelated
-        # neighbours like `codexctl` or `codexd`.
-        if executable != command and not executable.startswith(f"{command}-"):
-            continue
-        minutes = _etime_minutes(row["etime"])
-        if minutes is not None and minutes < min_hours * 60:
-            continue
-        # An unreadable ELAPSED field is reported, not dropped: an orphan that
-        # `ps` prints oddly would otherwise stay invisible forever.
-        found.append((minutes if minutes is not None else -1, row["pid"], args))
+    found = orphan_rows(ps_output, min_minutes=min_hours * 60, command=command)
 
     if not found:
         return CheckStatus(name, "ok", f"no orphaned {command} processes")

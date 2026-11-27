@@ -512,7 +512,7 @@ def collect(now_epoch: int, prior_metrics: dict | None = None) -> tuple[list[Che
     for unit in SERVICES:
         out.append(check_service_active(unit, _cmd(["systemctl", "is-active", unit])))
 
-    out.append(check_orphan_processes(_cmd(["ps", "-eo", "pid,ppid,etime,args"])))
+    out.append(check_orphan_processes(_cmd(["ps", "-ww", "-eo", "pid,ppid,etime,args"])))
 
     found, missing = [], []
     for label, path in CRON_LOGS:

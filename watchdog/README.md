@@ -267,7 +267,7 @@ The watchdog itself only reports. Next to it, small fixers act on the cases wher
 fix is known, safe and undone on its own. Each one acts at most once per cooldown,
 honours the pause file `~/.local/state/heal/pause` (planned work; removed after 2
 hours), keeps its own lock, state and outbox in `~/.local/state/heal/`, and sends one
-line per action: a success word (FIXED, RESTARTED, STARTED, RERAN, CLEANED), which
+line per action: a success word (FIXED, RESTARTED, STARTED, RERAN, CLEANED, STOPPED), which
 alert-watch ignores, or PROBLEM, which alert-watch looks at. Each has `--dry-run`.
 
 | Fixer | Cron | Acts when | Does |
@@ -275,6 +275,7 @@ alert-watch ignores, or PROBLEM, which alert-watch looks at. Each has `--dry-run
 | `watchdog.heal` | every 5 min | a service runs but gives no HTTP answer twice | restarts it once per 6 h (never T3) |
 | `watchdog.fix_backup` | every 15 min | no verified off-site backup for 30 h (`check_backup`) and none running | starts one backup run per 6 h; after a PROBLEM, nothing until a backup passes |
 | `watchdog.fix_jobs` | every 15 min | a job in `fix_jobs.JOBS` has a run too old with a clean log (a missed run) | reruns it once through `alertwatch.rerun.rerun()`, sharing alert-watch's 6-hour mark |
+| `watchdog.fix_orphans` | :10 and :40 | a `codex` process with PPID 1 (nothing waits for it) has run 3 h | stops it (TERM, then KILL) through a pidfd after re-checking it is the same process; once per process; never anything not named `codex`/`codex-*` |
 | `watchdog.cleanup` | hourly | server disk 80% full, Mac under 15 GB free | removes the explicit list in its docstring; still 85% after that: one PROBLEM a day naming what is left (idle `node_modules` too, never removed automatically) |
 
 The restic runner also clears stale repository locks before each backup
@@ -287,6 +288,7 @@ Cron lines (add by editing the crontab as a file, never through a pipe):
 */15 * * * * cd /home/dev/projects/ai-harness && /usr/bin/python3 -m watchdog.fix_backup >> watchdog/logs/fix_backup.cron.log 2>&1
 */15 * * * * cd /home/dev/projects/ai-harness && /usr/bin/python3 -m watchdog.fix_jobs >> watchdog/logs/fix_jobs.cron.log 2>&1
 23 * * * *   cd /home/dev/projects/ai-harness && /usr/bin/python3 -m watchdog.cleanup >> watchdog/logs/cleanup.cron.log 2>&1
+10,40 * * * * cd /home/dev/projects/ai-harness && /usr/bin/python3 -m watchdog.fix_orphans >> watchdog/logs/fix_orphans.cron.log 2>&1
 ```
 
 ## Architecture
