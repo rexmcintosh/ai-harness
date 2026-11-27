@@ -14,8 +14,8 @@ Rules:
 - Positive proof that nobody waits: its output (fd 1) is a pipe that no process holds
   open for reading. Output to a file, a terminal, /dev/null or a socket may be a
   deliberately detached run, so it is left alone (the watchdog still reports it).
-- Never the main process of a systemd service: that one is supervised, not left
-  behind. When the service answer cannot be read, nothing is signalled.
+- Never a process inside a systemd service (its main process or a worker it started):
+  systemd still answers for it. T3 sessions run in scopes, not services.
 - Only after 3 hours, so the fixer acts well before the watchdog warns at 6 hours.
 - Identity is pinned before any signal: a pidfd is opened, then /proc/<pid>/stat is
   read again for an adopting parent (init, or Rex's own user manager), the same start
@@ -30,6 +30,9 @@ Rules:
   prompt.
 - Never while the pause file exists (planned work). Child processes that Codex itself
   started are not touched.
+- Limit: a lost reader proves nobody gets the answer, not that the run has no other
+  useful effect (files it writes). The 3-hour wait is the guard for that; a run meant
+  to outlive its caller should write its output to a file, which keeps it safe here.
 
     python3 -m watchdog.fix_orphans            # check and act (cron, :10 and :40)
     python3 -m watchdog.fix_orphans --dry-run  # print what it would do
@@ -41,7 +44,6 @@ import argparse
 import os
 import select
 import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -133,13 +135,13 @@ def boot_id(proc: Path | None = None) -> str:
         return "noboot"
 
 
-def service_main_pid(pid: int, proc: Path | None = None, runner=None) -> bool:
-    """True when systemd runs this process as the main process of a service, so it is
-    supervised, not left behind. An unreadable answer also counts as True: when in
-    doubt, nothing is signalled. A process in a scope, or one left in a service it is
-    not the main process of (a T3 session's leftover in t3code.service), is False."""
+def in_service(pid: int, proc: Path | None = None) -> bool:
+    """True when the process lives inside a systemd service, the user manager itself
+    aside: a service's main process or a worker it started, so systemd still answers
+    for it, and it is left alone. An unreadable group also counts as True. A Codex run
+    left behind by a T3 session lives in a t3code-*.scope (a scope is not a service),
+    so it is False and may be stopped."""
     proc = proc or PROC
-    runner = runner or subprocess.run
     try:
         lines = (proc / str(pid) / "cgroup").read_text().splitlines()
     except OSError:
@@ -147,23 +149,8 @@ def service_main_pid(pid: int, proc: Path | None = None, runner=None) -> bool:
     path = next((ln.split(":", 2)[2] for ln in lines if ln.startswith("0::")), None)
     if path is None:
         return True
-    # The nearest enclosing service, also from a nested group (foo.service/worker).
-    parts = [p for p in path.split("/") if p]
-    at = next((i for i in range(len(parts) - 1, -1, -1) if parts[i].endswith(".service")), None)
-    if at is None:
-        return False
-    unit = parts[at]
-    user_manager = any(p.startswith("user@") and p.endswith(".service") for p in parts[:at])
-    cmd = ["systemctl"] + (["--user"] if user_manager else []) + [
-        "show", "-p", "MainPID", "--value", unit]
-    try:
-        out = runner(cmd, capture_output=True, text=True, timeout=20, env=fixkit.child_env())
-    except (OSError, subprocess.SubprocessError):
-        return True
-    answer = (out.stdout or "").strip()
-    if out.returncode != 0 or not answer.isdigit():
-        return True
-    return int(answer) == pid
+    return any(part.endswith(".service") and not part.startswith("user@")
+               for part in path.split("/"))
 
 
 def _wait_exit(pidfd: int, seconds: float) -> bool:
@@ -199,13 +186,61 @@ def stop(pidfd: int, term_wait: float | None = None, kill_wait: float | None = N
     return STOPPED if _wait_exit(pidfd, kill_wait) else FAILED
 
 
-def _session(entry: Path) -> int | None:
-    """Field 6 of /proc/<pid>/stat: the session id, readable for every user's process."""
+PIPE_MARGIN_S = 60       # a pipe is made, and its reader started, just before its writer
+
+
+def _stat_fields(entry: Path) -> list | None:
     try:
         stat = (entry / "stat").read_text()
-        return int(stat[stat.rfind(")") + 2:].split()[3])
-    except (OSError, ValueError, IndexError):
+    except OSError:
         return None
+    return stat[stat.rfind(")") + 2:].split()
+
+
+def _ancestors() -> set:
+    """This fixer and the processes that started it (cron's own root process too)."""
+    out, pid = set(), os.getpid()
+    while pid > 1 and str(pid) not in out:
+        out.add(str(pid))
+        fields = _stat_fields(PROC / str(pid))
+        try:
+            pid = int(fields[1])
+        except (TypeError, ValueError, IndexError):
+            break
+    return out
+
+
+def _hidden_cannot_hold(pid: str, oldest_holder: int, proc: Path, mine: set, memo: dict,
+                        depth: int = 0) -> bool:
+    """True when a process we cannot look into cannot hold a pipe made at
+    `oldest_holder`: a kernel thread, this fixer or one of its parents, a process older
+    than the pipe, or a newer one whose parent cannot hold it either (fds are inherited
+    from the parent: a root cron or sshd child of an old daemon). A newer one adopted by
+    init (it may have inherited the pipe, then detached) or started by a process we can
+    read (`sudo` from a shell) may hold it: False. Unknown also gives False."""
+    if pid in memo:
+        return memo[pid]
+    memo[pid] = False                            # a loop or a deep chain: unknown
+    fields = _stat_fields(proc / pid)
+    if fields is None or depth > 64:
+        return False
+    try:
+        ppid, flags, started = fields[1], int(fields[6]), int(fields[19])
+    except (ValueError, IndexError):
+        return False
+    if ppid in ("0", "2") or flags & 0x00200000 or pid in mine or started < oldest_holder:
+        memo[pid] = True
+    elif ppid != "1" and not _readable_fds(proc / ppid):
+        memo[pid] = _hidden_cannot_hold(ppid, oldest_holder, proc, mine, memo, depth + 1)
+    return memo[pid]
+
+
+def _readable_fds(entry: Path) -> bool:
+    try:
+        next(iter((entry / "fd").iterdir()), None)
+        return True
+    except OSError:
+        return False
 
 
 def output_abandoned(pid: int, proc: Path | None = None) -> bool:
@@ -215,14 +250,13 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
     detached run may be writing its result there), so those are False and the process
     is left alone.
 
-    Another user's process cannot be looked into. A reader in another user's process
-    comes from the same pipeline (`codex ... | sudo tee`), and a pipeline shares one
-    session; sudo keeps its own process in that session even when it gives the command a
-    new terminal. So a process we cannot read in the target's session, or one whose
-    session we cannot read, means unknown: False. Other users' processes in other
-    sessions (system services, the root cron process that starts this fixer, ssh
-    logins) cannot hold the pipe, except by a deliberate hand-over over a socket, the
-    one case this cannot see."""
+    Another user's process cannot be looked into. A process gets the pipe from its
+    parent when it starts (a pipeline such as `codex ... | sudo tee`, even if it later
+    moves to a new session), so only after the pipe was made, which is about when the
+    target started. See _hidden_cannot_hold for which hidden processes are cleared;
+    any other one means unknown: False. A pipe handed to a process over a socket is the
+    one case this cannot see. Any descriptor that cannot be read while it still exists
+    also means unknown: False."""
     proc = proc or PROC
     try:
         target = os.readlink(proc / str(pid) / "fd" / "1")
@@ -230,9 +264,13 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
         return False
     if not target.startswith("pipe:["):
         return False
-    own_session = _session(proc / str(pid))
-    if own_session is None:
+    fields = _stat_fields(proc / str(pid))
+    try:
+        oldest_holder = int(fields[19]) - PIPE_MARGIN_S * os.sysconf("SC_CLK_TCK")
+    except (TypeError, ValueError, IndexError):
         return False
+    mine = _ancestors() if proc == PROC else set()
+    memo: dict = {}
     try:
         entries = [d for d in proc.iterdir() if d.name.isdigit()]
     except OSError:
@@ -243,13 +281,10 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
         except FileNotFoundError:
             continue                             # gone
         except OSError:
-            session = _session(entry)
-            if session is None:
+            if not _hidden_cannot_hold(entry.name, oldest_holder, proc, mine, memo):
                 if not entry.exists():
                     continue                     # gone meanwhile
-                return False                     # unreadable, session unknown: keep
-            if session == own_session:
-                return False                     # unreadable, same pipeline maybe: keep
+                return False                     # unreadable, could be the reader: keep
             continue
         for fd in fds:
             if entry.name == str(pid) and fd.name == "1":
@@ -257,8 +292,14 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
             try:
                 if os.readlink(fd) != target:
                     continue
-            except OSError:
+            except FileNotFoundError:
                 continue                         # closed meanwhile
+            except OSError:
+                # Listed but not readable (the user manager is like this): judge the
+                # process as a hidden one.
+                if _hidden_cannot_hold(entry.name, oldest_holder, proc, mine, memo):
+                    break
+                return False                     # still there, unreadable, could hold it
             try:
                 info = (entry / "fdinfo" / fd.name).read_text()
                 flags = int(next(ln for ln in info.splitlines() if ln.startswith("flags:")).split()[1], 8)
@@ -343,7 +384,7 @@ def eligible(pid: int, row_exe: str, min_minutes: float) -> dict | None:
     ident = identity(pid)
     if not still_ours(ident, row_exe, min_minutes):
         return None
-    if service_main_pid(pid) or not output_abandoned(pid):
+    if in_service(pid) or not output_abandoned(pid):
         return None
     return ident
 

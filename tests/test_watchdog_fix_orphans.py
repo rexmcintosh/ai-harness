@@ -31,7 +31,7 @@ def world(tmp_path, monkeypatch):
     rows = []
     monkeypatch.setattr(run, "_cmd", lambda args: "    PID    PPID     ELAPSED COMMAND\n"
                         + "".join(f"{pid} 1 {etime} {cmd}\n" for pid, etime, cmd in rows))
-    monkeypatch.setattr(fix_orphans, "service_main_pid", lambda pid: False)
+    monkeypatch.setattr(fix_orphans, "in_service", lambda pid: False)
     monkeypatch.setattr(fix_orphans, "output_abandoned", lambda pid: True)
     real_identity = fix_orphans.identity
     # The decoy's parent is the test; report it as reparented to init, nothing else changed.
@@ -303,35 +303,23 @@ def _cgroup(tmp_path, pid, path):
     return tmp_path / "proc"
 
 
-def test_the_main_process_of_a_service_is_never_stopped(tmp_path):
-    from types import SimpleNamespace
+def test_anything_inside_a_service_is_never_stopped(tmp_path):
     user = "/user.slice/user-1000.slice/user@1000.service/app.slice"
-    asked = []
-
-    def answer(main_pid, rc=0):
-        def runner(cmd, **kw):
-            asked.append(cmd)
-            return SimpleNamespace(returncode=rc, stdout=f"{main_pid}\n")
-        return runner
-    proc = _cgroup(tmp_path, 50, f"{user}/codex-worker.service")
-    assert fix_orphans.service_main_pid(50, proc, answer(50))           # supervised
-    assert asked[-1] == ["systemctl", "--user", "show", "-p", "MainPID", "--value",
-                         "codex-worker.service"]
-    assert not fix_orphans.service_main_pid(50, proc, answer(1147))     # left in t3code.service
-    assert fix_orphans.service_main_pid(50, proc, answer(50, rc=1))     # cannot tell: keep
-    assert fix_orphans.service_main_pid(50, proc, answer(""))
-    proc = _cgroup(tmp_path, 51, f"{user}/t3code-codex-9.scope")
-    assert not fix_orphans.service_main_pid(51, proc, answer(929))      # a scope is not supervision
-    proc = _cgroup(tmp_path, 52, "/system.slice/codex.service")
-    fix_orphans.service_main_pid(52, proc, answer(52))
-    assert "--user" not in asked[-1]
-    assert fix_orphans.service_main_pid(4242, proc, answer(0))         # unreadable cgroup: keep
+    for pid, path, inside in [
+            (50, f"{user}/codex-worker.service", True),             # a service's main process
+            (51, f"{user}/codex-worker.service/worker", True),      # a worker it started
+            (52, "/system.slice/codex.service", True),
+            (53, f"{user}/t3code.service", True),                   # left in T3's own group
+            (54, f"{user}/app-t3code.slice/t3code-codex-9.scope", False),   # a T3 session
+            (55, "/user.slice/user-1000.slice/session-4.scope", False)]:    # an ssh login
+        assert fix_orphans.in_service(pid, _cgroup(tmp_path, pid, path)) is inside, path
+    assert fix_orphans.in_service(4242, tmp_path / "proc")                 # unreadable: keep
 
 
 def test_a_supervised_codex_is_left_alone(world, monkeypatch):
     p = world.start()
     world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
-    monkeypatch.setattr(fix_orphans, "service_main_pid", lambda pid: True)
+    monkeypatch.setattr(fix_orphans, "in_service", lambda pid: True)
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     assert alive(p) and world.sent == []
 
@@ -389,12 +377,14 @@ def test_a_process_that_changed_program_before_the_signal_is_left_alone(world):
 
 
 def _fake_proc(tmp_path, procs):
-    """procs: {pid: dict(session=, fds={fd: (target, flags)} or None for unreadable)}"""
+    """procs: {pid: dict(ppid=, start=, flags=, fds={fd: (target, flags)} or None)}.
+    fds None means another user's process: its fd directory cannot be read."""
     root = tmp_path / "fakeproc"
     for pid, info in procs.items():
         d = root / str(pid)
         (d / "fdinfo").mkdir(parents=True)
-        fields = ["S", "1", "0", str(info["session"])] + ["0"] * 15 + ["100"] + ["0"] * 10
+        fields = (["S", str(info.get("ppid", 1)), "0", "0", "0", "0", str(info.get("flags", 0))]
+                  + ["0"] * 12 + [str(info.get("start", 100))] + ["0"] * 10)
         (d / "stat").write_text(f"{pid} (x) " + " ".join(fields) + "\n")
         (d / "fd").mkdir()
         for fd, (target, flags) in (info.get("fds") or {}).items():
@@ -405,22 +395,35 @@ def _fake_proc(tmp_path, procs):
     return root
 
 
-def test_another_users_process_in_the_same_session_may_be_the_reader(tmp_path):
-    pipe = "pipe:[777]"
-    target = {"session": 40, "fds": {1: (pipe, "01")}}
-    proc = _fake_proc(tmp_path / "a", {10: target, 20: {"session": 99, "fds": None}})
+def _unlock(tmp_path):
+    for d in tmp_path.rglob("fd"):
+        d.chmod(0o700)
+
+
+def test_a_hidden_process_that_may_have_inherited_the_pipe_keeps_it(tmp_path):
+    pipe, tick = "pipe:[777]", os.sysconf("SC_CLK_TCK")
+    start = 100_000 * tick
+    target = {"ppid": 929, "start": start, "fds": {1: (pipe, "01")}}
+    shell = {"ppid": 1, "start": start - 10, "fds": {}}                   # Rex's shell: readable
+    cases = {
+        "old service": ({20: {"start": 50, "fds": None}}, True),
+        "kernel thread": ({21: {"ppid": 2, "start": start + 5, "fds": None}}, True),
+        "root cron child of an old daemon": (
+            {22: {"start": 50, "fds": None}, 23: {"ppid": 22, "start": start + 9, "fds": None}}, True),
+        "sudo from a shell (codex | sudo tee)": (
+            {30: shell, 31: {"ppid": 30, "start": start, "fds": None}}, False),
+        "inherited, then detached to init": ({32: {"ppid": 1, "start": start + 3, "fds": None}}, False),
+        "a pipe reader it holds itself": (
+            {10: dict(target, fds={1: (pipe, "01"), 5: (pipe, "0")})}, False),
+        "a reader that reads and writes": ({33: {"start": 50, "fds": {0: (pipe, "02")}}}, False),
+    }
     try:
-        assert fix_orphans.output_abandoned(10, proc)        # a service in another session
-        (proc / "20" / "fd").chmod(0o700)
-        proc = _fake_proc(tmp_path / "b", {10: target, 20: {"session": 40, "fds": None}})
-        assert not fix_orphans.output_abandoned(10, proc)    # `codex | sudo tee`: keep
-        proc = _fake_proc(tmp_path / "c", {10: {"session": 40, "fds": {1: (pipe, "01"), 5: (pipe, "0")}}})
-        assert not fix_orphans.output_abandoned(10, proc)    # it reads its own pipe
-        proc = _fake_proc(tmp_path / "d", {10: target, 30: {"session": 7, "fds": {0: (pipe, "02")}}})
-        assert not fix_orphans.output_abandoned(10, proc)    # a reader that reads and writes
+        for i, (name, (others, abandoned)) in enumerate(cases.items()):
+            procs = {10: target, **others}
+            proc = _fake_proc(tmp_path / str(i), procs)
+            assert fix_orphans.output_abandoned(10, proc) is abandoned, name
     finally:
-        for d in tmp_path.rglob("fd"):
-            d.chmod(0o700)
+        _unlock(tmp_path)
 
 
 def test_a_process_that_only_calls_itself_codex_is_left_alone(world):
@@ -430,22 +433,6 @@ def test_a_process_that_only_calls_itself_codex_is_left_alone(world):
     assert fix_orphans.identity(p.pid)["binary"] == "sleep"
     fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
     assert alive(p) and world.sent == []
-
-
-def test_the_service_around_a_nested_group_is_found(tmp_path):
-    from types import SimpleNamespace
-    asked = []
-
-    def runner(cmd, **kw):
-        asked.append(cmd)
-        return SimpleNamespace(returncode=0, stdout="60\n")
-    user = "/user.slice/user-1000.slice/user@1000.service/app.slice"
-    proc = _cgroup(tmp_path, 60, f"{user}/codex-worker.service/worker")
-    assert fix_orphans.service_main_pid(60, proc, runner)
-    assert asked[-1][1] == "--user" and asked[-1][-1] == "codex-worker.service"
-    proc = _cgroup(tmp_path, 61, f"{user}/t3code-codex-9.scope")
-    assert not fix_orphans.service_main_pid(61, proc, runner)   # user@1000.service's main is 60
-    assert "--user" not in asked[-1] and asked[-1][-1] == "user@1000.service"
 
 
 def test_an_undecided_stop_cut_off_twice_is_still_one_note(world, monkeypatch):
