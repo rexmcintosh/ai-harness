@@ -104,3 +104,32 @@ def test_send_turns_capture_off(tmp_path):
 def test_limit_note_part_way_says_no_retry():
     text = notes.limit_note(1794738000.0, part_way=True)
     assert "part way" in text and "will not be tried again" in text and "\u2014" not in text
+
+
+def _env_probe(tmp_path):
+    log = tmp_path / "env.txt"
+    fake = tmp_path / "tg-send"
+    fake.write_text(f"#!/usr/bin/env bash\ncat >/dev/null\n"
+                    f"echo \"${{TG_ENV:-none}} ${{TELEGRAM_BOT_TOKEN:-none}}\" > '{log}'\n")
+    fake.chmod(0o755)
+    return fake, log
+
+
+def test_send_uses_the_meettrack_bot_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "inherited")
+    fake, log = _env_probe(tmp_path)
+    bot = tmp_path / "telegram.env"
+    bot.write_text("TELEGRAM_BOT_TOKEN=x\n")
+    cfg = load_config(env={"ALERT_WATCH_TG_SEND": str(fake), "ALERT_WATCH_TG_ENV": str(bot)})
+    assert notes.send(cfg, "x") == "accepted"
+    assert log.read_text().split() == [str(bot), "none"]
+
+
+def test_a_missing_bot_file_leaves_the_bot_choice_as_before(tmp_path, monkeypatch):
+    monkeypatch.setenv("TG_ENV", "/inherited.env")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "inherited")
+    fake, log = _env_probe(tmp_path)
+    cfg = load_config(env={"ALERT_WATCH_TG_SEND": str(fake),
+                           "ALERT_WATCH_TG_ENV": str(tmp_path / "missing.env")})
+    assert notes.send(cfg, "x") == "accepted"
+    assert log.read_text().split() == ["/inherited.env", "inherited"]

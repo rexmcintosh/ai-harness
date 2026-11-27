@@ -11,6 +11,9 @@ mode = "diagnose"
 model = "opus"
 projects_dir = "/home/dev/projects"
 tg_send = "/home/dev/projects/ai-harness/bin/tg-send"
+# The bot that sends the notes: the MeetTrack bot's token file (TG_ENV for tg-send).
+# If the file is missing, nothing changes: tg-send picks its bot as before (Bebop on cron).
+tg_env = "/home/dev/.config/meettrack/telegram.env"
 
 run_timeout_s = 3600
 kill_after_s = 30

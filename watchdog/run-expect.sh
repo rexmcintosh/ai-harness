@@ -12,6 +12,13 @@ BASE="$(cd "$DIR/.." && pwd)"
 LOG_DIR="${WATCHDOG_LOG_DIR:-$DIR/logs}"
 ENV_FILE="${WATCHDOG_ENV_FILE:-/home/dev/projects/splash_poller/.env}"
 TG_SEND="${WATCHDOG_TG_SEND:-$BASE/bin/tg-send}"
+# Meet alerts come from the MeetTrack bot. If its token file is missing, nothing
+# changes: tg-send picks its bot as before (Bebop on cron).
+MEETTRACK_TG_ENV="${MEETTRACK_TG_ENV:-$HOME/.config/meettrack/telegram.env}"
+if [ -f "$MEETTRACK_TG_ENV" ]; then
+  export TG_ENV="$MEETTRACK_TG_ENV"
+  unset TELEGRAM_BOT_TOKEN  # a token in the environment would win over TG_ENV
+fi
 # Same default as expect_run.py; override both with WATCHDOG_CHAT_ID.
 CHAT_ID="${WATCHDOG_CHAT_ID:-7735693897}"
 export WATCHDOG_CHAT_ID="$CHAT_ID"

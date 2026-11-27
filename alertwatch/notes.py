@@ -81,6 +81,9 @@ def send(cfg, text: str) -> str:
     # Not captured at all (the run record keeps the text); the tag is a second guard.
     env = {**os.environ, "ALERT_SOURCE": "alert-watch", "ALERT_INBOX_DIR": "off",
            "TG_SEND_RECEIPT_OUTPUT": "1"}
+    if cfg.tg_env and os.path.isfile(cfg.tg_env):
+        env["TG_ENV"] = cfg.tg_env
+        env.pop("TELEGRAM_BOT_TOKEN", None)  # a token in the environment would win over TG_ENV
     try:
         proc = subprocess.run([cfg.tg_send, cfg.chat_id, "-"], input=text, text=True,
                               capture_output=True, env=env, timeout=60)

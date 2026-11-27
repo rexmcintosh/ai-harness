@@ -39,6 +39,7 @@ class Config:
     denied_paths: tuple[str, ...]
     rerun: dict[str, RerunJob]
     tg_send: str
+    tg_env: str
     claude_bin: str
     worktrees_dir: Path
     meettrack_run_dir: Path
@@ -74,6 +75,7 @@ def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) 
         denied_paths=tuple(str(p) for p in raw["denied_paths"]),
         rerun=rerun,
         tg_send=env.get("ALERT_WATCH_TG_SEND") or str(raw["tg_send"]),
+        tg_env=env.get("ALERT_WATCH_TG_ENV") or str(raw.get("tg_env") or ""),
         claude_bin=env.get("ALERT_WATCH_CLAUDE") or "claude",
         worktrees_dir=Path(state) / "worktrees",
         meettrack_run_dir=Path(str(raw["meettrack_run_dir"])),
