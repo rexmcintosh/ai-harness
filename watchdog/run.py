@@ -240,7 +240,8 @@ def _supabase_rows(url: str, key: str, path: str, error: dict | None = None) -> 
 # migrations/2026-09-18_meet_registry_tick_coverage.sql), so production may not
 # have them yet.
 _MEET_COLS = ("sr_meet_id,name,nation,feed_type,ingest_status,last_ingest_at,updated_at,"
-              "start_date,end_date")
+              "start_date,end_date,poller_started_at")  # poller_started_at: since the
+                                                        # 2026-06-15 supervisor, not new
 _MEET_COVERAGE_COLS = ("events_published,events_with_results,last_tick_errors,"
                        "coverage_at")
 # PostgREST 12 answers a missing column with 400 PGRST204; older builds pass

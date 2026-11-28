@@ -61,6 +61,18 @@ def test_recent_failed_is_crit_even_at_night():
     assert s.level == "crit" and "FAILED" in s.summary
 
 
+def test_failed_meet_age_comes_from_its_last_launch_not_updated_at():
+    # 11531: failed 8 Nov, but discover_meets.py rewrites updated_at every hour.
+    now = _now(15)
+    row = {"sr_meet_id": "11531", "name": "B", "ingest_status": "failed",
+           "updated_at": _iso(now, 10), "poller_started_at": _iso(now, 20 * 24 * 60)}
+    assert check_meet_freshness([row], now).level == "ok"
+    row["poller_started_at"] = _iso(now, 30)
+    assert check_meet_freshness([row], now).level == "crit"
+    row["poller_started_at"] = None          # never launched: updated_at, as before
+    assert check_meet_freshness([row], now).level == "crit"
+
+
 def test_old_failed_and_ended_meets_are_ok():
     now = _now(15)
     rows = [

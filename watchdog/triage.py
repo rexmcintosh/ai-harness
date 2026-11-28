@@ -696,7 +696,11 @@ def check_meet_freshness(rows, now_epoch, *,
         status = r.get("ingest_status")
         name = r.get("name") or r.get("sr_meet_id")
         if status == "failed":
-            upd = _iso_epoch(r.get("updated_at"))
+            # When it failed: the supervisor marks a meet failed at its last
+            # launch (poller_started_at). updated_at is no clock for this:
+            # discover_meets.py rewrites it every hour, so 11531 (failed 8 Nov)
+            # read as "failed in the last 24h" for weeks.
+            upd = _iso_epoch(r.get("poller_started_at")) or _iso_epoch(r.get("updated_at"))
             if upd is not None and (now_epoch - upd) < 24 * 3600:
                 failed.append(f"{r.get('sr_meet_id')} {name}")
             continue
