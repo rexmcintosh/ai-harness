@@ -209,6 +209,11 @@ class Snapshot:
     thin_skipped: dict = field(default_factory=dict)     # "11113" -> thin events whose ids
                                                          # could not be queried safely
     read_errors: dict = field(default_factory=dict)      # "11113" -> ["events: HTTP 500"]
+    startlist_heats: dict = field(default_factory=dict)  # "11175" -> start-list rows in the
+                                                         # database, for meets whose registry
+                                                         # row has no entries_ingested_at
+    startlist_unread: dict = field(default_factory=dict) # "11175" -> why those rows could
+                                                         # not be read (the check is not judged)
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +473,20 @@ def eval_startlist(row: dict, snap: Snapshot, cfg: dict, tz) -> list[Expectation
     if loaded is not None:
         return [Expectation(eid, "startlist", label(row), expected, deadline, "met", "warn",
                             f"start list loaded {hm_day(loaded, tz, snap.now)}",
+                            window="always", sr_meet_id=sid)]
+    seeded = snap.startlist_heats.get(sid, 0)
+    if seeded > 0:
+        # The PDF live writer seeds the start list itself and never stamps
+        # entries_ingested_at (only ingest_entries.py does): rows in the database
+        # are the proof. Quarteira (11175) nagged for a day with 720 rows loaded.
+        return [Expectation(eid, "startlist", label(row), expected, deadline, "met", "warn",
+                            f"start list in the database ({seeded} entries), loaded by "
+                            "the live writer", window="always", sr_meet_id=sid)]
+    if sid in snap.startlist_unread:
+        # No proof either way: not judged, so an open alert stays open and a met
+        # one does not flip to missed on one failed read.
+        return [Expectation(eid, "startlist", label(row), expected, deadline, "unknown", "warn",
+                            f"not judged: start-list rows not read ({snap.startlist_unread[sid]})",
                             window="always", sr_meet_id=sid)]
     if snap.now >= start:
         return [Expectation(eid, "startlist", label(row), expected, deadline, "closed", "warn",

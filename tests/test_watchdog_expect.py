@@ -2215,3 +2215,99 @@ def test_snapshot_reads_each_events_newest_due_heat_with_its_counts():
             "&last_due.order=scheduled_at.desc&last_due.limit=1") in ev_q
     assert [e["due_slot"] for e in s.events["11115"]] == [at("12:23", D8), None]
     assert not [p for p in calls if p.startswith("heats?")]
+
+
+# --- start lists seeded by the live writer (Quarteira 11175, 27 Nov 2026) ---
+
+def test_start_list_seeded_by_the_writer_is_met_without_entries_ingested_at():
+    row = reg("11175", start_date=NEXT, end_date=NEXT, entries_requested_at=None,
+              entries_ingested_at=None, ingest_status="polling", feed_type="pdf")
+    cfg = make_config({"startlist_scope": "all"})
+    s = snap(at("22:30"), [row])
+    assert by_id(evaluate(s, cfg, {})[0])["startlist:11175"].status == "missed"
+    s.startlist_heats["11175"] = 720
+    e = by_id(evaluate(s, cfg, {})[0])["startlist:11175"]
+    assert e.status == "met" and "720 entries" in e.evidence
+    s.startlist_heats["11175"] = 0          # a meets row with no start-list rows yet
+    assert by_id(evaluate(s, cfg, {})[0])["startlist:11175"].status == "missed"
+
+
+def _seed_rest(rows, meets_reply, calls):
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return rows, None
+            if path.startswith("meets?select=live_rankings_id,events"):
+                return meets_reply
+            return [], None
+    return FakeRest()
+
+
+def test_snapshot_counts_start_list_rows_only_for_meets_without_a_stamp():
+    calls = []
+    rows = [reg("11175", start_date=NEXT, end_date=NEXT, entries_ingested_at=None,
+                entries_requested_at=iso(at("09:00")), ingest_status="polling"),
+            reg("11113", start_date=NEXT, end_date=NEXT),                 # stamped
+            reg("11200", start_date=NEXT, end_date=NEXT, entries_ingested_at=None,
+                entries_requested_at=iso(at("09:00")), ingest_status="finished")]
+    reply = ([{"live_rankings_id": "sr-11175",
+               "events": [{"heats": [{"count": 700}]}, {"heats": [{"count": 20}]}, {"heats": []}]}],
+             None)
+    s = er.build_snapshot(at("20:00"), CFG, RUN_CFG, _seed_rest(rows, reply, calls), ps=lambda: "")
+    q = [p for p in calls if p.startswith("meets?select=live_rankings_id,events")]
+    assert q == ["meets?select=live_rankings_id,events(heats(count))&live_rankings_id=in.(sr-11175)"]
+    assert s.startlist_heats == {"11175": 720}
+
+
+def test_a_failed_start_list_row_read_is_not_judged_and_flags_nothing_else():
+    rows = [reg("11175", start_date=NEXT, end_date=NEXT, entries_ingested_at=None,
+                entries_requested_at=iso(at("09:00")), ingest_status="polling")]
+    s = er.build_snapshot(at("22:30"), CFG, RUN_CFG,
+                          _seed_rest(rows, (None, "ReadTimeout"), []), ps=lambda: "")
+    assert s.startlist_heats == {} and s.read_errors == {}
+    assert s.startlist_unread == {"11175": "ReadTimeout"}
+    e = by_id(evaluate(s, CFG, {})[0])["startlist:11175"]
+    assert e.status == "unknown" and "ReadTimeout" in e.evidence
+
+
+def test_a_failed_read_does_not_flip_a_met_start_list_to_a_new_alert():
+    row = reg("11175", start_date=NEXT, end_date=NEXT, entries_ingested_at=None,
+              entries_requested_at=iso(at("09:00")), ingest_status="polling")
+    s = snap(at("22:30"), [row])
+    s.startlist_heats["11175"] = 720
+    exps, _ = evaluate(s, CFG, {})
+    _, state = plan(exps, {}, at("22:30"), POLICY, racing_now=False)
+    s2 = snap(at("22:35"), [row])
+    s2.startlist_unread["11175"] = "ReadTimeout"
+    exps, _ = evaluate(s2, CFG, {})
+    notices, _ = plan(exps, state, at("22:35"), POLICY, racing_now=False)
+    assert [n for n in notices if n.id == "startlist:11175"] == []
+
+
+def test_start_list_rows_are_read_in_chunks_and_the_first_failure_stops_the_reads():
+    calls = []
+    rows = [reg(str(12000 + i), start_date=NEXT, end_date=NEXT, entries_ingested_at=None,
+                entries_requested_at=iso(at("09:00")), ingest_status="discovered")
+            for i in range(25)]
+
+    class FakeRest:
+        def get(self, path, timeout, count=False):
+            calls.append(path)
+            if path.startswith("meet_registry?select=sr_meet_id&limit=1"):
+                return [{"sr_meet_id": "1"}], None
+            if path.startswith("meet_registry"):
+                return rows, None
+            if path.startswith("meets?select=live_rankings_id,events"):
+                if "sr-12020" in path:
+                    return None, "ReadTimeout"
+                return [{"live_rankings_id": "sr-12004",
+                         "events": [{"heats": [{"count": 0}, {"count": 15}]}]}], None
+            return [], None
+    s = er.build_snapshot(at("20:00"), CFG, RUN_CFG, FakeRest(), ps=lambda: "")
+    q = [p for p in calls if p.startswith("meets?select=live_rankings_id,events")]
+    assert len(q) == 2 and q[1].endswith("in.(sr-12020,sr-12021,sr-12022,sr-12023,sr-12024)")
+    assert sorted(s.startlist_unread) == [str(12020 + i) for i in range(5)]
+    assert s.startlist_heats == {"12004": 15}          # the counts add up

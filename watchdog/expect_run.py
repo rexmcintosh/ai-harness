@@ -177,6 +177,7 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
         snap.registry_error = err
         return snap
     snap.registry = rows
+    _read_seeded_start_lists(snap, rows, cfg, run_cfg["read_timeout_s"], rest)
     live = []
     for r in rows:
         if not valid_sid(r.get("sr_meet_id")):
@@ -247,6 +248,52 @@ def build_snapshot(now: float, cfg: dict, run_cfg: dict, rest: Rest, ps=_ps) -> 
                         f"&end_date=lt.{cutoff}&order=end_date", timeout=run_cfg["read_timeout_s"])
     snap.stale_active = stale or []
     return snap
+
+
+def _read_seeded_start_lists(snap: Snapshot, rows: list, cfg: dict, timeout, rest: Rest) -> None:
+    """Count start-list rows (heats) for meets whose registry row has no
+    entries_ingested_at, so a start list the live writer seeded is not reported
+    missing. One read for all of them; on a failure those checks are not judged."""
+    open_ = [str(r["sr_meet_id"]) for r in rows
+             if valid_sid(r.get("sr_meet_id")) and r.get("start_date")
+             and r.get("entries_ingested_at") is None
+             and r.get("ingest_status") not in ("finished", "unsupported", "failed")
+             and (r.get("entries_requested_at") is not None or cfg["startlist_scope"] == "all")]
+    if not open_:
+        return
+    for i in range(0, len(open_), _SEEDED_CHUNK):
+        chunk = open_[i:i + _SEEDED_CHUNK]
+        ids = ",".join(meets_id(sid) for sid in chunk)
+        meets, err = rest.get(f"meets?select=live_rankings_id,events(heats(count))"
+                              f"&live_rankings_id=in.({ids})", timeout=timeout)
+        if not isinstance(meets, list):
+            # Only the start-list check is affected (not read_errors, which would
+            # stop the results checks for a live meet). Stop at the first failure:
+            # one timeout at most, not one per chunk.
+            for sid in open_[i:]:
+                snap.startlist_unread[sid] = err or "no reply"
+            return
+        by_lr = {m.get("live_rankings_id"): m for m in meets if isinstance(m, dict)}
+        for sid in chunk:
+            m = by_lr.get(meets_id(sid))
+            if m:          # no meets row yet: no rows seeded, the check judges as before
+                snap.startlist_heats[sid] = sum(_count(e.get("heats"))
+                                                for e in (m.get("events") or [])
+                                                if isinstance(e, dict))
+
+
+_SEEDED_CHUNK = 20
+
+
+def _count(v) -> int:
+    """An embedded `heats(count)`: PostgREST gives one {"count": n}; any others add up."""
+    total = 0
+    for c in (v if isinstance(v, list) else []):
+        try:
+            total += int(c.get("count") or 0) if isinstance(c, dict) else 0
+        except (TypeError, ValueError):
+            pass
+    return total
 
 
 # Meet and event ids go into PostgREST filters: plain ids only. Both columns
