@@ -225,6 +225,8 @@ def test_real_orphans_found_live_only_the_abandoned_one_is_stopped(tmp_path, mon
     try:
         if not fix_orphans.is_reaper(a_ident["ppid"]):
             pytest.skip(f"adopted by pid {a_ident['ppid']}, not init or a user manager")
+        if fix_orphans.in_service(abandoned):
+            pytest.skip("pytest runs inside a systemd service, where the fixer never acts")
         assert fix_orphans.output_abandoned(abandoned) and not fix_orphans.output_abandoned(to_file)
         fix_orphans.main(["--only-pid", str(to_file), "--min-hours", "0"])
         assert sent == [] and fix_orphans.identity(to_file)["start"] == f_ident["start"]
