@@ -113,3 +113,5 @@ def test_only_the_orphan_fixer_says_stopped():
     assert classify(entry(src, "PROBLEM: a leftover Codex process did not stop"), RULES)[0] == "look"
     assert classify(entry(src, "FIXED: x"), RULES)[0] == "look"
     assert classify(entry("python3 watchdog.fix_backup < CRON", "STOPPED: x"), RULES)[0] == "look"
+    for near in ("python3 watchdog.fix_orphans_other < CRON", "python3 my_fix_orphans.py < CRON"):
+        assert classify(entry(near, "STOPPED: x"), RULES)[0] == "look", near

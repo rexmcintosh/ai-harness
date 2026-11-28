@@ -213,7 +213,9 @@ def _ancestors() -> set:
 def _hidden_cannot_hold(pid: str, oldest_holder: int, proc: Path, mine: set, memo: dict,
                         depth: int = 0) -> bool:
     """True when a process we cannot look into cannot hold a pipe made at
-    `oldest_holder`: a kernel thread, this fixer or one of its parents, a process older
+    `oldest_holder`. It must sit in another control group than the target (a holder
+    that inherited the pipe along with it normally shares its group), and also be a
+    kernel thread, this fixer or one of its parents, a process older
     than the pipe, or a newer one whose parent cannot hold it either (fds are inherited
     from the parent: a root cron or sshd child of an old daemon). A newer one adopted by
     init (it may have inherited the pipe, then detached) or started by a process we can
@@ -228,11 +230,37 @@ def _hidden_cannot_hold(pid: str, oldest_holder: int, proc: Path, mine: set, mem
         ppid, flags, started = fields[1], int(fields[6]), int(fields[19])
     except (ValueError, IndexError):
         return False
-    if ppid in ("0", "2") or flags & 0x00200000 or pid in mine or started < oldest_holder:
+    if ppid in ("0", "2") or flags & 0x00200000:
+        memo[pid] = True                         # a kernel thread
+        return True
+    group = _cgroup_path(proc / pid)
+    target_group = memo.get("@target-group")
+    if group is None or target_group is None or _related(group, target_group):
+        return False                             # same group as the target, or unknown
+    if pid in mine or started < oldest_holder:
         memo[pid] = True
     elif ppid != "1" and not _readable_fds(proc / ppid):
         memo[pid] = _hidden_cannot_hold(ppid, oldest_holder, proc, mine, memo, depth + 1)
     return memo[pid]
+
+
+def _cgroup_path(entry: Path) -> str | None:
+    try:
+        lines = (entry / "cgroup").read_text().splitlines()
+    except OSError:
+        return None
+    return next((ln.split(":", 2)[2] for ln in lines if ln.startswith("0::")), None)
+
+
+def _related(a: str, b: str) -> bool:
+    """The same control group, or one inside the other. A process starts in its
+    parent's group and only a privileged manager moves it, so a hidden process that
+    inherited the pipe along with the target is normally in the target's group."""
+    if a == b:
+        return True
+    if "/" in (a, b):
+        return False                             # the top group holds only kernel threads
+    return a.startswith(b.rstrip("/") + "/") or b.startswith(a.rstrip("/") + "/")
 
 
 def _readable_fds(entry: Path) -> bool:
@@ -270,7 +298,7 @@ def output_abandoned(pid: int, proc: Path | None = None) -> bool:
     except (TypeError, ValueError, IndexError):
         return False
     mine = _ancestors() if proc == PROC else set()
-    memo: dict = {}
+    memo: dict = {"@target-group": _cgroup_path(proc / str(pid))}
     try:
         entries = [d for d in proc.iterdir() if d.name.isdigit()]
     except OSError:
@@ -434,6 +462,9 @@ def main(argv=None) -> int:
         pid = int(pid_text)
         if minutes < 0 or (args.only_pid is not None and pid != args.only_pid):
             continue                     # never act on an age we cannot read
+        first = identity(pid)
+        if not first or first["uid"] != os.getuid():
+            continue                     # gone, or another user's: never ours to judge
         try:
             pidfd = os.pidfd_open(pid)
         except ProcessLookupError:

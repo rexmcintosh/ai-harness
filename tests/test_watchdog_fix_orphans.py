@@ -386,6 +386,8 @@ def _fake_proc(tmp_path, procs):
         fields = (["S", str(info.get("ppid", 1)), "0", "0", "0", "0", str(info.get("flags", 0))]
                   + ["0"] * 12 + [str(info.get("start", 100))] + ["0"] * 10)
         (d / "stat").write_text(f"{pid} (x) " + " ".join(fields) + "\n")
+        if info.get("cg", "") is not None:
+            (d / "cgroup").write_text(f"0::{info.get('cg', '/system.slice/other.service')}\n")
         (d / "fd").mkdir()
         for fd, (target, flags) in (info.get("fds") or {}).items():
             os.symlink(target, d / "fd" / str(fd))
@@ -403,7 +405,8 @@ def _unlock(tmp_path):
 def test_a_hidden_process_that_may_have_inherited_the_pipe_keeps_it(tmp_path):
     pipe, tick = "pipe:[777]", os.sysconf("SC_CLK_TCK")
     start = 100_000 * tick
-    target = {"ppid": 929, "start": start, "fds": {1: (pipe, "01")}}
+    scope = "/user.slice/user-1000.slice/user@1000.service/app.slice/t3code-codex-1.scope"
+    target = {"ppid": 929, "start": start, "fds": {1: (pipe, "01")}, "cg": scope}
     shell = {"ppid": 1, "start": start - 10, "fds": {}}                   # Rex's shell: readable
     cases = {
         "old service": ({20: {"start": 50, "fds": None}}, True),
@@ -416,6 +419,9 @@ def test_a_hidden_process_that_may_have_inherited_the_pipe_keeps_it(tmp_path):
         "a pipe reader it holds itself": (
             {10: dict(target, fds={1: (pipe, "01"), 5: (pipe, "0")})}, False),
         "a reader that reads and writes": ({33: {"start": 50, "fds": {0: (pipe, "02")}}}, False),
+        "an old hidden process in the target's own group": (
+            {34: {"start": 50, "fds": None, "cg": scope}}, False),
+        "a hidden process whose group cannot be read": ({35: {"start": 50, "fds": None, "cg": None}}, False),
     }
     try:
         for i, (name, (others, abandoned)) in enumerate(cases.items()):
@@ -463,3 +469,14 @@ def test_an_undecided_stop_cut_off_twice_is_still_one_note(world, monkeypatch):
     fix_orphans.main([])
     fix_orphans.main([])
     assert len(world.sent) == 1 and "cut off" in world.sent[0]
+
+
+def test_another_users_codex_never_reaches_the_pidfd(world, monkeypatch):
+    p = world.start()
+    world.rows.append((p.pid, "05:10:00", f"{world.decoy} 300"))
+    monkeypatch.setattr(fix_orphans, "identity", lambda pid, proc=None: dict(
+        state="S", ppid=1, start=0, exe="codex", binary="codex", uid=os.getuid() + 1))
+    opened = []
+    monkeypatch.setattr(fix_orphans.os, "pidfd_open", lambda pid: opened.append(pid) or 0)
+    fix_orphans.main(["--only-pid", str(p.pid), "--min-hours", "0"])
+    assert opened == [] and world.sent == []
