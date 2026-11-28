@@ -168,8 +168,15 @@ class BackupTests(unittest.TestCase):
                 time.sleep(0.005)
             proc.kill()
             proc.wait()
-            if any(locks.iterdir()):
-                return
+            for lock in list(locks.iterdir()):
+                # A kill during the write leaves a half-written lock. restic cannot read
+                # it, so it blocks nothing; only a whole lock makes the test's point.
+                whole = subprocess.run(['/usr/bin/restic', '--no-cache', '--no-lock', 'cat', 'lock',
+                                        lock.name], env=env, capture_output=True).returncode == 0
+                if whole:
+                    return
+                lock.chmod(0o600)
+                lock.unlink()
         self.fail('could not leave a stale lock')
 
     def test_stale_lock_from_killed_run_is_cleared_before_backup(self):

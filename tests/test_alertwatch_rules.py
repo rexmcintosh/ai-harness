@@ -105,3 +105,13 @@ def test_no_ai_fixer_success_notes_are_ignored_and_problems_looked_at():
         assert classify(entry(src, "PROBLEM: it needs a look"), RULES)[0] == "look"
     # The rerun job's own messages are not the fixer's notes.
     assert classify(entry("fix-jobs-rerun:coverage_check", "RERAN: x"), RULES)[0] == "look"
+
+
+def test_only_the_orphan_fixer_says_stopped():
+    src = "python3 watchdog.fix_orphans < CRON"
+    assert classify(entry(src, "STOPPED: a leftover Codex process"), RULES)[0] == "ignore"
+    assert classify(entry(src, "PROBLEM: a leftover Codex process did not stop"), RULES)[0] == "look"
+    assert classify(entry(src, "FIXED: x"), RULES)[0] == "look"
+    assert classify(entry("python3 watchdog.fix_backup < CRON", "STOPPED: x"), RULES)[0] == "look"
+    for near in ("python3 watchdog.fix_orphans_other < CRON", "python3 my_fix_orphans.py < CRON"):
+        assert classify(entry(near, "STOPPED: x"), RULES)[0] == "look", near

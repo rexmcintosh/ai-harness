@@ -48,6 +48,14 @@ action = "ignore"
 source = "watchdog\\.(fix_backup|fix_jobs|cleanup)|(fix_backup|fix_jobs|cleanup)\\.py"
 text = "^(FIXED|STARTED|RERAN|CLEANED): "
 
+# watchdog.fix_orphans says STOPPED after it ends a leftover Codex process. Only its
+# own STOPPED lines are ignored; its PROBLEM lines are looked at.
+[[rule]]
+name = "fix-orphans-done"
+action = "ignore"
+source = "(^|[ /])watchdog\\.fix_orphans( |$)|(^|/)fix_orphans\\.py( |$)"
+text = "^STOPPED: "
+
 # The Monday all-well line (watchdog/weekly.py). Its problems are already raised by
 # the watchdog's own checks, so the summary itself is never a report.
 [[rule]]
