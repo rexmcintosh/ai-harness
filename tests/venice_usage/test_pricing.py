@@ -1,8 +1,10 @@
 """What the price table must be able to say, and what it must refuse to say.
 
-Every figure asserted here was read from Venice's live catalogue on 2026-09-12
+Every figure asserted here was read from Venice's live catalogue on 2026-11-28
 (`GET /api/v1/models`) and cross-checked against the billed SKUs for
-2026-08-22..2026-09-13 (`GET /billing/usage-history`). None of it is from memory.
+2026-08-30..2026-11-29 (`GET /billing/usage-history`). None of it is from memory.
+Venice cut most Claude and OpenAI prices between 2026-10-11 and 2026-11-08; the
+bills show the new rates (claude-opus-4-8 at 5.00/25.00 from 2026-10-15).
 """
 import pytest
 
@@ -13,11 +15,12 @@ from venice_usage.pricing import (TEXT_PRICES, age_days, basis_line, estimate_us
 
 # ------------------------------------------------------------- the numbers --
 def test_the_chair_is_priced_at_what_venice_bills_not_the_old_seed():
-    # The seed said 15.00/75.00. Venice bills 6.00/30.00 — the seed was 2.5x high,
-    # and that error was published in an audit before it was caught.
-    assert price_row("claude-opus-4-8")["input"] == 6.0
-    assert price_row("claude-opus-4-8")["output"] == 30.0
-    assert estimate_usd("claude-opus-4-8", 1_000_000, 1_000_000) == 36.0
+    # The seed said 15.00/75.00. Venice billed 6.00/30.00 in September (the seed
+    # was 2.5x high, and that error was published in an audit before it was
+    # caught) and bills 5.00/25.00 since 2026-10-15.
+    assert price_row("claude-opus-4-8")["input"] == 5.0
+    assert price_row("claude-opus-4-8")["output"] == 25.0
+    assert estimate_usd("claude-opus-4-8", 1_000_000, 1_000_000) == 30.0
 
 
 def test_deepseek_pro_is_priced_at_what_venice_bills_not_the_old_seed():
@@ -28,11 +31,13 @@ def test_deepseek_pro_is_priced_at_what_venice_bills_not_the_old_seed():
 
 def test_the_other_two_seeded_models_were_also_wrong():
     assert (price_row("claude-sonnet-4-6")["input"],
-            price_row("claude-sonnet-4-6")["output"]) == (3.6, 18.0)   # seed said 3.0/15.0
+            price_row("claude-sonnet-4-6")["output"]) == (3.0, 15.0)
+    # The seed said 3.0/15.0 when Venice billed 3.6/18.0. Venice has since cut
+    # the price to 3.0/15.0, so the seed's number is right again, by accident.
 
 
 def test_rounds_to_six_places():
-    assert estimate_usd("claude-opus-4-8", 1000, 0) == round(1000 / 1e6 * 6.0, 6)
+    assert estimate_usd("claude-opus-4-8", 1000, 0) == round(1000 / 1e6 * 5.0, 6)
 
 
 def test_an_unknown_model_is_not_guessed_at():
@@ -42,7 +47,7 @@ def test_an_unknown_model_is_not_guessed_at():
 
 def test_text_prices_still_exposes_input_output_pairs():
     # Back-compat: the old module's only public data structure still resolves.
-    assert TEXT_PRICES["claude-opus-4-8"] == (6.0, 30.0)
+    assert TEXT_PRICES["claude-opus-4-8"] == (5.0, 25.0)
 
 
 # -------------------------------------------------------------- the ledger --
@@ -83,9 +88,11 @@ def test_ledger_ids_the_catalogue_never_published_are_named_not_hidden():
 
 # --------------------------------------------------------------- the cache --
 def test_the_anthropic_family_bills_ttl_segmented_cache_writes():
-    # 6.00 = 2.00x its 3.00 input, against 3.75 = 1.25x for the 5m.
+    # 2.50 = 1.25x its 2.00 input for the 5m. The 1h rate is the last one billed
+    # (6.00, at the old 3.00 input); no 1h write has been billed since the cut,
+    # and the table never derives one.
     row = price_row("claude-sonnet-5")
-    assert row["cache_write_5m"] == 3.75
+    assert row["cache_write_5m"] == 2.5
     assert row["cache_write_1h"] == 6.0
     assert "cache_write" not in row
 
@@ -120,16 +127,16 @@ def test_the_one_hour_rates_are_exactly_the_billed_ones():
 
 def test_a_model_outside_the_anthropic_family_bills_one_un_suffixed_write():
     row = price_row("openai-gpt-56-sol")
-    assert row["cache_write"] == 3.125
+    assert row["cache_write"] == 5.0
     assert "cache_write_5m" not in row and "cache_write_1h" not in row
 
 
 def test_cache_reads_are_not_uniform_inside_a_family_and_are_not_corrected():
-    # Same 12.00 input. fable-5 reads at 0.1x, fable-5-1 at 0.025x. Billed fact.
+    # Same 10.00 input. fable-5 reads at 0.1x, fable-5-1 at 0.025x. Catalogue fact.
     five, five_one = price_row("claude-fable-5"), price_row("claude-fable-5-1")
-    assert five["input"] == five_one["input"] == 12.0
-    assert five["cache_read"] == 1.2
-    assert five_one["cache_read"] == 0.3
+    assert five["input"] == five_one["input"] == 10.0
+    assert five["cache_read"] == 1.0
+    assert five_one["cache_read"] == 0.25
 
 
 def test_where_the_catalogue_publishes_no_cache_write_none_is_invented():
@@ -140,7 +147,7 @@ def test_where_the_catalogue_publishes_no_cache_write_none_is_invented():
 
 def test_the_receipts_behind_the_cache_shapes_are_kept():
     assert pt.BILLED["claude-sonnet-5"]["cache_write_1h"] == 6.0
-    assert pt.BILLED["openai-gpt-56-sol"]["cache_write"] == 3.125
+    assert pt.BILLED["openai-gpt-56-sol"]["cache_write"] == 5.0
 
 
 # ------------------------------------------------------------- staleness ----

@@ -11,6 +11,7 @@ import json
 import pytest
 
 import venice_usage.cli as cli
+from venice_usage import price_table as pt
 from venice_usage.ledger import append, connect, query_rollup
 
 
@@ -57,8 +58,11 @@ def test_the_current_basis_values_rows_from_the_live_table(tmp_path):
     _seed(db)
     rows = {r["project"]: r for r in
             query_rollup(db_path=db, group_by=("project",), price_basis="current")}
-    # 1 Mtok into opus at 6.00 + 1 Mtok into grok at 1.42 — grok was 0 before.
-    assert rows["council"]["usd"] == pytest.approx(7.42)
+    # 1 Mtok into opus + 1 Mtok into grok, both at today's table rates. grok
+    # was stored as 0. Read from the table so a price refresh does not break this.
+    live = pt.PRICES["claude-opus-4-8"]["input"] + pt.PRICES["grok-4-3"]["input"]
+    assert rows["council"]["usd"] == pytest.approx(live)
+    assert live != 15.0                               # not the stored value
 
 
 def test_a_model_the_table_cannot_price_keeps_its_operator_supplied_usd(tmp_path):
