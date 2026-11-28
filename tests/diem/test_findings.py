@@ -179,8 +179,10 @@ def test_ack_unknown_and_ambiguous_ids(tmp_path):
 def test_backfill_reads_recent_outputs_once(tmp_path):
     state = tmp_path / "state"
     outputs = tmp_path / "out"
+    now = datetime(2026, 9, 28)
     old = _write_review(tmp_path, id_="0" * 32)
-    t_old = time.time() - 20 * 86400
+    t_old = now.timestamp() - 20 * 86400       # 20 days before the test's own "now",
+                                               # not the real clock (it broke after 2026-10-04)
     os.utime(old, (t_old, t_old))
     _write_review(tmp_path, repo="aris-management-website", id_="1" * 32,
                   rec="Approve. Fine.")
@@ -191,7 +193,6 @@ def test_backfill_reads_recent_outputs_once(tmp_path):
         "id": "2" * 32, "type": "review", "created": "2026-09-24T21:00:00",
         "payload": {"repo": "/home/dev/projects/ultimate-portugal",
                     "range": "c1..c2", "head": "c2"}}))
-    now = datetime(2026, 9, 28)
     assert backfill(state, outputs, days=14, now=now) == 1
     recs = Findings(state).all()
     assert [(r["repo"], r["reviewed"], r["date"]) for r in recs] == \

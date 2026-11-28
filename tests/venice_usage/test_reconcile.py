@@ -7,6 +7,7 @@ import sqlite3
 
 import pytest
 
+from venice_usage import price_table as pt
 from venice_usage import reconcile as rc
 
 
@@ -74,7 +75,9 @@ def test_the_summary_values_the_ledger_side_from_the_current_table():
     row = {"ts": "2026-09-04T03:10:02", "model": "claude-opus-4-8",
            "tokens_in": 1_000_000, "tokens_out": 0, "usd": 15.0}
     pair = [(row, rc.fold_requests(BILLED)[0])]
-    assert rc.summarise(pair, [])["ledger"] == pytest.approx(6.0)          # live rate
+    live = pt.PRICES["claude-opus-4-8"]["input"]                          # live rate
+    assert live != 15.0
+    assert rc.summarise(pair, [])["ledger"] == pytest.approx(live)
     assert rc.summarise(pair, [], price_basis="stored")["ledger"] == \
         pytest.approx(15.0)                                                # as written
 
